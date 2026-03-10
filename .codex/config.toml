@@ -1,0 +1,24 @@
+personality = "pragmatic"
+model = "gpt-5.3-codex"
+model_reasoning_effort = "high"
+project_doc_fallback_filenames = ["CLAUDE.md", "COPILOT.md"]
+
+# Add your project paths here:
+# [projects."/path/to/project"]
+# trust_level = "trusted"
+
+[features]
+search_tool = true
+multi_agent = true
+
+[tui]
+status_line = ["model-with-reasoning", "current-dir", "context-remaining", "five-hour-limit", "weekly-limit", "session-id"]
+
+# Skills are machine-specific. Add [[skills.config]] entries with absolute paths
+# to SKILL.md files on your machine, e.g.:
+# [[skills.config]]
+# path = "/path/to/skills/my-skill/SKILL.md"
+# enabled = true
+
+[notice.model_migrations]
+"gpt-5.2" = "gpt-5.3-codex"

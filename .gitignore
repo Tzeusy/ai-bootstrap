@@ -1,0 +1,48 @@
+# === Claude Code ===
+.claude/*
+!.claude/CLAUDE.md
+!.claude/settings.json
+!.claude/statusline.sh
+!.claude/config.json
+!.claude/plugins/
+.claude/plugins/*
+!.claude/plugins/marketplaces/
+.claude/plugins/marketplaces/*
+!.claude/plugins/marketplaces/claude-plugins-official/
+
+# === Codex ===
+.codex/skills
+.codex/sqlite
+.codex/vendor_imports
+.codex/.codex-global-state.json
+.codex/auth.json
+.codex/history.jsonl
+.codex/log
+.codex/tmp
+.codex/sessions
+.codex/models_cache.json
+.codex/version.json
+.codex/state_*
+.codex/shell_snapshots/
+
+# === Gemini ===
+.gemini/tmp
+.gemini/antigravity
+.gemini/skills
+.gemini/installation_id
+.gemini/google_accounts.json
+.gemini/oauth_creds.json
+.gemini/state.json
+.gemini/trustedFolders.json
+.gemini/history/
+
+# === GitHub ===
+.github/skills
+
+# === Python ===
+__pycache__/
+*.pyc
+.venv/
+
+# === Private / machine-specific ===
+skills/homelab-opentelemetry/

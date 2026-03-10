@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cruft Cleanup"
+  short_description: "Kill shims, keep only new code paths"
+  default_prompt: "Review changes and eliminate backward-compatibility shims, dead code paths, or legacy wrappers"

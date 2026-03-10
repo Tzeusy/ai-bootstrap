@@ -1,0 +1,2 @@
+prefix_rule(pattern=["kubectl"], decision="allow")
+prefix_rule(pattern=["helm"], decision="allow")
