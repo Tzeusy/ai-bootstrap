@@ -172,10 +172,9 @@ Every epic **must** include a final child bead that performs a deep-dive spec-to
 
 Before creating any beads, confirm the Dolt backend is healthy:
 
-1. **Check Dolt server**: `bd dolt status` should show the server is running.
-2. **Check DB health**: `bd doctor` to verify the database is in good shape before large issue-creation batches.
-3. **Quick check**: `bd vc status` should show no unresolved conflicts.
-4. **Branch hygiene**: `.beads/` is gitignored; it should never appear in code branch diffs.
+1. **Check DB health**: `bd doctor` to verify the database is in good shape before large issue-creation batches.
+2. **Quick check**: `bd vc status` should show no unresolved conflicts.
+3. **Branch hygiene**: `.beads/` is gitignored; it should never appear in code branch diffs.
 
 ### Phase 5: Create
 
@@ -183,7 +182,7 @@ Use `bd create` with all relevant flags. For multiple issues:
 - Create in dependency order (parents/blockers first)
 - Use `bd create --json` and parse the `id` field to capture IDs for subsequent `--parent` or `bd dep add` calls
 - **Do NOT use `bd q` with `-d`/`--description`** — `bd q` is a quick-create command with a limited flag set (only `-t`, `-p`, `-l`). Always use `bd create` when a description is needed.
-- Confirm Dolt DB health with `bd dolt status` after creation
+- Confirm DB health with `bd doctor` after creation
 
 **Rig routing:** `bd create` targets whichever `.beads/` DB is discovered from
 `$PWD`. If you're running from outside the target project (e.g., from the mayor
@@ -268,14 +267,11 @@ Beads data is persisted in the Dolt database (`.beads/dolt/`). Writes go directl
 ### Required checks
 
 ```bash
-# 1) Confirm Dolt server is healthy
-bd dolt status
-
-# 2) Optionally push Dolt commits to a remote (if configured)
+# 1) Optionally push Dolt commits to a remote (if configured)
 bd dolt push
 ```
 
-If Dolt checks fail, run `bd doctor --fix --yes` and fix the persistence path before ending the session.
+If checks fail, run `bd doctor --fix --yes` and fix the persistence path before ending the session.
 
 ## Common Anti-Patterns
 
