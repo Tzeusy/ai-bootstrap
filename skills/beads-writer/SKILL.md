@@ -63,7 +63,7 @@ These costs mean 10 trivial one-liner beads is significantly more expensive than
 
 **When tempted to merge**, ask: "Can a reviewer hold the full diff in their head?" If the bead requires scrolling through unrelated changes to review, split it.
 
-**Epic reconciliation rule**: Every epic **must** end with a final child bead for spec-to-code reconciliation. This bead is created last (after all implementation children) and ensures nothing from the original spec was missed. See Phase 3 → Reconciliation Bead for the template.
+**Epic reconciliation rule**: Every epic **must** end with a final child bead for spec-to-code reconciliation (gen-1). This bead is created last (after all implementation children) and ensures nothing from the original spec was missed. If gaps are found, the reconciliation bead creates fix beads and a gen-2 follow-up reconciliation (up to gen-3 max). See Phase 3 → Reconciliation Bead for the template.
 
 ### Phase 3: Craft Each Issue
 
@@ -154,17 +154,24 @@ Every epic **must** include a final child bead that performs a deep-dive spec-to
   4. For any requirement NOT covered (or only partially covered):
      a. Create a new child bead under this epic describing the missing work.
      b. Set appropriate priority and link dependencies.
-      c. Do NOT create another reconciliation bead.
-    5. Keep this reconciliation bead open (or blocked) until all newly created
-      gap beads are closed.
-    6. Re-run the requirement-to-bead checklist and close this bead only when all
-      requirements show full coverage.
+  5. If gap beads were created in step 4, create a follow-up reconciliation bead
+     (gen-2) that depends on ALL the new gap beads. The gen-2 bead re-runs this
+     same workflow to catch anything still missing after the gaps are filled.
+     - A gen-2 reconciliation bead may spawn one final gen-3 reconciliation bead
+       using the same pattern. Gen-3 is the hard limit — it must NOT spawn further
+       reconciliation beads.
+     - Tag the title with generation: "Reconcile spec-to-code (gen-N) for ..."
+  6. Keep this reconciliation bead open (or blocked) until all newly created
+     gap beads (and any follow-up reconciliation bead) are closed.
+  7. Re-run the requirement-to-bead checklist and close this bead only when all
+     requirements show full coverage.
   ```
 - **Acceptance Criteria**:
   ```
   1. Every requirement in the epic spec has a corresponding implementation bead
   2. Any gaps found result in new child beads created under the same epic
-  3. Reconciliation summary is recorded in the close reason
+  3. If gaps were found, a follow-up reconciliation bead (next gen) was created
+  4. Reconciliation summary is recorded in the close reason
   ```
 - **Dependencies**: Add dependencies from the reconciliation bead to all other children (`bd dep add <recon-id> <child-id>`) so it runs last.
 
@@ -256,7 +263,7 @@ Before finalizing any bead, verify:
 - [ ] Labels use existing taxonomy (not one-off tags)
 - [ ] Single responsibility — one testable outcome per issue
 - [ ] Epics include a final reconciliation bead that depends on all siblings
-- [ ] Reconciliation beads never spawn additional reconciliation beads
+- [ ] Reconciliation beads include generation tag (gen-1/gen-2/gen-3) and never exceed gen-3
 
 ## 🚨 MANDATORY: Persist Beads at Session End
 
@@ -287,7 +294,7 @@ If checks fail, run `bd doctor --fix --yes` and fix the persistence path before 
 | Using "high"/"medium"/"low" for priority | Use numeric 0-4 only |
 | Too many tiny sub-beads (>7 per epic) | Merge tightly-coupled work; each bead should be 30-120 min of focused work |
 | Epic without reconciliation bead | Always add a final spec-to-code reconciliation child |
-| Reconciliation bead creates another reconciliation bead | Create implementation/fix gap beads instead |
+| Reconciliation bead exceeds gen-3 | Gen-3 is the hard limit; close with remaining gaps documented |
 
 ## Resources
 
