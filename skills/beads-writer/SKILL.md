@@ -65,6 +65,20 @@ These costs mean 10 trivial one-liner beads is significantly more expensive than
 
 **Epic reconciliation rule**: Every epic **must** end with a final child bead for spec-to-code reconciliation (gen-1). This bead is created last (after all implementation children) and ensures nothing from the original spec was missed. If gaps are found, the reconciliation bead creates fix beads and a gen-2 follow-up reconciliation (up to gen-3 max). See Phase 3 → Reconciliation Bead for the template.
 
+#### OpenSpec-Anchored Epics
+
+When an epic is driven by an OpenSpec specification change, each child bead **must** explicitly reference the spec sections it covers. This prevents drift between spec and implementation.
+
+For each child bead:
+1. **In the description**, list the specific OpenSpec section(s) the bead implements (e.g., `Covers: spec.endpoints.POST_/auth/refresh, spec.schemas.TokenResponse`).
+2. **In the acceptance criteria**, include a cross-check item: "Verify implementation matches behavior defined in [section path(s)]" — citing the exact section(s) so the worker can read and validate against them.
+3. **Avoid vague references** like "per the spec." Always cite the specific section path so the worker doesn't have to search.
+
+This ensures:
+- Workers know exactly which spec sections to read before implementing
+- Reviewers can validate implementation against the cited spec sections
+- The reconciliation bead can systematically audit spec coverage by section rather than guessing what was intended
+
 ### Phase 3: Craft Each Issue
 
 For each issue, fill fields deliberately. Consult `references/fields-and-examples.md` for the full field schema, type selection guide, priority calibration, and exemplary beads.
