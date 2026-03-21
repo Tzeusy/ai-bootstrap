@@ -4,6 +4,7 @@ Usage:
     cd .claude/skills/excalidraw-diagram/references
     uv run python render_excalidraw.py <path-to-file.excalidraw> [--output path.png] [--scale 2] [--width 1920]
     uv run python render_excalidraw.py <path-to-file.excalidraw> --format svg [--output path.svg]
+    uv run python render_excalidraw.py <path-to-file.excalidraw> --dark --format svg  # dark mode
 
 First-time setup:
     cd .claude/skills/excalidraw-diagram/references
@@ -17,6 +18,83 @@ import argparse
 import json
 import sys
 from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Dark-mode color transform
+# ---------------------------------------------------------------------------
+
+DARK_BG = "#1e1e2e"
+
+# backgroundColor (shape fills): light pastels → dark rich tones
+_FILL_MAP: dict[str, str] = {
+    "#3b82f6": "#1e40af",   # Primary → darker blue
+    "#60a5fa": "#1e40af",   # Secondary → darker blue
+    "#93c5fd": "#1e3a5f",   # Tertiary → dark blue
+    "#fed7aa": "#7c2d12",   # Start/Trigger → dark orange
+    "#a7f3d0": "#064e3b",   # End/Success → dark green
+    "#fee2e2": "#7f1d1d",   # Warning/Reset → dark red
+    "#fef3c7": "#78350f",   # Decision → dark amber
+    "#ddd6fe": "#4c1d95",   # AI/LLM → dark purple
+    "#dbeafe": "#1e3a5f",   # Inactive → dark blue
+    "#fecaca": "#7f1d1d",   # Error → dark red
+}
+
+# strokeColor on non-text elements: dark strokes → lighter for contrast
+_STROKE_MAP: dict[str, str] = {
+    "#1e3a5f": "#7dd3fc",   # Primary stroke → sky
+    "#c2410c": "#fb923c",   # Start/Trigger → lighter orange
+    "#047857": "#34d399",   # End/Success → lighter green
+    "#b45309": "#fbbf24",   # Decision → lighter amber
+    "#6d28d9": "#a78bfa",   # AI/LLM → lighter purple
+    "#1e40af": "#93c5fd",   # Inactive → lighter blue
+    "#b91c1c": "#f87171",   # Error → lighter red
+    "#dc2626": "#f87171",   # Warning → lighter red
+    "#64748b": "#94a3b8",   # Slate structural → lighter slate
+}
+
+# strokeColor on text elements (text color): dark text → light
+_TEXT_MAP: dict[str, str] = {
+    "#1e40af": "#93c5fd",   # Title → light blue
+    "#3b82f6": "#60a5fa",   # Subtitle → lighter blue
+    "#64748b": "#94a3b8",   # Body/Detail → lighter slate
+    "#374151": "#e2e8f0",   # On-light-fills → light (fills are now dark)
+    "#1e3a5f": "#7dd3fc",   # Structural labels → sky
+    "#c2410c": "#fb923c",   # Orange labels → lighter orange
+    "#047857": "#34d399",   # Green labels → lighter green
+    "#b45309": "#fbbf24",   # Amber labels → lighter amber
+    "#6d28d9": "#a78bfa",   # Purple labels → lighter purple
+    "#b91c1c": "#f87171",   # Red labels → lighter red
+    "#dc2626": "#f87171",   # Red labels → lighter red
+}
+
+# Colors that must never change (evidence artifacts, explicit white, etc.)
+_KEEP = frozenset({"#ffffff", "#22c55e", "#1e293b", "transparent"})
+
+
+def _map_color(color: str, mapping: dict[str, str]) -> str:
+    if not isinstance(color, str) or color.lower() in _KEEP:
+        return color
+    return mapping.get(color.lower(), color)
+
+
+def apply_dark_theme(data: dict) -> dict:
+    """Transform an Excalidraw document to dark mode in-place and return it."""
+    app = data.setdefault("appState", {})
+    app["viewBackgroundColor"] = DARK_BG
+    # Keep exportWithDarkMode false — we handle all color transforms ourselves.
+    # Excalidraw's built-in dark mode would double-transform our already-mapped colors.
+    app["exportWithDarkMode"] = False
+
+    for el in data.get("elements", []):
+        is_text = el.get("type") == "text"
+        if "strokeColor" in el:
+            m = _TEXT_MAP if is_text else _STROKE_MAP
+            el["strokeColor"] = _map_color(el["strokeColor"], m)
+        if "backgroundColor" in el:
+            el["backgroundColor"] = _map_color(el["backgroundColor"], _FILL_MAP)
+
+    return data
 
 
 def validate_excalidraw(data: dict) -> list[str]:
@@ -76,6 +154,7 @@ def render(
     scale: int = 2,
     max_width: int = 1920,
     fmt: str = "png",
+    dark: bool = False,
 ) -> Path:
     """Render an .excalidraw file to PNG or SVG. Returns the output path."""
     # Import playwright here so validation errors show before import errors
@@ -101,6 +180,10 @@ def render(
             print(f"  - {err}", file=sys.stderr)
         sys.exit(1)
 
+    # Apply dark-mode color transform (operates on a copy of the data)
+    if dark:
+        data = apply_dark_theme(json.loads(json.dumps(data)))
+
     # Compute viewport size from element bounding box
     elements = [e for e in data["elements"] if not e.get("isDeleted")]
     min_x, min_y, max_x, max_y = compute_bounding_box(elements)
@@ -112,9 +195,14 @@ def render(
     vp_width = min(int(diagram_w), max_width)
     vp_height = max(int(diagram_h), 600)
 
-    # Output path
+    # Output path — append _dark suffix when rendering dark mode
     if output_path is None:
-        output_path = excalidraw_path.with_suffix(f".{fmt}")
+        if dark:
+            output_path = excalidraw_path.with_suffix("").with_name(
+                excalidraw_path.stem + f"_dark.{fmt}"
+            )
+        else:
+            output_path = excalidraw_path.with_suffix(f".{fmt}")
 
     # Template path (same directory as this script)
     template_path = Path(__file__).parent / "render_template.html"
@@ -183,13 +271,14 @@ def main() -> None:
     parser.add_argument("--format", "-f", choices=["png", "svg"], default="png", help="Output format (default: png)")
     parser.add_argument("--scale", "-s", type=int, default=2, help="Device scale factor for PNG (default: 2)")
     parser.add_argument("--width", "-w", type=int, default=1920, help="Max viewport width (default: 1920)")
+    parser.add_argument("--dark", "-d", action="store_true", help="Render in dark mode (transforms colors automatically)")
     args = parser.parse_args()
 
     if not args.input.exists():
         print(f"ERROR: File not found: {args.input}", file=sys.stderr)
         sys.exit(1)
 
-    out_path = render(args.input, args.output, args.scale, args.width, fmt=args.format)
+    out_path = render(args.input, args.output, args.scale, args.width, fmt=args.format, dark=args.dark)
     print(str(out_path))
 
 

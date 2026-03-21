@@ -62,6 +62,51 @@ Used for code snippets, data examples, and other concrete evidence inside techni
 
 ## Background
 
-| Property | Value |
-|----------|-------|
-| Canvas background | `#ffffff` |
+| Property | Light | Dark |
+|----------|-------|------|
+| Canvas background | `#ffffff` | `#1e1e2e` |
+
+---
+
+## Dark Mode
+
+Dark mode is applied automatically by the render script via `--dark`. You do **not** need to create separate `.excalidraw` files — author diagrams in light mode and the renderer transforms colors at render time.
+
+```bash
+# Render light (default)
+uv run python render_excalidraw.py diagram.excalidraw --format svg
+
+# Render dark (auto-transforms colors, outputs diagram_dark.svg)
+uv run python render_excalidraw.py diagram.excalidraw --format svg --dark
+```
+
+### Dark Mode Shape Colors
+
+Fills become darker, strokes become lighter — maintaining contrast on the dark canvas.
+
+| Semantic Purpose | Fill (dark) | Stroke (dark) |
+|------------------|-------------|---------------|
+| Primary/Neutral | `#1e40af` | `#7dd3fc` |
+| Secondary | `#1e40af` | `#7dd3fc` |
+| Tertiary | `#1e3a5f` | `#7dd3fc` |
+| Start/Trigger | `#7c2d12` | `#fb923c` |
+| End/Success | `#064e3b` | `#34d399` |
+| Warning/Reset | `#7f1d1d` | `#f87171` |
+| Decision | `#78350f` | `#fbbf24` |
+| AI/LLM | `#4c1d95` | `#a78bfa` |
+| Inactive/Disabled | `#1e3a5f` | `#93c5fd` |
+| Error | `#7f1d1d` | `#f87171` |
+
+### Dark Mode Text Colors
+
+| Level | Color (dark) |
+|-------|-------------|
+| Title | `#93c5fd` |
+| Subtitle | `#60a5fa` |
+| Body/Detail | `#94a3b8` |
+| On dark fills | `#e2e8f0` |
+| On evidence artifacts | `#ffffff` (unchanged) |
+
+### Colors That Don't Change
+
+Evidence artifact backgrounds (`#1e293b`), evidence text (`#22c55e`), and white text (`#ffffff`) are already dark-mode native and are preserved as-is.

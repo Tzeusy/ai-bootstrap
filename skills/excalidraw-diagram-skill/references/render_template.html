@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #ffffff; overflow: hidden; }
+    body { overflow: hidden; }
     #root { display: inline-block; }
     #root svg { display: block; }
   </style>
@@ -22,9 +22,14 @@
         const appState = data.appState || {};
         const files = data.files || {};
 
-        // Force white background in appState
+        // Use background from data, default to white if not set
         appState.viewBackgroundColor = appState.viewBackgroundColor || "#ffffff";
-        appState.exportWithDarkMode = false;
+        if (appState.exportWithDarkMode === undefined) {
+          appState.exportWithDarkMode = false;
+        }
+
+        // Match body background for screenshot captures
+        document.body.style.background = appState.viewBackgroundColor;
 
         const svg = await exportToSvg({
           elements: elements,

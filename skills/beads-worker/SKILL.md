@@ -63,6 +63,28 @@ a shared Dolt database; worktrees access it via a redirect file. Do not commit
 
 Never modify files in `REPO_ROOT` directly. All work happens in `WORKTREE_PATH`.
 
+### Runtime Bootstrap (mandatory)
+
+Before reading the issue or exploring code, validate your execution context:
+
+```bash
+PWD_REAL=$(pwd -P)
+BRANCH=$(git branch --show-current 2>/dev/null || true)
+
+if [ "${PWD_REAL}" != "${WORKTREE_PATH}" ] || \
+   [ "${PWD_REAL}" = "${REPO_ROOT}" ] || \
+   [ -z "${BRANCH}" ] || \
+   [ "${BRANCH}" = "main" ] || \
+   [ "${BRANCH}" = "master" ]; then
+  echo "invalid-runtime-context"
+  exit 1
+fi
+```
+
+Bootstrap is part of the job. Do **not** continue into planning or
+implementation until this check passes. If your runtime supports interim
+updates, send a brief bootstrap acknowledgement after validation.
+
 ---
 
 ## Workflow
@@ -90,6 +112,9 @@ Lifecycle ownership boundary:
 5. **Decision Point:** If the task is too complex for a single pass, spawn a `Plan` subagent or a researcher subagent (using `HIGH_COMPLEXITY_MODEL`) to break it down or design the solution first.
 6. Form a concrete plan: what files change, what tests are needed, what the
    acceptance criteria are.
+
+Do not spend unbounded time here. Once you have the file list and test plan,
+start editing.
 
 ### Phase 2: Implement
 
@@ -282,6 +307,9 @@ When you finish (success or blocker), produce a structured summary:
 ### Blockers (if any)
 - <description of what's blocking>
 ```
+
+If bootstrap failed, report the blocker as `invalid-runtime-context` and stop
+without touching code or Beads state.
 
 This report helps the coordinator track progress and make dispatch decisions.
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Direction"
+  short_description: "Analyze project direction and produce spec-driven work plans"
+  default_prompt: "What should this project work on next?"

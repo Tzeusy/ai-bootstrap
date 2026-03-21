@@ -31,7 +31,7 @@
     "type": "command",
     "command": "bash ~/.claude/statusline.sh"
   },
+  "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
-  "teammateMode": "tmux",
-  "effortLevel": "high"
+  "teammateMode": "tmux"
 }

@@ -33,7 +33,20 @@ Primary responsibilities:
 
 ## Environment Setup
 
+**CRITICAL: Always use a dedicated worktree. NEVER switch branches or operate
+directly in the main repository (`REPO_ROOT`).** Switching branches in the main
+repo disrupts the coordinator and other workers sharing that checkout. All git
+operations (checkout, rebase, commit, push) MUST happen inside `WORKTREE_PATH`.
+
 ```bash
+# Validate worktree before any work
+if [ -z "${WORKTREE_PATH}" ] || [ "${WORKTREE_PATH}" = "${REPO_ROOT}" ]; then
+  echo "ERROR: Worker must run in a dedicated worktree, not the main repo."
+  bd update "${ISSUE_ID}" \
+    --status blocked \
+    --append-notes "Worker aborted: no dedicated worktree provided. WORKTREE_PATH must differ from REPO_ROOT."
+  exit 1
+fi
 cd "${WORKTREE_PATH}"
 ```
 
@@ -110,12 +123,23 @@ bd update "${ISSUE_ID}" --status in_progress --add-label review-running --json
    the PR head branch (git prohibits the same branch in two worktrees):
    ```bash
    if [ -n "${ORIGINAL_ID}" ]; then
-     bd worktree remove ".worktrees/parallel-agents/${ORIGINAL_ID}" 2>/dev/null || true
+     bd worktree remove "${REPO_ROOT}/.worktrees/parallel-agents/${ORIGINAL_ID}" 2>/dev/null || true
    fi
    ```
+   **Use absolute paths for `bd worktree remove` — never `cd` to `REPO_ROOT`.**
 9. Check out the PR head branch and rebase onto latest base branch upfront,
-   so all review runs against current main:
+   so all review runs against current main.
+   **CRITICAL: Verify you are in `WORKTREE_PATH` before ANY git checkout/rebase.**
+   Running `git checkout` from `REPO_ROOT` will switch the main repo's branch
+   and break the coordinator and all other workers.
    ```bash
+   # Safety: assert we are in the worktree, not the main repo
+   cd "${WORKTREE_PATH}"
+   if [ "$(pwd -P)" = "$(cd "${REPO_ROOT}" && pwd -P)" ]; then
+     echo "FATAL: about to run git checkout in REPO_ROOT — aborting"
+     exit 1
+   fi
+
    PR_META=$(gh pr view "${PR_NUMBER}" --json headRefName,baseRefName)
    PR_HEAD_BRANCH=$(echo "${PR_META}" | jq -r '.headRefName')
    PR_BASE_BRANCH=$(echo "${PR_META}" | jq -r '.baseRefName')
@@ -401,6 +425,15 @@ gh pr close "${PR_NUMBER}"
 
 ## Constraints
 
+- **NEVER operate in the main repository checkout.** All git operations
+  (checkout, rebase, commit, push) must happen inside a dedicated worktree.
+  Switching branches in the main repo disrupts the coordinator and other
+  parallel workers. If `WORKTREE_PATH` is unset or equals `REPO_ROOT`, abort.
+- **NEVER `cd` to `REPO_ROOT`.** Use absolute paths (e.g.,
+  `${REPO_ROOT}/.worktrees/...`) or `git -C "${REPO_ROOT}"` when you need to
+  reference the main repo. If you `cd` to `REPO_ROOT` and then run
+  `git checkout`, you will switch the main repo off `main` and break
+  everything. Always `cd "${WORKTREE_PATH}"` before git operations.
 - Do not merge if unresolved issues remain.
 - Do not close beads before PR merge.
 - Do not merge draft PRs.

@@ -69,7 +69,7 @@ These costs mean 10 trivial one-liner beads is significantly more expensive than
 
 When an epic is driven by an OpenSpec specification change, each child bead **must** explicitly reference the spec sections it covers. This prevents drift between spec and implementation.
 
-For each child bead:
+First ensure the relevant OpenSpec change is committed to `main/master`. Then, for each child bead:
 1. **In the description**, list the specific OpenSpec section(s) the bead implements (e.g., `Covers: spec.endpoints.POST_/auth/refresh, spec.schemas.TokenResponse`).
 2. **In the acceptance criteria**, include a cross-check item: "Verify implementation matches behavior defined in [section path(s)]" — citing the exact section(s) so the worker can read and validate against them.
 3. **Avoid vague references** like "per the spec." Always cite the specific section path so the worker doesn't have to search.
@@ -179,6 +179,8 @@ Every epic **must** include a final child bead that performs a deep-dive spec-to
      gap beads (and any follow-up reconciliation bead) are closed.
   7. Re-run the requirement-to-bead checklist and close this bead only when all
      requirements show full coverage.
+  8. If requirements show full coverage and the epic bead is managed via a OpenSpec change, 
+     run /opsx:sync to synchronize deltas into the authorititative application specification.
   ```
 - **Acceptance Criteria**:
   ```

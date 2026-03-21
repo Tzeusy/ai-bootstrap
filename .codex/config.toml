@@ -1,5 +1,5 @@
 personality = "pragmatic"
-model = "gpt-5.3-codex"
+model = "gpt-5.4"
 model_reasoning_effort = "high"
 project_doc_fallback_filenames = ["CLAUDE.md", "COPILOT.md"]
 
@@ -22,3 +22,12 @@ status_line = ["model-with-reasoning", "current-dir", "context-remaining", "five
 
 [notice.model_migrations]
 "gpt-5.2" = "gpt-5.3-codex"
+"gpt-5.3-codex" = "gpt-5.4"
+
+
+
+
+
+
+
+

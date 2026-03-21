@@ -24,6 +24,7 @@
 .codex/version.json
 .codex/state_*
 .codex/shell_snapshots/
+.codex/logs*
 
 # === Gemini ===
 .gemini/tmp

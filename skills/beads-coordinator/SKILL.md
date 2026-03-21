@@ -74,6 +74,7 @@ spawn workers (e.g., Task tool in Claude Code, subagent in Codex, etc.).
 | Worktree creation | `bd worktree create` (isolated code checkout for `agent/<issue-id>`) |
 | Branch naming | `agent/<issue-id>` |
 | Worktree root | `.worktrees/parallel-agents/` |
+| Worker bootstrap | Mandatory: worker must prove `pwd` = `WORKTREE_PATH` and branch = expected worker branch before being counted as running |
 | Issue tracker | `bd` CLI only — no markdown TODOs, no external trackers |
 | Rig routing | `bd create/list/ready` default to whichever `.beads/` DB is discovered from `$PWD`. **If running from a different directory (e.g., mayor or town root), pass `--rig <rig>` to target the correct project.** Commands that take an existing bead ID (`bd update`, `bd close`, `bd show`, `bd dep`) auto-route via the ID prefix. **Note:** `bd search`, `bd blocked`, `bd count`, `bd stale`, and `bd query` do **not** support `--rig` — use `bd list` with filters instead (e.g., `bd list --rig <rig> --status=open` to find issues), or `cd` into the rig's workspace directory first. |
 | Metadata persistence | Dolt DB (`.beads/dolt/`) via auto-started sql-server; shared across worktrees via redirect |
@@ -252,6 +253,10 @@ Construct a dispatch prompt by injecting issue-specific context:
 | `WORKTREE_PATH` | Absolute path to the worktree directory |
 | `REPO_ROOT` | Absolute path to the main repository |
 
+Keep the prompt compact. Prefer a short issue summary, acceptance criteria, and
+likely edit targets over pasting giant Beads JSON blobs unless the extra detail
+is truly needed.
+
 Example dispatch prompt (`beads-worker`):
 
 ```
@@ -299,9 +304,32 @@ Workers operate autonomously following their selected workflow:
 - `beads-pr-reviewer-worker`: review threads/comments and decide merge/close
   path for `pr-review-task` beads
 
+### 6a. Bootstrap the worker (mandatory)
+
+A spawned worker is **not** considered running until it proves it is operating
+from the assigned worktree.
+
+Bootstrap contract:
+- `pwd` must equal `WORKTREE_PATH`
+- current branch must equal the expected worker branch (`agent/<id>` for normal
+  workers, or the expected PR/review branch for review workers)
+- `pwd` must **not** equal `REPO_ROOT`
+
+If the runtime supports interim updates, require a short bootstrap
+acknowledgement before continuing. If bootstrap never arrives, or if the worker
+reports repo-root / `main` / `master` context, treat dispatch as failed and
+release the bead immediately.
+
 ### 7. Monitor workers
 
-- Track each worker's `ISSUE_ID`, branch, worktree path, and start time.
+- Track each worker's `ISSUE_ID`, branch, worktree path, start time, and
+  bootstrap status.
+- Do **not** count a slot as occupied until bootstrap succeeds.
+- A missing bootstrap acknowledgement is a **dispatch failure**, not an
+  implementation stall.
+- If `main` or the repo root checkout advances unexpectedly while a worker is
+  supposedly active, stop and investigate worktree misbinding before
+  dispatching more workers.
 - When an implementation worker completes, reconcile from branch/PR state plus
   worker report (not from worker-owned bead mutations):
   - Check for open PR on `agent/<id>`:
@@ -333,7 +361,8 @@ Workers operate autonomously following their selected workflow:
   NEW_ID=$(echo "${NEW_JSON}" | jq -r '.id // .[0].id')
   bd dep add "<original-id>" "${NEW_ID}"
   ```
-- If a worker fails or stalls (no progress for >5 minutes):
+- If a worker fails bootstrap, or stalls after bootstrap (no diff / commit / PR
+  signal for >5 minutes):
   - Log the failure.
   - Release the issue:
     - for `pr-review-task` issues: `bd update <id> --status blocked --remove-label review-running --json`
