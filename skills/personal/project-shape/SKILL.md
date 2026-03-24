@@ -145,6 +145,27 @@ When code changes diverge from documentation:
 
 Use `/project-direction` for a full direction analysis including priority-weighted work plans. Use `/reconcile-spec-to-project` for detailed spec-code divergence detection.
 
+## Workflow 4: Generate Project Overview
+
+Synthesize all four pillars into a visual, layman-friendly `docs/README.md` with embedded Excalidraw SVG diagrams. This is the public face of the project's shape — it makes someone who knows nothing understand what the project is, why it exists, and how it works.
+
+### Requirements
+
+- At least two pillars must exist (heart-and-soul + one other)
+- Uses `/excalidraw-diagram` skill for all visualizations
+- Uses independent review subagents (accessibility + adversarial)
+
+### The Process
+
+1. **Extract** — Read each pillar, pull out only what a layman needs to understand
+2. **Design diagrams** — Plan 3-5 Excalidraw diagrams that visually argue the project's story (vision, architecture, scope, pillar model, domain-specific)
+3. **Generate** — Build each diagram via `/excalidraw-diagram`, render to SVG, validate through render-view-fix loop
+4. **Write** — Structured markdown: thesis → what it's not → how it works → what v1 delivers → principles → navigating the docs
+5. **Review** — Spawn accessibility + adversarial review subagents targeting layman comprehension
+6. **Commit** — Place at `docs/README.md`, store diagram sources in `docs/assets/`
+
+Read `references/generate-overview.md` for the full guide: diagram specs, document skeleton, review agent prompts, and writing guidelines.
+
 ## Reference Index
 
 ### Pillar Guides
@@ -164,6 +185,7 @@ Use `/project-direction` for a full direction analysis including priority-weight
 | Review Protocol | `references/review-protocol.md` | Reviewing generated docs with independent subagents — agent specs, iteration rules, anti-patterns |
 | Bootstrapping Phases | `references/bootstrapping.md` | Step-by-step phase guide for establishing shape from scratch |
 | Local Skill Templates | `references/local-skill-templates.md` | Installing agent navigation skills for each pillar |
+| Generate Project Overview | `references/generate-overview.md` | Creating a layman-friendly docs/README.md with Excalidraw diagrams |
 
 ## Local Skill Installation
 
