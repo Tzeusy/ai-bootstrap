@@ -9,7 +9,7 @@ Topology cross-cuts the other three pillars. Doctrine says *why* a boundary exis
 ## Recommended Structure
 
 ```
-docs/lay-and-land/
+about/lay-and-land/
 ├── README.md              # Index: what maps exist and when to consult them
 ├── components.md          # Component inventory with ownership and boundaries
 ├── data-flow.md           # How data moves through the system
@@ -59,7 +59,7 @@ Maps should include visual diagrams wherever possible. Prefer:
 2. **Excalidraw** — Hand-drawn feel, good for whiteboards, `.excalidraw` files are JSON
 3. **SVG** — For polished diagrams, store sources alongside rendered output
 
-Store diagram sources in `docs/lay-and-land/assets/` so they can be updated.
+Store diagram sources in `about/lay-and-land/assets/` so they can be updated.
 
 ### Diagram Principles
 
@@ -99,7 +99,7 @@ Store diagram sources in `docs/lay-and-land/assets/` so they can be updated.
 |-------|--------|
 | Absent | No architecture docs, topology is tribal knowledge |
 | Nascent | README has a rough architecture section or a single diagram |
-| Structured | `docs/lay-and-land/` exists with component and data-flow docs |
+| Structured | `about/lay-and-land/` exists with component and data-flow docs |
 | Mature | Complete topology with diagrams, boundary annotations, cross-references to RFCs/specs, actively maintained |
 
 ## Evolution

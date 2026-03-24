@@ -99,10 +99,10 @@ You are reviewing the coherence BETWEEN project shape documents.
 Read all of the following documents, then evaluate their alignment.
 
 Documents:
-- [docs/heart-and-soul/vision.md]: [content]
-- [docs/heart-and-soul/v1.md]: [content]
-- [docs/law-and-lore/rfcs/...]: [content]
-- [docs/lay-and-land/components.md]: [content]
+- [about/heart-and-soul/vision.md]: [content]
+- [about/heart-and-soul/v1.md]: [content]
+- [about/law-and-lore/rfcs/...]: [content]
+- [about/lay-and-land/components.md]: [content]
 - [openspec/...]: [content if exists]
 
 Evaluate:

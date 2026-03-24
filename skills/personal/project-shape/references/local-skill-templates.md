@@ -11,7 +11,7 @@ Customize the tables and rules for your project's specific domains.
 name: heart-and-soul
 description: >
   CRITICAL — Load the project's foundational doctrine before making architectural decisions,
-  writing code, designing APIs, creating tests, or proposing features. The docs/heart-and-soul/
+  writing code, designing APIs, creating tests, or proposing features. The about/heart-and-soul/
   directory contains prime directives: what the system is, what it is not, how it works, and
   what v1 ships. Selectively load ONLY the documents relevant to your current task. Use
   proactively at the start of substantive work, when making design decisions, or when unsure
@@ -20,7 +20,7 @@ description: >
 
 # Project Doctrine — Heart and Soul
 
-The `docs/heart-and-soul/` directory contains the prime directives of this project. These are
+The `about/heart-and-soul/` directory contains the prime directives of this project. These are
 not documentation — they are doctrine. They define the principles the code must embody.
 
 **Consult relevant soul files before:**
@@ -35,13 +35,13 @@ not documentation — they are doctrine. They define the principles the code mus
 ### Always relevant
 | File | Read when... | Key content |
 |------|-------------|-------------|
-| `docs/heart-and-soul/vision.md` | Starting any session, scope questions | Core thesis, non-goals |
-| `docs/heart-and-soul/v1.md` | Implementing anything, scoping features | What v1 ships vs defers |
+| `about/heart-and-soul/vision.md` | Starting any session, scope questions | Core thesis, non-goals |
+| `about/heart-and-soul/v1.md` | Implementing anything, scoping features | What v1 ships vs defers |
 
 ### Select by domain
 | File | Read when... | Key content |
 |------|-------------|-------------|
-| `docs/heart-and-soul/architecture.md` | Protocol, transport, rendering | Structural philosophy |
+| `about/heart-and-soul/architecture.md` | Protocol, transport, rendering | Structural philosophy |
 <!-- Add rows for each domain file -->
 
 ## Non-Negotiable Rules
@@ -57,7 +57,7 @@ not documentation — they are doctrine. They define the principles the code mus
 ---
 name: law-and-lore
 description: >
-  Load design contracts (RFCs) to contextualize implementation work. The docs/law-and-lore/
+  Load design contracts (RFCs) to contextualize implementation work. The about/law-and-lore/
   directory contains numbered design documents defining wire-level contracts, data models, state
   machines, and quantitative budgets. Consult relevant RFCs before implementing features, writing
   protocol definitions, designing state machines, or resolving cross-subsystem integration
@@ -66,7 +66,7 @@ description: >
 
 # Design Contracts — Law and Lore
 
-The `docs/law-and-lore/` directory contains the authoritative design contracts. These are
+The `about/law-and-lore/` directory contains the authoritative design contracts. These are
 wire-level specifications that code must conform to.
 
 **Consult relevant RFCs before:**
@@ -82,7 +82,7 @@ wire-level specifications that code must conform to.
 ### Foundation
 | RFC | File | Read when... | Key content |
 |-----|------|-------------|-------------|
-| 0001 | `docs/law-and-lore/rfcs/0001-<name>.md` | [domain] | [summary] |
+| 0001 | `about/law-and-lore/rfcs/0001-<name>.md` | [domain] | [summary] |
 <!-- Add rows for each RFC -->
 
 ## Key Contracts
@@ -114,10 +114,10 @@ every test traces back to a normative requirement in a spec.
 
 | Layer | Location | Role |
 |-------|----------|------|
-| Doctrine | `docs/heart-and-soul/` | WHY — philosophical foundations |
-| Design Contracts | `docs/law-and-lore/` | HOW — wire-level contracts |
+| Doctrine | `about/heart-and-soul/` | WHY — philosophical foundations |
+| Design Contracts | `about/law-and-lore/` | HOW — wire-level contracts |
 | Capability Specs | `openspec/` | WHAT — normative requirements with testable scenarios |
-| Topology | `docs/lay-and-land/` | WHERE — component boundaries and connections |
+| Topology | `about/lay-and-land/` | WHERE — component boundaries and connections |
 
 ## Domain Lookup
 
@@ -150,7 +150,7 @@ every test traces back to a normative requirement in a spec.
 name: lay-and-land
 description: >
   Load the project's topology maps to understand where components live, how they connect,
-  and what boundaries exist. The docs/lay-and-land/ directory contains component inventories,
+  and what boundaries exist. The about/lay-and-land/ directory contains component inventories,
   data flow diagrams, dependency maps, and deployment topology. Consult before: adding new
   components, modifying integration points, changing deployment, or when unsure where something
   lives in the system. Use proactively when onboarding or when work crosses component boundaries.
@@ -158,7 +158,7 @@ description: >
 
 # System Topology — Lay and Land
 
-The `docs/lay-and-land/` directory contains the spatial understanding of this project — where
+The `about/lay-and-land/` directory contains the spatial understanding of this project — where
 components live, how data flows, what boundaries exist, and how the system is deployed.
 
 **Consult topology maps before:**
@@ -173,10 +173,10 @@ components live, how data flows, what boundaries exist, and how the system is de
 
 | Map | Read when... | Key content |
 |-----|-------------|-------------|
-| `docs/lay-and-land/components.md` | Need to understand what exists and who owns what | Component inventory, boundaries, ownership |
-| `docs/lay-and-land/data-flow.md` | Need to understand how data moves | Data paths, transformations, trust boundaries |
-| `docs/lay-and-land/deployment.md` | Need to understand where things run | Environments, targets, infrastructure |
-| `docs/lay-and-land/dependencies.md` | Need to understand what depends on what | Internal + external dependencies |
+| `about/lay-and-land/components.md` | Need to understand what exists and who owns what | Component inventory, boundaries, ownership |
+| `about/lay-and-land/data-flow.md` | Need to understand how data moves | Data paths, transformations, trust boundaries |
+| `about/lay-and-land/deployment.md` | Need to understand where things run | Environments, targets, infrastructure |
+| `about/lay-and-land/dependencies.md` | Need to understand what depends on what | Internal + external dependencies |
 <!-- Add rows for additional maps -->
 
 ## Key Boundaries

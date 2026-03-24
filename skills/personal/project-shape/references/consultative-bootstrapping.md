@@ -80,7 +80,7 @@ Run these tracks sequentially. Each track should be 3-5 exchanges deep before mo
 - If they say "all of them are non-negotiable": "If two conflict — say performance vs simplicity — which wins?"
 - If a principle sounds like a platitude ("clean code"): "Give me a concrete example of what 'clean code' means here. What would you reject?"
 
-#### Track 4: Architecture (feeds → docs/heart-and-soul/architecture.md, docs/lay-and-land/)
+#### Track 4: Architecture (feeds → about/heart-and-soul/architecture.md, about/lay-and-land/)
 
 | Question | Purpose |
 |----------|---------|
@@ -89,7 +89,7 @@ Run these tracks sequentially. Each track should be 3-5 exchanges deep before mo
 | "What breaks if this component goes down?" | Find critical paths |
 | "What's the trust boundary? What can't talk to what?" | Map security boundaries |
 
-#### Track 5: Design Contracts (feeds → docs/law-and-lore/)
+#### Track 5: Design Contracts (feeds → about/law-and-lore/)
 
 Only pursue this track if the project is past the idea stage:
 

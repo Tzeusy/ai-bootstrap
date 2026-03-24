@@ -7,7 +7,7 @@ The design contracts layer answers **HOW**: how the system works at the wire/pro
 ## Recommended Structure
 
 ```
-docs/law-and-lore/
+about/law-and-lore/
 ├── rfcs/                    # Numbered design documents
 │   ├── 0001-<name>.md       # Each RFC defines a subsystem contract
 │   ├── 0002-<name>.md
@@ -101,7 +101,7 @@ Examples of load-bearing contracts:
 |-------|--------|
 | Absent | No design docs beyond inline code comments |
 | Nascent | Some design docs exist but unnumbered and unreviewed |
-| Structured | Numbered RFCs in `docs/law-and-lore/rfcs/`, some reviews |
+| Structured | Numbered RFCs in `about/law-and-lore/rfcs/`, some reviews |
 | Mature | Complete RFC coverage of all subsystems, review rounds, cross-references, field allocation maps |
 
 ## Evolution

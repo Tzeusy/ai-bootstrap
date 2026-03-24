@@ -2,7 +2,7 @@
 name: project-shape
 description: >
   Analyze and bootstrap the four-pillar knowledge architecture of a software project:
-  docs/heart-and-soul (doctrine), docs/law-and-lore (RFCs/design contracts), docs/lay-and-land
+  about/heart-and-soul (doctrine), about/law-and-lore (RFCs/design contracts), about/lay-and-land
   (topology), and openspec/ (capability specs at root). Use when: starting a new project's
   knowledge structure, auditing documentation health, onboarding, deciding where ideas should
   be documented, translating ideas into requirements, or mapping system topology. Triggers:
@@ -23,12 +23,12 @@ Every well-shaped project has four distinct knowledge layers, each answering a d
 
 | Pillar | Folder | Local Skill | Question | Content |
 |--------|--------|-------------|----------|---------|
-| **Doctrine** | `docs/heart-and-soul/` | `heart-and-soul` | **WHY** does this exist? | Vision, principles, non-negotiables, scope boundaries, what it is NOT |
-| **Design Contracts** | `docs/law-and-lore/` | `law-and-lore` | **HOW** will it work? | RFCs, design docs, wire contracts, state machines, reviews, trade-offs |
+| **Doctrine** | `about/heart-and-soul/` | `heart-and-soul` | **WHY** does this exist? | Vision, principles, non-negotiables, scope boundaries, what it is NOT |
+| **Design Contracts** | `about/law-and-lore/` | `law-and-lore` | **HOW** will it work? | RFCs, design docs, wire contracts, state machines, reviews, trade-offs |
 | **Capability Specs** | `openspec/` | `spec-and-spine` | **WHAT** exactly must be built? | Normative requirements, WHEN/THEN scenarios, testable acceptance criteria |
-| **Topology** | `docs/lay-and-land/` | `lay-and-land` | **WHERE** does everything live and connect? | Component diagrams, dependency boundaries, data flow, deployment topology, integration maps |
+| **Topology** | `about/lay-and-land/` | `lay-and-land` | **WHERE** does everything live and connect? | Component diagrams, dependency boundaries, data flow, deployment topology, integration maps |
 
-Three pillars live under `docs/` — human-authored knowledge with poetic names. `openspec/` stays at root because it's a product with its own structure and conventions.
+Three pillars live under `about/` — the project's self-knowledge with poetic names. `openspec/` stays at root because it's a product with its own structure and conventions.
 
 The pillars form a **traceability chain**:
 
@@ -60,10 +60,10 @@ This produces a health report showing which pillars exist, their maturity, and g
 
 If scanning isn't available, check for these signals:
 
-1. **Doctrine exists?** — Look for: `docs/heart-and-soul/`, `heart-and-soul/`, `vision.md`, `MANIFESTO.md`, `PHILOSOPHY.md`, or doctrine-like content in `README.md`
-2. **Design contracts exist?** — Look for: `docs/law-and-lore/`, `docs/rfcs/`, `docs/adrs/`, numbered design docs, review rounds
+1. **Doctrine exists?** — Look for: `about/heart-and-soul/`, `heart-and-soul/`, `vision.md`, `MANIFESTO.md`, `PHILOSOPHY.md`, or doctrine-like content in `README.md`
+2. **Design contracts exist?** — Look for: `about/law-and-lore/`, `docs/rfcs/`, `docs/adrs/`, numbered design docs, review rounds
 3. **Specs exist?** — Look for: `openspec/`, `specs/`, `requirements/`, files with WHEN/THEN scenarios, formal requirement IDs
-4. **Topology exists?** — Look for: `docs/lay-and-land/`, `maps/`, `architecture/`, component diagrams, deployment docs, `ARCHITECTURE.md`
+4. **Topology exists?** — Look for: `about/lay-and-land/`, `maps/`, `architecture/`, component diagrams, deployment docs, `ARCHITECTURE.md`
 
 Rate each pillar: **absent** → **nascent** (scattered, informal) → **structured** (dedicated folder, some coverage) → **mature** (comprehensive, traceable, maintained)
 
@@ -104,7 +104,7 @@ Elements:
     4. "lay-and-land" (WHERE) — rectangle, earth tone (structure)
   - Sequential arrows connecting 1→2→3→4
   - A dashed bypass arrow from node 2 to node 4, labeled "can start in parallel after architecture track"
-  - Below each node: the folder path (docs/heart-and-soul/, docs/law-and-lore/, openspec/, docs/lay-and-land/) as free-floating small text
+  - Below each node: the folder path (about/heart-and-soul/, about/law-and-lore/, openspec/, about/lay-and-land/) as free-floating small text
 Argument: Order matters — each pillar grounds the next. But topology can start early.
 -->
 
@@ -165,7 +165,7 @@ Use `/project-direction` for a full direction analysis including priority-weight
 
 ## Workflow 4: Generate Project Overview
 
-Synthesize all four pillars into a visual, layman-friendly `docs/README.md` with embedded Excalidraw SVG diagrams. This is the public face of the project's shape — it makes someone who knows nothing understand what the project is, why it exists, and how it works.
+Synthesize all four pillars into a visual, layman-friendly `about/README.md` with embedded Excalidraw SVG diagrams. This is the public face of the project's shape — it makes someone who knows nothing understand what the project is, why it exists, and how it works.
 
 ### Requirements
 
@@ -180,7 +180,7 @@ Synthesize all four pillars into a visual, layman-friendly `docs/README.md` with
 3. **Generate** — Build each diagram via `/excalidraw-diagram`, render to SVG, validate through render-view-fix loop
 4. **Write** — Structured markdown: thesis → what it's not → how it works → what v1 delivers → principles → navigating the docs
 5. **Review** — Spawn accessibility + adversarial review subagents targeting layman comprehension
-6. **Commit** — Place at `docs/README.md`, store diagram sources in `docs/assets/`
+6. **Commit** — Place at `about/README.md`, store diagram sources in `about/assets/`
 
 Read `references/generate-overview.md` for the full guide: diagram specs, document skeleton, review agent prompts, and writing guidelines.
 
@@ -203,7 +203,7 @@ Read `references/generate-overview.md` for the full guide: diagram specs, docume
 | Review Protocol | `references/review-protocol.md` | Reviewing generated docs with independent subagents — agent specs, iteration rules, anti-patterns |
 | Bootstrapping Phases | `references/bootstrapping.md` | Step-by-step phase guide for establishing shape from scratch |
 | Local Skill Templates | `references/local-skill-templates.md` | Installing agent navigation skills for each pillar |
-| Generate Project Overview | `references/generate-overview.md` | Creating a layman-friendly docs/README.md with Excalidraw diagrams |
+| Generate Project Overview | `references/generate-overview.md` | Creating a layman-friendly about/README.md with Excalidraw diagrams |
 
 ## Local Skill Installation
 

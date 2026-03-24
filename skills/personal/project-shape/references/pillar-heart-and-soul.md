@@ -7,7 +7,7 @@ The doctrine layer answers **WHY**: why this project exists, what it believes, w
 ## Recommended Structure
 
 ```
-docs/heart-and-soul/
+about/heart-and-soul/
 ├── README.md          # Reading order, one-line per file, selection guide
 ├── vision.md          # Core thesis, what this IS and IS NOT, performance goals
 ├── architecture.md    # Structural philosophy (not implementation — that's RFCs)
@@ -66,7 +66,7 @@ Add a domain file when a topic has principles that code must embody:
 |-------|--------|
 | Absent | No vision, principles, or scope docs |
 | Nascent | README has some philosophy but no dedicated folder |
-| Structured | `docs/heart-and-soul/` exists with vision and scope |
+| Structured | `about/heart-and-soul/` exists with vision and scope |
 | Mature | Complete doctrine, domain files, numbered rules, actively referenced by RFCs/specs |
 
 ## Evolution

@@ -3,9 +3,9 @@
 # Usage: shape-scan.sh [project-root]
 #
 # Canonical layout:
-#   docs/heart-and-soul/  (doctrine)
-#   docs/law-and-lore/    (design contracts / RFCs)
-#   docs/lay-and-land/    (topology / maps)
+#   about/heart-and-soul/  (doctrine)
+#   about/law-and-lore/    (design contracts / RFCs)
+#   about/lay-and-land/    (topology / maps)
 #   openspec/             (capability specs — product, stays at root)
 #
 # Also detects legacy layouts (heart-and-soul/ at root, docs/rfcs/, maps/, etc.)
@@ -73,11 +73,11 @@ resolve_pillar() {
 
 # --- Pillar 1: Doctrine ---
 echo "## Pillar 1: Doctrine (WHY)"
-HAS_DIR=$(resolve_pillar "$ROOT/docs/heart-and-soul" "$ROOT/heart-and-soul")
+HAS_DIR=$(resolve_pillar "$ROOT/about/heart-and-soul" "$ROOT/heart-and-soul")
 if [ -n "$HAS_DIR" ]; then
   label="${HAS_DIR#$ROOT/}"
   check_dir "$label/" "$HAS_DIR"
-  [ "$HAS_DIR" = "$ROOT/heart-and-soul" ] && echo "    [LEGACY] Consider moving to docs/heart-and-soul/"
+  [ "$HAS_DIR" = "$ROOT/heart-and-soul" ] && echo "    [LEGACY] Consider moving to about/heart-and-soul/"
   check_file "vision.md" "$HAS_DIR/vision.md" || echo "    - [MISSING] vision.md (critical)"
   check_file "v1.md" "$HAS_DIR/v1.md" || true
   check_file "architecture.md" "$HAS_DIR/architecture.md" || true
@@ -89,20 +89,20 @@ if [ -n "$HAS_DIR" ]; then
   echo "  Local skill:"
   check_skill "heart-and-soul"
 else
-  echo "  [ABSENT] docs/heart-and-soul/"
+  echo "  [ABSENT] about/heart-and-soul/"
   for f in PHILOSOPHY.md MANIFESTO.md VALUES.md VISION.md; do
-    [ -f "$ROOT/$f" ] && echo "  [HINT] Found $f in root — consider moving to docs/heart-and-soul/"
+    [ -f "$ROOT/$f" ] && echo "  [HINT] Found $f in root — consider moving to about/heart-and-soul/"
   done
 fi
 echo ""
 
 # --- Pillar 2: Design Contracts ---
 echo "## Pillar 2: Design Contracts (HOW)"
-LAL_DIR=$(resolve_pillar "$ROOT/docs/law-and-lore" "$ROOT/docs")
+LAL_DIR=$(resolve_pillar "$ROOT/about/law-and-lore" "$ROOT/docs")
 if [ -n "$LAL_DIR" ]; then
   label="${LAL_DIR#$ROOT/}"
   check_dir "$label/" "$LAL_DIR"
-  # Find rfcs — could be at docs/law-and-lore/rfcs/ or legacy docs/rfcs/
+  # Find rfcs — could be at about/law-and-lore/rfcs/ or legacy docs/rfcs/
   RFC_DIR=""
   [ -d "$LAL_DIR/rfcs" ] && RFC_DIR="$LAL_DIR/rfcs"
   if [ -n "$RFC_DIR" ]; then
@@ -119,13 +119,13 @@ if [ -n "$LAL_DIR" ]; then
   fi
   [ -d "$LAL_DIR/prompts" ] && echo "    - Epic prompts: present"
   [ -d "$LAL_DIR/notes" ] && echo "    - Notes: present"
-  [ "$LAL_DIR" = "$ROOT/docs" ] && echo "    [LEGACY] Consider restructuring as docs/law-and-lore/"
+  [ "$LAL_DIR" = "$ROOT/docs" ] && echo "    [LEGACY] Consider restructuring as about/law-and-lore/"
   echo "  Local skill:"
   check_skill "law-and-lore"
 else
-  echo "  [ABSENT] docs/law-and-lore/"
+  echo "  [ABSENT] about/law-and-lore/"
   for d in design rfcs adrs decisions; do
-    [ -d "$ROOT/$d" ] && echo "  [HINT] Found $d/ in root — consider consolidating under docs/law-and-lore/"
+    [ -d "$ROOT/$d" ] && echo "  [HINT] Found $d/ in root — consider consolidating under about/law-and-lore/"
   done
 fi
 echo ""
@@ -156,11 +156,11 @@ echo ""
 
 # --- Pillar 4: Topology ---
 echo "## Pillar 4: Topology (WHERE)"
-LAY_DIR=$(resolve_pillar "$ROOT/docs/lay-and-land" "$ROOT/maps")
+LAY_DIR=$(resolve_pillar "$ROOT/about/lay-and-land" "$ROOT/maps")
 if [ -n "$LAY_DIR" ]; then
   label="${LAY_DIR#$ROOT/}"
   check_dir "$label/" "$LAY_DIR"
-  [ "$LAY_DIR" = "$ROOT/maps" ] && echo "    [LEGACY] Consider moving to docs/lay-and-land/"
+  [ "$LAY_DIR" = "$ROOT/maps" ] && echo "    [LEGACY] Consider moving to about/lay-and-land/"
   check_file "components.md" "$LAY_DIR/components.md" || true
   check_file "data-flow.md" "$LAY_DIR/data-flow.md" || true
   check_file "deployment.md" "$LAY_DIR/deployment.md" || true
@@ -174,21 +174,21 @@ if [ -n "$LAY_DIR" ]; then
   echo "  Local skill:"
   check_skill "lay-and-land"
 else
-  echo "  [ABSENT] docs/lay-and-land/"
+  echo "  [ABSENT] about/lay-and-land/"
   for d in architecture diagrams topology; do
-    [ -d "$ROOT/$d" ] && echo "  [HINT] Found $d/ in root — consider consolidating under docs/lay-and-land/"
+    [ -d "$ROOT/$d" ] && echo "  [HINT] Found $d/ in root — consider consolidating under about/lay-and-land/"
   done
-  [ -f "$ROOT/ARCHITECTURE.md" ] && echo "  [HINT] Found ARCHITECTURE.md in root — consider splitting into docs/lay-and-land/"
+  [ -f "$ROOT/ARCHITECTURE.md" ] && echo "  [HINT] Found ARCHITECTURE.md in root — consider splitting into about/lay-and-land/"
 fi
 echo ""
 
 # --- Summary ---
 echo "## Shape Summary"
 pillars=0
-[ -n "$(resolve_pillar "$ROOT/docs/heart-and-soul" "$ROOT/heart-and-soul")" ] && pillars=$((pillars + 1))
-[ -n "$(resolve_pillar "$ROOT/docs/law-and-lore" "$ROOT/docs")" ] && pillars=$((pillars + 1))
+[ -n "$(resolve_pillar "$ROOT/about/heart-and-soul" "$ROOT/heart-and-soul")" ] && pillars=$((pillars + 1))
+[ -n "$(resolve_pillar "$ROOT/about/law-and-lore" "$ROOT/docs")" ] && pillars=$((pillars + 1))
 [ -d "$ROOT/openspec" ] && pillars=$((pillars + 1))
-[ -n "$(resolve_pillar "$ROOT/docs/lay-and-land" "$ROOT/maps")" ] && pillars=$((pillars + 1))
+[ -n "$(resolve_pillar "$ROOT/about/lay-and-land" "$ROOT/maps")" ] && pillars=$((pillars + 1))
 
 skills=0
 for name in heart-and-soul law-and-lore spec-and-spine lay-and-land; do

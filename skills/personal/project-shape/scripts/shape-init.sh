@@ -3,9 +3,9 @@
 # Usage: shape-init.sh [project-root] [--pillars=1,2,3,4] [--skills-only] [--tools=claude,codex,gemini]
 #
 # Canonical layout:
-#   docs/heart-and-soul/  (doctrine)
-#   docs/law-and-lore/    (design contracts / RFCs)
-#   docs/lay-and-land/    (topology / maps)
+#   about/heart-and-soul/  (doctrine)
+#   about/law-and-lore/    (design contracts / RFCs)
+#   about/lay-and-land/    (topology / maps)
 #   openspec/             (capability specs — product, stays at root)
 #
 # Idempotent: skips anything that already exists.
@@ -62,9 +62,9 @@ create_dir() {
 scaffold_heart_and_soul() {
   if [ "$SKILLS_ONLY" = true ]; then return; fi
   echo ""
-  echo "## Pillar 1: docs/heart-and-soul/"
-  create_dir "$ROOT/docs/heart-and-soul"
-  create_file "$ROOT/docs/heart-and-soul/README.md" "# Heart and Soul
+  echo "## Pillar 1: about/heart-and-soul/"
+  create_dir "$ROOT/about/heart-and-soul"
+  create_file "$ROOT/about/heart-and-soul/README.md" "# Heart and Soul
 
 Project doctrine. Reading order:
 
@@ -73,7 +73,7 @@ Project doctrine. Reading order:
 
 Add domain files as needed (security.md, failure.md, etc.)."
 
-  create_file "$ROOT/docs/heart-and-soul/vision.md" "# Vision
+  create_file "$ROOT/about/heart-and-soul/vision.md" "# Vision
 
 ## What is this?
 
@@ -101,7 +101,7 @@ Add domain files as needed (security.md, failure.md, etc.)."
 
 <!-- How do you know this project is working? -->"
 
-  create_file "$ROOT/docs/heart-and-soul/v1.md" "# V1 Scope
+  create_file "$ROOT/about/heart-and-soul/v1.md" "# V1 Scope
 
 ## V1 Ships
 
@@ -129,11 +129,11 @@ Add domain files as needed (security.md, failure.md, etc.)."
 scaffold_law_and_lore() {
   if [ "$SKILLS_ONLY" = true ]; then return; fi
   echo ""
-  echo "## Pillar 2: docs/law-and-lore/"
-  create_dir "$ROOT/docs/law-and-lore"
-  create_dir "$ROOT/docs/law-and-lore/rfcs"
-  create_dir "$ROOT/docs/law-and-lore/reviews"
-  create_file "$ROOT/docs/law-and-lore/rfcs/0001-TEMPLATE.md" "# RFC 0001: <Title>
+  echo "## Pillar 2: about/law-and-lore/"
+  create_dir "$ROOT/about/law-and-lore"
+  create_dir "$ROOT/about/law-and-lore/rfcs"
+  create_dir "$ROOT/about/law-and-lore/reviews"
+  create_file "$ROOT/about/law-and-lore/rfcs/0001-TEMPLATE.md" "# RFC 0001: <Title>
 
 **Status:** Draft
 **Author:** <name>
@@ -180,10 +180,10 @@ specs_dir: changes"
 scaffold_lay_and_land() {
   if [ "$SKILLS_ONLY" = true ]; then return; fi
   echo ""
-  echo "## Pillar 4: docs/lay-and-land/"
-  create_dir "$ROOT/docs/lay-and-land"
-  create_dir "$ROOT/docs/lay-and-land/assets"
-  create_file "$ROOT/docs/lay-and-land/README.md" "# Lay and Land — System Topology
+  echo "## Pillar 4: about/lay-and-land/"
+  create_dir "$ROOT/about/lay-and-land"
+  create_dir "$ROOT/about/lay-and-land/assets"
+  create_file "$ROOT/about/lay-and-land/README.md" "# Lay and Land — System Topology
 
 Maps of where components live, how they connect, and what boundaries exist.
 
@@ -195,7 +195,7 @@ Maps of where components live, how they connect, and what boundaries exist.
 
 Diagrams live in \`assets/\`."
 
-  create_file "$ROOT/docs/lay-and-land/components.md" "# Component Map
+  create_file "$ROOT/about/lay-and-land/components.md" "# Component Map
 
 ## Components
 
@@ -233,7 +233,7 @@ scaffold_skill_heart_and_soul() {
 name: heart-and-soul
 description: >
   Load the project's foundational doctrine before making architectural decisions,
-  writing code, designing APIs, creating tests, or proposing features. The docs/heart-and-soul/
+  writing code, designing APIs, creating tests, or proposing features. The about/heart-and-soul/
   directory contains prime directives: what the system is, what it is not, and what v1 ships.
   Selectively load ONLY the documents relevant to your current task. Use proactively at the
   start of substantive work or when unsure about project conventions.
@@ -241,7 +241,7 @@ description: >
 
 # Project Doctrine — Heart and Soul
 
-The \`docs/heart-and-soul/\` directory contains the prime directives of this project.
+The \`about/heart-and-soul/\` directory contains the prime directives of this project.
 These are not documentation — they are doctrine.
 
 **Consult relevant soul files before:**
@@ -256,8 +256,8 @@ These are not documentation — they are doctrine.
 ### Always relevant
 | File | Read when... | Key content |
 |------|-------------|-------------|
-| \`docs/heart-and-soul/vision.md\` | Starting any session, scope questions | Core thesis, non-goals, non-negotiable rules |
-| \`docs/heart-and-soul/v1.md\` | Implementing anything, scoping features | What v1 ships vs defers |
+| \`about/heart-and-soul/vision.md\` | Starting any session, scope questions | Core thesis, non-goals, non-negotiable rules |
+| \`about/heart-and-soul/v1.md\` | Implementing anything, scoping features | What v1 ships vs defers |
 
 ### Select by domain
 | File | Read when... | Key content |
@@ -273,7 +273,7 @@ scaffold_skill_law_and_lore() {
   install_skill "law-and-lore" "---
 name: law-and-lore
 description: >
-  Load design contracts (RFCs) to contextualize implementation work. The docs/law-and-lore/
+  Load design contracts (RFCs) to contextualize implementation work. The about/law-and-lore/
   directory contains numbered design documents defining wire-level contracts, data models, state
   machines, and quantitative budgets. Consult relevant RFCs before implementing features, writing
   protocol definitions, or resolving cross-subsystem integration questions. Selectively load
@@ -282,7 +282,7 @@ description: >
 
 # Design Contracts — Law and Lore
 
-The \`docs/law-and-lore/\` directory contains the authoritative design contracts.
+The \`about/law-and-lore/\` directory contains the authoritative design contracts.
 
 **Consult relevant RFCs before:**
 - Implementing any subsystem or feature
@@ -296,7 +296,7 @@ The \`docs/law-and-lore/\` directory contains the authoritative design contracts
 
 | RFC | File | Read when... | Key content |
 |-----|------|-------------|-------------|
-| 0001 | \`docs/law-and-lore/rfcs/0001-<name>.md\` | [domain] | [summary] |
+| 0001 | \`about/law-and-lore/rfcs/0001-<name>.md\` | [domain] | [summary] |
 <!-- Add rows for each RFC -->
 
 ## Key Contracts
@@ -325,10 +325,10 @@ every test traces back to a normative requirement in a spec.
 
 | Layer | Location | Role |
 |-------|----------|------|
-| Doctrine | \`docs/heart-and-soul/\` | WHY — philosophical foundations |
-| Design Contracts | \`docs/law-and-lore/\` | HOW — wire-level contracts |
+| Doctrine | \`about/heart-and-soul/\` | WHY — philosophical foundations |
+| Design Contracts | \`about/law-and-lore/\` | HOW — wire-level contracts |
 | Capability Specs | \`openspec/\` | WHAT — normative requirements with testable scenarios |
-| Topology | \`docs/lay-and-land/\` | WHERE — component boundaries and connections |
+| Topology | \`about/lay-and-land/\` | WHERE — component boundaries and connections |
 
 ## Domain Lookup
 
@@ -359,7 +359,7 @@ scaffold_skill_lay_and_land() {
 name: lay-and-land
 description: >
   Load the project's topology maps to understand where components live, how they connect,
-  and what boundaries exist. The docs/lay-and-land/ directory contains component inventories,
+  and what boundaries exist. The about/lay-and-land/ directory contains component inventories,
   data flow diagrams, dependency maps, and deployment topology. Consult before adding new
   components, modifying integration points, changing deployment, or when unsure where something
   lives in the system.
@@ -367,7 +367,7 @@ description: >
 
 # System Topology — Lay and Land
 
-The \`docs/lay-and-land/\` directory contains the spatial understanding of this project — where
+The \`about/lay-and-land/\` directory contains the spatial understanding of this project — where
 components live, how data flows, what boundaries exist, and how the system is deployed.
 
 **Consult topology maps before:**
@@ -382,9 +382,9 @@ components live, how data flows, what boundaries exist, and how the system is de
 
 | Map | Read when... | Key content |
 |-----|-------------|-------------|
-| \`docs/lay-and-land/components.md\` | Need to understand what exists | Component inventory, boundaries, ownership |
-| \`docs/lay-and-land/data-flow.md\` | Need to understand how data moves | Data paths, transformations, trust boundaries |
-| \`docs/lay-and-land/deployment.md\` | Need to understand where things run | Environments, targets, infrastructure |
+| \`about/lay-and-land/components.md\` | Need to understand what exists | Component inventory, boundaries, ownership |
+| \`about/lay-and-land/data-flow.md\` | Need to understand how data moves | Data paths, transformations, trust boundaries |
+| \`about/lay-and-land/deployment.md\` | Need to understand where things run | Environments, targets, infrastructure |
 <!-- Add rows for additional maps -->
 
 ## Key Boundaries

@@ -1,10 +1,10 @@
 # Generate Project Overview
 
-Synthesize all four pillars into a visual, layman-friendly markdown document that serves as `docs/README.md`. This is the public face of the project's shape — it should make someone who knows nothing about the project understand what it is, why it exists, how it works, and where everything lives.
+Synthesize all four pillars into a visual, layman-friendly markdown document that serves as `about/README.md`. This is the public face of the project's shape — it should make someone who knows nothing about the project understand what it is, why it exists, how it works, and where everything lives.
 
 ## Output
 
-A single markdown file at `docs/README.md` containing:
+A single markdown file at `about/README.md` containing:
 - Embedded SVG diagrams (rendered from Excalidraw)
 - Prose written for a non-technical reader
 - Links into the four pillars for readers who want depth
@@ -36,7 +36,7 @@ Plan 3-5 Excalidraw diagrams that visually argue the project's story. Each diagr
 
 **What it argues**: What this project IS — its core thesis in visual form.
 
-Source: `docs/heart-and-soul/vision.md`
+Source: `about/heart-and-soul/vision.md`
 
 Approach:
 - Use the `/excalidraw-diagram` skill's conceptual/simple mode
@@ -48,7 +48,7 @@ Approach:
 
 **What it argues**: How the major pieces fit together.
 
-Source: `docs/lay-and-land/components.md`, `docs/heart-and-soul/architecture.md`
+Source: `about/lay-and-land/components.md`, `about/heart-and-soul/architecture.md`
 
 Approach:
 - Use `/excalidraw-diagram` at the comprehensive level
@@ -61,7 +61,7 @@ Approach:
 
 **What it argues**: What v1 delivers vs what comes later.
 
-Source: `docs/heart-and-soul/v1.md`
+Source: `about/heart-and-soul/v1.md`
 
 Approach:
 - Side-by-side or inside/outside visual
@@ -97,7 +97,7 @@ For each diagram:
 2. **Render to PNG** using the excalidraw render script
 3. **Convert to SVG** for clean markdown embedding (or use PNG with relative path)
 4. **Validate** through the render-view-fix loop until the diagram passes quality checks
-5. **Store** diagram sources in `docs/assets/` (or `docs/lay-and-land/assets/`)
+5. **Store** diagram sources in `about/assets/` (or `about/lay-and-land/assets/`)
 
 ### Phase 4: Write the Document
 
@@ -147,10 +147,10 @@ This project's documentation follows a four-pillar knowledge architecture:
 
 | Pillar | Location | What You'll Find |
 |--------|----------|-----------------|
-| **Heart and Soul** | `docs/heart-and-soul/` | Vision, principles, scope boundaries |
-| **Law and Lore** | `docs/law-and-lore/` | Technical design decisions and contracts |
+| **Heart and Soul** | `about/heart-and-soul/` | Vision, principles, scope boundaries |
+| **Law and Lore** | `about/law-and-lore/` | Technical design decisions and contracts |
 | **Spec and Spine** | `openspec/` | Detailed feature requirements |
-| **Lay and Land** | `docs/lay-and-land/` | System maps and component topology |
+| **Lay and Land** | `about/lay-and-land/` | System maps and component topology |
 
 [Brief guidance: "Start with heart-and-soul/vision.md for the full thesis.
 Read law-and-lore/ when you need to understand a technical decision.

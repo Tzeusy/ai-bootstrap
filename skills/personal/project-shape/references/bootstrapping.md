@@ -7,7 +7,7 @@ Step-by-step guide for establishing the four-pillar knowledge architecture from 
 - A project with a clear purpose (even if only in the founder's head)
 - Willingness to write before coding
 
-## Phase 1: Doctrine (docs/heart-and-soul/)
+## Phase 1: Doctrine (about/heart-and-soul/)
 
 **Goal**: Capture what the project believes before anyone writes code.
 
@@ -40,7 +40,7 @@ Only when a domain has principles worth codifying. Common early additions:
 
 An index file with one-line descriptions and a recommended reading order. Not doctrine itself — a map to doctrine.
 
-## Phase 2: Design Contracts (docs/law-and-lore/)
+## Phase 2: Design Contracts (about/law-and-lore/)
 
 **Goal**: Capture technical decisions in reviewable, numbered documents.
 
@@ -52,7 +52,7 @@ Start writing RFCs when you're making technical decisions that:
 - Establish performance budgets
 - Will be hard to change later
 
-### Step 1: Create docs/law-and-lore/rfcs/
+### Step 1: Create about/law-and-lore/rfcs/
 
 Write your first RFC for the most foundational subsystem. Number it `0001`.
 
@@ -91,7 +91,7 @@ One spec file per subsystem/domain. Each requirement must have:
 
 Use the spec requirements to create implementation beads. Each v1-mandatory requirement generates one or more tasks.
 
-## Phase 4: Topology (docs/lay-and-land/)
+## Phase 4: Topology (about/lay-and-land/)
 
 **Goal**: Document where components live, how they connect, and what boundaries exist.
 
@@ -103,7 +103,7 @@ Start mapping topology when:
 - New contributors (human or LLM) struggle to find where things live
 - Integration between subsystems becomes non-trivial
 
-### Step 1: Create docs/lay-and-land/
+### Step 1: Create about/lay-and-land/
 
 Start with `components.md` — an inventory of what exists and who owns what.
 
@@ -113,7 +113,7 @@ As the system grows, document how data moves (`data-flow.md`) and where things r
 
 ### Step 3: Include diagrams
 
-Visual maps are more effective than prose. Use Mermaid (version-controllable) or Excalidraw (hand-drawn feel). Store sources in `docs/lay-and-land/assets/`.
+Visual maps are more effective than prose. Use Mermaid (version-controllable) or Excalidraw (hand-drawn feel). Store sources in `about/lay-and-land/assets/`.
 
 ### Step 4: Cross-reference other pillars
 
