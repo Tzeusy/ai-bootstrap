@@ -1,5 +1,5 @@
 ---
-name: th-project-shape
+name: project-shape
 description: >
   Analyze and bootstrap the four-pillar knowledge architecture of a software project:
   docs/heart-and-soul (doctrine), docs/law-and-lore (RFCs/design contracts), docs/lay-and-land
@@ -143,7 +143,7 @@ When code changes diverge from documentation:
 
 ### Related Skills
 
-Use `/th-project-direction` for a full direction analysis including priority-weighted work plans. Use `/th-reconcile-spec-to-project` for detailed spec-code divergence detection.
+Use `/project-direction` for a full direction analysis including priority-weighted work plans. Use `/reconcile-spec-to-project` for detailed spec-code divergence detection.
 
 ## Reference Index
 

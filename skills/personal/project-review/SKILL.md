@@ -1,5 +1,5 @@
 ---
-name: th-project-review
+name: project-review
 description: Deep evidence-based audit of a repository's health, quality, maintainability, and long-term viability. Produces a structured report with scores, risks, and actionable recommendations. Use when asked to review, audit, or assess a project, codebase, or repository — or when asked about project health, tech debt, or code quality at a repo-wide level. Triggers on phrases like "review this project", "audit the codebase", "assess code quality", "project health check", "tech debt audit".
 ---
 

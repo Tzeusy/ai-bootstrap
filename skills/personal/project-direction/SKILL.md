@@ -1,5 +1,5 @@
 ---
-name: th-project-direction
+name: project-direction
 description: Analyze a software project's true direction, validate alignment between specs/docs and implementation, and produce a prioritized, spec-driven work plan with beads. Ensures every non-trivial epic includes a report-generation bead for human review. Use when deciding what to work on next, evaluating feature proposals, checking spec-to-code drift, sequencing roadmap items, or pushing back on misaligned requirements. Triggers on "what should we work on next", "prioritize features", "does the code match the spec", "is this roadmap aligned", "what's highest leverage", "should we build this", "is this tractable", "break this down into chunks".
 ---
 

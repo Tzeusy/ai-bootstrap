@@ -1,6 +1,6 @@
 # Epic Report Bead
 
-Execution guide for the **epic report bead** — a child bead created by `/th-project-direction` during work plan materialization. This bead generates a human-readable report of what was built, for a human to review.
+Execution guide for the **epic report bead** — a child bead created by `/project-direction` during work plan materialization. This bead generates a human-readable report of what was built, for a human to review.
 
 This file is referenced in the report bead's description. The executor (human, `/beads-worker`, or agent) follows this guide.
 
@@ -8,7 +8,7 @@ This file is referenced in the report bead's description. The executor (human, `
 
 ## Bead Template
 
-When `/th-project-direction` calls `/beads-writer` to create the epic, include a report bead with this structure:
+When `/project-direction` calls `/beads-writer` to create the epic, include a report bead with this structure:
 
 ```
 Title: "Generate epic report for: {epic title}"
@@ -18,7 +18,7 @@ Parent: {epic-id}
 Dependencies: ALL implementation children + reconciliation bead (this runs last)
 Description: |
   Generate a human-readable epic report following the guide in
-  /th-project-direction references/epic-report.md.
+  /project-direction references/epic-report.md.
 
   Epic ID: {epic-id}
   Spec sections covered: {list}
