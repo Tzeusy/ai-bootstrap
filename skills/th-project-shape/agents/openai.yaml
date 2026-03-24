@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Shape"
+  short_description: "Define project structure: doctrine, design, specs"
+  default_prompt: "Use $th-project-shape to analyze and bootstrap the three-pillar knowledge architecture for this project."
