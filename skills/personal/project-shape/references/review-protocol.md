@@ -13,21 +13,22 @@ Independent review breaks this by giving a fresh agent only the document, not th
 
 ## Review Architecture
 
-```
-Generator Agent (highest capability model, max thinking)
-  ↓ produces draft document
-  ↓
-Review Agent 1: Coherence (fresh context, no generation history)
-  ↓ findings
-Review Agent 2: Adversarial (fresh context, no generation history)
-  ↓ findings
-Review Agent 3: Cross-Pillar (fresh context, reads all pillars)
-  ↓ findings
-  ↓
-Generator Agent: incorporates findings, revises
-  ↓
-[Optional: second review round if major issues found]
-```
+<!-- [DIAGRAM: review-architecture]
+Style: conceptual, simple. Use /excalidraw-diagram.
+Layout: vertical pipeline with fan-out and convergence.
+Elements:
+  - Top: hero rectangle "Generator Agent" labeled "(highest capability model, max thinking)", warm/primary color
+  - Arrow down labeled "produces draft document"
+  - Fan-out to 3 parallel review agents (side-by-side rectangles, all in a cool/secondary color):
+    - "Review Agent 1: Coherence" — subtitle "fresh context, no generation history"
+    - "Review Agent 2: Adversarial" — subtitle "fresh context, no generation history"
+    - "Review Agent 3: Cross-Pillar" — subtitle "fresh context, reads all pillars"
+  - Each has a downward arrow labeled "findings"
+  - Convergence: all 3 findings arrows merge into a single arrow pointing down
+  - Bottom: "Generator Agent: incorporates findings, revises" — same color as top
+  - Dashed cycle arrow from bottom back to the fan-out, labeled "Optional: second round if major issues"
+Argument: Independence is the key — review agents have NO access to generation context. The fan-out ensures parallel, unbiased evaluation.
+-->
 
 ## Subagent Specifications
 

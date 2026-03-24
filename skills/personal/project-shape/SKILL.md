@@ -15,6 +15,8 @@ description: >
 
 A project's **shape** is the knowledge architecture that makes it comprehensible to both humans and LLMs. Shape is not code — it's the structured understanding that tells you *what* a project is, *why* it exists, *how* it works, and *what* must be built.
 
+**Visualization directive**: When presenting any workflow or conceptual model from this skill to a user, generate an Excalidraw diagram using `/excalidraw-diagram` and render it to SVG. Diagrams should argue visually, not just label boxes. All flowcharts described below include `[DIAGRAM]` markers with generation specs.
+
 ## The Four-Pillar Model
 
 Every well-shaped project has four distinct knowledge layers, each answering a different question:
@@ -30,11 +32,17 @@ Three pillars live under `docs/` — human-authored knowledge with poetic names.
 
 The pillars form a **traceability chain**:
 
-```
-Doctrine principle → RFC design decision → Spec requirement → Code → Test
-          ↕                  ↕                    ↕              ↕
-      Topology map: where components live, how they connect, what boundaries exist
-```
+<!-- [DIAGRAM: traceability-chain]
+Style: conceptual, simple. Use /excalidraw-diagram.
+Layout: horizontal assembly line (left-to-right) with a cross-cutting band beneath.
+Elements:
+  - Top row: 5 nodes in a chain — "Doctrine principle" → "RFC design decision" → "Spec requirement" → "Code" → "Test"
+    Connected by arrows. Each node is a rounded rectangle, color-coded by pillar.
+  - Bottom band: A wide, semi-transparent rectangle spanning the full width labeled "Topology map: where components live, how they connect, what boundaries exist"
+    Connected to each top-row node with bidirectional dashed arrows (↕), showing topology cross-cuts every layer.
+  - The bottom band should visually "support" the chain, like a foundation or substrate.
+Argument: Every implementation decision traces back through this chain. Topology is not a phase — it cross-cuts all others.
+-->
 
 Every implementation decision should trace back through this chain. The topology layer cross-cuts all others — it shows *where* the doctrine is embodied, *where* the design contracts apply, and *where* the specs are implemented.
 
@@ -85,10 +93,20 @@ Bootstrapping is a **consultative process**, not a template-filling exercise. Th
 
 Work top-down — each pillar grounds the next:
 
-```
-docs/heart-and-soul/  →  docs/law-and-lore/  →  openspec/  →  docs/lay-and-land/
-     (WHY)                    (HOW)               (WHAT)          (WHERE)
-```
+<!-- [DIAGRAM: pillar-order]
+Style: conceptual, simple. Use /excalidraw-diagram.
+Layout: horizontal chain of 4 nodes with a parallel bypass arrow.
+Elements:
+  - 4 pillars as distinct shapes, left-to-right:
+    1. "heart-and-soul" (WHY) — ellipse, warm color (origin/start)
+    2. "law-and-lore" (HOW) — rectangle, cool color (process)
+    3. "openspec" (WHAT) — diamond or hexagon, accent color (decision/spec)
+    4. "lay-and-land" (WHERE) — rectangle, earth tone (structure)
+  - Sequential arrows connecting 1→2→3→4
+  - A dashed bypass arrow from node 2 to node 4, labeled "can start in parallel after architecture track"
+  - Below each node: the folder path (docs/heart-and-soul/, docs/law-and-lore/, openspec/, docs/lay-and-land/) as free-floating small text
+Argument: Order matters — each pillar grounds the next. But topology can start early.
+-->
 
 Topology (lay-and-land) can be started in parallel with design contracts once the architecture interview track is complete.
 
@@ -98,19 +116,19 @@ Read `references/bootstrapping.md` for phase-by-phase details.
 
 The shape model provides a natural funnel for turning ideas into code:
 
-```
-Idea/Insight
-  ↓  "Does this align with doctrine?"
-docs/heart-and-soul/ review
-  ↓  "Where does this live in the system?"
-docs/lay-and-land/ topology check
-  ↓  "How would this work technically?"
-docs/law-and-lore/ RFC draft
-  ↓  "What exactly must be built and tested?"
-openspec/ capability spec
-  ↓  "Create beads for implementation"
-bd create ...
-```
+<!-- [DIAGRAM: idea-funnel]
+Style: conceptual, simple. Use /excalidraw-diagram.
+Layout: vertical funnel/timeline — wide at top, narrowing toward bottom.
+Elements:
+  - Top: large cloud shape labeled "Idea / Insight" (abstract, fuzzy)
+  - 5 stages descending vertically, each with:
+    - A gate question (free-floating italic text to the right): "Does this align with doctrine?", "Where does this live?", "How would this work?", "What exactly must be built?", "Create beads"
+    - The pillar that answers it (colored node matching the pillar's color): heart-and-soul, lay-and-land, law-and-lore, openspec, bd create
+  - Arrows between each stage, narrowing (funnel visual)
+  - Left side: a "reject" arrow branching off after the first gate, labeled "doctrine misalignment — idea dies early"
+  - Bottom: small precise rectangle labeled "Implementation beads" (concrete, sharp)
+Argument: Ideas enter fuzzy and exit precise. Each pillar sharpens them. Bad ideas are killed early by doctrine.
+-->
 
 At each stage, ideas get sharper and more concrete. Bad ideas die early (doctrine misalignment). Good ideas gain precision (spec scenarios).
 

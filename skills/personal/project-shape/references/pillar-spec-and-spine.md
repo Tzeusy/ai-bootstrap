@@ -60,9 +60,18 @@ The chain: `doctrine principle → RFC §section → spec requirement → WHEN/T
 
 Specs evolve through a managed lifecycle:
 
-```
-explore → new → continue → apply → verify → sync → archive
-```
+<!-- [DIAGRAM: spec-lifecycle]
+Style: conceptual, simple. Use /excalidraw-diagram.
+Layout: horizontal timeline with spiral/cycle return.
+Elements:
+  - 7 stages as small dots on a horizontal timeline line, each with a free-floating label above:
+    "explore" → "new" → "continue" → "apply" → "verify" → "sync" → "archive"
+  - Arrows connecting each dot sequentially left-to-right
+  - A dashed cycle arrow from "verify" back to "continue", labeled "issues found — iterate"
+  - Color gradient: early stages (explore, new) in lighter/cooler tones, later stages (sync, archive) in warmer/darker tones
+  - "archive" endpoint as a filled dot (completion)
+Argument: Specs have a lifecycle — they're not write-once. The verify→continue loop ensures specs stay honest.
+-->
 
 | Phase | Action |
 |-------|--------|
