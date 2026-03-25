@@ -2,6 +2,8 @@
 
 Install these as `.claude/skills/<name>/SKILL.md` (and equivalents for `.codex/`, `.gemini/`, etc.) in the target project. Each skill is an **index** — it tells agents which file to read for a given task, not what the file says.
 
+**CRITICAL FORMAT REQUIREMENT:** Every SKILL.md file **MUST** begin with YAML frontmatter delimited by `---`. Without frontmatter, skill loaders silently reject the file. Required fields: `name` and `description`. Optional fields: `license`, `compatibility`, `metadata`, `allowed-tools`. Do not omit the opening or closing `---` delimiters. Do not start the file with a markdown heading.
+
 Customize the tables and rules for your project's specific domains.
 
 ## Template: heart-and-soul

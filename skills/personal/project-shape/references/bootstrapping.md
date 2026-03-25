@@ -133,9 +133,15 @@ mkdir -p .claude/skills/{heart-and-soul,law-and-lore,spec-and-spine,lay-and-land
 
 ### Step 2: Write SKILL.md for each
 
-Use the templates from `references/local-skill-templates.md`. Customize the index tables with your actual files and domains.
+**Preferred:** Run `shape-init.sh --skills-only` which generates correctly-formatted skills automatically.
 
-### Step 3: Test navigation
+**If writing manually:** Every SKILL.md **MUST** start with YAML frontmatter (`---` delimiters with `name` and `description` fields). Without frontmatter, skill loaders silently reject the file. Use the templates from `references/local-skill-templates.md` and customize the index tables with your actual files and domains.
+
+### Step 3: Validate format
+
+Run `shape-scan.sh` and check that all four skills show `[VALID]` frontmatter. Fix any `[INVALID]` warnings before committing.
+
+### Step 4: Test navigation
 
 Start a new LLM session and try tasks that should trigger each skill. Verify the agent finds the right files.
 

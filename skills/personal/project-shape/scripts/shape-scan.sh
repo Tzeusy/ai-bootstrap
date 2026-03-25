@@ -50,7 +50,29 @@ check_skill() {
   for tool_dir in .claude .codex .gemini .opencode; do
     local skill_path="$ROOT/$tool_dir/skills/$name/SKILL.md"
     if [ -f "$skill_path" ]; then
-      echo "    - $tool_dir/skills/$name/ [installed]"
+      # Validate YAML frontmatter: file must start with --- and have a closing ---
+      local first_line
+      first_line=$(head -1 "$skill_path")
+      if [ "$first_line" = "---" ]; then
+        # Check for closing delimiter (second --- within first 20 lines)
+        local has_closing
+        has_closing=$(tail -n +2 "$skill_path" | head -20 | grep -c '^---$' || true)
+        if [ "$has_closing" -ge 1 ]; then
+          # Check for required fields
+          local has_name has_desc
+          has_name=$(sed -n '2,20p' "$skill_path" | grep -c '^name:' || true)
+          has_desc=$(sed -n '2,20p' "$skill_path" | grep -c '^description:' || true)
+          if [ "$has_name" -ge 1 ] && [ "$has_desc" -ge 1 ]; then
+            echo "    - $tool_dir/skills/$name/ [VALID]"
+          else
+            echo "    - $tool_dir/skills/$name/ [INVALID] missing required name/description fields"
+          fi
+        else
+          echo "    - $tool_dir/skills/$name/ [INVALID] missing closing --- delimiter"
+        fi
+      else
+        echo "    - $tool_dir/skills/$name/ [INVALID] missing YAML frontmatter (file must start with ---)"
+      fi
       found=1
     fi
   done

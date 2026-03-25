@@ -209,9 +209,42 @@ Read `references/generate-overview.md` for the full guide: diagram specs, docume
 
 Each pillar should have a corresponding local skill in `.claude/skills/` (and equivalent for other tools). These skills teach LLM agents how to navigate and use each pillar.
 
-Read `references/local-skill-templates.md` for templates. The key principle: local skills are **indexes with selection guidance**, not duplicates of the content. They tell the agent *which file to read* for a given task, not *what the file says*.
+**Preferred method:** Run `shape-init.sh` which generates correctly-formatted skills automatically:
+
+```bash
+bash <skill-path>/scripts/shape-init.sh [project-root] --skills-only --tools=claude,codex
+```
+
+**If writing skills manually**, every SKILL.md **MUST** start with YAML frontmatter. Without it, skill loaders reject the file silently. This is the required format:
+
+```yaml
+---
+name: <pillar-name>
+description: >
+  Multi-line description of when this skill should be used.
+  This is the triggering mechanism — be specific about contexts.
+---
+
+# Skill Title
+
+Markdown body follows...
+```
+
+- The `---` delimiters on lines 1 and N are mandatory — without them the file is invalid
+- `name` and `description` are required; `license`, `compatibility`, `metadata`, and `allowed-tools` are optional
+- Read `references/local-skill-templates.md` for full customizable templates per pillar
+
+The key principle: local skills are **indexes with selection guidance**, not duplicates of the content. They tell the agent *which file to read* for a given task, not *what the file says*.
 
 All four pillars should have a corresponding local skill: `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`.
+
+**After writing skills, validate them:**
+
+```bash
+bash <skill-path>/scripts/shape-scan.sh [project-root]
+```
+
+The scan checks for frontmatter validity. Fix any reported issues before committing.
 
 ## Anti-Patterns
 
