@@ -171,7 +171,6 @@ may already account for it.
 
 ### Beads Creation Safety
 - Create child beads sequentially (`&&`-chained), never in parallel
-- Run `bd sync` between unrelated batches
 - Use `bd dep add` after creation, not `--deps` flag
 - See CLAUDE.md for any project-specific beads gotchas
 
