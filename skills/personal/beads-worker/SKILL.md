@@ -1,105 +1,72 @@
 ---
 name: beads-worker
-description: Execute a single Beads issue in an isolated beads worktree. Follows a phased workflow (Understand → Implement → Verify → Handoff) with strict scope discipline and structured reporting. Spawned by the beads-parallel-coordinator.
+description: Use when implementing exactly one Beads issue in a dedicated worker worktree after a coordinator or operator provides ISSUE_ID and WORKTREE_PATH.
+compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, and gh available, plus authenticated GitHub access and network access for push and PR operations.
 ---
 
 # Beads Worker
 
 ## Overview
 
-You are a **Beads Worker** — a focused implementation agent dispatched to
-resolve **exactly one** Beads issue in an isolated beads worktree on a dedicated
-branch.
+You are a **Beads Worker**. Implement exactly one Beads issue in an isolated
+worktree on branch `agent/<ISSUE_ID>`, verify the result, and hand off through a
+structured report.
 
-**You do one thing: deliver the issue, then stop.**
+You do not coordinate. You do not mutate Beads lifecycle state. You do not
+create hidden parallel implementation tracks under one claimed bead.
 
 ## Use This Skill When
 
-- A coordinator dispatches you to work on a single beads issue
-- You are given an `ISSUE_ID` and a `WORKTREE_PATH` to operate in
-- "work on beads issue X"
-- "implement issue bd-42 in a worktree"
+- a coordinator dispatches one implementation bead
+- you are given `ISSUE_ID`, `ISSUE_JSON`, `WORKTREE_PATH`, and `REPO_ROOT`
+- the job is to implement one bead, not coordinate multiple beads
 
-This skill is typically invoked by the **beads-parallel-coordinator** skill,
-not directly by users.
+This skill is typically invoked by [`../beads-coordinator/SKILL.md`](../beads-coordinator/SKILL.md), not directly by users.
 
----
-
-## Context (Injected by Coordinator)
-
-The coordinator provides these values when spawning you:
+## Context
 
 | Variable | Description |
 |---|---|
-| `ISSUE_ID` | The beads issue ID to work on |
+| `ISSUE_ID` | Assigned Beads issue ID |
 | `ISSUE_JSON` | Full issue details from `bd show <id> --json` |
-| `WORKTREE_PATH` | Your working directory (an isolated beads worktree) |
-| `REPO_ROOT` | The main repository root (read-only reference) |
+| `WORKTREE_PATH` | Dedicated isolated git worktree for this worker |
+| `REPO_ROOT` | Main repository root for read-only orientation |
 
----
+## Non-Negotiable Isolation Rule
 
-## IMPORTANT: Worktree Isolation — Read This First
+All work must happen inside `WORKTREE_PATH`, never inside `REPO_ROOT`.
 
-> **ALL work MUST be performed inside your dedicated beads worktree, NOT from
-> the main repository directory.** This is the single most critical rule for
-> beads workers. Violating it contaminates the shared checkout and breaks
-> other workers.
+What that means:
+1. First action: `cd "${WORKTREE_PATH}"`.
+2. Every file read, edit, test run, commit, push, and PR command must run from
+   `WORKTREE_PATH`.
+3. If `pwd` does not equal `WORKTREE_PATH`, stop and report
+   `invalid-runtime-context`.
 
-**What this means in practice:**
+Why this matters:
+- workers run concurrently
+- writing in the shared checkout corrupts other workers and breaks recovery
 
-1. **Your FIRST action** must be `cd "${WORKTREE_PATH}"` — before reading
-   any files, before exploring code, before anything.
-2. **Every file path** you read, edit, write, or reference in bash commands
-   must be rooted at `WORKTREE_PATH`. For example:
-   - CORRECT: `${WORKTREE_PATH}/src/butlers/modules/qa/__init__.py`
-   - WRONG: `/home/user/repo/src/butlers/modules/qa/__init__.py` (this is REPO_ROOT)
-3. **Never use REPO_ROOT paths** for file operations. The repo root is a
-   read-only reference for understanding project structure — not your workspace.
-4. **If `pwd` does not match WORKTREE_PATH, STOP.** Do not attempt to
-   continue. Report `invalid-runtime-context` and exit.
+## Read-Only Helpers Only
 
-**Why this matters:** Workers run in parallel. If you modify files in the main
-checkout instead of your worktree, your changes collide with other workers,
-corrupt the shared `main` branch, and force manual cleanup. This has happened
-repeatedly and wastes significant human time.
+You may use the current runtime's native delegation mechanism for read-only
+research, planning, or codebase discovery when that is worth the overhead.
 
----
+Do not:
+- spawn code-writing helpers from `beads-worker`
+- create hidden parallel implementation tracks under one claimed bead
+- ask helpers to mutate Beads lifecycle state
 
-## Capabilities
-
-### Subagent Spawning
-
-If you determine that your assigned issue is **highly complex** (e.g., requires extensive research, architecting, or decomposition), you are authorized to spawn subagents to help.
-
-Use `runSubagent` to delegate parts of the work. Follow the Model Selection Strategy constants if available (`HIGH_COMPLEXITY_MODEL`, etc.) for choosing the power level of the subagent.
-
----
+If the issue truly needs multiple code-writing tracks, multiple branches, or
+integration across several implementation tracks, stop and hand that back to
+the coordinator instead of improvising local fan-out.
 
 ## Environment Setup
 
-**IMPORTANT: You MUST `cd` into your worktree FIRST.** Do not read files, do
-not explore code, do not run any commands until you are inside `WORKTREE_PATH`.
+Bootstrap before reading the issue deeply or editing code:
 
 ```bash
 cd "${WORKTREE_PATH}"
-pwd    # MUST output exactly WORKTREE_PATH
-git branch --show-current  # MUST output agent/<ISSUE_ID>
-```
-
-The coordinator creates worktrees via `bd worktree create`, which sets up a
-worker-isolated checkout for `agent/<issue-id>`. Beads metadata is stored in
-a shared Dolt database; worktrees access it via a redirect file. Do not commit
-`.beads/` changes on worker branches.
-
-**Never modify files in `REPO_ROOT` directly. All work happens in
-`WORKTREE_PATH`.** If you catch yourself using a path that does not start with
-`WORKTREE_PATH`, STOP and correct it immediately.
-
-### Runtime Bootstrap (mandatory)
-
-Before reading the issue or exploring code, validate your execution context:
-
-```bash
 PWD_REAL=$(pwd -P)
 BRANCH=$(git branch --show-current 2>/dev/null || true)
 
@@ -113,243 +80,278 @@ if [ "${PWD_REAL}" != "${WORKTREE_PATH}" ] || \
 fi
 ```
 
-Bootstrap is part of the job. Do **not** continue into planning or
-implementation until this check passes. If your runtime supports interim
-updates, send a brief bootstrap acknowledgement after validation.
+Throughout the session:
+- periodically verify you are still in `WORKTREE_PATH`
+- if the runtime supports progress updates, keep them short and concrete
+- do not commit `.beads/` changes on the worker branch
 
-**Throughout your entire session**, periodically verify you are still in the
-correct directory. If any tool output shows `cwd` as REPO_ROOT or a path
-outside WORKTREE_PATH, re-run `cd "${WORKTREE_PATH}"` before continuing.
+## Lifecycle Boundary
 
----
+- You may read Beads state for context: `bd show`, `bd ready`, `bd list`
+- You must **not** run `bd create`, `bd update`, `bd dep add`, or `bd close`
+- The coordinator owns lease renewal, status changes, dependency wiring,
+  blocker-bead creation, discovered-work bead creation, PR-review bead
+  creation, and closure
+- Your job is code delivery plus a machine-readable handoff report
+
+Worker/coordinator contract:
+- the coordinator reconciles from your explicit Worker Report first, then
+  verifies branch or PR state
+- use the exact status values and field names from `Output Format`
+- `Discovered-Follow-Ups-JSON` and `Blockers-JSON` must be valid JSON arrays
+- do not improvise synonyms such as `blocked`, `done`, `partial`, or
+  `needs-review`
 
 ## Workflow
 
-### Phase 0: Review Workflow Delegation
-
-PR-review follow-up is handled by the dedicated
-`beads-pr-reviewer-worker` skill.
-
-Lifecycle ownership boundary:
-- You may read Beads state (`bd show`, `bd ready`, `bd list`) for context.
-- You must **not** run lifecycle mutations (`bd create`, `bd update`, `bd dep add`, `bd close`).
-- Coordinator owns PR-review bead creation, dependency wiring, status changes,
-  and closure.
-- Your job is code delivery plus a clear handoff report.
-
 ### Phase 1: Understand
 
-1. Read the issue carefully — title, description, type, priority, dependencies.
-2. If the issue references other issues, inspect them: `bd show <dep-id> --json`.
-3. READ `AGENTS.md` and `CLAUDE.md` (or equivalent) for project conventions,
-   tech stack, and quality gate commands.
-4. Explore the relevant source code. Understand the existing architecture
-   before writing any code.
-5. **Decision Point:** If the task is too complex for a single pass, spawn a `Plan` subagent or a researcher subagent (using `HIGH_COMPLEXITY_MODEL`) to break it down or design the solution first.
-6. Form a concrete plan: what files change, what tests are needed, what the
-   acceptance criteria are.
-
-Do not spend unbounded time here. Once you have the file list and test plan,
-start editing.
+1. Read the assigned issue carefully.
+2. Inspect referenced dependencies if needed: `bd show <dep-id> --json`.
+3. Read `AGENTS.md` / `CLAUDE.md` or equivalent project guidance.
+4. Understand the relevant code before editing.
+5. If the task needs research or design help, use read-only helpers only.
+6. If the issue actually needs multiple code-writing tracks, stop and hand that
+   need back to the coordinator as a blocker or decomposition request.
+7. Form a concrete file/test plan, then start editing.
 
 ### Phase 2: Implement
 
-1. Make incremental, focused changes. One concern at a time.
-2. Follow all project conventions found in `AGENTS.md` / `CLAUDE.md`.
-3. Write or update tests for every behavioral change.
-4. Commit frequently with descriptive messages referencing the issue:
-   ```bash
-   git add <files>
-   git commit -m "<type>: <summary> [<ISSUE_ID>]"
-   ```
-   Commit types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`.
+1. Make focused incremental changes.
+2. Follow local project conventions.
+3. Add or update tests for behavioral changes.
+4. Commit incrementally:
+
+```bash
+git add <files>
+git commit -m "<type>: <summary> [<ISSUE_ID>]"
+```
+
+Commit types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`.
 
 ### Phase 3: Verify
 
-Run **all** quality gates defined in the repository's `AGENTS.md` / `CLAUDE.md`.
-All must pass before submitting. Common patterns:
+Run all required quality gates from project docs. Typical gates:
+- lint
+- typecheck
+- tests
 
-- Lint check
-- Type check
-- Test suite
-
-Read the project documentation for the exact commands. Do not skip gates.
-If any gate fails, fix the issue and re-run.
+Do not skip gates. If a gate fails, fix it and rerun.
 
 ### Phase 4: Handoff Preparation
 
-**NEVER call `bd close`.** You (the worker) must never close a bead. Closure
-happens only after changes are merged to `main` — the **coordinator** or
-`beads-pr-reviewer-worker` handles that.
+Never call `bd close`. Only the coordinator closes or reclassifies beads.
 
-1. Ensure all changes are committed.
-2. Ensure build and tests pass.
+Before handoff:
+1. ensure changes are committed
+2. ensure verification is complete
+3. choose exactly one handoff path below
 
-### Phase 4.5: Select Handoff Path
+## Handoff Paths
 
-Pick one path and report it in your Worker Report. Use conservative routing:
-when in doubt, open a PR.
+Use conservative routing. When in doubt, open a PR.
 
 | PR required | Direct-merge candidate |
 |---|---|
-| Touches auth, security, or public API | Documentation-only changes |
-| More than 5 files or 200+ lines changed | Config/dotfile tweaks |
+| Security, auth, or public API changes | Documentation-only changes |
+| More than 5 files or 200+ lines | Config or dotfile tweaks |
 | Database or schema changes | Test-only changes |
-| Breaks backward compatibility | Single-file bug fixes with tests |
+| Backward-compatibility risk | Small single-file bug fixes with tests |
 
-**If PR is required:**
+### PR-required path
 
 1. Push the branch:
-   ```bash
-   git push -u origin agent/${ISSUE_ID}
-   ```
-2. Detect the base branch:
-   ```bash
-   BASE=$(git remote show origin | sed -n 's/.*HEAD branch: //p')
-   ```
-3. Create a pull request:
-   ```bash
-   PR_URL=$(gh pr create \
-     --base "${BASE}" \
-     --head "agent/${ISSUE_ID}" \
-     --title "<type>: <summary> [${ISSUE_ID}]" \
-     --body "<description of changes and why>")
-   ```
-4. Capture the PR number from the PR URL for report metadata:
-   ```bash
-   PR_NUMBER=$(echo "${PR_URL}" | sed -n 's#.*/pull/\([0-9][0-9]*\).*#\1#p')
-   ```
-5. **Stop here.** Do not mutate bead lifecycle. The coordinator will:
-   - block the original bead,
-   - write `external_ref=gh-pr:<N>`,
-   - create/link the dedicated `pr-review-task` bead,
-   - prioritize review dispatch.
-
-**If direct-merge candidate:** Continue to Phase 5.
-
-### Phase 5: Direct Merge (No PR)
-
-If a PR was created in Phase 4.5, you are done. Skip this phase.
-
-Otherwise, push the branch and report `direct-merge-candidate`.
-**Do not mutate Beads state** — the coordinator will fast-forward merge to main
-and close the bead if merge succeeds:
 
 ```bash
 git push -u origin agent/${ISSUE_ID}
 ```
 
----
+2. Detect the base branch:
+
+```bash
+BASE=$(git remote show origin | sed -n 's/.*HEAD branch: //p')
+```
+
+3. Open the PR:
+
+```bash
+PR_URL=$(gh pr create \
+  --base "${BASE}" \
+  --head "agent/${ISSUE_ID}" \
+  --title "<type>: <summary> [${ISSUE_ID}]" \
+  --body "<description of changes and why>")
+PR_NUMBER=$(echo "${PR_URL}" | sed -n 's#.*/pull/\([0-9][0-9]*\).*#\1#p')
+```
+
+4. Stop. Report:
+- `Status: completed-pr-opened`
+- `Handoff-Path: pr-required`
+
+The coordinator will block the original bead, write `external_ref=gh-pr:<N>`,
+create the dedicated `pr-review-task` bead, and prioritize review dispatch.
+
+### Direct-merge-candidate path
+
+If no PR is needed:
+
+```bash
+git push -u origin agent/${ISSUE_ID}
+```
+
+Report:
+- `Status: completed-direct-merge-candidate`
+- `Handoff-Path: direct-merge-candidate`
+
+The coordinator will attempt the fast-forward merge and close the bead if that
+succeeds.
 
 ## Discovered Work
 
-While implementing, you may find related problems that are **out of scope** for
-the current issue. If the new work would take more than 2 minutes:
+If you find additional work that is out of scope and would take more than two
+minutes:
+1. do not fix it inline
+2. add it to `Discovered-Follow-Ups-JSON`
+3. continue the assigned issue
 
-1. **Do not** fix it inline. Stay focused on your assigned issue.
-2. Add each discovered item to your Worker Report with:
-   - title
-   - suggested type/priority
-   - short rationale
-3. Continue with your original issue.
-
-If you discover any **nontrivial errors or bugs** while working (even if you
-could fix them quickly), report them explicitly. Do not silently fix or ignore
-them. The coordinator will create linked beads safely from your report.
-
----
+If you discover a real need for decomposition across multiple code-writing
+tracks, report that explicitly as a blocker or follow-up instead of spawning
+parallel writers yourself.
 
 ## Handling Blockers
 
-If you hit a **hard blocker** that prevents completion (missing API keys,
-broken external dependency, infrastructure requirement):
+If a hard blocker prevents completion:
+1. document what you tried and why it is blocked
+2. commit any useful partial progress
+3. push the branch if the next worker should inherit remote recovery state
+4. set `Status: blocked-awaiting-coordinator`
+5. set `Recovery-State` deliberately:
+   - `branch-pushed` if the remote branch has useful recovery work
+   - `local-only` if useful work exists only in the local worktree
+   - `no-code-changes` if there is nothing to preserve
+6. set `Resume-Condition` to the exact event required before work should resume
+7. record blocker details in `Blockers-JSON`
+8. do not describe this as a stall
 
-1. Document what you tried and why it's blocked.
-2. Commit any partial progress with a clear commit message.
-3. Push your branch.
-4. Report blocker details in your final output (the coordinator creates blocker
-   beads and links dependencies).
-
----
+The coordinator will preserve recovery state, create blocker beads, wire
+dependencies, and mark the original issue blocked.
 
 ## Scope Rules
 
 | Do | Don't |
 |---|---|
-| Fix the assigned issue completely | Refactor unrelated code |
-| Write tests for your changes | Skip tests to save time |
-| Report out-of-scope findings clearly | Fix unrelated bugs inline |
-| Follow existing code patterns | Introduce new frameworks without justification |
-| Commit incrementally | Make one giant commit |
-| Run all quality gates | Push without verifying |
-| Handoff via PR URL or direct-merge recommendation | Run `bd create/update/dep/close` |
-
----
+| Finish the assigned issue | Refactor unrelated code |
+| Stay inside `WORKTREE_PATH` | Work in `REPO_ROOT` |
+| Use read-only helpers only | Spawn code-writing helpers |
+| Report discovered work clearly | Fix unrelated bugs inline |
+| Run all quality gates | Skip verification |
+| Handoff via the structured Worker Report | Run `bd create/update/dep/close` |
 
 ## Commit Convention
 
-```
-<type>: <imperative summary, ≤72 chars> [<ISSUE_ID>]
+```text
+<type>: <imperative summary, <=72 chars> [<ISSUE_ID>]
 
-<optional body — what and why, not how>
+<optional body: what changed and why>
 ```
 
 Examples:
-```
+
+```text
 feat: add PSF scoring to analyst agent [bd-42]
 fix: handle missing bedroom count in curator [bd-17]
 test: add dedup edge cases for cross-portal listings [bd-88]
 ```
 
----
-
 ## Output Format
 
-When you finish (success or blocker), produce a structured summary:
+When you finish, produce exactly this high-level structure. The scalar fields
+are plain text. The follow-up and blocker collections are JSON arrays.
 
-```
+Machine-safe reporting rules:
+- `Discovered-Follow-Ups-JSON` must be valid JSON
+- `Blockers-JSON` must be valid JSON
+- use compact valid JSON only: no comments, trailing commas, or prose outside
+  the JSON structure
+- use exactly the keys shown below
+
+````text
 ## Worker Report: <ISSUE_ID>
 
-**Status**: completed-pr-opened | completed-direct-merge-candidate | blocked
-**Branch**: agent/<ISSUE_ID>
-**Summary**: <1-2 sentence description of what was done>
+Status: completed-pr-opened | completed-direct-merge-candidate | blocked-awaiting-coordinator | invalid-runtime-context
+Issue: <ISSUE_ID>
+Branch: agent/<ISSUE_ID>
+Worktree: <WORKTREE_PATH>
+Head-Commit: <git rev-parse HEAD or n/a>
+Branch-Pushed: yes | no
+Handoff-Path: pr-required | direct-merge-candidate | blocked-awaiting-coordinator | invalid-runtime-context
+PR-URL: <url or n/a>
+PR-Number: <number or n/a>
+Base-Branch: <branch or n/a>
+Review-Reason: <why PR review is needed or n/a>
+Recovery-State: branch-pushed | local-only | no-code-changes
+Resume-Condition: <what must happen before another worker should resume or n/a>
+Summary: <1-2 sentence description of what was done>
 
-### Handoff
-- **Path**: pr-required | direct-merge-candidate | blocked
-- **PR URL**: <PR URL or n/a>
-- **PR Number**: <number or n/a>
-- **Reason**: <why this handoff path was chosen>
+Quality-Gates:
+- lint: pass | fail | not-run
+- typecheck: pass | fail | not-run
+- tests: pass | fail | not-run
 
-### Changes
+Changes:
 - <file>: <what changed>
-- <file>: <what changed>
 
-### Tests
-- <test file>: <what's covered>
+Tests:
+- <test file or command>: <coverage or result>
 
-### Quality Gates
-- lint: pass | fail
-- typecheck: pass | fail
-- tests: pass | fail (<N> passed, <M> failed)
-
-### Pull Request (if created)
-- **URL**: <PR URL>
-- **Reason**: <why review was needed>
-- **Head Branch**: agent/<ISSUE_ID>
-
-### Discovered Issues
-- <title> (suggested: type=<type>, P<n>): <why it should be tracked>
-
-### Blockers (if any)
-- <description of what's blocking>
+Discovered-Follow-Ups-JSON:
+```json
+[]
 ```
 
-If bootstrap failed, report the blocker as `invalid-runtime-context` and stop
-without touching code or Beads state.
+Blockers-JSON:
+```json
+[]
+```
+````
 
-This report helps the coordinator track progress and make dispatch decisions.
+Rules:
+- use exactly one `Status` value
+- if `Status` is `completed-pr-opened`, populate `PR-URL`, `PR-Number`, and
+  `Branch-Pushed: yes`
+- if `Status` is `completed-direct-merge-candidate`, use `Branch-Pushed: yes`
+  and `PR-URL: n/a`
+- if `Status` is `blocked-awaiting-coordinator`, include at least one blocker
+  object and set `Recovery-State` truthfully
+- if bootstrap failed, report `Status: invalid-runtime-context` and stop without
+  touching code or Beads lifecycle state
+- if there are no discovered follow-ups or blockers, use `[]`
 
----
+JSON object schemas:
+
+`Discovered-Follow-Ups-JSON` entries:
+
+```json
+{
+  "title": "Short follow-up title",
+  "type": "bug",
+  "priority": 2,
+  "depends_on": "bd-42",
+  "rationale": "Why this should be tracked separately"
+}
+```
+
+`Blockers-JSON` entries:
+
+```json
+{
+  "title": "Concrete blocker title",
+  "type": "task",
+  "priority": 1,
+  "depends_on": "bd-42",
+  "rationale": "What is blocked and why",
+  "unblock_condition": "What must happen before work can resume"
+}
+```
 
 ## bd Quick Reference
 

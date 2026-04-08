@@ -128,8 +128,8 @@ spawn workers (e.g., Task tool in Claude Code, subagent in Codex, etc.).
 >
 > Implementation workers (`beads-worker`) must never call `bd close` and should
 > not run lifecycle mutations (`bd create/update/dep`) for assigned issue flow.
-> `beads-pr-reviewer-worker` may close review/original beads only after it has
-> confirmed the PR is merged.
+> `beads-pr-reviewer-worker` reports merge outcome and follow-up needs; the
+> coordinator performs closure after confirming the PR is merged.
 
 ### 0. Check PR-review issues (priority lane)
 
