@@ -15,7 +15,7 @@ description: >
 
 A project's **shape** is the knowledge architecture that makes it comprehensible to both humans and LLMs. Shape is not code — it's the structured understanding that tells you *what* a project is, *why* it exists, *how* it works, and *what* must be built.
 
-**Visualization directive**: When presenting any workflow or conceptual model from this skill to a user, generate an Excalidraw diagram using `/excalidraw-diagram` and render it to SVG. Diagrams should argue visually, not just label boxes. All flowcharts described below include `[DIAGRAM]` markers with generation specs.
+**Visualization directive**: Prefer `/excalidraw-diagram` plus SVG rendering when the environment supports it and the diagram materially improves comprehension. If that skill or renderer is unavailable, fall back to Mermaid or concise prose. Do not block shape work on diagram tooling.
 
 ## The Four-Pillar Model
 
@@ -56,6 +56,8 @@ bash <skill-path>/scripts/shape-scan.sh [project-root]
 
 This produces a health report showing which pillars exist, their maturity, and gaps.
 
+For the scanner's intended thresholds and conservative scoring rules, read `references/maturity-rubric.md`.
+
 ### Manual Assessment
 
 If scanning isn't available, check for these signals:
@@ -73,9 +75,17 @@ Bootstrapping is a **consultative process**, not a template-filling exercise. Th
 
 ### Quality Requirements
 
-- **Use the most capable model available** with maximum thinking/reasoning budget
-- **Never self-review** — use independent subagents for review (see below)
+- **Use the most capable model available** with maximum thinking/reasoning budget when available
+- **Never self-review** — use independent subagents for review when the environment supports them (see below)
 - **Challenge the user** — accept vague answers only to push deeper, never to ship
+
+### Fallback Modes
+
+- **Full mode** — Highest-capability model, independent review subagents, diagrams rendered via `/excalidraw-diagram`
+- **Lite mode** — Single agent plus deliberate self-critique and user review when subagents are unavailable
+- **No-diagram mode** — Use Mermaid or prose when diagram tooling is unavailable
+
+The skill still applies in constrained environments. Degrade the presentation, not the rigor.
 
 ### The Process
 
@@ -170,8 +180,8 @@ Synthesize all four pillars into a visual, layman-friendly `about/README.md` wit
 ### Requirements
 
 - At least two pillars must exist (heart-and-soul + one other)
-- Uses `/excalidraw-diagram` skill for all visualizations
-- Uses independent review subagents (accessibility + adversarial)
+- Prefer `/excalidraw-diagram` for visualizations; fall back to Mermaid or prose when unavailable
+- Use independent review subagents when available; otherwise do an explicit accessibility/adversarial self-check and ask the user to validate
 
 ### The Process
 
@@ -204,6 +214,8 @@ Read `references/generate-overview.md` for the full guide: diagram specs, docume
 | Bootstrapping Phases | `references/bootstrapping.md` | Step-by-step phase guide for establishing shape from scratch |
 | Local Skill Templates | `references/local-skill-templates.md` | Installing agent navigation skills for each pillar |
 | Generate Project Overview | `references/generate-overview.md` | Creating a layman-friendly about/README.md with Excalidraw diagrams |
+| Maturity Rubric | `references/maturity-rubric.md` | Understanding scanner thresholds and what qualifies as structured/shaped/mature |
+| Evaluation Scenarios | `references/evaluation-scenarios.md` | Testing the skill package itself across strong/weak environments and legacy/scaffolded repos |
 
 ## Local Skill Installation
 
@@ -215,7 +227,7 @@ Each pillar should have a corresponding local skill in `.claude/skills/` (and eq
 bash <skill-path>/scripts/shape-init.sh [project-root] --skills-only --tools=claude,codex
 ```
 
-**If writing skills manually**, every SKILL.md **MUST** start with YAML frontmatter. Without it, skill loaders reject the file silently. This is the required format:
+**If writing skills manually**, every SKILL.md **MUST** start with YAML frontmatter. Without it, skill loaders reject the file silently. Use only the currently supported metadata keys:
 
 ```yaml
 ---
@@ -231,7 +243,7 @@ Markdown body follows...
 ```
 
 - The `---` delimiters on lines 1 and N are mandatory — without them the file is invalid
-- `name` and `description` are required; `license`, `compatibility`, `metadata`, and `allowed-tools` are optional
+- `name` and `description` are the supported fields; do not add extra frontmatter keys unless the target platform explicitly documents them
 - Read `references/local-skill-templates.md` for full customizable templates per pillar
 
 The key principle: local skills are **indexes with selection guidance**, not duplicates of the content. They tell the agent *which file to read* for a given task, not *what the file says*.
@@ -242,9 +254,19 @@ All four pillars should have a corresponding local skill: `heart-and-soul`, `law
 
 ```bash
 bash <skill-path>/scripts/shape-scan.sh [project-root]
+bash <skill-path>/scripts/self-test.sh
+bash <skill-path>/scripts/eval-fallbacks.sh
 ```
 
-The scan checks for frontmatter validity. Fix any reported issues before committing.
+The scan checks structural integrity plus common scaffold/template drift. The self-test script exercises the scanner and scaffolder against known scenarios. The fallback eval script checks that constrained-environment behavior is still explicitly supported in the package docs. Fix any reported issues before committing.
+
+## Maintenance Expectations
+
+- Keep package metadata, scripts, and references consistent. If the model says "four pillars," adapters and companion files must say the same.
+- Treat `shape-scan.sh` as an auditor, not a brochure. Prefer conservative assessments over flattering ones.
+- Re-run `scripts/self-test.sh` whenever changing `SKILL.md`, `shape-scan.sh`, or `shape-init.sh`.
+- Re-run `scripts/eval-fallbacks.sh` whenever changing fallback-mode guidance or references.
+- Keep `tests/fixtures/` aligned with real scanner behavior. Fixtures are part of the package contract, not throwaway test data.
 
 ## Anti-Patterns
 

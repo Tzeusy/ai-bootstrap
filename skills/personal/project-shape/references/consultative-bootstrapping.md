@@ -19,6 +19,17 @@ Generating project shape documents demands the highest reasoning quality availab
 - **Never rush generation** — a flawed vision.md costs more than a delayed one
 - **Prefer depth over speed** — one excellent document beats three mediocre ones
 
+### Mid-Tier Model Guidance
+
+If only a mid-tier model is available:
+
+- Narrow the scope of each turn — one interview track or one document section at a time
+- Make contradictions explicit in the prompt instead of expecting the model to infer them
+- Use shorter synthesis/review loops with more user validation checkpoints
+- Prefer conservative wording over polished but speculative prose
+
+The package still applies. The trade-off is throughput and polish, not correctness standards.
+
 ## Phase 1: Discovery Interview
 
 ### The Opening Question

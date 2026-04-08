@@ -151,6 +151,17 @@ Output: Ranked list of cross-pillar issues, each with affected documents and fix
 - Use `Agent` tool with a clean prompt (no conversation history) to ensure independence
 - Each review agent runs in its own invocation — do not batch reviews in a single agent
 
+## Fallback When Subagents Are Unavailable
+
+If the environment does not support independent subagents, do **not** skip review. Use this lite review fallback:
+
+1. Run a **coherence pass** yourself using the Review Agent 1 criteria
+2. Run a separate **adversarial pass** yourself using the Review Agent 2 criteria
+3. Summarize the top unresolved risks explicitly
+4. Present the document and those risks to the user for validation before treating it as settled
+
+This is weaker than true independent review, so say that plainly. The fallback preserves rigor by making the review modes explicit rather than silently collapsing generation and review together.
+
 ## Anti-Patterns
 
 - **Self-review** — The generator reviewing its own output in the same context. This catches typos, not blind spots.

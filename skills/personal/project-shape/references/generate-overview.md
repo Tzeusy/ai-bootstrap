@@ -5,15 +5,15 @@ Synthesize all four pillars into a visual, layman-friendly markdown document tha
 ## Output
 
 A single markdown file at `about/README.md` containing:
-- Embedded SVG diagrams (rendered from Excalidraw)
+- Embedded SVG or PNG diagrams (preferably rendered from Excalidraw, with Mermaid or prose fallbacks allowed)
 - Prose written for a non-technical reader
 - Links into the four pillars for readers who want depth
 
 ## Prerequisites
 
 - At least two pillars must exist (heart-and-soul + one other)
-- `/excalidraw-diagram` skill must be available for visualization
-- Excalidraw renderer must be set up (see `/excalidraw-diagram` for setup)
+- Prefer `/excalidraw-diagram` plus a working renderer for visualization
+- If Excalidraw tooling is unavailable, use Mermaid or skip diagrams that do not materially improve understanding
 
 ## Process
 
@@ -30,7 +30,7 @@ Read each pillar and extract the layman-relevant essence. Not every technical de
 
 ### Phase 2: Design the Diagrams
 
-Plan 3-5 Excalidraw diagrams that visually argue the project's story. Each diagram should teach something that prose alone can't convey.
+Plan 3-5 diagrams that visually argue the project's story. Prefer Excalidraw when available. Each diagram should teach something that prose alone can't convey.
 
 #### Diagram 1: The Vision (required)
 
@@ -94,8 +94,8 @@ Approach:
 For each diagram:
 
 1. **Design** using `/excalidraw-diagram` methodology (depth assessment → concept mapping → pattern selection → sketch → JSON)
-2. **Render to PNG** using the excalidraw render script
-3. **Convert to SVG** for clean markdown embedding (or use PNG with relative path)
+2. **Render** using the best available pipeline for the environment
+3. **Prefer SVG** for clean markdown embedding; PNG is acceptable when SVG export is unavailable
 4. **Validate** through the render-view-fix loop until the diagram passes quality checks
 5. **Store** diagram sources in `about/assets/` (or `about/lay-and-land/assets/`)
 

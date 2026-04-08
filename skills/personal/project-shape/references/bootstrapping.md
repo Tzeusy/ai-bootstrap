@@ -141,7 +141,18 @@ mkdir -p .claude/skills/{heart-and-soul,law-and-lore,spec-and-spine,lay-and-land
 
 Run `shape-scan.sh` and check that all four skills show `[VALID]` frontmatter. Fix any `[INVALID]` warnings before committing.
 
-### Step 4: Test navigation
+### Step 4: Run package self-checks
+
+Before relying on the scaffold, run:
+
+```bash
+bash <skill-path>/scripts/shape-scan.sh [project-root]
+bash <skill-path>/scripts/self-test.sh
+```
+
+Interpret the scan using `references/maturity-rubric.md`. A fully scaffolded project should not be considered mature until authored content and traceability are in place.
+
+### Step 5: Test navigation
 
 Start a new LLM session and try tasks that should trigger each skill. Verify the agent finds the right files.
 

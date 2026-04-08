@@ -12,6 +12,7 @@
 set -euo pipefail
 
 ROOT="${1:-.}"
+mkdir -p "$ROOT"
 ROOT="$(cd "$ROOT" && pwd)"
 PILLARS="1,2,3,4"
 SKILLS_ONLY=false
@@ -33,6 +34,7 @@ IFS=',' read -ra TOOL_LIST <<< "$TOOLS"
 
 created=0
 skipped=0
+SCAFFOLD_MARKER="<!-- SHAPE-SCAFFOLD: replace scaffold content with authored project-specific content -->"
 
 # --- Helpers ---
 create_file() {
@@ -66,6 +68,8 @@ scaffold_heart_and_soul() {
   create_dir "$ROOT/about/heart-and-soul"
   create_file "$ROOT/about/heart-and-soul/README.md" "# Heart and Soul
 
+$SCAFFOLD_MARKER
+
 Project doctrine. Reading order:
 
 1. \`vision.md\` — Core thesis, non-goals, non-negotiable rules
@@ -74,6 +78,8 @@ Project doctrine. Reading order:
 Add domain files as needed (security.md, failure.md, etc.)."
 
   create_file "$ROOT/about/heart-and-soul/vision.md" "# Vision
+
+$SCAFFOLD_MARKER
 
 ## What is this?
 
@@ -102,6 +108,8 @@ Add domain files as needed (security.md, failure.md, etc.)."
 <!-- How do you know this project is working? -->"
 
   create_file "$ROOT/about/heart-and-soul/v1.md" "# V1 Scope
+
+$SCAFFOLD_MARKER
 
 ## V1 Ships
 
@@ -133,7 +141,19 @@ scaffold_law_and_lore() {
   create_dir "$ROOT/about/law-and-lore"
   create_dir "$ROOT/about/law-and-lore/rfcs"
   create_dir "$ROOT/about/law-and-lore/reviews"
+  create_file "$ROOT/about/law-and-lore/README.md" "# Law and Lore
+
+$SCAFFOLD_MARKER
+
+Numbered design contracts, RFCs, and review notes live here.
+
+1. Start with \`rfcs/0001-TEMPLATE.md\`
+2. Replace the template with a real RFC before relying on this pillar
+3. Add review notes under \`reviews/\` as decisions evolve"
+
   create_file "$ROOT/about/law-and-lore/rfcs/0001-TEMPLATE.md" "# RFC 0001: <Title>
+
+$SCAFFOLD_MARKER
 
 **Status:** Draft
 **Author:** <name>
@@ -169,6 +189,16 @@ scaffold_openspec() {
   echo ""
   echo "## Pillar 3: openspec/"
   create_dir "$ROOT/openspec"
+  create_file "$ROOT/openspec/README.md" "# OpenSpec
+
+$SCAFFOLD_MARKER
+
+Capability specifications live here.
+
+1. Create a real change under \`changes/<change-name>/\`
+2. Add one or more authored \`spec.md\` files
+3. Replace this scaffold README once the spec structure is established"
+
   create_file "$ROOT/openspec/config.yaml" "# OpenSpec configuration
 version: 1
 project: $(basename "$ROOT")
@@ -185,6 +215,8 @@ scaffold_lay_and_land() {
   create_dir "$ROOT/about/lay-and-land/assets"
   create_file "$ROOT/about/lay-and-land/README.md" "# Lay and Land — System Topology
 
+$SCAFFOLD_MARKER
+
 Maps of where components live, how they connect, and what boundaries exist.
 
 | Map | Description |
@@ -196,6 +228,8 @@ Maps of where components live, how they connect, and what boundaries exist.
 Diagrams live in \`assets/\`."
 
   create_file "$ROOT/about/lay-and-land/components.md" "# Component Map
+
+$SCAFFOLD_MARKER
 
 ## Components
 
@@ -217,6 +251,38 @@ graph TD
 ## Boundaries
 
 <!-- What are the trust/ownership/deployment boundaries? -->"
+
+  create_file "$ROOT/about/lay-and-land/data-flow.md" "# Data Flow
+
+$SCAFFOLD_MARKER
+
+## Sources
+
+<!-- Where data enters the system -->
+
+## Transformations
+
+<!-- How data changes as it moves -->
+
+## Sinks
+
+<!-- Where data leaves or is persisted -->"
+
+  create_file "$ROOT/about/lay-and-land/deployment.md" "# Deployment
+
+$SCAFFOLD_MARKER
+
+## Environments
+
+<!-- Where this system runs -->
+
+## Runtime Topology
+
+<!-- Services, jobs, or components per environment -->
+
+## Operational Constraints
+
+<!-- Deployment budgets, scaling, or availability constraints -->"
 }
 
 # --- Local skill scaffolds ---
@@ -240,6 +306,8 @@ description: >
 ---
 
 # Project Doctrine — Heart and Soul
+
+$SCAFFOLD_MARKER
 
 The \`about/heart-and-soul/\` directory contains the prime directives of this project.
 These are not documentation — they are doctrine.
@@ -282,6 +350,8 @@ description: >
 
 # Design Contracts — Law and Lore
 
+$SCAFFOLD_MARKER
+
 The \`about/law-and-lore/\` directory contains the authoritative design contracts.
 
 **Consult relevant RFCs before:**
@@ -317,6 +387,8 @@ description: >
 ---
 
 # Capability Specs — Spec and Spine
+
+$SCAFFOLD_MARKER
 
 OpenSpec capability specifications are the backbone of this project. Every feature, every task,
 every test traces back to a normative requirement in a spec.
@@ -366,6 +438,8 @@ description: >
 ---
 
 # System Topology — Lay and Land
+
+$SCAFFOLD_MARKER
 
 The \`about/lay-and-land/\` directory contains the spatial understanding of this project — where
 components live, how data flows, what boundaries exist, and how the system is deployed.
