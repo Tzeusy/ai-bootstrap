@@ -26,6 +26,12 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
+MAX_BOUND_TEXT_WIDTH_RATIO = 0.75
+MAX_BOUND_TEXT_HEIGHT_RATIO = 0.65
+MIN_BOUND_TEXT_HORIZONTAL_PADDING = 24
+MIN_BOUND_TEXT_VERTICAL_PADDING = 14
+
+
 @dataclass(frozen=True)
 class Theme:
     name: str
@@ -169,6 +175,78 @@ def validate_excalidraw(data: dict) -> list[str]:
     return errors
 
 
+def summarize_text_label(text: str, limit: int = 64) -> str:
+    normalized = text.replace("\n", " / ").strip()
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[: limit - 3] + "..."
+
+
+def lint_layout_warnings(data: dict) -> list[str]:
+    warnings: list[str] = []
+    elements = data.get("elements", [])
+    elements_by_id = {
+        element["id"]: element
+        for element in elements
+        if isinstance(element, dict) and isinstance(element.get("id"), str) and not element.get("isDeleted")
+    }
+
+    for element in elements:
+        if element.get("isDeleted") or element.get("type") != "text":
+            continue
+
+        container_id = element.get("containerId")
+        if not isinstance(container_id, str):
+            continue
+
+        container = elements_by_id.get(container_id)
+        if container is None:
+            continue
+
+        container_width = abs(float(container.get("width", 0) or 0))
+        container_height = abs(float(container.get("height", 0) or 0))
+        text_width = abs(float(element.get("width", 0) or 0))
+        text_height = abs(float(element.get("height", 0) or 0))
+        if container_width <= 0 or container_height <= 0 or text_width <= 0 or text_height <= 0:
+            continue
+
+        container_x = float(container.get("x", 0) or 0)
+        container_y = float(container.get("y", 0) or 0)
+        text_x = float(element.get("x", 0) or 0)
+        text_y = float(element.get("y", 0) or 0)
+
+        left_padding = text_x - container_x
+        right_padding = (container_x + container_width) - (text_x + text_width)
+        top_padding = text_y - container_y
+        bottom_padding = (container_y + container_height) - (text_y + text_height)
+
+        label = summarize_text_label(element.get("text") or element.get("originalText") or element["id"])
+        width_ratio = text_width / container_width
+        height_ratio = text_height / container_height
+
+        if width_ratio > MAX_BOUND_TEXT_WIDTH_RATIO:
+            warnings.append(
+                f"Bound text '{label}' uses {width_ratio:.0%} of container '{container_id}' width; target <= 75%."
+            )
+
+        if height_ratio > MAX_BOUND_TEXT_HEIGHT_RATIO:
+            warnings.append(
+                f"Bound text '{label}' uses {height_ratio:.0%} of container '{container_id}' height; target <= 65%."
+            )
+
+        if min(left_padding, right_padding) < MIN_BOUND_TEXT_HORIZONTAL_PADDING:
+            warnings.append(
+                f"Bound text '{label}' in container '{container_id}' has horizontal padding below 24px."
+            )
+
+        if min(top_padding, bottom_padding) < MIN_BOUND_TEXT_VERTICAL_PADDING:
+            warnings.append(
+                f"Bound text '{label}' in container '{container_id}' has vertical padding below 14px."
+            )
+
+    return warnings
+
+
 def compute_bounding_box(elements: list[dict]) -> tuple[float, float, float, float]:
     min_x = float("inf")
     min_y = float("inf")
@@ -262,6 +340,12 @@ def render(
         for error in errors:
             print(f"  - {error}", file=sys.stderr)
         sys.exit(1)
+
+    layout_warnings = lint_layout_warnings(data)
+    if layout_warnings:
+        print("WARNING: Layout risks detected:", file=sys.stderr)
+        for warning in layout_warnings:
+            print(f"  - {warning}", file=sys.stderr)
 
     try:
         catalog = load_theme_catalog()

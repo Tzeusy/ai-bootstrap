@@ -1,3 +1,7 @@
+# /// script
+# requires-python = ">=3.11"
+# ///
+
 from __future__ import annotations
 
 import re
@@ -55,6 +59,13 @@ class SkillDocsTests(unittest.TestCase):
         self.assertRegex(skill_contents, re.compile(r"mermaid", re.IGNORECASE))
         self.assertRegex(readme_contents, re.compile(r"mermaid", re.IGNORECASE))
         self.assertRegex(skill_contents, re.compile(r"mermaid.*excalidraw|excalidraw.*mermaid", re.IGNORECASE))
+
+    def test_skill_documents_container_fit_rules_and_layout_lint(self):
+        contents = SKILL_MD.read_text(encoding="utf-8")
+
+        self.assertRegex(contents, re.compile(r"70.?75%", re.IGNORECASE))
+        self.assertRegex(contents, re.compile(r"60.?65%", re.IGNORECASE))
+        self.assertRegex(contents, re.compile(r"layout lint|layout warning", re.IGNORECASE))
 
 
 if __name__ == "__main__":

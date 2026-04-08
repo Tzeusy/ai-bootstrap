@@ -1,3 +1,10 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "playwright>=1.40.0",
+# ]
+# ///
+
 from __future__ import annotations
 
 import copy
@@ -140,6 +147,77 @@ class RenderScriptTests(unittest.TestCase):
 
         self.assertEqual(output_path, Path("/tmp/diagram_midnight.svg"))
 
+    def test_layout_lint_flags_tight_bound_text(self):
+        renderer = load_renderer_module()
+        document = {
+            "type": "excalidraw",
+            "version": 2,
+            "elements": [
+                {
+                    "id": "box",
+                    "type": "rectangle",
+                    "x": 0,
+                    "y": 0,
+                    "width": 220,
+                    "height": 96,
+                    "boundElements": [{"id": "label", "type": "text"}],
+                },
+                {
+                    "id": "label",
+                    "type": "text",
+                    "x": 22,
+                    "y": 26,
+                    "width": 176,
+                    "height": 44,
+                    "text": "5. Render locally with\nPlaywright + bundle",
+                    "originalText": "5. Render locally with\nPlaywright + bundle",
+                    "containerId": "box",
+                },
+            ],
+            "appState": {},
+            "files": {},
+        }
+
+        warnings = renderer.lint_layout_warnings(document)
+
+        self.assertTrue(warnings)
+        self.assertRegex("\n".join(warnings), r"75%")
+        self.assertRegex("\n".join(warnings), r"horizontal padding")
+
+    def test_layout_lint_accepts_well_padded_bound_text(self):
+        renderer = load_renderer_module()
+        document = {
+            "type": "excalidraw",
+            "version": 2,
+            "elements": [
+                {
+                    "id": "box",
+                    "type": "rectangle",
+                    "x": 0,
+                    "y": 0,
+                    "width": 220,
+                    "height": 96,
+                    "boundElements": [{"id": "label", "type": "text"}],
+                },
+                {
+                    "id": "label",
+                    "type": "text",
+                    "x": 35,
+                    "y": 26,
+                    "width": 150,
+                    "height": 44,
+                    "text": "5. Render locally\nwith Playwright",
+                    "originalText": "5. Render locally\nwith Playwright",
+                    "containerId": "box",
+                },
+            ],
+            "appState": {},
+            "files": {},
+        }
+
+        warnings = renderer.lint_layout_warnings(document)
+        self.assertEqual(warnings, [])
+
     def test_invalid_theme_fails_without_traceback(self):
         document = {
             "type": "excalidraw",
@@ -176,6 +254,56 @@ class RenderScriptTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Unknown theme", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
+
+    def test_renderer_emits_layout_warning_before_render(self):
+        document = {
+            "type": "excalidraw",
+            "version": 2,
+            "elements": [
+                {
+                    "id": "box",
+                    "type": "rectangle",
+                    "x": 0,
+                    "y": 0,
+                    "width": 220,
+                    "height": 96,
+                    "strokeColor": "#569CD6",
+                    "backgroundColor": "#264F78",
+                    "boundElements": [{"id": "label", "type": "text"}],
+                },
+                {
+                    "id": "label",
+                    "type": "text",
+                    "x": 22,
+                    "y": 26,
+                    "width": 176,
+                    "height": 44,
+                    "strokeColor": "#FFFFFF",
+                    "backgroundColor": "transparent",
+                    "text": "5. Render locally with\nPlaywright + bundle",
+                    "originalText": "5. Render locally with\nPlaywright + bundle",
+                    "containerId": "box",
+                },
+            ],
+            "appState": {
+                "viewBackgroundColor": "#1F1F1F",
+                "excalidrawDiagramTheme": "default",
+            },
+            "files": {},
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            diagram_path = Path(tmpdir) / "layout-warning.excalidraw"
+            diagram_path.write_text(json.dumps(document), encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT_PATH), str(diagram_path), "--format", "svg"],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("WARNING: Layout risks detected", result.stderr)
 
     def test_render_svg_with_vendored_bundle(self):
         renderer = load_renderer_module()

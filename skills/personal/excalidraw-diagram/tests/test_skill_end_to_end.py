@@ -1,6 +1,14 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "playwright>=1.40.0",
+# ]
+# ///
+
 from __future__ import annotations
 
 import importlib.util
+import json
 import shutil
 import sys
 import subprocess
@@ -49,6 +57,9 @@ class SkillEndToEndTests(unittest.TestCase):
     def test_skill_workflow_renders_for_default_and_midnight_themes(self):
         renderer = load_renderer_module()
         OUTPUT_DIR.mkdir(exist_ok=True)
+        document = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+
+        self.assertEqual(renderer.lint_layout_warnings(document), [])
 
         outputs = {}
         for theme_name in ("default", "midnight"):
@@ -83,8 +94,8 @@ class SkillEndToEndTests(unittest.TestCase):
         mermaid = output_path.read_text(encoding="utf-8")
         self.assertIn("flowchart TD", mermaid)
         self.assertIn("step1_box", mermaid)
-        self.assertIn("1. Receive prompt<br/>and target diagram", mermaid)
-        self.assertIn("5. Render locally with<br/>Playwright + bundle", mermaid)
+        self.assertIn("1. Read prompt<br/>and goal", mermaid)
+        self.assertIn("5. Render locally<br/>with Playwright", mermaid)
         self.assertIn("Optional branch: convert Mermaid into or out of Excalidraw", mermaid)
 
 

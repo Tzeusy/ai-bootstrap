@@ -1,3 +1,7 @@
+# /// script
+# requires-python = ">=3.11"
+# ///
+
 from __future__ import annotations
 
 import re
@@ -27,6 +31,15 @@ REPO_REFRESH = find_repo_refresh_script()
 
 
 class SkillPackageTests(unittest.TestCase):
+    def test_all_skill_python_entrypoints_use_pep723_metadata(self) -> None:
+        python_files = sorted((SKILL_ROOT / "scripts").glob("*.py")) + sorted((SKILL_ROOT / "tests").glob("*.py"))
+        self.assertTrue(python_files)
+
+        for path in python_files:
+            contents = path.read_text(encoding="utf-8")
+            self.assertIn("# /// script", contents, path)
+            self.assertIn('requires-python = ">=3.11"', contents, path)
+
     def test_skill_frontmatter_declares_compatibility(self) -> None:
         text = SKILL_PATH.read_text(encoding="utf-8")
         frontmatter = text.split("---", 2)[1]

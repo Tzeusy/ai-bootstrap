@@ -118,7 +118,9 @@ Rules:
 - Use `fontFamily: 3`.
 - Prefer `roughness: 0` and `opacity: 100`.
 - Every real relationship gets an arrow or structural line.
-- If using a container, make sure the text fits.
+- If using a container, keep bound text under about 70-75% of the container width and under about 60-65% of the container height.
+- For boxed labels, aim for at least 24px horizontal padding and 14px vertical padding.
+- If a boxed label is too tight, shorten the wording first, then add a better line break, then widen the container. Reduce font size only as a last resort.
 - Pull element shapes and field structure from `references/element-templates.md` and `references/json-schema.md`.
 
 ### 6. Render And Iterate
@@ -140,10 +142,13 @@ Then inspect the exported image and fix:
 - clipping
 - overlap
 - ambiguous labels
+- boxed labels that feel edge-to-edge
 - weak hierarchy
 - awkward whitespace
 - bad arrow routing
 - unreadable evidence artifacts
+
+The renderer emits layout warnings before export when bound text is likely too tight inside a container. Treat those warnings as fix-me items, not ignorable noise.
 
 Use `references/render-checklist.md` for the full loop.
 
