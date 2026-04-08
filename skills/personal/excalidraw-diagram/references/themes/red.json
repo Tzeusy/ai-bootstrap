@@ -1,0 +1,43 @@
+{
+  "name": "red",
+  "mode": "dark",
+  "background": "#390000",
+  "fills": {
+    "primary": "#580000",
+    "secondary": "#330000",
+    "tertiary": "#550000",
+    "start": "#7A2800",
+    "success": "#2D3D14",
+    "warning": "#5B1616",
+    "decision": "#5F3600",
+    "ai": "#4A1C28",
+    "inactive": "#400000",
+    "error": "#700000"
+  },
+  "strokes": {
+    "primary": "#FB9A4B",
+    "start": "#AA5507",
+    "success": "#41A83E",
+    "warning": "#F12727",
+    "decision": "#FEC758",
+    "ai": "#FF6262",
+    "inactive": "#E7C0C0",
+    "error": "#EC0D1E",
+    "structural": "#CC3333"
+  },
+  "text": {
+    "title": "#F8F8F8",
+    "subtitle": "#FB9A4B",
+    "body": "#E7C0C0",
+    "on_light": "#F8F8F8",
+    "on_dark": "#FFFFFF"
+  },
+  "evidence": {
+    "background": "#300000",
+    "code_text": "#FFFFFF",
+    "data_text": "#41A83E"
+  },
+  "preserve": [
+    "transparent"
+  ]
+}

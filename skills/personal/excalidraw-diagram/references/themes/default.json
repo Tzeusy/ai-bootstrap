@@ -1,0 +1,43 @@
+{
+  "name": "default",
+  "mode": "dark",
+  "background": "#1F1F1F",
+  "fills": {
+    "primary": "#264F78",
+    "secondary": "#2A2D2E",
+    "tertiary": "#3B3B3B",
+    "start": "#4D3A1A",
+    "success": "#1E3A1E",
+    "warning": "#4D2D2D",
+    "decision": "#4B4A2A",
+    "ai": "#3B2E58",
+    "inactive": "#252526",
+    "error": "#5A1D1D"
+  },
+  "strokes": {
+    "primary": "#569CD6",
+    "start": "#CE9178",
+    "success": "#6A9955",
+    "warning": "#D16969",
+    "decision": "#DCDCAA",
+    "ai": "#C586C0",
+    "inactive": "#808080",
+    "error": "#F44747",
+    "structural": "#6E7681"
+  },
+  "text": {
+    "title": "#D4D4D4",
+    "subtitle": "#9CDCFE",
+    "body": "#CCCCCC",
+    "on_light": "#CCCCCC",
+    "on_dark": "#FFFFFF"
+  },
+  "evidence": {
+    "background": "#181818",
+    "code_text": "#D4D4D4",
+    "data_text": "#4EC9B0"
+  },
+  "preserve": [
+    "transparent"
+  ]
+}

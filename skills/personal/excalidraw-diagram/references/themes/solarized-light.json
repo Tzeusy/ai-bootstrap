@@ -1,0 +1,43 @@
+{
+  "name": "solarized-light",
+  "mode": "light",
+  "background": "#FDF6E3",
+  "fills": {
+    "primary": "#EEE8D5",
+    "secondary": "#F5EFD9",
+    "tertiary": "#DDD6C1",
+    "start": "#F3DEC5",
+    "success": "#DCEFEA",
+    "warning": "#F7DDD9",
+    "decision": "#EFE4B8",
+    "ai": "#ECE8F8",
+    "inactive": "#F2EFD6",
+    "error": "#F3D6D2"
+  },
+  "strokes": {
+    "primary": "#268BD2",
+    "start": "#CB4B16",
+    "success": "#2AA198",
+    "warning": "#DC322F",
+    "decision": "#B58900",
+    "ai": "#6C71C4",
+    "inactive": "#93A1A1",
+    "error": "#DC322F",
+    "structural": "#93A1A1"
+  },
+  "text": {
+    "title": "#657B83",
+    "subtitle": "#268BD2",
+    "body": "#586E75",
+    "on_light": "#586E75",
+    "on_dark": "#FFFFFF"
+  },
+  "evidence": {
+    "background": "#EEE8D5",
+    "code_text": "#586E75",
+    "data_text": "#2AA198"
+  },
+  "preserve": [
+    "transparent"
+  ]
+}

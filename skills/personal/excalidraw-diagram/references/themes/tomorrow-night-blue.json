@@ -1,0 +1,43 @@
+{
+  "name": "tomorrow-night-blue",
+  "mode": "dark",
+  "background": "#002451",
+  "fills": {
+    "primary": "#00346E",
+    "secondary": "#001C40",
+    "tertiary": "#001733",
+    "start": "#4E3520",
+    "success": "#243B2F",
+    "warning": "#4A2435",
+    "decision": "#4E4727",
+    "ai": "#3F2C58",
+    "inactive": "#203A66",
+    "error": "#4A2435"
+  },
+  "strokes": {
+    "primary": "#BBDAFF",
+    "start": "#FFC58F",
+    "success": "#D1F1A9",
+    "warning": "#FF9DA4",
+    "decision": "#FFEEAD",
+    "ai": "#EBBBFF",
+    "inactive": "#7285B7",
+    "error": "#A92049",
+    "structural": "#7285B7"
+  },
+  "text": {
+    "title": "#FFFFFF",
+    "subtitle": "#BBDAFF",
+    "body": "#D6E4FF",
+    "on_light": "#EAF1FF",
+    "on_dark": "#FFFFFF"
+  },
+  "evidence": {
+    "background": "#001733",
+    "code_text": "#FFFFFF",
+    "data_text": "#99FFFF"
+  },
+  "preserve": [
+    "transparent"
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "name": "solarized-dark",
+  "mode": "dark",
+  "background": "#002B36",
+  "fills": {
+    "primary": "#073642",
+    "secondary": "#003847",
+    "tertiary": "#00212B",
+    "start": "#4A2C1A",
+    "success": "#0C4B4A",
+    "warning": "#4A1D1D",
+    "decision": "#4B4900",
+    "ai": "#3C355C",
+    "inactive": "#073642",
+    "error": "#3B1F1F"
+  },
+  "strokes": {
+    "primary": "#268BD2",
+    "start": "#CB4B16",
+    "success": "#2AA198",
+    "warning": "#DC322F",
+    "decision": "#B58900",
+    "ai": "#6C71C4",
+    "inactive": "#93A1A1",
+    "error": "#DC322F",
+    "structural": "#586E75"
+  },
+  "text": {
+    "title": "#839496",
+    "subtitle": "#268BD2",
+    "body": "#93A1A1",
+    "on_light": "#EEE8D5",
+    "on_dark": "#FDF6E3"
+  },
+  "evidence": {
+    "background": "#00212B",
+    "code_text": "#EEE8D5",
+    "data_text": "#2AA198"
+  },
+  "preserve": [
+    "transparent"
+  ]
+}

@@ -47,3 +47,6 @@ If nothing to add, do nothing.
 - Parallelizable work (e.g., install + verify, npm test + typecheck, multiple tasks from plan)
 - Long-running or blocking tasks where a worker can run independently.
 Isolation for risky changes or checks
+
+# Notes to self
+- `skills/personal/excalidraw-diagram/tests/output/` is a checked-in artifact directory for end-to-end fixtures and should contain the source `.excalidraw`, generated Mermaid `.mmd`, and themed SVG renders.

@@ -1,0 +1,17 @@
+{
+  "default_theme": "default",
+  "themes": {
+    "default": "default.json",
+    "vscode-dark": "vscode-dark.json",
+    "vscode-light": "vscode-light.json",
+    "midnight": "midnight.json",
+    "monokai": "monokai.json",
+    "solarized-dark": "solarized-dark.json",
+    "solarized-light": "solarized-light.json",
+    "tomorrow-night-blue": "tomorrow-night-blue.json",
+    "abyss": "abyss.json",
+    "kimbie-dark": "kimbie-dark.json",
+    "red": "red.json",
+    "quiet-light": "quiet-light.json"
+  }
+}

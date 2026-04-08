@@ -1,0 +1,43 @@
+{
+  "name": "kimbie-dark",
+  "mode": "dark",
+  "background": "#221A0F",
+  "fills": {
+    "primary": "#362712",
+    "secondary": "#423523",
+    "tertiary": "#5E452B",
+    "start": "#5B3A17",
+    "success": "#374327",
+    "warning": "#553134",
+    "decision": "#5B4516",
+    "ai": "#3C2D49",
+    "inactive": "#2E2418",
+    "error": "#5A232A"
+  },
+  "strokes": {
+    "primary": "#8AB1B0",
+    "start": "#F79A32",
+    "success": "#889B4A",
+    "warning": "#DC3958",
+    "decision": "#D3AF86",
+    "ai": "#98676A",
+    "inactive": "#A57A4C",
+    "error": "#DC3958",
+    "structural": "#A57A4C"
+  },
+  "text": {
+    "title": "#D3AF86",
+    "subtitle": "#F79A32",
+    "body": "#C0A17E",
+    "on_light": "#D3AF86",
+    "on_dark": "#FFFFFF"
+  },
+  "evidence": {
+    "background": "#1A130C",
+    "code_text": "#F3E7D3",
+    "data_text": "#889B4A"
+  },
+  "preserve": [
+    "transparent"
+  ]
+}

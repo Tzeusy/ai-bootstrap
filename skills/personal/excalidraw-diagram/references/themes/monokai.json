@@ -1,0 +1,43 @@
+{
+  "name": "monokai",
+  "mode": "dark",
+  "background": "#272822",
+  "fills": {
+    "primary": "#49483E",
+    "secondary": "#414339",
+    "tertiary": "#3E3D32",
+    "start": "#5B3D1F",
+    "success": "#3E4D2A",
+    "warning": "#5A1F32",
+    "decision": "#5A5234",
+    "ai": "#4B3B62",
+    "inactive": "#3A3B36",
+    "error": "#5A1F32"
+  },
+  "strokes": {
+    "primary": "#66D9EF",
+    "start": "#FD971F",
+    "success": "#A6E22E",
+    "warning": "#F92672",
+    "decision": "#E6DB74",
+    "ai": "#AE81FF",
+    "inactive": "#99947C",
+    "error": "#F92672",
+    "structural": "#88846F"
+  },
+  "text": {
+    "title": "#F8F8F2",
+    "subtitle": "#66D9EF",
+    "body": "#CFCFC2",
+    "on_light": "#F8F8F2",
+    "on_dark": "#FFFFFF"
+  },
+  "evidence": {
+    "background": "#1E1F1C",
+    "code_text": "#F8F8F2",
+    "data_text": "#A6E22E"
+  },
+  "preserve": [
+    "transparent"
+  ]
+}

@@ -1,0 +1,15 @@
+%% How excalidraw-diagram works
+%% Prompt -> choose theme -> plan structure -> write JSON -> render locally -> inspect and iterate
+flowchart TD
+    step1_box["1. Receive prompt<br/>and target diagram"]
+    step2_box["2. Choose theme<br/>and diagram mode"]
+    step3_box["3. Read references<br/>and plan structure"]
+    step4_box["4. Generate<br/>Excalidraw JSON"]
+    step5_box["5. Render locally with<br/>Playwright + bundle"]
+    step6_box["6. Inspect output,<br/>fix issues, iterate"]
+    step1_box --> step2_box
+    step2_box --> step3_box
+    step3_box --> step4_box
+    step4_box --> step5_box
+    step5_box --> step6_box
+    note_2_note["Optional branch: convert Mermaid into or out of Excalidraw when the request is really about graph semantics."]

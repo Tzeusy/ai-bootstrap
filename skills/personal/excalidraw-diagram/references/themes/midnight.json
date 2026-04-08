@@ -1,0 +1,43 @@
+{
+  "name": "midnight",
+  "mode": "dark",
+  "background": "#111827",
+  "fills": {
+    "primary": "#1f2937",
+    "secondary": "#243447",
+    "tertiary": "#334155",
+    "start": "#7c2d12",
+    "success": "#064e3b",
+    "warning": "#7f1d1d",
+    "decision": "#78350f",
+    "ai": "#312e81",
+    "inactive": "#1e3a5f",
+    "error": "#7f1d1d"
+  },
+  "strokes": {
+    "primary": "#93c5fd",
+    "start": "#fb923c",
+    "success": "#34d399",
+    "warning": "#f87171",
+    "decision": "#fbbf24",
+    "ai": "#c4b5fd",
+    "inactive": "#93c5fd",
+    "error": "#f87171",
+    "structural": "#94a3b8"
+  },
+  "text": {
+    "title": "#bfdbfe",
+    "subtitle": "#93c5fd",
+    "body": "#cbd5e1",
+    "on_light": "#e5e7eb",
+    "on_dark": "#ffffff"
+  },
+  "evidence": {
+    "background": "#0f172a",
+    "code_text": "#ffffff",
+    "data_text": "#4ade80"
+  },
+  "preserve": [
+    "transparent"
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "name": "quiet-light",
+  "mode": "light",
+  "background": "#F5F5F5",
+  "fills": {
+    "primary": "#EDEDF5",
+    "secondary": "#F2F2F2",
+    "tertiary": "#E8E8E8",
+    "start": "#F1E8D6",
+    "success": "#E4F6D4",
+    "warning": "#FBE4E3",
+    "decision": "#F1ECD6",
+    "ai": "#EEE7F7",
+    "inactive": "#E8E8E8",
+    "error": "#F4D3D3"
+  },
+  "strokes": {
+    "primary": "#4B69C6",
+    "start": "#9C5D27",
+    "success": "#448C27",
+    "warning": "#CD3131",
+    "decision": "#AA3731",
+    "ai": "#7A3E9D",
+    "inactive": "#AAAAAA",
+    "error": "#660000",
+    "structural": "#8C8C8C"
+  },
+  "text": {
+    "title": "#3B3B3B",
+    "subtitle": "#4B69C6",
+    "body": "#666666",
+    "on_light": "#2E2E2E",
+    "on_dark": "#FFFFFF"
+  },
+  "evidence": {
+    "background": "#EDEDF5",
+    "code_text": "#3B3B3B",
+    "data_text": "#448C27"
+  },
+  "preserve": [
+    "transparent"
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "name": "abyss",
+  "mode": "dark",
+  "background": "#000C18",
+  "fills": {
+    "primary": "#082050",
+    "secondary": "#060621",
+    "tertiary": "#051336",
+    "start": "#4B2A11",
+    "success": "#133D2B",
+    "warning": "#401625",
+    "decision": "#4A3D14",
+    "ai": "#261846",
+    "inactive": "#08286B",
+    "error": "#3F1121"
+  },
+  "strokes": {
+    "primary": "#2277FF",
+    "start": "#DDBB88",
+    "success": "#22AA44",
+    "warning": "#F280D0",
+    "decision": "#FFEEBB",
+    "ai": "#9966B8",
+    "inactive": "#596F99",
+    "error": "#A22D44",
+    "structural": "#384887"
+  },
+  "text": {
+    "title": "#8AA9FF",
+    "subtitle": "#6688CC",
+    "body": "#8FA7C5",
+    "on_light": "#C6D2F0",
+    "on_dark": "#FFFFFF"
+  },
+  "evidence": {
+    "background": "#051336",
+    "code_text": "#FFEEBB",
+    "data_text": "#22AA44"
+  },
+  "preserve": [
+    "transparent"
+  ]
+}

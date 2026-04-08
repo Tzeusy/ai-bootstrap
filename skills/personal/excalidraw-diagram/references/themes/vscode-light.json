@@ -1,0 +1,43 @@
+{
+  "name": "vscode-light",
+  "mode": "light",
+  "background": "#FFFFFF",
+  "fills": {
+    "primary": "#E8E8E8",
+    "secondary": "#F3F3F3",
+    "tertiary": "#F8F8F8",
+    "start": "#F3E2CF",
+    "success": "#E4F1DF",
+    "warning": "#F7E2E0",
+    "decision": "#F2EBDA",
+    "ai": "#EFE8F9",
+    "inactive": "#F0F0F0",
+    "error": "#F3D6D6"
+  },
+  "strokes": {
+    "primary": "#005FB8",
+    "start": "#A31515",
+    "success": "#388A34",
+    "warning": "#BC3300",
+    "decision": "#795E26",
+    "ai": "#AF00DB",
+    "inactive": "#8B8B8B",
+    "error": "#CD3131",
+    "structural": "#8A8A8A"
+  },
+  "text": {
+    "title": "#1F1F1F",
+    "subtitle": "#005FB8",
+    "body": "#3B3B3B",
+    "on_light": "#2B2B2B",
+    "on_dark": "#FFFFFF"
+  },
+  "evidence": {
+    "background": "#F3F3F3",
+    "code_text": "#1F1F1F",
+    "data_text": "#388A34"
+  },
+  "preserve": [
+    "transparent"
+  ]
+}
