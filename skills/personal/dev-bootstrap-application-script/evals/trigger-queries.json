@@ -1,0 +1,26 @@
+[
+  {
+    "query": "Can you make me a dev.sh that starts my API, worker, postgres, and frontend in tmux with one command?",
+    "should_trigger": true
+  },
+  {
+    "query": "My tmux launcher is brittle. It targets panes by number and breaks on rerun. Rewrite it so I can restart the whole stack safely.",
+    "should_trigger": true
+  },
+  {
+    "query": "I need one command to boot our local stack: Redis, Postgres, FastAPI, Celery, and Vite.",
+    "should_trigger": true
+  },
+  {
+    "query": "Can you explain what tmux is and how panes work?",
+    "should_trigger": false
+  },
+  {
+    "query": "Write a python script that reads a csv and uploads rows into postgres.",
+    "should_trigger": false
+  },
+  {
+    "query": "Please debug why my existing dev.sh exits immediately after starting docker compose.",
+    "should_trigger": false
+  }
+]

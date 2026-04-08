@@ -1,0 +1,38 @@
+{
+  "skill_name": "dev-bootstrap-application-script",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a local-only dev.sh for a repo with postgres, redis, a Python API, a worker, and a Vite frontend. I want one command to boot everything in tmux, with clean reruns and logs, but I do not want any remote proxy setup.",
+      "expected_output": "A local-first bash script that launches the stack in tmux, avoids remote-proxy assumptions, captures pane IDs, writes per-run logs, and adds dependency checks for the API/worker.",
+      "assertions": [
+        "The script does not make Tailscale or another remote proxy mandatory for the default path",
+        "The script captures tmux pane IDs instead of using numeric pane indices",
+        "The script creates timestamped logs and refreshes logs/latest",
+        "The script includes readiness checks for dependent services"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Rewrite my fragile tmux launcher. It currently targets panes by index, stacks duplicate pipe-pane commands on rerun, and drops keystrokes when I rerun it quickly. Keep the same services but make it idempotent and operator-friendly.",
+      "expected_output": "A rewritten tmux launcher that kills and recreates windows safely, uses pipe-pane -o, adds a short post-split delay, and keeps reruns stable.",
+      "assertions": [
+        "The rewritten script tears down the target window before recreating it",
+        "The script uses tmux pipe-pane -o for pane log piping",
+        "The script includes a short delay before tmux send-keys",
+        "The script avoids numeric pane targeting"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Build a tmux-based dev bootstrap for a monorepo with postgres, redis, API, worker, web app, and Storybook. Group the panes so they stay readable. I also need optional Tailscale Serve support behind an explicit flag because I only use it sometimes.",
+      "expected_output": "A multi-window bash launcher that separates services by concern, keeps no more than four panes per window, and gates Tailscale Serve behind an explicit opt-in flag.",
+      "assertions": [
+        "The script uses multiple named tmux windows for readability",
+        "No tmux window exceeds four panes",
+        "Tailscale Serve is opt-in rather than always-on",
+        "The script prints local URLs and, when enabled, a remote URL"
+      ]
+    }
+  ]
+}

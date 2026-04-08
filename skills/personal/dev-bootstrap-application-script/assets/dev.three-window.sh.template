@@ -1,0 +1,383 @@
+#!/usr/bin/env bash
+# Bootstrap a full __APP_NAME__ dev environment in tmux.
+#
+# Layout:
+#   __WINDOW_INFRA__:    __WINDOW_INFRA_LAYOUT__
+#   __WINDOW_APP__:      __WINDOW_APP_LAYOUT__
+#   __WINDOW_FRONTEND__: __WINDOW_FRONTEND_LAYOUT__
+#
+# Startup Layers:
+#   Layer 0 - optional reverse-proxy preflight (tailscale serve)
+#   Layer 1 - launch panes/services
+#   Layer 2 - readiness gates + URL output
+#
+# Usage: ./dev.sh [--enable-tailscale-serve] [--skip-tailscale-check]
+
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WINDOW_INFRA="__WINDOW_INFRA__"
+WINDOW_APP="__WINDOW_APP__"
+WINDOW_FRONTEND="__WINDOW_FRONTEND__"
+
+ENABLE_TAILSCALE_SERVE=false
+SKIP_TAILSCALE_CHECK=false
+for arg in "$@"; do
+  case "$arg" in
+    --enable-tailscale-serve) ENABLE_TAILSCALE_SERVE=true ;;
+    --skip-tailscale-check) SKIP_TAILSCALE_CHECK=true ;;
+    *)
+      echo "Error: unknown argument: $arg" >&2
+      echo "Usage: ./dev.sh [--enable-tailscale-serve] [--skip-tailscale-check]" >&2
+      exit 1
+      ;;
+  esac
+done
+
+normalize_path_prefix() {
+  local p="${1:-/}"
+  if [ -z "$p" ]; then
+    p="/"
+  fi
+  if [ "${p#/}" = "$p" ]; then
+    p="/${p}"
+  fi
+  if [ "$p" != "/" ]; then
+    p="${p%/}"
+  fi
+  echo "$p"
+}
+
+path_prefix_to_base() {
+  local p="$1"
+  if [ "$p" = "/" ]; then
+    echo "/"
+  else
+    echo "${p}/"
+  fi
+}
+
+get_serve_target_ports_for_path() {
+  local target="$1"
+  local path_prefix="$2"
+  local status_json="$3"
+  SERVE_STATUS_JSON="$status_json" python3 - "$target" "$path_prefix" <<'PY'
+import json
+import os
+import sys
+
+target = sys.argv[1]
+path_prefix = sys.argv[2]
+data = json.loads(os.environ.get("SERVE_STATUS_JSON", "{}"))
+ports = set()
+
+for hostport, cfg in (data.get("Web") or {}).items():
+    handlers = (cfg or {}).get("Handlers") or {}
+    for handler_path, handler in handlers.items():
+        if (
+            handler_path == path_prefix
+            and isinstance(handler, dict)
+            and handler.get("Proxy") == target
+        ):
+            try:
+                _, port_str = hostport.rsplit(":", 1)
+                port = int(port_str)
+            except Exception:
+                port = 443
+            ports.add(str(port))
+            break
+
+if not ports:
+    raise SystemExit(1)
+
+print(" ".join(sorted(ports, key=int)))
+PY
+}
+
+port_present_in_list() {
+  local ports="$1"
+  local wanted="$2"
+  local p
+  for p in $ports; do
+    if [ "$p" = "$wanted" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+resolve_tailscale_dashboard_url() {
+  local ts_hostname=""
+  ts_hostname=$(
+    tailscale status --json 2>/dev/null | \
+      python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('Self',{}).get('DNSName','').rstrip('.'))" 2>/dev/null || \
+      echo ""
+  )
+  if [ -z "$ts_hostname" ]; then
+    return 1
+  fi
+
+  if [ "$TAILSCALE_HTTPS_PORT" = "443" ]; then
+    if [ "$TAILSCALE_PATH_PREFIX" = "/" ]; then
+      TAILSCALE_DASHBOARD_URL="https://${ts_hostname}/"
+    else
+      TAILSCALE_DASHBOARD_URL="https://${ts_hostname}${TAILSCALE_PATH_PREFIX}/"
+    fi
+  else
+    if [ "$TAILSCALE_PATH_PREFIX" = "/" ]; then
+      TAILSCALE_DASHBOARD_URL="https://${ts_hostname}:${TAILSCALE_HTTPS_PORT}/"
+    else
+      TAILSCALE_DASHBOARD_URL="https://${ts_hostname}:${TAILSCALE_HTTPS_PORT}${TAILSCALE_PATH_PREFIX}/"
+    fi
+  fi
+  return 0
+}
+
+run_serve_mapping() {
+  local path_prefix="$1"
+  local target="$2"
+  local cmd_output=""
+  local rc=0
+
+  if [ "$path_prefix" = "/" ]; then
+    cmd_output=$(tailscale serve --yes --bg --https="${TAILSCALE_HTTPS_PORT}" "$target" 2>&1) || rc=$?
+  else
+    cmd_output=$(tailscale serve --yes --bg --https="${TAILSCALE_HTTPS_PORT}" --set-path "$path_prefix" "$target" 2>&1) || rc=$?
+  fi
+
+  if [ "$rc" -ne 0 ] && echo "$cmd_output" | grep -Eqi "(invalid argument format|unknown flag|usage)"; then
+    rc=0
+    if [ "$path_prefix" = "/" ]; then
+      cmd_output=$(tailscale serve "https:${TAILSCALE_HTTPS_PORT}" "$target" 2>&1) || rc=$?
+    else
+      cmd_output=$(tailscale serve "https:${TAILSCALE_HTTPS_PORT}" "$path_prefix" "$target" 2>&1) || rc=$?
+    fi
+  fi
+
+  echo "$cmd_output"
+  return "$rc"
+}
+
+ensure_tailscale_serve() {
+  if ! command -v tailscale &>/dev/null; then
+    echo "Error: tailscale CLI not found on PATH" >&2
+    echo "Install: https://tailscale.com/download" >&2
+    echo "Or skip this check: ./dev.sh --enable-tailscale-serve --skip-tailscale-check" >&2
+    return 1
+  fi
+
+  local ts_status="{}"
+  ts_status=$(tailscale status --json 2>/dev/null) || true
+  local ts_state
+  ts_state=$(
+    echo "$ts_status" | \
+      python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('BackendState','Unknown'))" 2>/dev/null || \
+      echo "Unknown"
+  )
+  if [ "$ts_state" = "NeedsLogin" ] || [ "$ts_state" = "NoState" ] || [ "$ts_state" = "Stopped" ]; then
+    echo "Error: tailscale is not authenticated (state: ${ts_state})" >&2
+    echo "Run: tailscale up" >&2
+    echo "Or skip this check: ./dev.sh --enable-tailscale-serve --skip-tailscale-check" >&2
+    return 1
+  fi
+
+  local serve_status_json="{}"
+  serve_status_json=$(tailscale serve status --json 2>/dev/null) || serve_status_json="{}"
+  local existing_ports=""
+  existing_ports=$(
+    get_serve_target_ports_for_path "$TAILSCALE_TARGET" "$TAILSCALE_PATH_PREFIX" "$serve_status_json" 2>/dev/null || true
+  )
+
+  if port_present_in_list "$existing_ports" "$TAILSCALE_HTTPS_PORT"; then
+    resolve_tailscale_dashboard_url || true
+    echo "Layer 0: tailscale serve already configured (${TAILSCALE_PATH_PREFIX} -> ${TAILSCALE_TARGET})"
+    return 0
+  fi
+
+  local start_output=""
+  if ! start_output=$(run_serve_mapping "$TAILSCALE_PATH_PREFIX" "$TAILSCALE_TARGET"); then
+    echo "Error: failed to configure tailscale serve" >&2
+    echo "Required mapping: ${TAILSCALE_PATH_PREFIX} -> ${TAILSCALE_TARGET}" >&2
+    if [ -n "$start_output" ]; then
+      echo "tailscale output:" >&2
+      echo "$start_output" >&2
+    fi
+    if echo "$start_output" | grep -qi "Access denied: serve config denied"; then
+      echo "Permission hint: sudo tailscale set --operator=$USER" >&2
+    fi
+    return 1
+  fi
+
+  serve_status_json=$(tailscale serve status --json 2>/dev/null) || serve_status_json="{}"
+  existing_ports=$(
+    get_serve_target_ports_for_path "$TAILSCALE_TARGET" "$TAILSCALE_PATH_PREFIX" "$serve_status_json" 2>/dev/null || true
+  )
+  if ! port_present_in_list "$existing_ports" "$TAILSCALE_HTTPS_PORT"; then
+    echo "Error: tailscale mapping not observed after apply (check: tailscale serve status)" >&2
+    return 1
+  fi
+
+  resolve_tailscale_dashboard_url || true
+  echo "Layer 0: tailscale serve ready (${TAILSCALE_PATH_PREFIX} -> ${TAILSCALE_TARGET})"
+}
+
+wait_for_port() {
+  local port="$1"
+  local name="${2:-port $1}"
+  local retries="${3:-30}"
+  local i
+  echo "Waiting for ${name}..."
+  for i in $(seq 1 "$retries"); do
+    if nc -z localhost "$port" 2>/dev/null; then
+      echo "${name} ready"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "Timed out waiting for ${name}" >&2
+  return 1
+}
+
+wait_for_http() {
+  local url="$1"
+  local label="$2"
+  local max_wait="${3:-60}"
+  local interval=2
+  local elapsed=0
+  echo "Waiting for ${label} (${url})..."
+  while [ "$elapsed" -lt "$max_wait" ]; do
+    if curl -sf "$url" >/dev/null 2>&1; then
+      echo "${label} ready (${elapsed}s)"
+      return 0
+    fi
+    sleep "$interval"
+    elapsed=$((elapsed + interval))
+  done
+  echo "Warning: ${label} not ready within ${max_wait}s" >&2
+  return 1
+}
+
+FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+BACKEND_PORT="${BACKEND_PORT:-9990}"
+TAILSCALE_HTTPS_PORT="${TAILSCALE_HTTPS_PORT:-443}"
+TAILSCALE_PATH_PREFIX_RAW="${TAILSCALE_PATH_PREFIX:-/}"
+TAILSCALE_PATH_PREFIX="$(normalize_path_prefix "$TAILSCALE_PATH_PREFIX_RAW")"
+FRONTEND_BASE_PATH="$(path_prefix_to_base "$TAILSCALE_PATH_PREFIX")"
+TAILSCALE_TARGET=""
+
+LOCAL_FRONTEND_URL="http://localhost:${FRONTEND_PORT}/"
+LOCAL_BACKEND_API_BASE_URL="http://localhost:${BACKEND_PORT}/api"
+TAILSCALE_DASHBOARD_URL=""
+
+if [ "$ENABLE_TAILSCALE_SERVE" = "true" ]; then
+  if [ "$TAILSCALE_PATH_PREFIX" = "/" ]; then
+    TAILSCALE_TARGET="http://localhost:${FRONTEND_PORT}"
+  else
+    TAILSCALE_TARGET="http://localhost:${FRONTEND_PORT}${TAILSCALE_PATH_PREFIX}"
+  fi
+fi
+
+if ! command -v tmux &>/dev/null; then
+  echo "Error: tmux is not installed" >&2
+  exit 1
+fi
+
+if [ "$ENABLE_TAILSCALE_SERVE" = "true" ]; then
+  if [ "$SKIP_TAILSCALE_CHECK" = "false" ]; then
+    ensure_tailscale_serve
+  else
+    echo "Layer 0: skipping tailscale preflight (--skip-tailscale-check)"
+  fi
+else
+  echo "Layer 0: local-only mode (tailscale disabled)"
+fi
+
+if [ -n "${TMUX:-}" ]; then
+  SESSION="$(tmux display-message -p '#S')"
+else
+  SESSION="__SESSION_NAME__"
+  tmux new-session -d -s "$SESSION" -c "$PROJECT_DIR" 2>/dev/null || true
+fi
+
+tmux kill-window -t "${SESSION}:${WINDOW_INFRA}" 2>/dev/null || true
+tmux kill-window -t "${SESSION}:${WINDOW_APP}" 2>/dev/null || true
+tmux kill-window -t "${SESSION}:${WINDOW_FRONTEND}" 2>/dev/null || true
+
+PANE_DB=$(tmux new-window -t "$SESSION" -n "$WINDOW_INFRA" -c "$PROJECT_DIR" -P -F '#{pane_id}')
+PANE_CACHE=$(tmux split-window -t "$PANE_DB" -h -c "$PROJECT_DIR" -P -F '#{pane_id}')
+
+PANE_API=$(tmux new-window -t "$SESSION" -n "$WINDOW_APP" -c "$PROJECT_DIR" -P -F '#{pane_id}')
+PANE_WORKER=$(tmux split-window -t "$PANE_API" -h -c "$PROJECT_DIR" -P -F '#{pane_id}')
+
+PANE_WEB=$(tmux new-window -t "$SESSION" -n "$WINDOW_FRONTEND" -c "__FRONTEND_DIR__" -P -F '#{pane_id}')
+PANE_AUX=$(tmux split-window -t "$PANE_WEB" -h -c "__FRONTEND_DIR__" -P -F '#{pane_id}')
+
+sleep 0.3
+
+LOGS_ROOT="${PROJECT_DIR}/logs"
+LOGS_RUN_ID="$(date +%Y%m%d_%H%M%S)"
+LOGS_RUN_DIR="${LOGS_ROOT}/${LOGS_RUN_ID}"
+LOGS_LATEST_LINK="${LOGS_ROOT}/latest"
+
+mkdir -p "${LOGS_RUN_DIR}"
+rm -rf "${LOGS_LATEST_LINK}"
+ln -s "${LOGS_RUN_DIR}" "${LOGS_LATEST_LINK}"
+echo "Logs for this run: ${LOGS_RUN_DIR}"
+
+pipe_pane_to_log() {
+  local pane_id="$1"
+  local log_file="$2"
+  tmux pipe-pane -o -t "$pane_id" \
+    "perl -pe 'BEGIN { \$| = 1 } s/\\e\\[[0-?]*[ -\\/]*[@-~]//g; s/\\e\\][^\\a]*(?:\\a|\\e\\\\)//g; s/\\r//g; s/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]//g' >> '${log_file}'"
+}
+
+pipe_pane_to_log "$PANE_DB" "${LOGS_RUN_DIR}/db.log"
+pipe_pane_to_log "$PANE_CACHE" "${LOGS_RUN_DIR}/cache.log"
+pipe_pane_to_log "$PANE_API" "${LOGS_RUN_DIR}/api.log"
+pipe_pane_to_log "$PANE_WORKER" "${LOGS_RUN_DIR}/worker.log"
+pipe_pane_to_log "$PANE_WEB" "${LOGS_RUN_DIR}/web.log"
+pipe_pane_to_log "$PANE_AUX" "${LOGS_RUN_DIR}/aux.log"
+
+ENV_CMD=""
+if [ -f "${PROJECT_DIR}/.env" ]; then
+  ENV_CMD="set -a; source ${PROJECT_DIR}/.env; set +a; "
+fi
+
+# Window 1: infrastructure
+tmux send-keys -t "$PANE_DB" "${ENV_CMD}__CMD_DB__" Enter
+tmux send-keys -t "$PANE_CACHE" "${ENV_CMD}__CMD_CACHE__" Enter
+
+# Window 2: application
+tmux send-keys -t "$PANE_API" "${ENV_CMD}__CMD_API__" Enter
+tmux send-keys -t "$PANE_WORKER" "${ENV_CMD}__CMD_WORKER__" Enter
+
+# Window 3: frontend / docs / tooling
+tmux send-keys -t "$PANE_WEB" "${ENV_CMD}__CMD_WEB__" Enter
+tmux send-keys -t "$PANE_AUX" "${ENV_CMD}__CMD_AUX__" Enter
+
+# Example frontend command with base-path wiring:
+# tmux send-keys -t "$PANE_WEB" \
+#   "${ENV_CMD}FRONTEND_BASE_PATH=${FRONTEND_BASE_PATH} VITE_API_PROXY_TARGET=http://127.0.0.1:${BACKEND_PORT} npm run dev -- --host 0.0.0.0 --port ${FRONTEND_PORT} --strictPort --base ${FRONTEND_BASE_PATH}" \
+#   Enter
+
+# Readiness gates
+# wait_for_port 5432 postgres 45
+# wait_for_port 6379 redis 45
+# wait_for_http "http://localhost:${BACKEND_PORT}/ready" "backend readiness" 60
+# wait_for_http "${LOCAL_FRONTEND_URL}" "frontend root" 60
+
+echo "Local frontend URL: ${LOCAL_FRONTEND_URL}"
+echo "Local backend API base URL: ${LOCAL_BACKEND_API_BASE_URL}"
+if [ -n "$TAILSCALE_DASHBOARD_URL" ]; then
+  echo "Tailscale frontend URL: ${TAILSCALE_DASHBOARD_URL}"
+fi
+
+tmux select-layout -t "${SESSION}:${WINDOW_INFRA}" even-horizontal
+tmux select-layout -t "${SESSION}:${WINDOW_APP}" even-horizontal
+tmux select-layout -t "${SESSION}:${WINDOW_FRONTEND}" even-horizontal
+tmux select-window -t "${SESSION}:${WINDOW_APP}"
+tmux select-pane -t "$PANE_API"
+
+if [ -z "${TMUX:-}" ]; then
+  exec tmux attach-session -t "$SESSION"
+fi
