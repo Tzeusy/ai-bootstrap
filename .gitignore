@@ -19,7 +19,10 @@
 .codex/history.jsonl
 .codex/log
 .codex/tmp
+.codex/.tmp/
 .codex/sessions
+.codex/cache/
+.codex/plugins/
 .codex/models_cache.json
 .codex/version.json
 .codex/state_*
