@@ -2,15 +2,18 @@
 
 Per-domain checklists for subagent investigators. Each section is self-contained — pass only the relevant domain section to the assigned subagent.
 
+If Phase 0 of `project-review` found usable `project-shape` artifacts, treat them as the normative baseline for every domain. README claims are still evidence, but they do not override doctrine, law, or spec.
+
 **Tool usage**: Use Glob for file discovery and Grep for content search. Fall back to Bash only for commands that require piping (e.g., `wc -l`, `sort`).
 
 ---
 
-## Domain A: Project Mapping & Goal Inference
+## Domain A: Project Mapping, Normative Baseline & Goal Inference
 
-**Objective**: Build the project map and infer goals. This grounds all other investigations.
+**Objective**: Build the project map, establish the normative baseline, and infer goals. This grounds all other investigations.
 
 ### What to examine
+- Project-shape artifacts: `about/heart-and-soul/`, `about/law-and-lore/`, `about/lay-and-land/`, `openspec/`
 - README.md, docs/, wiki references
 - Package manifests: package.json, pyproject.toml, Cargo.toml, go.mod, Gemfile, pom.xml, build.gradle
 - Entry points: main.*, index.*, app.*, cmd/, bin/, src/main
@@ -23,6 +26,7 @@ Per-domain checklists for subagent investigators. Each section is self-contained
 
 ### Search patterns (using LLM tools)
 ```
+Glob: "about/heart-and-soul/**/*", "about/law-and-lore/**/*", "about/lay-and-land/**/*", "openspec/**/*"
 Glob: "**/main.*", "**/index.*", "**/app.*", "cmd/**/*", "bin/**/*"
 Glob: "**/*.proto", "**/*.graphql", "**/openapi.*", "**/swagger.*"
 Grep: pattern="description" glob="package.json" (extract project description)
@@ -32,16 +36,18 @@ Bash: git tag --sort=-creatordate | head -10 (version history)
 
 ### Deliverable
 Structured summary covering:
-1. **Languages & frameworks** (evidence: file extensions, imports, configs)
-2. **Entry points & services** (what runs, what deploys)
-3. **Dependency management** (lock files, version pinning)
-4. **Test structure** (test dirs, frameworks, CI test steps)
-5. **CI/CD pipeline** (stages, triggers, deploy targets)
-6. **Infrastructure** (containers, cloud, databases, caches, queues)
-7. **Maturity signals** (versioning, changelog, contribution guide, benchmarks, runbooks)
-8. **Explicit goals** (from README, docs, package description)
-9. **Implicit goals** (from architecture choices, what was built but not documented)
-10. **Goal contradictions** (where docs and code disagree)
+1. **Project-shape maturity** and which pillars exist
+2. **Normative baseline** (doctrine, design contracts, specs, topology)
+3. **Languages & frameworks** (evidence: file extensions, imports, configs)
+4. **Entry points & services** (what runs, what deploys)
+5. **Dependency management** (lock files, version pinning)
+6. **Test structure** (test dirs, frameworks, CI test steps)
+7. **CI/CD pipeline** (stages, triggers, deploy targets)
+8. **Infrastructure** (containers, cloud, databases, caches, queues)
+9. **Maturity signals** (versioning, changelog, contribution guide, benchmarks, runbooks)
+10. **Explicit goals** (from doctrine, specs, README, docs, package description)
+11. **Implicit goals** (from architecture choices, what was built but not documented)
+12. **Goal contradictions** (where doctrine/spec/README and code disagree)
 
 ---
 
@@ -282,6 +288,7 @@ Scored assessments (1-5 with confidence) for categories 13-15 with evidence.
 **Step 1: Feature gap discovery**
 
 Read `references/project-type-adaptations.md` for standard expectations per project type. For each expected feature:
+- Check the project-shape baseline first. If doctrine/spec/topology already defines the expectation, treat it as normative.
 - Is it present? (search for it)
 - Is it partially implemented?
 - Is it completely absent?
@@ -350,7 +357,8 @@ For each risk discovered across steps 1-3:
 2. Scale analysis (10x bottleneck, 100x breaking point, org scaling limits)
 3. Time-horizon risks (1yr, 3yr, 5yr)
 4. Prioritized risk register (top 10-15 risks, ordered by severity × likelihood)
-5. Roadmap draft: 5 quick wins, 5 medium improvements, 3 strategic investments
+5. Advisory roadmap draft: 5 quick wins, 5 medium improvements, 3 strategic investments
+6. Planning constraints for `/project-direction`: required spec work, sequencing constraints, and explicit deprioritizations
 
 ---
 

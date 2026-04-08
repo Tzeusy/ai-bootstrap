@@ -24,13 +24,13 @@ Mark as N/A with a one-line justification. Do NOT force a 1-5 score on inapplica
 
 | Score | Criteria |
 |-------|----------|
-| 1 | README claims don't match implementation; no clear purpose |
-| 2 | Partial alignment; major stated features missing or broken |
-| 3 | Core goals met; some documented features incomplete or diverged |
-| 4 | Strong alignment; minor gaps between docs and reality |
-| 5 | README accurately reflects capabilities; clear, coherent product vision throughout |
+| 1 | Normative requirements or README claims don't match implementation; no clear purpose |
+| 2 | Partial alignment; major required or stated features missing or broken |
+| 3 | Core goals met; some documented or specified features incomplete or diverged |
+| 4 | Strong alignment; minor gaps between doctrine/specs/docs and reality |
+| 5 | Doctrine/specs/docs accurately reflect capabilities; clear, coherent product vision throughout |
 
-**Evidence to cite**: README claims vs actual code paths, example outputs, feature flags, dead code for unfinished features.
+**Evidence to cite**: doctrine/spec claims, README claims, actual code paths, example outputs, feature flags, dead code for unfinished features.
 
 ## 2. Architecture and Modularity
 

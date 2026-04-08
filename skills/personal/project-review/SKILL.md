@@ -1,198 +1,253 @@
 ---
 name: project-review
-description: Deep evidence-based audit of a repository's health, quality, maintainability, and long-term viability. Produces a structured report with scores, risks, and actionable recommendations. Also handles third-party deep-dive reviews by fact-checking claims, filtering for project context, and synthesizing confirmed findings. Use when asked to review, audit, or assess a project, codebase, or repository — or when asked about project health, tech debt, code quality, or external review findings at a repo-wide level. Triggers on phrases like "review this project", "audit the codebase", "assess code quality", "project health check", "tech debt audit", "review feedback", "external audit", "deep dive review".
+description: Use when auditing a repository's overall health, tech debt, maintainability, architecture quality, or a third-party repo-wide audit. Use for repository-level assessment requests such as "review this project", "audit the codebase", or "assess project health", not for single-PR review or exhaustive spec-to-code reconciliation.
 ---
 
 # Project Review
 
-Perform a blunt, evidence-based audit of a repository across 15 categories. Every major claim must cite specific files/functions. Treat README as a claim to validate, not truth. Label assertions as [Observed], [Inferred], or [Unknown]. Every criticism must include a concrete remedy.
+Perform a blunt, evidence-based audit of a repository across 15 categories. Start by establishing the project's normative baseline through `/project-shape`. End by handing confirmed findings to `/project-direction` for scheduling. Treat README as a claim to validate, not as the primary source of truth when shape artifacts exist.
+
+Normative source order:
+1. `about/heart-and-soul/` and `about/law-and-lore/`
+2. `openspec/`
+3. `about/lay-and-land/`
+4. README / docs / issue tracker
+5. Repository inference from code and history
+
+Every major claim must cite specific files or sections. Label assertions as [Observed], [Inferred], or [Unknown]. Every criticism must include a concrete remedy.
 
 ## Workflow
 
-### Phase 0: Gather Context
+### Phase 0: Establish the Normative Baseline with `/project-shape`
 
-Ask the user (or infer from the repo) before starting:
-
-| Parameter | Values | Default |
-|-----------|--------|---------|
-| Project type | library, SDK, backend, SaaS, frontend, CLI, mobile, monorepo, ML/data, internal tool, IaC, serverless | Infer from scan |
-| Intended users | developers, end users, internal team, enterprises | Infer from docs |
-| Expected maturity | prototype, beta, production, mission-critical | Infer from signals |
-| Team size | solo, small (2-5), medium (6-20), large (20+) | Infer or Unknown |
-| Public/private | open-source, private/internal | Infer from LICENSE |
-| Focus areas | Any subset of the 15 categories, or "all" | all |
-| Scope | full, focused, quick | full |
-
-**Inference heuristics**: Infer type from scan output (e.g., Dockerfile + API routes = backend; package.json `main`/`types` = library). Infer maturity from git age, tag count, CI presence, and doc completeness. If ambiguous, state assumption explicitly and proceed.
-
-**Hybrid projects** (e.g., monorepo with frontend + backend): identify the **primary type** (where most value and risk lives), apply its elevated categories at full weight, and import 2-3 key concerns from secondary types. See `references/project-type-adaptations.md` for details.
-
-### Phase 1: Automated Scan
-
-Run the project scan script:
+Read `../project-shape/SKILL.md` first, then run the shape scan:
 
 ```bash
-bash <skill_dir>/scripts/project-scan.sh <repo_root>
+bash ../project-shape/scripts/shape-scan.sh <repo_root>
 ```
 
-**Before proceeding**, read `references/project-type-adaptations.md` to determine which categories to elevate or lower for this project type.
+Use the result to classify each pillar using `project-shape`'s own maturity vocabulary: `absent`, `nascent`, `structured`, or `mature`.
+
+Review behavior:
+- If doctrine, design, specs, or topology are `structured` or `mature`, treat them as the primary normative baseline for their domains.
+- If only some pillars exist, use those pillars normatively and fall back elsewhere.
+- If all pillars are `absent` or effectively unusable, fall back to README/docs/code and lower confidence on alignment judgments.
+
+If the scan finds relevant pillars:
+- Read the actual doctrine/design/spec/topology files before reviewing code.
+- Extract the project's explicit non-negotiables, scope boundaries, architectural claims, and normative requirements.
+- Note contradictions between pillars. Do not silently resolve them.
+
+If the scan reports weak or missing shape:
+- Record the missing pillars in the report.
+- Downgrade confidence on product-coherence and roadmap judgments.
+- Use README/docs/code as provisional truth, but call out the absence of normative artifacts as a project risk.
+
+Output of Phase 0: a short baseline packet containing:
+- Per-pillar maturity and missing pillars
+- Source-of-truth order used for this review
+- Explicit doctrine/spec requirements that the code must satisfy
+- Any unresolved contradictions across doctrine, law, spec, README, or code
+
+### Phase 1: Automated Repository Scan
+
+Run the review scan:
+
+```bash
+bash scripts/project-scan.sh <repo_root>
+```
+
+Before proceeding, read `references/project-type-adaptations.md` to calibrate scoring by project type and maturity.
+
+Calibration rule: `project-shape` sets the project's normative requirements; `project-type-adaptations.md` adjusts emphasis and expectations. If generic project-type advice conflicts with doctrine, law, or spec, the shaped project artifacts win.
 
 #### Edge cases
 
 | Situation | Handling |
 |-----------|----------|
-| <50 source files | Skip full subagent dispatch; single-agent review covering all domains |
-| >50k LOC | Focus on entry points, churn hotspots (from scan), and public API surface |
-| Monorepo with 10+ packages | Sample 3-5 representative packages + shared/core code |
-| No README or docs | Infer goals from git history, comments, tests, and package metadata |
+| <50 source files | Skip full subagent fan-out; single-agent review is acceptable |
+| >50k LOC | Focus on entry points, churn hotspots, public API surface, and normative requirements |
+| Monorepo with 10+ packages | Sample 3-5 representative packages plus shared/core code |
+| No README or docs | Infer goals from git history, tests, manifests, and code comments |
 | Shallow git clone | Note in report; commit counts and churn data are unreliable |
 | Generated code (protobuf, ORM output, bundles) | Exclude from quality scoring; note presence |
+| Shape absent or weak | Treat missing pillars as a maintainability and planning risk, not just a documentation gap |
 
 ### Phase 2: Parallel Investigation
 
-Read `references/investigation-guides.md` for per-domain checklists. Read `references/subagent-template.md` for the exact dispatch format.
+Read `references/investigation-guides.md` for per-domain checklists. Read `references/subagent-template.md` for the dispatch format.
 
 Dispatch subagents per this plan:
 
 | Agent | Domain | Scores | Key focus |
 |-------|--------|--------|-----------|
-| A | Project mapping & goals | — | Repo map, goals, doc contradictions |
-| B | Code quality & architecture | 1-4 | Modularity, clarity, correctness |
+| A | Project mapping & baseline reconciliation | — | Repo map, goals, doc contradictions, shape-vs-code contradictions |
+| B | Code quality & architecture | 1-4 | Modularity, clarity, correctness, normative violations |
 | C | Reliability & tooling | 5-8 | Errors, observability, testing, hygiene |
-| D | Security, perf & data | 9-12 | Deps, auth, performance, API design |
-| E | Docs, ops & maintainability | 13-15 | Documentation, release, change safety |
-| F | Gaps, scale & risk | — | Feature gaps, 10x/100x, risk register |
+| D | Security, perf & data | 9-12 | Dependencies, auth, performance, API/data design |
+| E | Docs, ops & maintainability | 13-15 | Documentation, release, change safety, missing shape artifacts |
+| F | Gaps, scale & planning constraints | — | Feature gaps, 10x/100x, risk register, sequencing constraints |
 
-**Dispatch strategy**: Launch A-F all in parallel. Agent F can operate independently from B-E (it investigates the codebase directly). If time permits and F finishes early, supplement F's findings with risks surfaced by B-E during synthesis.
+Dispatch strategy:
+- Launch A-F in parallel for a full review.
+- Pass both the Phase 0 baseline packet and the Phase 1 scan output to every subagent.
+- Agent F can work independently, but during synthesis its roadmap draft remains advisory only. It does not create beads or own scheduling.
 
-Each subagent receives: scan output, project context (Phase 0), its domain section from `investigation-guides.md`, relevant scoring rubric from `references/scoring-rubric.md`, and project-type calibration.
+Each subagent receives:
+- Phase 0 baseline packet
+- Shape-scan output
+- Project-scan output
+- Project context (type, users, maturity, scope)
+- Its domain section from `references/investigation-guides.md`
+- Relevant rubric sections from `references/scoring-rubric.md`
+- Relevant project-type calibration from `references/project-type-adaptations.md`
 
 ### Phase 3: Synthesis
 
 Collect all subagent reports. Read `references/report-template.md` for the output structure.
 
-1. **Merge scores**: When subagents disagree on a category, take the **lower** score (conservative). Note the disagreement with both evidence sets.
-2. **Handle N/A categories**: If a category is not applicable (e.g., Observability for a static library), mark as "N/A" in the scorecard. Do not include N/A categories in the average.
-3. **Build risk register**: Combine risks from all domains, deduplicate, prioritize by severity x likelihood.
-4. **Generate roadmap**: Quick wins (1-3 days), medium (1-3 weeks), strategic (1-3 months+). Order by ROI.
-5. **Write executive summary**: 3 paragraphs — overall health, goal fulfillment, biggest strengths and risks.
-6. **Assign verdict** using this decision matrix:
+1. Merge scores conservatively. When subagents disagree on a category, take the lower score and record the disagreement.
+2. Mark genuinely inapplicable categories as `N/A`; exclude them from the average.
+3. Classify findings into four buckets:
+   - Normative violations: doctrine/law/spec/topology contradicted by implementation
+   - Generic health risks: code quality, reliability, tooling, security, performance, DX
+   - Shape gaps: missing or stale pillars that weaken review confidence or decision quality
+   - Deprioritized items: theoretically good ideas that do not fit the project's actual context
+4. Build the risk register by severity x likelihood.
+5. Generate an advisory roadmap: quick wins, medium improvements, strategic investments. This roadmap is for synthesis only and must not create execution artifacts.
+6. Assign the verdict:
 
 | Verdict | Criteria |
 |---------|----------|
 | **Healthy** | No category below 3; no critical risks; average >= 3.5 |
-| **Healthy but fragile** | No category below 2; <= 1 critical risk; average >= 3.0; but missing safety nets (tests, CI, types) |
-| **Functional but accumulating debt** | 1-3 categories below 3; average 2.5-3.5; growing risk register; delivers value but trajectory is negative |
+| **Healthy but fragile** | No category below 2; <= 1 critical risk; average >= 3.0; but missing safety nets |
+| **Functional but accumulating debt** | 1-3 categories below 3; average 2.5-3.5; growing risk register |
 | **At risk** | 3+ categories below 3 OR any category at 1 OR 2+ critical risks; average < 3.0 |
 | **Severely at risk** | 5+ categories below 3 OR multiple categories at 1 OR critical security/data risks; average < 2.0 |
+
+7. Prepare the `/project-direction` handoff packet:
+   - Confirmed findings only
+   - Phase 0 baseline packet
+   - Required doctrine/law/spec updates before implementation planning
+   - Recommended sequencing constraints and dependency hints
+   - Deprioritized items with reasons
+   - Evidence index
 
 ### Phase 4: Deliver
 
 Output the report per `references/report-template.md`.
 
+The report must make the boundary explicit:
+- `project-review` audits and classifies
+- `project-direction` decides sequencing, specs, and beads
+
 ## Adapting to Scope
 
-**Full review** (default): All 6 subagents, all 15 categories, complete report.
+**Full review** (default): All 6 subagents, all 15 categories, complete report plus planning handoff packet.
 
-**Focused review** (user specifies categories): Dispatch only relevant subagents. Still include executive summary, scorecard (scored categories only), and risk register.
+**Focused review** (user specifies categories): Dispatch only relevant subagents. Still include the normative baseline, scorecard for scoped categories, risk register, and planning handoff packet.
 
-**Quick health check** (fast answer): Run scan + dispatch Agent A only (with instructions to also spot-check 2-3 files per category). Output: compact scorecard, executive summary, top 5 risks. Skip detailed findings.
+**Quick health check** (fast answer): Run shape scan + project scan + Agent A, then do a brief orchestrator sweep of obvious high-risk areas (tests, CI, auth/secrets, docs). Output: executive summary, provisional scorecard, top 5 risks, explicit low-confidence markers where evidence is thin. Do not pretend this is equivalent to a full review.
 
-**Third-party deep-dive review synthesis** ("process this review/audit"): Use this workflow to fact-check external findings, filter for project context, and convert confirmed findings into actionable recommendations.
+**Third-party deep-dive review synthesis** ("process this review/audit"): Fact-check external findings, filter them through the project's actual context, convert confirmed findings into a planning handoff packet, and route execution planning to `/project-direction`.
 
-**OpenSpec reconciliation request** ("reconcile spec vs implementation", "what's implemented but undocumented", "what's specified but missing"): route to `$reconcile-spec-to-project`. That skill performs exhaustive bidirectional spec/code mapping and remediation (spec creation + beads creation), which is outside this skill's primary 15-category health-audit flow.
+**OpenSpec reconciliation request** ("reconcile spec vs implementation", "what's implemented but undocumented", "what's specified but missing"): Route to `$reconcile-spec-to-project`. That skill performs exhaustive bidirectional spec/code mapping and remediation, which is outside this skill's primary health-audit flow.
 
 ## Handling Third-Party Deep-Dive Reviews
 
-When an external reviewer (human or AI) produces a comprehensive project review, the goal is to extract maximum value while filtering noise. The overarching standard: design and architecture should be as clean and optimized as possible, following best practices that leading software engineers in top firms would be proud of.
+When an external reviewer produces a comprehensive project review, extract value without inheriting its mistakes.
 
-### Step 1: Fact-Check Before Synthesizing
+### Step 1: Fact-check before synthesizing
 
-External reviews operate on incomplete information. Before accepting any claim:
+Before accepting any external claim:
+- Verify quantitative claims: line counts, dependency counts, file sizes, test counts
+- Verify referenced paths and named features
+- Verify process claims against actual CI, docs, and code
+- Label each finding: [Confirmed], [Overstated], [Incorrect], or [Unverifiable]
 
-- **Verify quantitative claims** — line counts, file sizes, dependency counts. Reviewers frequently estimate or hallucinate metrics. A "3,597-line file" that's actually 944 lines changes the severity assessment entirely.
-- **Verify referenced paths** — files cited as missing may exist at different paths; features called absent may be implemented under different names.
-- **Test process claims against reality** — if the review says "CI doesn't enforce X", read the actual CI workflow. If it says "no tests for Y", grep for them.
-- **Label each finding**: [Confirmed], [Overstated], [Incorrect], [Unverifiable]. Only act on [Confirmed].
+Only [Confirmed] findings enter the planning handoff packet.
 
-### Step 2: Filter for the Project's Actual Context
+### Step 2: Filter for the project's actual context
 
-Not all best-practice advice applies to every project. Explicitly deprioritize recommendations that don't fit:
+Not all best-practice advice applies equally. Explicitly deprioritize recommendations that do not fit the project:
 
 | Filter | Example of what to deprioritize |
-|--------|-------------------------------|
-| Single-user project | Multi-tenant scaling, contributor onboarding docs, CODEOWNERS |
-| Solo maintainer | Formal API versioning contracts, compatibility matrices for internal APIs |
-| Early-stage | Comprehensive conformance harnesses before the interfaces stabilize |
-| Self-hosted | SaaS-style auth hardening beyond proportional threat model |
+|--------|---------------------------------|
+| Single-user project | Multi-tenant scaling, contributor governance overhead |
+| Solo maintainer | Formal compatibility matrices for internal APIs |
+| Early-stage project | Heavy conformance harnesses before interfaces stabilize |
+| Self-hosted/internal tool | SaaS-style auth hardening beyond the real threat model |
 
-State what you're deprioritizing and why. This prevents the review from inflating scope.
+If doctrine or law artifacts exist, use them to justify deprioritization. If they do not exist, say that the filter is inferential rather than explicit.
 
-### Step 3: Synthesize Actionables by ROI
+### Step 3: Synthesize actionables by ROI
 
 Sort confirmed findings into tiers:
 
-**Tier 1 — High ROI, do soon:**
-- Structural improvements with measurable before/after (e.g., splitting a 7k-line file)
-- Test quality upgrades that change regression detection capability (e.g., replacing source-inspection tests with behavioral ones)
-- One-line CI/docs fixes that close documented-vs-actual gaps
+**Tier 1 — High ROI, do soon**
+- Structural improvements with measurable before/after evidence
+- Test upgrades that materially change regression detection
+- Small CI/docs fixes that close documented-vs-actual gaps
 
-**Tier 2 — Good practice, medium effort:**
-- CI coverage gaps for critical paths
-- Operational improvements that make existing instrumentation usable
-- Proportional security hardening (warnings, not architecture changes)
+**Tier 2 — Good practice, medium effort**
+- Coverage and observability improvements for critical paths
+- Proportional security hardening
+- Operability improvements that unlock debugging and safer releases
 
-**Tier 3 — Deprioritized with reason:**
-- Items filtered out by project context (Step 2)
-- Recommendations framed in enterprise-scale terms that don't apply
-- Speculative "strategic investments" without concrete first steps
+**Tier 3 — Deprioritized with reason**
+- Items filtered out by project context
+- Enterprise-scale recommendations that do not fit
+- Strategic suggestions without a concrete first step
 
-### Step 4: Create Rigorous Beads for High-Risk Items
+### Step 4: Prepare planning inputs, not execution artifacts
 
-For structural refactors identified by the review (especially decomposition of large files or architectural changes):
+For structural refactors or major risks identified by the review, prepare a packet for `/project-direction` that includes:
+1. Baseline evidence to preserve: public interfaces, startup/shutdown behavior, critical-path tests, current constraints
+2. Logical workstream boundaries: what could be split into separate epics/tasks
+3. Required reconciliation gates: how to prove behavior stayed equivalent after changes
 
-1. **Baseline bead** (P0) — snapshot current behavior: tool surfaces, startup/shutdown sequences, test pass counts. This is the "before" picture.
-2. **Extraction beads** — one per logical boundary, with explicit testing requirements in the description. Each must prove behavioral equivalence, not just "tests pass."
-3. **Reconciliation bead** (P0) — runs last, depends on all extraction beads. Compares against the baseline on every measurable dimension. This is the quality gate that prevents the refactor from silently changing behavior.
+Do not create beads directly from `project-review`. `project-direction` owns the dependency graph and planning graph generation.
 
-Wire dependencies so baseline runs first and reconciliation runs last.
-
-### Step 5: Handle Episodic Artifacts
+### Step 5: Handle episodic artifacts
 
 The review document itself is transitory. After extracting actionables:
+- Do not commit the review as permanent doctrine
+- If the review surfaces genuine doctrine or design insight, update the relevant `project-shape` pillar instead
+- Keep the durable artifacts as updated shape/spec docs plus the `/project-direction` handoff packet
 
-- Do NOT commit the review to the repo's permanent docs (or remove it if already committed)
-- Create beads for all actionable findings — the beads are the durable artifact, not the review
-- If the review surfaced genuinely new architectural insight, capture that in the project's doctrine docs (e.g., `heart-and-soul/`) rather than keeping the review as a reference
+## Anti-Patterns
 
-### Anti-Patterns
-
-- **Accepting severity assessments at face value** — always verify the evidence behind the score
-- **Treating all recommendations as equal** — a review may list 20 items; typically 3-5 are high-leverage
-- **Enterprise-framing a personal project** — "bounded contexts" and "3-month strategic investments" for what is actually "split one file and tighten some imports"
-- **Scope inflation** — reviews tend to recommend more work than is warranted. The correct response to "spend the next major cycle on X" is often "spend 3 days on the concrete subset of X that matters"
-- **Preserving the review as canon** — the review is a snapshot opinion, not a living document. Extract value, then discard
+- Skipping `/project-shape` and treating README as sufficient when doctrine/spec artifacts exist
+- Accepting severity assessments from an external review at face value
+- Treating all recommendations as equally important
+- Enterprise-framing a personal project
+- Creating beads or other execution artifacts directly from `project-review`
+- Preserving the review as canon instead of extracting durable doctrine/spec/planning updates
 
 ## References
 
 | File | Read when | Content |
 |------|-----------|---------|
-| `references/scoring-rubric.md` | Phase 2 (pass to subagents B-E) | 1-5 criteria per category with evidence guidance |
-| `references/investigation-guides.md` | Phase 2 (pass relevant domain to each subagent) | Per-domain checklists, search patterns, deliverables |
-| `references/subagent-template.md` | Phase 2 (dispatch format) | Exact template for subagent prompts, depth limits, domain-specific additions |
-| `references/report-template.md` | Phase 3 (synthesis) | Complete output format with scorecard, findings, risk register |
-| `references/project-type-adaptations.md` | Phase 0-1 (calibration) | Category weighting by project type, maturity expectations, hybrid handling |
+| `../project-shape/SKILL.md` | Phase 0 | Four-pillar model, shape assessment workflow, normative source hierarchy |
+| `../project-direction/SKILL.md` | Phase 3-4 | Planning contract, sequencing expectations, and handoff target |
+| `references/scoring-rubric.md` | Phase 2 | 1-5 criteria per category with evidence guidance |
+| `references/investigation-guides.md` | Phase 2 | Per-domain checklists, search patterns, deliverables |
+| `references/subagent-template.md` | Phase 2 | Dispatch template and required prompt fields |
+| `references/report-template.md` | Phase 3-4 | Output structure, scorecard, handoff packet layout |
+| `references/project-type-adaptations.md` | Phase 1-3 | Category weighting by project type, maturity expectations, hybrid handling |
 
 ## Scripts
 
-- `scripts/project-scan.sh <repo_root>` — Automated structural scan. Run first, always. Covers: languages, frameworks, deps, tests, CI, infra, API schemas, governance, git signals (including churn hotspots), repo size.
+- `../project-shape/scripts/shape-scan.sh <repo_root>` — Establishes the normative baseline and shape maturity. Run first.
+- `scripts/project-scan.sh <repo_root>` — Structural repository scan covering languages, deps, tests, CI, infra, governance, git signals, and size.
 
-## After Review: Schedule with /project-direction
+## After Review: Schedule with `/project-direction`
 
-Once review findings are confirmed, invoke `/project-direction` to schedule all necessary changes into a coherent, dependency-aware execution plan.
+Once findings are confirmed, invoke `/project-direction`.
 
-Handoff expectations:
-- Feed `/project-direction` the confirmed findings and evidence.
-- Require reconciliation against doctrine/spec artifacts before planning implementation.
-- Materialize the resulting work as beads for execution tracking.
-- Keep execution ownership separate from review; `project-review` audits, `/project-direction` schedules.
+Handoff contract:
+- Feed it the Phase 0 baseline packet, not just the scorecard
+- Separate normative violations from generic health risks
+- Identify which findings require doctrine/law/spec updates before any implementation planning
+- Include sequencing constraints, dependency hints, and explicit deprioritized items
+- Keep execution ownership separate: `project-review` audits, `/project-direction` plans

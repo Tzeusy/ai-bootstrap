@@ -9,6 +9,21 @@
 
 set -euo pipefail
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  cat <<'EOF'
+Usage: bash scripts/project-scan.sh [repo_root]
+
+Scans a repository and prints a structured text summary covering:
+- languages and directory structure
+- manifests and lock files
+- CI, infra, database, and API-schema signals
+- tests, tooling, docs, governance, and monorepo markers
+- git history and churn hotspots
+- approximate repository size
+EOF
+  exit 0
+fi
+
 REPO="${1:-.}"
 cd "$REPO"
 
@@ -27,12 +42,12 @@ echo ""
 echo "=== LANGUAGES (by file extension, top 15) ==="
 find . -type f "${EXCLUDES[@]}" \
   -not -name '*.lock' -not -name 'package-lock.json' -not -name 'yarn.lock' \
-  2>/dev/null | grep -o '\.[^./]*$' | sed 's/^\.//' | sort | uniq -c | sort -rn | head -15
+  2>/dev/null | grep -o '\.[^./]*$' | sed 's/^\.//' | sort | uniq -c | sort -rn | sed -n '1,15p'
 echo ""
 
 # --- Directory structure (top 2 levels, top 3 for src-like dirs) ---
 echo "=== DIRECTORY STRUCTURE ==="
-find . -maxdepth 2 -type d "${EXCLUDES[@]}" -not -name '.*' 2>/dev/null | sort | head -50
+find . -maxdepth 2 -type d "${EXCLUDES[@]}" -not -name '.*' 2>/dev/null | sort | sed -n '1,50p'
 echo ""
 
 # --- Package manifests ---
@@ -63,7 +78,7 @@ for f in .github/workflows .gitlab-ci.yml Jenkinsfile .circleci bitbucket-pipeli
   if [ -e "$f" ]; then
     echo "  Found: $f"
     if [ -d "$f" ]; then
-      ls -1 "$f" 2>/dev/null | head -10 | sed 's/^/    /'
+      ls -1 "$f" 2>/dev/null | sed -n '1,10p' | sed 's/^/    /'
     fi
   fi
 done
@@ -114,10 +129,10 @@ for pattern in openapi.yaml openapi.json swagger.yaml swagger.json schema.graphq
   done < <(find . -maxdepth 4 -name "$pattern" "${EXCLUDES[@]}" 2>/dev/null | head -5)
 done
 # GraphQL files
-gql_count=$(find . -name '*.graphql' -o -name '*.gql' 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ' || echo 0)
+gql_count=$(find . \( -name '*.graphql' -o -name '*.gql' \) -not -path '*/node_modules/*' 2>/dev/null | wc -l | tr -d ' ')
 [ "${gql_count:-0}" -gt 0 ] && echo "  GraphQL files: $gql_count"
 # Proto files
-proto_count=$(find . -name '*.proto' 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ' || echo 0)
+proto_count=$(find . -name '*.proto' -not -path '*/node_modules/*' 2>/dev/null | wc -l | tr -d ' ')
 [ "${proto_count:-0}" -gt 0 ] && echo "  Protobuf files: $proto_count"
 echo ""
 
@@ -230,7 +245,9 @@ echo "=== GIT SIGNALS ==="
 if [ -d ".git" ]; then
   echo "  Commits: $(git rev-list --count HEAD 2>/dev/null || echo 'unknown')"
   echo "  Contributors: $(git shortlog -sn --no-merges HEAD 2>/dev/null | wc -l | tr -d ' ')"
-  echo "  First commit: $(git log --reverse --format='%ai' 2>/dev/null | head -1 || echo 'unknown')"
+  first_commit=$(git log --reverse --format='%ai' 2>/dev/null | sed -n '1p')
+  [ -n "${first_commit:-}" ] || first_commit='unknown'
+  echo "  First commit: $first_commit"
   echo "  Latest commit: $(git log -1 --format='%ai' 2>/dev/null || echo 'unknown')"
   echo "  Tags: $(git tag 2>/dev/null | wc -l | tr -d ' ')"
   latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')
@@ -247,7 +264,7 @@ if [ -d ".git" ]; then
   # Churn hotspots (top 10 most-changed files in last 500 commits)
   echo "  --- Churn hotspots (top 10, last 500 commits) ---"
   git log --oneline -500 --name-only --pretty=format: 2>/dev/null \
-    | sort | uniq -c | sort -rn | head -10 | sed 's/^/    /'
+    | sort | uniq -c | sort -rn | sed -n '1,10p' | sed 's/^/    /'
 fi
 echo ""
 
