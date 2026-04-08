@@ -24,16 +24,10 @@ status_line = ["model-with-reasoning", "current-dir", "context-remaining", "five
 "gpt-5.2" = "gpt-5.3-codex"
 "gpt-5.3-codex" = "gpt-5.4"
 
-
-
-
-
-
-
-
-
-
-
+# Keep machine-specific trusted project paths local and out of version control.
+# Example:
+# [projects."/absolute/path/to/project"]
+# trust_level = "trusted"
 
 [plugins."github@openai-curated"]
 enabled = true
