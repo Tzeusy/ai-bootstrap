@@ -48,6 +48,11 @@ If nothing to add, do nothing.
 - Long-running or blocking tasks where a worker can run independently.
 Isolation for risky changes or checks
 
+## Notes to self
+- `skills/` is the canonical local mirror source for shared workflows; mirrored tool skill names are flattened by basename, so provenance must be reasoned from the source tree rather than the installed name.
+- `opencode/` installs under `$HOME/.config/opencode`, unlike `.claude`, `.codex`, and `.gemini`, which map directly under `$HOME`.
+- `.claude/`, `.codex/`, and `.gemini` mix tracked baseline config with ignored runtime state; any topology or doctrine docs should distinguish canonical source, mirror surfaces, installed targets, and local-only state explicitly.
+
 # Notes to self
 - `skills/personal/excalidraw-diagram/tests/output/` is a checked-in artifact directory for end-to-end fixtures and should contain the source `.excalidraw`, generated Mermaid `.mmd`, and themed SVG renders.
 - `skills/personal/excalidraw-diagram/scripts/render_excalidraw.py` emits non-fatal layout warnings for bound text that exceeds roughly 75% width, 65% height, or minimum padding inside a container; keep fixtures and examples lint-clean.

@@ -8,6 +8,7 @@
 4. Keep regeneration scripts with the artifacts they justify; do not hand-edit vendored outputs without updating their regeneration path.
 5. Treat repository docs as part of the product. If a structural rule changes, doctrine, RFCs, and specs must move with it.
 6. Preserve local-only boundaries. New runtime files belong in ignored paths unless they are deliberately portable, non-secret defaults.
+7. Keep the Beads operating model explicit when touching project workflow docs. If the main execution path changes, doctrine and topology must change with it.
 
 ## Review Questions
 
@@ -21,4 +22,5 @@
 
 - Copying a shared skill into a tool namespace and then evolving it independently without documenting the fork.
 - Committing caches, logs, runtime IDs, or machine-specific settings as if they were portable config.
+- Letting checked-in baseline config accumulate machine-private values until nobody can tell what is a portable default anymore.
 - Burying load-bearing repository rules inside one tool's prompt file instead of documenting them in shared docs.

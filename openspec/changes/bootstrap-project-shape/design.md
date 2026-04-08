@@ -11,7 +11,7 @@ Bootstrap the four-pillar shape with repository-level documents only:
 
 ## Traceability
 
-- Doctrine rules D1-D6 are defined in `about/heart-and-soul/vision.md`.
+- Doctrine rules D1-D7 are defined in `about/heart-and-soul/vision.md`.
 - RFC 0001 translates those rules into a concrete repository contract.
 - The repository-shape spec converts the contract into testable requirements and scenarios.
 

@@ -14,42 +14,52 @@ The repository already spans multiple agent runtimes and mixes shared assets wit
 
 ## Design
 
-### 3.1 Repository Layers
+### Repository Layers
 
 The repository is divided into three logical layers:
 
-- **Tool facades:** `.claude/`, `.codex/`, `.gemini/`, and `opencode/` contain platform-specific prompts, settings, rules, metadata, and mirrored skill entrypoints.
+- **Tool facades:** `.claude/`, `.codex/`, and `.gemini/` contain platform-specific prompts, settings, rules, metadata, and skill mirror surfaces; `opencode/` currently contains tool-specific config only.
 - **Shared authoring layers:** `skills/` is the primary shared workflow library, `skills/personal/` is the primary local operating-model layer, `agents/` is a secondary reference corpus, and repository-level docs explain the contract.
 - **Support utilities:** `scripts/` and skill-local scripts/assets provide reproducible maintenance operations such as vendored bundle refreshes.
 
-### 3.2 Source-of-Truth Rules
+### Source-of-Truth Rules
 
 - Shared workflow content belongs in `skills/` by default.
+- Within `skills/`, `skills/personal/` is the primary locally authored workflow layer, while non-`personal/` trees remain either upstream-derived submodules, vendored copies, or intentional forks that must retain visible provenance.
 - Tool skill directories such as `.claude/skills`, `.codex/skills`, `.gemini/skills`, and `.gemini/antigravity/skills` are mirrors or entrypoint surfaces, not the authored source of truth.
 - Mirrored skill names are flattened by basename, so provenance must be reasoned about from the source tree rather than from the installed name alone.
 - Tool namespaces may contain equivalents only when the target platform needs different metadata, formatting, or runtime semantics.
 - A contributor introducing a second copy of shared logic must document which copy is authoritative, whether the content is locally authored or upstream-derived, and why the fork exists.
 
-### 3.3 Distribution Model
+### Distribution Model
 
 - The repository is designed to be cloned or vendored as a submodule into a local machine.
 - Tool-specific roots are then symlinked or copied into home-directory config locations.
 - Shared skills may be copied or symlinked into tool-specific skill directories, but their authored source remains under `skills/`.
 - In practice, local installation may pass through in-repo mirror surfaces such as `.claude/skills` or directly into home-directory skill paths; neither mirror layer supersedes the source tree.
+- OpenCode currently installs as config under `$HOME/.config/opencode` rather than participating in the in-repo skill-mirror layout used by Claude, Codex, and Gemini.
 - Regeneration or refresh flows must be explicit and scriptable. For example, `scripts/refresh.sh` is the supported way to rebuild the vendored Excalidraw bundle used by the personal Excalidraw skill.
 
-### 3.4 Runtime and Local-Only State
+### Runtime and Local-Only State
 
 - Secrets, caches, session traces, runtime IDs, and per-machine overrides are not canonical assets.
 - When such data must live under a tool namespace for runtime reasons, it must be gitignored or otherwise excluded from the repository contract.
 - Versioned baseline settings are allowed when they are portable, non-secret defaults rather than machine-private state.
 
-### 3.5 Documentation Contract
+### Documentation Contract
 
 - Top-level README material explains repository purpose and installation.
 - Doctrine explains placement rules and boundaries.
 - Topology explains where repository layers live and how they connect.
 - OpenSpec records normative requirements so future audits can test whether the repo still matches its intended shape.
+
+### Governance and Lifecycle
+
+- `Draft` means the contract is authored and reviewed, but still awaiting human ratification.
+- `Accepted` means a human maintainer has reviewed the RFC, confirmed it matches the live repository, and decided it is the current contract of record.
+- `Superseded` means a later RFC or explicit contract amendment replaces this one.
+- Every status change must cite the review round(s) and rationale that justified it.
+- Review rounds should record scope, findings, unresolved risks, and the next decision needed so later maintainers can audit what was and was not examined.
 
 ## Integration
 

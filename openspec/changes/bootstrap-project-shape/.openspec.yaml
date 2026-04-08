@@ -2,3 +2,9 @@ change: bootstrap-project-shape
 title: Bootstrap project shape for the genai repository
 status: draft
 created: 2026-04-08
+verification:
+  - shape-scan matches authored four-pillar structure
+  - project-shape docs cross-check cleanly against the live repository and README
+close_when:
+  - RFC 0001 lifecycle status is explicitly reviewed by a human maintainer
+  - the bootstrap change is either promoted with verification evidence or archived with rationale
