@@ -1,6 +1,6 @@
 ---
 name: project-review
-description: Deep evidence-based audit of a repository's health, quality, maintainability, and long-term viability. Produces a structured report with scores, risks, and actionable recommendations. Use when asked to review, audit, or assess a project, codebase, or repository — or when asked about project health, tech debt, or code quality at a repo-wide level. Triggers on phrases like "review this project", "audit the codebase", "assess code quality", "project health check", "tech debt audit".
+description: Deep evidence-based audit of a repository's health, quality, maintainability, and long-term viability. Produces a structured report with scores, risks, and actionable recommendations. Also handles third-party deep-dive reviews by fact-checking claims, filtering for project context, and synthesizing confirmed findings. Use when asked to review, audit, or assess a project, codebase, or repository — or when asked about project health, tech debt, code quality, or external review findings at a repo-wide level. Triggers on phrases like "review this project", "audit the codebase", "assess code quality", "project health check", "tech debt audit", "review feedback", "external audit", "deep dive review".
 ---
 
 # Project Review
@@ -98,6 +98,81 @@ Output the report per `references/report-template.md`.
 
 **Quick health check** (fast answer): Run scan + dispatch Agent A only (with instructions to also spot-check 2-3 files per category). Output: compact scorecard, executive summary, top 5 risks. Skip detailed findings.
 
+**Third-party deep-dive review synthesis** ("process this review/audit"): Use this workflow to fact-check external findings, filter for project context, and convert confirmed findings into actionable recommendations.
+
+**OpenSpec reconciliation request** ("reconcile spec vs implementation", "what's implemented but undocumented", "what's specified but missing"): route to `$reconcile-spec-to-project`. That skill performs exhaustive bidirectional spec/code mapping and remediation (spec creation + beads creation), which is outside this skill's primary 15-category health-audit flow.
+
+## Handling Third-Party Deep-Dive Reviews
+
+When an external reviewer (human or AI) produces a comprehensive project review, the goal is to extract maximum value while filtering noise. The overarching standard: design and architecture should be as clean and optimized as possible, following best practices that leading software engineers in top firms would be proud of.
+
+### Step 1: Fact-Check Before Synthesizing
+
+External reviews operate on incomplete information. Before accepting any claim:
+
+- **Verify quantitative claims** — line counts, file sizes, dependency counts. Reviewers frequently estimate or hallucinate metrics. A "3,597-line file" that's actually 944 lines changes the severity assessment entirely.
+- **Verify referenced paths** — files cited as missing may exist at different paths; features called absent may be implemented under different names.
+- **Test process claims against reality** — if the review says "CI doesn't enforce X", read the actual CI workflow. If it says "no tests for Y", grep for them.
+- **Label each finding**: [Confirmed], [Overstated], [Incorrect], [Unverifiable]. Only act on [Confirmed].
+
+### Step 2: Filter for the Project's Actual Context
+
+Not all best-practice advice applies to every project. Explicitly deprioritize recommendations that don't fit:
+
+| Filter | Example of what to deprioritize |
+|--------|-------------------------------|
+| Single-user project | Multi-tenant scaling, contributor onboarding docs, CODEOWNERS |
+| Solo maintainer | Formal API versioning contracts, compatibility matrices for internal APIs |
+| Early-stage | Comprehensive conformance harnesses before the interfaces stabilize |
+| Self-hosted | SaaS-style auth hardening beyond proportional threat model |
+
+State what you're deprioritizing and why. This prevents the review from inflating scope.
+
+### Step 3: Synthesize Actionables by ROI
+
+Sort confirmed findings into tiers:
+
+**Tier 1 — High ROI, do soon:**
+- Structural improvements with measurable before/after (e.g., splitting a 7k-line file)
+- Test quality upgrades that change regression detection capability (e.g., replacing source-inspection tests with behavioral ones)
+- One-line CI/docs fixes that close documented-vs-actual gaps
+
+**Tier 2 — Good practice, medium effort:**
+- CI coverage gaps for critical paths
+- Operational improvements that make existing instrumentation usable
+- Proportional security hardening (warnings, not architecture changes)
+
+**Tier 3 — Deprioritized with reason:**
+- Items filtered out by project context (Step 2)
+- Recommendations framed in enterprise-scale terms that don't apply
+- Speculative "strategic investments" without concrete first steps
+
+### Step 4: Create Rigorous Beads for High-Risk Items
+
+For structural refactors identified by the review (especially decomposition of large files or architectural changes):
+
+1. **Baseline bead** (P0) — snapshot current behavior: tool surfaces, startup/shutdown sequences, test pass counts. This is the "before" picture.
+2. **Extraction beads** — one per logical boundary, with explicit testing requirements in the description. Each must prove behavioral equivalence, not just "tests pass."
+3. **Reconciliation bead** (P0) — runs last, depends on all extraction beads. Compares against the baseline on every measurable dimension. This is the quality gate that prevents the refactor from silently changing behavior.
+
+Wire dependencies so baseline runs first and reconciliation runs last.
+
+### Step 5: Handle Episodic Artifacts
+
+The review document itself is transitory. After extracting actionables:
+
+- Do NOT commit the review to the repo's permanent docs (or remove it if already committed)
+- Create beads for all actionable findings — the beads are the durable artifact, not the review
+- If the review surfaced genuinely new architectural insight, capture that in the project's doctrine docs (e.g., `heart-and-soul/`) rather than keeping the review as a reference
+
+### Anti-Patterns
+
+- **Accepting severity assessments at face value** — always verify the evidence behind the score
+- **Treating all recommendations as equal** — a review may list 20 items; typically 3-5 are high-leverage
+- **Enterprise-framing a personal project** — "bounded contexts" and "3-month strategic investments" for what is actually "split one file and tighten some imports"
+- **Scope inflation** — reviews tend to recommend more work than is warranted. The correct response to "spend the next major cycle on X" is often "spend 3 days on the concrete subset of X that matters"
+- **Preserving the review as canon** — the review is a snapshot opinion, not a living document. Extract value, then discard
+
 ## References
 
 | File | Read when | Content |
@@ -111,3 +186,13 @@ Output the report per `references/report-template.md`.
 ## Scripts
 
 - `scripts/project-scan.sh <repo_root>` — Automated structural scan. Run first, always. Covers: languages, frameworks, deps, tests, CI, infra, API schemas, governance, git signals (including churn hotspots), repo size.
+
+## After Review: Schedule with /project-direction
+
+Once review findings are confirmed, invoke `/project-direction` to schedule all necessary changes into a coherent, dependency-aware execution plan.
+
+Handoff expectations:
+- Feed `/project-direction` the confirmed findings and evidence.
+- Require reconciliation against doctrine/spec artifacts before planning implementation.
+- Materialize the resulting work as beads for execution tracking.
+- Keep execution ownership separate from review; `project-review` audits, `/project-direction` schedules.

@@ -17,7 +17,7 @@ Determine what a project should work on next. Ground decisions in specifications
 
 ## Workflow
 
-### Phase 0: Gather Context
+### Preflight: Gather Context
 
 Ask the user (or infer from the repo):
 
@@ -29,84 +29,112 @@ Ask the user (or infer from the repo):
 | Spec location | openspec/, spec/, docs/design/, or "none" | Infer from scan |
 | Focus | Full direction analysis, specific feature evaluation, spec-drift check | Full |
 
-### Phase 1: Spec Scan
+### Reconciliation Protocol (Mandatory for Phases 1-3)
 
-Run the spec-focused scan:
+Each phase below MUST include at least 4 reconciliation passes (`R1`-`R4` minimum). A pass is a subagent-driven deep-dive review of the latest generated artifacts and diffs for that phase.
 
-```bash
-bash <skill_dir>/scripts/spec-scan.sh <repo_root>
+Pass requirements:
+- Use a dedicated subagent for each pass.
+- Feed the subagent the latest changed files, relevant specs/docs, and acceptance criteria.
+- Apply fixes from the pass before launching the next pass.
+- Continue beyond 4 passes if acceptance criteria are not met.
+
+Use this unbiased prompt persona for every reconciliation pass (customize only the phase context and artifact list):
+
+```text
+You are a lead software architect at a world-class software organization.
+Perform an unbiased deep-dive reconciliation review of the provided artifacts.
+Do not assume they are correct or incorrect.
+Identify contradictions, omissions, requirement drift, weak assumptions, and unverifiable claims.
+Map every finding to concrete evidence (file/section references) and to phase acceptance criteria.
+Recommend the minimum precise changes required to reach acceptance.
 ```
 
-This discovers specification artifacts, design docs, roadmap files, agent context, issue tracking, and recent spec/doc changes. Use the output to inform all investigation.
+### Phase 1: /project-shape Reconciliation (Doctrine First)
 
-### Phase 2: Parallel Investigation
+Run a `/project-shape` reconciliation pass to ensure all proposed/new features align with the project's central doctrine.
 
-Read `references/subagent-template.md` for the dispatch format.
+Execution:
+1. Reconcile `about/heart-and-soul/` and `about/law-and-lore/` so they form one coherent doctrine-and-policy baseline.
+2. Map each proposed feature/initiative to this baseline; flag and resolve doctrine conflicts.
+3. Run mandatory reconciliation passes (`R1`-`R4+`) using the protocol above.
+4. Finalize shape docs.
+
+Acceptance criteria:
+- Full synthesis between "heart-and-soul" and "law-and-lore".
+- New/proposed features are explicitly aligned (or explicitly rejected/escalated) against doctrine.
+- Shape docs are committed and pushed before Phase 2 begins.
+
+### Phase 2: Specification Scan + Fitness/Gap Synthesis ("Spec-and-Spine")
+
+Run the specification and implementation reconciliation workflow, then synthesize an OpenSpec changeset through `/opsx:ff`.
+
+Steps:
+1. Run the spec-focused scan:
+   ```bash
+   bash <skill_dir>/scripts/spec-scan.sh <repo_root>
+   ```
+2. Run parallel investigation (A, B, C), then synthesis (D):
 
 | Agent | Role | Input | Output |
 |-------|------|-------|--------|
-| A | Project spirit & requirements | Scan + specs | Direction model, requirements, reality check |
-| B | Spec adherence & workflows | Scan + specs | Spec drift report, workflow completeness |
+| A | Doctrine/spec intent validation | Shape docs + scan + specs | Intent model, mandate checks, requirement fidelity |
+| B | Spec adherence & workflows | Scan + specs | Spec drift inventory, workflow completeness |
 | C | Implementation fitness | Scan + code | Test confidence, observability, delivery readiness, architectural fitness |
-| D | Alignment & gap analysis | A + B + C | Alignment matrix, gaps, push-back list |
+| D | Alignment & gap synthesis | A + B + C | Alignment matrix, gaps, push-back list, spec deltas |
 
-**Dispatch strategy**: Launch A, B, C in parallel. Launch D after they complete (it synthesizes their findings).
+3. Use `/opsx:ff` to synthesize all findings into an OpenSpec changeset.
+4. Run mandatory reconciliation passes (`R1`-`R4+`) over the OpenSpec changeset and supporting analysis.
+5. Finalize spec updates.
 
-Each agent receives its domain-specific guide:
-- A, B: `references/direction-model.md`
-- C: `references/direction-model.md` Phase 2 sections 2.3-2.6
-- D: `references/alignment-review.md`
+Acceptance criteria:
+- Full readiness of "spec-and-spine" (spec intent, implemented spine, and gap analysis are coherent and actionable).
+- OpenSpec changeset is complete, internally consistent, and traceable to doctrine + implementation evidence.
+- Spec changes are committed and pushed before Phase 3 begins.
 
-### Phase 3: Work Plan
+### Phase 3: Beads Generation (Planning Graph Only)
 
-Done by the orchestrator (not a subagent). Read `references/work-plan-template.md` for the decomposition rules and output format.
+Call `/beads-writer` to create a full, acyclic dependency graph of work from the approved OpenSpec changeset.
 
-Steps:
-1. **Prioritize** aligned items by: user value > leverage > tractability > timing
-2. **Sequence** respecting dependencies and serialization constraints
-3. **Decompose** each item into 3-10 hour chunks with acceptance criteria
-4. **Link** every chunk to its spec section (or flag "spec work required first")
-5. **Add reconciliation** after each chunk and each logical block
-6. **List what NOT to do** with reasons and revisit triggers
+Execution:
+1. Generate epics/tasks with explicit dependencies and no cycles.
+2. Ensure each bead traces back to doctrine/law/spec mandates and acceptance criteria.
+3. Include required reconciliation/report structural beads per `/beads-writer` conventions.
+4. Run mandatory reconciliation passes (`R1`-`R4+`) on the graph (cycle checks, mandate coverage checks, dependency sanity).
 
-### Phase 4: Materialize as Beads
+Acceptance criteria:
+- Full coherence between generated beads and `/project-shape` doctrine/law plus OpenSpec mandates.
+- Dependency graph is acyclic, prioritized, and execution-ready.
+- Delivery/execution is NOT handled by `project-direction`; this is separately owned by `beads-coordinator` runs.
 
-Call `/beads-writer` to create epics and children from the work plan. For every non-trivial epic (>=3 children or >100 lines expected), include these mandatory structural beads:
+### Handoff Output (No Delivery Ownership)
 
-1. **Reconciliation bead** (standard — see `/beads-writer` patterns)
-2. **Epic report bead** — a child that generates a human-readable report after all implementation and reconciliation children close
-
-The epic report bead must:
-- Depend on ALL implementation children AND the reconciliation bead (it runs last)
-- Have type `task` and a title like `"Generate epic report for: {epic title}"`
-- Reference `references/epic-report.md` from this skill as its execution guide
-- Include in its description: the epic ID, spec sections covered, and the scaffold script invocation
-
-See `references/epic-report.md` for the report bead's content template and `scripts/epic-report-scaffold.sh` for the scaffold tool it should use.
-
-### Phase 5: Deliver
-
-Output the direction report per `references/work-plan-template.md`. End with the blunt conclusion:
+Output the direction report per `references/work-plan-template.md`, including:
 - What is the project's real direction?
 - What should it work on next?
 - What should it stop pretending it can do?
+- Which beads graph was generated and why it is coherent with doctrine/law/spec.
+
+Do not execute or deliver the beads plan here; hand off explicitly to `beads-coordinator`.
 
 ## Adapting to Focus
 
-**Full direction analysis** (default): All 4 agents, complete report, beads materialization.
+All focus modes MUST preserve Phases 1-3 and the mandatory `R1`-`R4+` reconciliation passes for each phase. Focus changes depth/scope within a phase, not phase existence.
 
-**Feature evaluation** ("should we build X?"): Run A + C only. Evaluate the specific feature against the 8-dimension framework in `references/alignment-review.md`. Output: alignment assessment, tractability verdict, recommended next step.
+**Full direction analysis** (default): Full scope in Phases 1-3 plus handoff output.
 
-**Spec-drift check** ("does code match spec?"): Run B only. Output: spec adherence inventory with implemented/partial/contradicted/missing status per section.
+**Feature evaluation** ("should we build X?"): Narrow all phases to feature X. In Phase 2, keep the 8-dimension evaluation from `references/alignment-review.md`.
 
-**Work decomposition** ("break this down"): Skip Phases 1-2. Read the spec and code for the specific feature. Decompose directly into chunks per `references/work-plan-template.md`.
+**Spec-drift check** ("does code match spec?"): Phase 2 emphasizes B + C + D outputs, but still requires doctrine reconciliation in Phase 1 and bead graph updates in Phase 3 for confirmed gaps.
+
+**Work decomposition** ("break this down"): Run all phases with minimal breadth. Phase 3 output is the primary artifact.
 
 ## Edge Cases
 
 | Situation | Handling |
 |-----------|----------|
-| No specs exist | Phase 2A infers goals from code/docs. First work item: write specs for core features. |
-| Specs exist but are outdated | Agent B catalogs drift. Work plan starts with spec reconciliation. |
+| No specs exist | Phase 2 creates initial OpenSpec through `/opsx:ff`; do not skip doctrine reconciliation in Phase 1. |
+| Specs exist but are outdated | Agent B catalogs drift; Phase 2 must produce a corrective OpenSpec changeset before Phase 3. |
 | No clear project direction | State this directly. Recommend a direction-setting workshop or spec sprint before any feature work. |
 | Conflicting specs | Flag each contradiction with evidence from both sides. Do not resolve — escalate to user. |
 | Massive spec surface (>50 sections) | Agent B samples: fully audit core features, spot-check secondary features. |
@@ -115,13 +143,13 @@ Output the direction report per `references/work-plan-template.md`. End with the
 
 | File | Read when | Content |
 |------|-----------|---------|
-| `references/direction-model.md` | Phase 2 (agents A, B, C) | How to determine project spirit, classify requirements, and assess current state |
+| `references/direction-model.md` | Phase 1 and Phase 2 (agents A, B, C) | Project spirit, requirement classification, current-state assessment |
 | `references/alignment-review.md` | Phase 2 (agent D) | 8-dimension evaluation framework, classification buckets, push-back checklist, gap analysis |
-| `references/work-plan-template.md` | Phase 3 (orchestrator) | Chunk decomposition rules, reconciliation patterns, complete output format |
-| `references/subagent-template.md` | Phase 2 (dispatch) | Agent roles, dispatch template, depth limits, per-agent notes |
-| `references/epic-report.md` | Phase 4 (report bead content) | Report structure, `/excalidraw-diagram` integration, beads follow-up, spec compliance matrix |
+| `references/work-plan-template.md` | Handoff output | Output format, sequencing presentation, reconciliation reporting |
+| `references/subagent-template.md` | Phases 1-3 (reconciliation and dispatch) | Agent roles, dispatch template, depth limits, per-agent notes |
+| `references/epic-report.md` | Phase 3 (beads structure) | Report bead structure, `/excalidraw-diagram` integration, spec compliance matrix |
 
 ## Scripts
 
-- `scripts/spec-scan.sh <repo_root>` — Discovers specs, design docs, roadmap, agent context, issue tracking, git activity by area. Run first, always.
-- `scripts/epic-report-scaffold.sh <epic-id> [repo_root]` — Used by the report bead executor. Bootstraps report markdown from beads epic data, creates `docs/reports/` with metadata pre-filled.
+- `scripts/spec-scan.sh <repo_root>` — Discovers specs, design docs, roadmap, agent context, issue tracking, git activity by area. Required in Phase 2.
+- `scripts/epic-report-scaffold.sh <epic-id> [repo_root]` — Used by report bead executors created in Phase 3. Bootstraps report markdown from beads epic data, creates `docs/reports/` with metadata pre-filled.
