@@ -38,6 +38,33 @@ The coordinator provides these values when spawning you:
 
 ---
 
+## IMPORTANT: Worktree Isolation — Read This First
+
+> **ALL work MUST be performed inside your dedicated beads worktree, NOT from
+> the main repository directory.** This is the single most critical rule for
+> beads workers. Violating it contaminates the shared checkout and breaks
+> other workers.
+
+**What this means in practice:**
+
+1. **Your FIRST action** must be `cd "${WORKTREE_PATH}"` — before reading
+   any files, before exploring code, before anything.
+2. **Every file path** you read, edit, write, or reference in bash commands
+   must be rooted at `WORKTREE_PATH`. For example:
+   - CORRECT: `${WORKTREE_PATH}/src/butlers/modules/qa/__init__.py`
+   - WRONG: `/home/user/repo/src/butlers/modules/qa/__init__.py` (this is REPO_ROOT)
+3. **Never use REPO_ROOT paths** for file operations. The repo root is a
+   read-only reference for understanding project structure — not your workspace.
+4. **If `pwd` does not match WORKTREE_PATH, STOP.** Do not attempt to
+   continue. Report `invalid-runtime-context` and exit.
+
+**Why this matters:** Workers run in parallel. If you modify files in the main
+checkout instead of your worktree, your changes collide with other workers,
+corrupt the shared `main` branch, and force manual cleanup. This has happened
+repeatedly and wastes significant human time.
+
+---
+
 ## Capabilities
 
 ### Subagent Spawning
@@ -50,10 +77,13 @@ Use `runSubagent` to delegate parts of the work. Follow the Model Selection Stra
 
 ## Environment Setup
 
-Before doing anything else:
+**IMPORTANT: You MUST `cd` into your worktree FIRST.** Do not read files, do
+not explore code, do not run any commands until you are inside `WORKTREE_PATH`.
 
 ```bash
 cd "${WORKTREE_PATH}"
+pwd    # MUST output exactly WORKTREE_PATH
+git branch --show-current  # MUST output agent/<ISSUE_ID>
 ```
 
 The coordinator creates worktrees via `bd worktree create`, which sets up a
@@ -61,7 +91,9 @@ worker-isolated checkout for `agent/<issue-id>`. Beads metadata is stored in
 a shared Dolt database; worktrees access it via a redirect file. Do not commit
 `.beads/` changes on worker branches.
 
-Never modify files in `REPO_ROOT` directly. All work happens in `WORKTREE_PATH`.
+**Never modify files in `REPO_ROOT` directly. All work happens in
+`WORKTREE_PATH`.** If you catch yourself using a path that does not start with
+`WORKTREE_PATH`, STOP and correct it immediately.
 
 ### Runtime Bootstrap (mandatory)
 
@@ -84,6 +116,10 @@ fi
 Bootstrap is part of the job. Do **not** continue into planning or
 implementation until this check passes. If your runtime supports interim
 updates, send a brief bootstrap acknowledgement after validation.
+
+**Throughout your entire session**, periodically verify you are still in the
+correct directory. If any tool output shows `cwd` as REPO_ROOT or a path
+outside WORKTREE_PATH, re-run `cd "${WORKTREE_PATH}"` before continuing.
 
 ---
 

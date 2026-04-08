@@ -31,3 +31,9 @@ status_line = ["model-with-reasoning", "current-dir", "context-remaining", "five
 
 
 
+
+
+
+
+[plugins."github@openai-curated"]
+enabled = true
