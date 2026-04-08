@@ -1,24 +1,39 @@
 ---
 name: cruft-cleanup
 description: >
-  Eliminate backward-compatibility shims, dead legacy code paths, and cruft during refactors
-  or migrations. Use when reviewing or writing code that touches refactored, renamed, or
-  migrated interfaces — especially when LLM-generated code introduces unnecessary shims,
-  re-exports, compatibility wrappers, or "old path still works" fallbacks. Invoke explicitly
-  with /cruft-cleanup to audit changed code, or as a post-refactor pass.
+  Use when reviewing or writing refactors, renames, or migrations where old interfaces may
+  linger as aliases, re-exports, wrappers, fallback branches, deprecated flags, or other
+  compatibility cruft. Especially relevant when changed code keeps both old and new paths
+  alive inside the same repo.
 ---
 
 # Cruft Cleanup
 
-**Why this skill exists:** LLMs are trained on codebases that value backward compatibility — published libraries, versioned APIs, multi-team monorepos. This biases LLM-generated code toward preserving old interfaces "just in case," even when the old interface is internal, has zero external consumers, and every callsite is in the same repo. Left unchecked, this instinct layers shim upon shim until the codebase is more glue than logic.
+LLMs tend to preserve old interfaces "just in case." In same-repo refactors, that usually produces dead wrappers, aliases, and fallback paths instead of a finished migration.
 
-When refactoring, migrating, or renaming code, leave **only the new code paths**. Do not preserve old interfaces, shim layers, or backward-compatibility wrappers unless there is a verified external consumer that cannot be updated in the same change.
+When refactoring, migrating, or renaming code, leave **only the new code path** unless backward compatibility is explicitly required.
+
+## When to Use
+
+Use this skill when:
+
+- A function, module, type, flag, config key, or CLI option was renamed, moved, or replaced
+- A diff keeps both old and new interfaces alive in the same repo
+- A refactor adds aliases, re-exports, wrappers, or fallback branches "for compatibility"
+- LLM-generated code says some variant of "old path still works"
+- Tests were updated incompletely and still exercise the retired interface
+
+Do not use this skill as a blanket rule for:
+
+- Published APIs with real downstream consumers
+- Cross-repo migrations that cannot be completed atomically
+- Temporary compatibility layers with a verified owner and removal date
 
 ## The Core Rule
 
 **If you changed it, finish the job.** Every callsite, import, reference, and test must use the new interface. The old one is deleted — not deprecated, not re-exported, not aliased.
 
-**When you are the author of a refactor:** Do not introduce the shim in the first place. Update every consumer in the same change. If you catch yourself writing a compatibility alias, wrapper, or fallback — stop and update the callers instead.
+If you catch yourself writing a compatibility alias, wrapper, or fallback, stop and update the callers instead.
 
 ## Anti-Patterns to Eliminate
 
@@ -106,6 +121,14 @@ engine:
 
 Delete the dead config keys, env vars, and CLI flags. If a config field has exactly one valid value, it's not configuration — it's a constant. Inline it and remove the option.
 
+## Quick Audit Flow
+
+1. Read the diff and list every renamed, moved, or replaced interface.
+2. Grep for old names, module paths, flags, and config keys.
+3. Delete aliases, wrappers, re-exports, fallback branches, and tombstones.
+4. Update all callsites and tests to the new interface.
+5. Re-grep to confirm the old interface is gone.
+
 ## Audit Checklist
 
 When reviewing changed code, verify:
@@ -140,8 +163,8 @@ Internal code, private APIs, and same-repo consumers do not qualify. Update them
 - If updating all callers makes the PR too large, the issue decomposition is wrong — split by component, not by "migrate then clean up"
 
 **Reactive (auditing existing changes):**
-1. **Read the diff** — identify all renamed, moved, or restructured interfaces
-2. **Grep for old names** — find every remaining reference to the pre-refactor interface
-3. **Update or delete** — migrate each reference to the new interface; delete the old one
-4. **Run tests** — if a test breaks, fix the test to use the new interface (do not re-add the shim)
-5. **Re-grep** — verify zero remaining references to old names
+1. Read the diff for every renamed, moved, or restructured interface
+2. Grep for every remaining reference to the pre-refactor interface
+3. Migrate or delete each reference
+4. Run tests and fix them to use the new interface
+5. Re-grep until old references are gone
