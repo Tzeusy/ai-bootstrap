@@ -223,6 +223,14 @@ This pillar should express stack-neutral engineering principles and reviewable e
 not technology recommendations. State standards in terms of evidence, invariants, change
 safety, maintainability, and operational care.
 
+By default, this pillar should encode a few explicit engineering biases unless the project
+overrides them:
+- Prefer `/cruft-cleanup` principles for same-repo refactors and migrations; remove dead
+  internal compatibility paths rather than preserving them by default
+- Prefer readability and simplicity over cleverness
+- Prefer strong observability, especially diagnosable exception paths
+- Prefer durable, maintainable fixes over short-term patches that merely clear the immediate error
+
 **Consult relevant craft files before:**
 - Any non-trivial implementation work
 - Reviewing a pull request or preparing one for review
@@ -256,6 +264,18 @@ only the narrower standards docs the current change needs.
 | What behavior is required? | `/spec-and-spine` |
 | Where does this component live and connect? | `/lay-and-land` |
 | What quality evidence is required before merge or ship? | `/craft-and-care` |
+
+## Default Biases
+
+1. **Finish migrations cleanly** — For same-repo refactors or renames, prefer removing retired
+   wrappers, aliases, fallback branches, dead flags, and old paths. Use `/cruft-cleanup` when
+   this question is in play.
+2. **Choose clarity over cleverness** — Prefer readable, straightforward implementations unless
+   a more complex design is clearly necessary for correctness or reliability.
+3. **Instrument failures for diagnosis** — Exception paths should emit enough context to narrow
+   likely causes quickly, not just announce failure.
+4. **Fix for the long term** — Prefer maintainable, correct solutions over temporary patches that
+   only suppress the immediate symptom.
 
 ## Mandatory Use Rule
 

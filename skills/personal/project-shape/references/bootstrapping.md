@@ -71,6 +71,7 @@ Capture the baseline standards that apply broadly:
 1. **Definition of done** — What must be true before a change is considered complete?
 2. **Clarity and maintainability bar** — What makes a change readable, reviewable, and safe to extend?
 3. **Change hygiene** — What kinds of hidden coupling, dead code, unclear naming, or partial rollouts are unacceptable?
+4. **Default engineering biases** — Does the project prefer cleanup over internal compatibility cruft, simplicity over cleverness, diagnosable failure paths, and durable fixes over expedient patches?
 
 ### Step 2: Write testing-and-verification.md
 
@@ -79,6 +80,7 @@ Define how the project earns confidence:
 1. **Evidence expectations** — What forms of verification are expected for different change types?
 2. **Regression discipline** — What does a good bug fix or risky refactor require?
 3. **Verification before merge** — What must the author prove?
+4. **Observability expectation** — What logging or diagnostic context is expected so likely causes of failures can be enumerated quickly?
 
 ### Step 3: Add domain standards as needed
 

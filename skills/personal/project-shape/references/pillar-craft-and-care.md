@@ -12,6 +12,26 @@ This pillar should express stack-neutral principles and reviewable expectations.
 humans and agents what evidence, discipline, and care are required, without prescribing vendors,
 frameworks, or tools unless the project has separately standardized those choices elsewhere.
 
+## Default Engineering Biases
+
+Unless a project explicitly overrides them, `craft-and-care` should default to these engineering
+biases:
+
+1. **Prefer cleanup over same-repo compatibility cruft** — Follow `/cruft-cleanup` principles
+   wherever possible. When a refactor, rename, or migration can be completed atomically inside the
+   same repo, prefer deleting retired wrappers, aliases, fallback branches, dead flags, and unused
+   paths over preserving them "just in case." Preserve backward compatibility only when there is a
+   verified external consumer or a real cross-repo migration constraint.
+2. **Prefer readability and simplicity over cleverness** — When two approaches can achieve the
+   same correctness and reliability, prefer the simpler and more readable one. Dense, overly
+   abstract, or surprising code needs a strong justification.
+3. **Bias toward observability** — Failure paths should be diagnosable. At minimum, logs should be
+   instrumented so exceptions can be investigated quickly, with enough structured context to narrow
+   plausible causes rather than merely report that something failed.
+4. **Prefer durable fixes over expedient patches** — Do not optimize for "clear the error for now"
+   when a correct, maintainable fix is tractable. Assume engineering time is available; optimize
+   for correctness, reliability, and long-term maintainability instead.
+
 ## Recommended Structure
 
 ```text
@@ -34,6 +54,7 @@ Must answer:
 - What makes a change complete here?
 - What clarity and maintainability standards are non-negotiable?
 - What kinds of hidden complexity, unclear naming, dead paths, or partial fixes are unacceptable?
+- Which cleanup-vs-compatibility, simplicity-vs-cleverness, and durable-fix biases are expected by default?
 
 ### `testing-and-verification.md`
 
@@ -41,6 +62,7 @@ Must answer:
 - What evidence is required for different classes of change?
 - What regression protection is expected for bug fixes and risky refactors?
 - What must be verified before merge or release?
+- What observability evidence or diagnostic instrumentation is required for failure-prone paths?
 
 ### `review-and-documentation.md`
 
@@ -67,6 +89,7 @@ Add when the project's risk profile justifies them:
 - Review quality expectations
 - Documentation update expectations
 - Observability and operational readiness standards
+- Cleanup expectations for dead internal code paths and same-repo migrations
 - API/interface change hygiene
 - Dependency admission and upgrade standards
 - Maintainability and clarity expectations
@@ -90,6 +113,7 @@ Add when the project's risk profile justifies them:
 - Prefer evidence questions over slogans
 - Explain the reason for each standard when it is not obvious
 - Cross-link the other pillars where the standards apply
+- Make cleanup, simplicity, observability, and durable-fix expectations explicit enough that a reviewer can reject a change for violating them
 
 ### Don't
 
@@ -98,6 +122,7 @@ Add when the project's risk profile justifies them:
 - Prescribe tools when the real requirement is an outcome
 - Re-state product requirements or architecture details
 - Confuse standards with detailed operating procedures
+- Preserve dead internal compatibility layers, clever abstractions, or under-instrumented failure paths by default unless the project explicitly says to
 
 ## Maturity Levels
 

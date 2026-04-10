@@ -106,16 +106,21 @@ This track should produce stack-neutral engineering standards, not tool choices.
 
 | Question | Purpose |
 |----------|---------|
+| "When a same-repo refactor is complete, do you prefer deleting the old path or leaving wrappers behind?" | Surface cleanup-vs-compatibility bias |
+| "If a solution is more clever but harder to read, when is that acceptable here?" | Surface simplicity-vs-cleverness bias |
 | "What evidence would make you confident this change is safe to merge?" | Surface verification standards |
 | "When a bug is fixed here, what kind of regression protection do you expect?" | Extract testing discipline |
 | "What operational signals would tell you this change is healthy in production?" | Extract observability and operational care expectations |
 | "What kinds of code review feedback should block a merge here?" | Surface review quality bar |
+| "If a quick patch would suppress the symptom but a deeper fix would take longer, which do you want?" | Surface durable-fix bias |
 | "What sort of change would technically work but still be unacceptable?" | Expose maintainability, clarity, or hygiene boundaries |
 
 **Challenge patterns:**
 - If the answers name tools instead of principles: "What outcome do you need from that tool? State the standard without the vendor."
 - If the answers are generic: "What would a concrete violation look like in a PR?"
 - If everything is "use best practices": "Which two or three rules would you actually reject work over?"
+- If they want compatibility layers by default: "Is there a real external consumer, or is this just internal inertia?"
+- If they accept vague logging: "When an exception happens at 3am, what should the logs tell you about likely causes?"
 
 #### Track 6: Design Contracts (feeds → about/law-and-lore/)
 
