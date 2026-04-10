@@ -40,6 +40,14 @@ Every route runs on the same backbone:
 
 The coordinator works top-down through the semantic spine. Doctrine grounds RFCs, RFCs ground specs, and specs ground execution planning. `lay-and-land` is the spatial cross-cut: update it anywhere the placement of components, boundaries, or data flow matters. `craft-and-care` is the execution-quality cross-cut: it defines how changes touching any pillar must be implemented, verified, reviewed, documented, and operated.
 
+![Five pillars as load-bearing structure](assets/five-pillars-load-bearing.svg)
+
+The first visual frames the model positively: all five pillars are structural. `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`, and `craft-and-care` each carry a different kind of project health.
+
+![Failure modes when a pillar is weak or missing](assets/five-pillars-health-risks.svg)
+
+The second visual frames the same model diagnostically: each pillar prevents a different failure mode, so missing shape does not create one generic problem. It creates a specific kind of project sickness depending on which pillar is weak.
+
 ## Workflow 1: Bootstrap Shape
 
 Use this when the project has weak or absent shape. The coordinator should:
