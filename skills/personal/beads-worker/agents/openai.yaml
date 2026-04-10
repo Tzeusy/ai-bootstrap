@@ -1,0 +1,4 @@
+interface:
+  display_name: "Beads Worker"
+  short_description: "Implement one Beads issue in an isolated worker worktree"
+  default_prompt: "Use $beads-worker to implement exactly one assigned Beads issue in its dedicated worktree and produce the structured worker report."
