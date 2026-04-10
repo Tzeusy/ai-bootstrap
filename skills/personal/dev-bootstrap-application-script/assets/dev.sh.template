@@ -9,20 +9,22 @@
 #   Layer 1 - launch panes/services
 #   Layer 2 - readiness gates + URL output
 #
-# Usage: ./dev.sh [--skip-tailscale-check]
+# Usage: ./dev.sh [--enable-tailscale-serve] [--skip-tailscale-check]
 
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WINDOW="__WINDOW_NAME__"
 
+ENABLE_TAILSCALE_SERVE=false
 SKIP_TAILSCALE_CHECK=false
 for arg in "$@"; do
   case "$arg" in
+    --enable-tailscale-serve) ENABLE_TAILSCALE_SERVE=true ;;
     --skip-tailscale-check) SKIP_TAILSCALE_CHECK=true ;;
     *)
       echo "Error: unknown argument: $arg" >&2
-      echo "Usage: ./dev.sh [--skip-tailscale-check]" >&2
+      echo "Usage: ./dev.sh [--enable-tailscale-serve] [--skip-tailscale-check]" >&2
       exit 1
       ;;
   esac
@@ -156,7 +158,7 @@ ensure_tailscale_serve() {
   if ! command -v tailscale &>/dev/null; then
     echo "Error: tailscale CLI not found on PATH" >&2
     echo "Install: https://tailscale.com/download" >&2
-    echo "Or skip this check: ./dev.sh --skip-tailscale-check" >&2
+    echo "Or skip this check: ./dev.sh --enable-tailscale-serve --skip-tailscale-check" >&2
     return 1
   fi
 
@@ -171,7 +173,7 @@ ensure_tailscale_serve() {
   if [ "$ts_state" = "NeedsLogin" ] || [ "$ts_state" = "NoState" ] || [ "$ts_state" = "Stopped" ]; then
     echo "Error: tailscale is not authenticated (state: ${ts_state})" >&2
     echo "Run: tailscale up" >&2
-    echo "Or skip this check: ./dev.sh --skip-tailscale-check" >&2
+    echo "Or skip this check: ./dev.sh --enable-tailscale-serve --skip-tailscale-check" >&2
     return 1
   fi
 
@@ -252,23 +254,27 @@ wait_for_http() {
 }
 
 # Optional reverse-proxy knobs.
-# If your app does not use path-prefix routing, set TAILSCALE_PATH_PREFIX=/.
+# Leave tailscale disabled unless the user or project needs remote HTTPS access.
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 BACKEND_PORT="${BACKEND_PORT:-9990}"
 TAILSCALE_HTTPS_PORT="${TAILSCALE_HTTPS_PORT:-443}"
-TAILSCALE_PATH_PREFIX_RAW="${TAILSCALE_PATH_PREFIX:-/__APP_SLUG__}"
+TAILSCALE_PATH_PREFIX_RAW="${TAILSCALE_PATH_PREFIX:-/}"
 TAILSCALE_PATH_PREFIX="$(normalize_path_prefix "$TAILSCALE_PATH_PREFIX_RAW")"
 FRONTEND_BASE_PATH="$(path_prefix_to_base "$TAILSCALE_PATH_PREFIX")"
-if [ "$TAILSCALE_PATH_PREFIX" = "/" ]; then
-  TAILSCALE_TARGET="http://localhost:${FRONTEND_PORT}"
-else
-  # Preserve prefix routing end-to-end through the local dev server.
-  TAILSCALE_TARGET="http://localhost:${FRONTEND_PORT}${TAILSCALE_PATH_PREFIX}"
-fi
+TAILSCALE_TARGET=""
 
-LOCAL_FRONTEND_URL="http://localhost:${FRONTEND_PORT}${FRONTEND_BASE_PATH}"
+LOCAL_FRONTEND_URL="http://localhost:${FRONTEND_PORT}/"
 LOCAL_BACKEND_API_BASE_URL="http://localhost:${BACKEND_PORT}/api"
 TAILSCALE_DASHBOARD_URL=""
+
+if [ "$ENABLE_TAILSCALE_SERVE" = "true" ]; then
+  if [ "$TAILSCALE_PATH_PREFIX" = "/" ]; then
+    TAILSCALE_TARGET="http://localhost:${FRONTEND_PORT}"
+  else
+    # Preserve prefix routing end-to-end through the local dev server.
+    TAILSCALE_TARGET="http://localhost:${FRONTEND_PORT}${TAILSCALE_PATH_PREFIX}"
+  fi
+fi
 
 # --- Prerequisites -----------------------------------------------------------
 if ! command -v tmux &>/dev/null; then
@@ -277,10 +283,12 @@ if ! command -v tmux &>/dev/null; then
 fi
 
 # --- Layer 0: optional tailscale preflight ----------------------------------
-if [ "$SKIP_TAILSCALE_CHECK" = "false" ]; then
+if [ "$ENABLE_TAILSCALE_SERVE" = "true" ] && [ "$SKIP_TAILSCALE_CHECK" = "false" ]; then
   ensure_tailscale_serve
-else
+elif [ "$ENABLE_TAILSCALE_SERVE" = "true" ]; then
   echo "Layer 0: skipping tailscale preflight (--skip-tailscale-check)"
+else
+  echo "Layer 0: local-only mode (tailscale disabled)"
 fi
 
 # --- Session handling --------------------------------------------------------
@@ -338,16 +346,16 @@ fi
 # are base-path aware and pass --base (or framework equivalent) as needed.
 
 # Pane 0: __SERVICE_0__
-tmux send-keys -t "$PANE_0" "__CMD_0__" Enter
+tmux send-keys -t "$PANE_0" "${ENV_CMD}__CMD_0__" Enter
 
 # Pane 1: __SERVICE_1__
-# tmux send-keys -t "$PANE_1" "__CMD_1__" Enter
+# tmux send-keys -t "$PANE_1" "${ENV_CMD}__CMD_1__" Enter
 
 # Pane 2: __SERVICE_2__
-# tmux send-keys -t "$PANE_2" "__CMD_2__" Enter
+# tmux send-keys -t "$PANE_2" "${ENV_CMD}__CMD_2__" Enter
 
 # Pane 3: __SERVICE_3__
-# tmux send-keys -t "$PANE_3" "__CMD_3__" Enter
+# tmux send-keys -t "$PANE_3" "${ENV_CMD}__CMD_3__" Enter
 
 # Example frontend command with base-path wiring:
 # tmux send-keys -t "$PANE_1" \

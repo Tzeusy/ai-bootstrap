@@ -30,6 +30,9 @@ or dispatching any work.
 3. **Conservative defaults** — when uncertain, leave the bead alone and append a
    note for human triage rather than making a wrong state transition.
 4. **Idempotent** — running cleanup twice in a row produces no additional changes.
+5. **Respect lease ownership** — a live foreign lease is a hard stop. Cleanup
+   may mutate only when the lease is absent, expired, or clearly belongs to a
+   dead session.
 
 ---
 
@@ -37,6 +40,18 @@ or dispatching any work.
 
 Execute each pass in order. Collect a summary of all mutations for the final
 report.
+
+### Lease Guard (mandatory for every pass)
+
+Before mutating any bead:
+- inspect lease metadata if present
+- if a live foreign lease exists, skip mutation for that bead
+- do not treat mere ownership mismatch as stale
+- only expired leases, missing leases, or clearly dead owners are eligible for
+  cleanup mutation
+
+This guard applies to all reopen, close, relabel, unblock, and release actions
+below.
 
 **Rig routing:** If running from outside the target rig (e.g., from the mayor
 or town root), pass `--rig <rig>` to `bd list` and `bd ready` calls so they
@@ -74,15 +89,16 @@ For each `in_progress` bead, determine if a worker is still active:
 |---|---|---|---|
 | yes | yes | `direct-merge` | Worker finished, coordinator missed it. Process as direct-merge (see Pass 5). |
 | yes | yes | `pr-review` | Worker created PR, coordinator missed it. Process in Pass 2. |
-| yes | yes | (none) | Worker may still be running or stalled. Check `bd stale` age. If updated >30min ago with no subagent activity, release: `bd update <id> --status open --append-notes "Released stale in_progress claim (no activity, worktree exists)"`. Remove worktree. |
-| yes | no | any | Worker died mid-work. Check for meaningful commits in the worktree (`git -C <worktree> log --oneline origin/HEAD..HEAD`). If commits exist, push the branch and release to open. If no commits, just clean up worktree and release to open. |
+| yes | yes | (none) | Worker may still be running or stalled. If a live foreign lease exists, skip. Otherwise check `bd stale` age. If updated >30min ago with no subagent activity, release: `bd update <id> --status open --append-notes "Released stale in_progress claim (no activity, worktree exists)"`. Remove worktree. |
+| yes | no | any | Worker died mid-work. If a live foreign lease exists, skip. Otherwise check for meaningful commits in the worktree (`git -C <worktree> log --oneline origin/HEAD..HEAD`). If commits exist, **do not push**. Add label `recovery-needed`, append a note that unpublished recovery work exists, and release only if you preserve the recovery worktree/branch for later coordinator inspection. If no commits, just clean up worktree and release to open. |
 | no | yes | `direct-merge` | Process as direct-merge (Pass 5). |
 | no | yes | `pr-review` | Process in Pass 2. |
-| no | yes | (none) | Stale claim. Release to open: `bd update <id> --status open --append-notes "Released stale claim (no worktree, unpushed branch exists)"`. |
-| no | no | any | Fully orphaned. Release to open: `bd update <id> --status open --append-notes "Released orphaned in_progress claim (no worktree, no branch)"`. |
+| no | yes | (none) | If a live foreign lease exists, skip. Otherwise stale claim. Release to open: `bd update <id> --status open --append-notes "Released stale claim (no worktree, unpushed branch exists)"`. |
+| no | no | any | If a live foreign lease exists, skip. Otherwise fully orphaned. Release to open: `bd update <id> --status open --append-notes "Released orphaned in_progress claim (no worktree, no branch)"`. |
 
 Also remove `review-running` label from any bead that has it but is not actively
-being processed by a live worker (no worktree):
+being processed by a live worker (no worktree), but only if no live foreign
+lease exists:
 ```bash
 bd update <id> --remove-label review-running
 ```
@@ -103,7 +119,8 @@ For each blocked bead with `pr-review` label (but **not** `pr-review-task`):
      (.external_ref // "") as $ref |
      ($ref | capture("^gh-pr:(?<n>[0-9]+)$")?.n) // empty')
    ```
-   If no PR number found, append note and skip:
+   If no PR number found, append note and skip, but only when no live foreign
+   lease exists:
    ```bash
    bd update <id> --append-notes "Cleanup: no external_ref gh-pr:N found, needs manual triage"
    ```
@@ -117,9 +134,9 @@ For each blocked bead with `pr-review` label (but **not** `pr-review-task`):
 
 | PR State | Action |
 |---|---|
-| **MERGED** | Close this bead: `bd close <id> --reason "Cleanup: PR #${PR_NUMBER} already merged"`. Clean up worktree and remote branch if they exist. |
-| **CLOSED** (not merged) | Reopen for re-triage: `bd update <id> --status open --remove-label pr-review --append-notes "Cleanup: PR #${PR_NUMBER} closed without merge — needs re-triage"`. |
-| **OPEN** | PR still active — leave bead as-is. Verify a corresponding `pr-review-task` bead exists (check dependents). If missing, append note: `"Cleanup: PR #${PR_NUMBER} is open but no pr-review-task bead found — needs manual wiring"`. |
+| **MERGED** | If no live foreign lease exists, close this bead: `bd close <id> --reason "Cleanup: PR #${PR_NUMBER} already merged"`. Clean up worktree and remote branch if they exist. |
+| **CLOSED** (not merged) | If no live foreign lease exists, reopen for re-triage: `bd update <id> --status open --remove-label pr-review --append-notes "Cleanup: PR #${PR_NUMBER} closed without merge — needs re-triage"`. |
+| **OPEN** | PR still active — leave bead as-is. Verify exactly one corresponding `pr-review-task` bead exists (check dependents). If missing or duplicated, append note for coordinator dedupe/rebuild on next loop. |
 | **gh fails** | Append note, skip. Do not mutate on transient errors. |
 
 ### Pass 3: Blocked `pr-review-task` beads (review bead reconciliation)
@@ -161,13 +178,21 @@ For each `pr-review-task` bead:
 
 | PR State | Original bead status | Action |
 |---|---|---|
-| **MERGED** | open/in_progress/blocked | Close both beads: `bd close <review-id> --reason "Cleanup: PR #N already merged"` and `bd close <original-id> --reason "Cleanup: PR #N already merged"`. Clean up worktree/branch. |
-| **MERGED** | already closed | Close only the review bead. |
-| **CLOSED** (not merged) | any | Close review bead: `bd close <review-id> --reason "Cleanup: PR #N closed without merge"`. Update original: `bd update <original-id> --status open --remove-label pr-review --append-notes "Cleanup: PR #N closed, review bead closed — needs re-triage"`. |
-| **OPEN** | any | PR still active — leave both beads as-is. Check for stale `review-running` label (remove if no active worktree). |
+| **MERGED** | open/in_progress/blocked | If neither bead has a live foreign lease, close both beads: `bd close <review-id> --reason "Cleanup: PR #N already merged"` and `bd close <original-id> --reason "Cleanup: PR #N already merged"`. Clean up worktree/branch. |
+| **MERGED** | already closed | If no live foreign lease exists on the review bead, close only the review bead. |
+| **CLOSED** (not merged) | any | If neither bead has a live foreign lease, close review bead: `bd close <review-id> --reason "Cleanup: PR #N closed without merge"`. Update original: `bd update <original-id> --status open --remove-label pr-review --append-notes "Cleanup: PR #N closed, review bead closed — needs re-triage"`. |
+| **OPEN** | any | PR still active — leave both beads as-is. Check for stale `review-running` label only when no live foreign lease exists. |
 | Cannot resolve PR | — | Append note to review bead, skip mutation. |
 
 ### Pass 4: Blocked beads whose blockers are all closed
+
+Before unblocking ordinary blocked work, dedupe any PR-review beads:
+- group `pr-review-task` beads by original implementation bead and PR number
+- keep the oldest still-relevant blocked bead as canonical
+- close or note duplicates so the coordinator does not dispatch two reviewers,
+  but skip any duplicate carrying a live foreign lease
+
+A duplicate review bead must never survive cleanup silently.
 
 A bead may be `blocked` because it depends on other beads. If all blocking beads
 are now closed, the blocked bead should be unblocked.
@@ -189,7 +214,7 @@ For each blocked bead (skip those already handled in Pass 2/3):
      # If any blocker is NOT closed, bead stays blocked
    done
    ```
-3. If **all blockers are closed**, unblock:
+3. If **all blockers are closed** and no live foreign lease exists, unblock:
    ```bash
    bd update <id> --status open \
      --append-notes "Cleanup: all blocking dependencies are now closed, unblocking"
@@ -233,9 +258,14 @@ For each worktree under `.worktrees/parallel-agents/` only:
    git push origin --delete "agent/${WT_NAME}" 2>/dev/null || true
    ```
 4. **If bead is open** (was released in an earlier pass) — remove worktree only
-   (branch may have useful commits):
+   unless the bead carries `recovery-needed` or an equivalent recovery note.
+   Recovery-tagged worktrees must be preserved for coordinator inspection:
    ```bash
-   bd worktree remove ".worktrees/parallel-agents/${WT_NAME}" --force 2>/dev/null || true
+   if bead has recovery-needed label; then
+     : preserve worktree for recovery
+   else
+     bd worktree remove ".worktrees/parallel-agents/${WT_NAME}" --force 2>/dev/null || true
+   fi
    ```
 5. **If bead does not exist** (deleted or corrupted) — remove worktree and
    branch:
@@ -257,7 +287,8 @@ bd list --label review-running --json --limit 0
 ```
 
 For each bead with `review-running`:
-- If status is NOT `in_progress`, or no worktree exists for it:
+- If status is NOT `in_progress`, or no worktree exists for it, and no live
+  foreign lease exists:
   ```bash
   bd update <id> --remove-label review-running \
     --append-notes "Cleanup: removed stale review-running label (no active worker)"
