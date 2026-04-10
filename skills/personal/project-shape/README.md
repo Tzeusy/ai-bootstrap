@@ -12,8 +12,8 @@ The coordinator operates in six stages:
 
 1. **Intake**: read the user's request, inspect the repository, and decide whether the job is shape assessment, bootstrap, idea translation, maintenance, or overview generation.
 2. **Assess**: run `scripts/shape-scan.sh` when possible, then inspect pillar coverage manually if needed.
-3. **Route**: choose the correct workflow based on repo state and user intent.
-4. **Execute**: run the selected workflow with the correct pillar order and related skills.
+3. **Route**: choose the correct workflow based on repo state and user intent, then decide which pillar documents should be handled by distinct subagents.
+4. **Execute**: run the selected workflow with the correct pillar order and related skills, preferring per-pillar subagents for document investigation and refinement so each pillar gets a tighter context window.
 5. **Review**: use fresh-context review agents when available; otherwise run explicit coherence and adversarial self-review.
 6. **Install**: write or update docs, local skills, and overview assets, then validate with the package scripts.
 
@@ -46,9 +46,10 @@ Use this when the project has weak or absent shape. The coordinator should:
 
 1. Run the consultative interview from [`references/consultative-bootstrapping.md`](references/consultative-bootstrapping.md).
 2. Synthesize draft doctrine first, then draft a minimal `craft-and-care` baseline, then design contracts and specs, while starting topology as soon as the architecture track is clear.
-3. Scaffold directories with `scripts/shape-init.sh` once the content direction is stable.
-4. Install or refresh local pillar skills from [`references/local-skill-templates.md`](references/local-skill-templates.md).
-5. Validate with `scripts/shape-scan.sh` and `scripts/self-test.sh`.
+3. Prefer distinct subagents per pillar for document investigation and refinement. A `heart-and-soul` draft should not share the same generation context as a `law-and-lore` RFC or a `craft-and-care` standards pass unless the work is too small to justify dispatch.
+4. Scaffold directories with `scripts/shape-init.sh` once the content direction is stable.
+5. Install or refresh local pillar skills from [`references/local-skill-templates.md`](references/local-skill-templates.md).
+6. Validate with `scripts/shape-scan.sh` and `scripts/self-test.sh`.
 
 Read [`references/bootstrapping.md`](references/bootstrapping.md) for the phase-level checklist and common failure modes.
 
@@ -79,6 +80,8 @@ The coordinator audits:
 
 When drift is found, update only the affected sections first, then run delta review instead of re-reviewing the entire corpus.
 
+For non-trivial curation work, prefer assigning one subagent per affected pillar or per coherent document cluster. This keeps doctrine, contracts, specs, topology, and engineering standards from bleeding into one another through an overstuffed shared context window.
+
 Use [`references/maturity-rubric.md`](references/maturity-rubric.md) to interpret scan output and [`references/evaluation-scenarios.md`](references/evaluation-scenarios.md) to pressure-test fallback behavior.
 
 ## Workflow 4: Generate A Project Overview
@@ -102,6 +105,7 @@ See [`references/generate-overview.md`](references/generate-overview.md) for the
 Generated shape artifacts are not considered settled until review completes.
 
 - **Primary mode**: one generation agent plus independent review agents for coherence, adversarial pressure, and cross-pillar alignment.
+- **Generation/curation mode**: for substantive document work, fan out by pillar. Use distinct subagents to investigate and refine `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`, and `craft-and-care` artifacts separately whenever the work can be cleanly partitioned.
 - **Cross-pillar review duty**: check execution fit as well as semantic fit. If doctrine, RFCs, specs, or topology imply testing, observability, documentation, compatibility, or operational obligations, `craft-and-care` should make those standards explicit.
 - **Revision rule**: revise after findings, then run a second round only if the first review surfaced major issues.
 - **Stop rule**: if a third round would be needed, the coordinator should return to the user and reopen the interview rather than papering over unclear intent.

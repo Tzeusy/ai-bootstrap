@@ -131,6 +131,20 @@ Only pursue this track if the project is past the idea stage:
 
 After the interview, synthesize — don't transcribe. The human said many things; your job is to find the coherent thread.
 
+### Subagent Dispatch Guidance
+
+If the environment supports subagents and the scope is substantive, fan out synthesis by pillar:
+
+- one subagent for `heart-and-soul`
+- one for `craft-and-care`
+- one for `law-and-lore`
+- one for `lay-and-land`
+- one for `spec-and-spine` once the prerequisite pillars are stable enough
+
+This keeps each pillar's draft grounded in the right slice of evidence rather than letting one swollen context window blur doctrine, contracts, requirements, topology, and engineering standards together.
+
+Use the lead agent to own the interview, route the evidence to the right pillar worker, and reconcile contradictions across pillars. Use the pillar subagents to investigate, draft, and refine within their narrower remit.
+
 ### Synthesis Steps
 
 1. **Extract the thesis** — One paragraph that captures what this project IS, distilled from Track 1 answers

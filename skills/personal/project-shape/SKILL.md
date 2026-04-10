@@ -79,6 +79,7 @@ Bootstrapping is a **consultative process**, not a template-filling exercise. Th
 ### Quality Requirements
 
 - **Use the most capable model available** with maximum thinking/reasoning budget when available
+- **Prefer distinct subagents per pillar for substantive document generation or curation** — keep doctrine, contracts, specs, topology, and engineering standards in tighter, task-specific context windows whenever the work can be partitioned cleanly
 - **Never self-review** — use independent subagents for review when the environment supports them (see below)
 - **Challenge the user** — accept vague answers only to push deeper, never to ship
 
@@ -94,7 +95,7 @@ The skill still applies in constrained environments. Degrade the presentation, n
 
 1. **Consultative interview** — Structured Socratic extraction across five tracks (identity, boundaries, principles, architecture, contracts). Read `references/consultative-bootstrapping.md` for the full protocol with question banks and challenge patterns.
 
-2. **Synthesize** — Distill interview answers into draft documents. Use the human's own language. Make implicit trade-offs explicit. Flag contradictions.
+2. **Synthesize** — Distill interview answers into draft documents. Use the human's own language. Make implicit trade-offs explicit. Flag contradictions. For substantive shape work, prefer one subagent per pillar or per major pillar document cluster so each draft is generated and refined in a tighter context window.
 
 3. **Independent review** — Spawn fresh subagents (no generation context) to review each document. Read `references/review-protocol.md` for the three review agent specs (Coherence, Adversarial, Cross-Pillar).
 
@@ -168,7 +169,7 @@ For an existing project, assess coherence across pillars and keep docs current.
 When code changes diverge from documentation:
 
 1. **Detect** — Compare implementation against spec requirements, RFC contracts, and doctrine
-2. **Update** — Generate updated sections for affected documents
+2. **Update** — Generate updated sections for affected documents, preferring distinct subagents per affected pillar so each curation pass stays narrow and pillar-specific
 3. **Review the delta** — Spawn independent review agents on changed sections (not the full doc)
 4. **Cross-check** — Run cross-pillar review if changes affect multiple pillars
 5. **Present to user** — Show diff with review summary before committing

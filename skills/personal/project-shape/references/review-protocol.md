@@ -11,6 +11,24 @@ When an LLM writes vision.md and then reviews it, it is primed by its own genera
 
 Independent review breaks this by giving a fresh agent only the document, not the generation context.
 
+The same principle applies one step earlier in the workflow: substantive document generation and curation should also be partitioned where possible. A dedicated pillar worker with a tighter context window will usually produce cleaner doctrine, contracts, specs, topology docs, and engineering standards than a single monolithic agent carrying all pillars at once.
+
+## Generation And Curation Partitioning
+
+When the task is large enough to justify dispatch, prefer:
+
+- one investigation/refinement subagent per pillar, or
+- one investigation/refinement subagent per coherent document cluster within a pillar
+
+Examples:
+
+- `heart-and-soul/vision.md` and `v1.md` can share one doctrine-focused worker
+- `law-and-lore/rfcs/0001-*.md` and its review notes can share one contracts-focused worker
+- `lay-and-land/components.md` and `data-flow.md` can share one topology-focused worker
+- `craft-and-care/engineering-bar.md` and `testing-and-verification.md` can share one standards-focused worker
+
+Do not split work so aggressively that the coordinator spends more time stitching than the workers save. The point is targeted context windows, not maximal fan-out.
+
 ## Review Architecture
 
 <!-- [DIAGRAM: review-architecture]
@@ -127,7 +145,7 @@ Output: Ranked list of cross-pillar issues, each with affected documents and fix
 
 ### For New Projects (bootstrapping)
 
-1. **Generate** — Use the consultative bootstrapping protocol to produce each document
+1. **Generate** — Use the consultative bootstrapping protocol to produce each document, preferring distinct generation/refinement subagents per pillar when the work is substantial
 2. **Review sequentially** — After each document, run Review Agents 1 and 2 on it
 3. **Revise** — Incorporate findings, re-synthesize if needed
 4. **Cross-review** — After all pillars exist, run Review Agent 3
@@ -136,7 +154,7 @@ Output: Ranked list of cross-pillar issues, each with affected documents and fix
 ### For Existing Projects (maintenance)
 
 1. **Detect drift** — When code changes diverge from docs, flag for review
-2. **Update** — Generate updated sections
+2. **Update** — Generate updated sections, preferring per-pillar curation subagents when multiple pillars are affected
 3. **Review the delta** — Run Review Agents 1 and 2 on just the changed sections
 4. **Cross-check** — Run Review Agent 3 if changes affect cross-pillar coherence
 5. **Present to user** — Show diff with review findings

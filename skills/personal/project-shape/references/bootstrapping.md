@@ -6,6 +6,19 @@ Step-by-step guide for establishing the five-pillar knowledge architecture from 
 
 - A project with a clear purpose (even if only in the founder's head)
 - Willingness to write before coding
+- Ability to partition substantive pillar work across distinct subagents when the environment supports it
+
+## Dispatch Principle
+
+For substantive generation or curation of pillar documentation, prefer one subagent per pillar or per coherent pillar-document cluster. The goal is not ceremony. The goal is narrower context windows:
+
+- doctrine work should not be diluted by RFC implementation detail
+- RFC drafting should not inherit unnecessary topology or overview-writing context
+- spec curation should stay close to requirements and scenarios
+- topology curation should stay spatial and boundary-focused
+- craft-and-care drafting should stay focused on execution standards rather than product behavior
+
+Keep work local only when the task is too small to justify dispatch or when the next step is tightly blocked on the result.
 
 ## Phase 1: Doctrine (about/heart-and-soul/)
 
@@ -38,6 +51,10 @@ Only when a domain has principles worth codifying. Common early additions:
 ### Step 4: Write README.md
 
 An index file with one-line descriptions and a recommended reading order. Not doctrine itself — a map to doctrine.
+
+### Dispatch note
+
+If the environment supports subagents, doctrine drafting and doctrine revision should be handled by a dedicated pillar-specific subagent rather than a general-purpose document worker carrying other pillar context.
 
 ## Phase 2: Engineering Standards (about/craft-and-care/)
 
@@ -77,6 +94,10 @@ Only when the project's risk profile warrants them. Common additions:
 `craft-and-care` should define enduring engineering principles and reviewable expectations.
 Detailed runbooks, CI recipes, and tool-specific instructions belong elsewhere and may be linked.
 
+### Dispatch note
+
+`craft-and-care` benefits from its own subagent because it is especially prone to overlap drift. Keep the context focused on execution quality, not feature behavior, architecture contracts, or topology.
+
 ## Phase 3: Design Contracts (about/law-and-lore/)
 
 **Goal**: Capture technical decisions in reviewable, numbered documents.
@@ -96,6 +117,10 @@ Write your first RFC for the most foundational subsystem. Number it `0001`.
 ### Step 2: Establish review discipline
 
 Even solo projects benefit from review rounds — your future self (or an LLM agent) reviewing past decisions and their rationale.
+
+### Dispatch note
+
+Use a dedicated subagent for RFC investigation and refinement so technical contract work stays isolated from doctrine prose, topology maps, and standards curation.
 
 ### Step 3: Cross-reference doctrine
 
@@ -128,6 +153,10 @@ One spec file per subsystem/domain. Each requirement must have:
 
 Use the spec requirements to create implementation tasks or work items. Each v1-mandatory requirement generates one or more tasks.
 
+### Dispatch note
+
+When curating specs, prefer a spec-focused subagent so requirement edits stay grounded in scenarios and traceability rather than drifting into architectural or doctrinal restatement.
+
 ## Phase 5: Topology (about/lay-and-land/)
 
 **Goal**: Document where components live, how they connect, and what boundaries exist.
@@ -155,6 +184,10 @@ Visual maps are more effective than prose. Use Mermaid (version-controllable) or
 ### Step 4: Cross-reference other pillars
 
 Annotate the topology with which RFCs govern which boundaries, and which doctrine principles justify the structure.
+
+### Dispatch note
+
+Topology work should be handled by a dedicated subagent whenever the mapping work is non-trivial. Spatial reasoning degrades when mixed with broad generation context from doctrine, specs, and overview prose.
 
 ## Phase 6: Local Skills
 
