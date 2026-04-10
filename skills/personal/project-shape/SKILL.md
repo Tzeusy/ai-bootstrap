@@ -227,6 +227,10 @@ Read `references/generate-overview.md` for the full guide: diagram specs, docume
 
 Each pillar should have a corresponding local skill in `.claude/skills/` (and equivalent for other tools). These skills teach LLM agents how to navigate and use each pillar.
 
+**Skill-generation mandate:** Generated local skills **MUST** follow current `agentskills.io` expectations and `/skill-creator` best practices. Keep frontmatter valid, keep descriptions focused on triggering conditions, and keep the SKILL body lean enough to act as a routing/index layer rather than a monolith.
+
+**Progressive discovery mandate:** Local skills should optimize for targeted context retrieval. Treat `SKILL.md` as the discovery surface, then fan detailed guidance out into narrower files such as `references/*.md`, deterministic helpers in `scripts/`, and only the output-facing resources in `assets/`. Every supporting file that an agent may need should be linked from `SKILL.md` with explicit "read when..." guidance so the agent can load only the relevant slice.
+
 **Preferred method:** Run `shape-init.sh` which generates correctly-formatted skills automatically:
 
 ```bash
@@ -250,9 +254,9 @@ Markdown body follows...
 
 - The `---` delimiters on lines 1 and N are mandatory — without them the file is invalid
 - `name` and `description` are the supported fields; do not add extra frontmatter keys unless the target platform explicitly documents them
-- Read `references/local-skill-templates.md` for full customizable templates per pillar
+- Read `references/local-skill-templates.md` for full customizable templates per pillar plus the required progressive-discovery structure
 
-The key principle: local skills are **indexes with selection guidance**, not duplicates of the content. They tell the agent *which file to read* for a given task, not *what the file says*.
+The key principle: local skills are **indexes with selection guidance**, not duplicates of the content. They tell the agent *which file to read* for a given task, not *what the file says*. If a pillar is accumulating large inline guidance, split it into targeted sub-docs or utilities and keep the skill as the router.
 
 All five pillars should have a corresponding local skill: `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`.
 

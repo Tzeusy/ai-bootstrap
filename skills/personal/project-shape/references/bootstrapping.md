@@ -208,7 +208,7 @@ mkdir -p .claude/skills/{heart-and-soul,law-and-lore,spec-and-spine,lay-and-land
 
 **Preferred:** Run `shape-init.sh --skills-only` which generates correctly-formatted skills automatically.
 
-**If writing manually:** Every SKILL.md **MUST** start with YAML frontmatter (`---` delimiters with `name` and `description` fields). Without frontmatter, skill loaders silently reject the file. Use the templates from `references/local-skill-templates.md` and customize the index tables with your actual files and domains.
+**If writing manually:** Every SKILL.md **MUST** start with YAML frontmatter (`---` delimiters with `name` and `description` fields). Without frontmatter, skill loaders silently reject the file. Manual pillar skills **MUST** follow current `agentskills.io` expectations and `/skill-creator` best practices: keep the description about when to use the skill, keep the body concise, and structure the skill as an index/router instead of copying whole docs into it. Use the templates from `references/local-skill-templates.md`, customize the index tables with your actual files and domains, and fan deeper guidance into `references/`, `scripts/`, and other supporting files that `SKILL.md` links with explicit "read when..." cues.
 
 ### Step 3: Validate format
 

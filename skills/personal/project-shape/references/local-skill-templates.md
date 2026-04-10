@@ -4,6 +4,10 @@ Install these as `.claude/skills/<name>/SKILL.md` (and equivalents for `.codex/`
 
 **CRITICAL FORMAT REQUIREMENT:** Every SKILL.md file **MUST** begin with YAML frontmatter delimited by `---`. Without frontmatter, skill loaders silently reject the file. Supported fields: `name` and `description`. Do not omit the opening or closing `---` delimiters. Do not start the file with a markdown heading.
 
+**Authoring mandate:** These local skills **MUST** follow current `agentskills.io` conventions and `/skill-creator` best practices. In practice that means: valid minimal frontmatter, a trigger-oriented `description`, a concise SKILL body that routes rather than repeats source material, and explicit navigation cues that help the agent select only the files needed for the current task.
+
+**Progressive discovery mandate:** Design every pillar skill for targeted retrieval. Keep `SKILL.md` as the discovery/index layer, and fan heavier or narrower content out into supporting files such as `references/*.md` and `scripts/*`. Supporting files should not be hidden sidecars: link them directly from `SKILL.md` with "read when..." guidance so the agent can progressively discover and load only the relevant slice.
+
 Customize the tables and rules for your project's specific domains.
 
 ## Template: heart-and-soul
@@ -309,7 +313,7 @@ For each template:
 
 All five skills should be installed: `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`.
 
-The templates above are starting points — customize heavily for your project's specific domains, files, and conventions.
+The templates above are starting points — customize heavily for your project's specific domains, files, and conventions. When a pillar grows beyond a compact routing skill, split detail into targeted sub-docs or utilities instead of expanding `SKILL.md` into a monolith.
 
 Before relying on these local skills, remove scaffold markers/placeholders and run:
 
