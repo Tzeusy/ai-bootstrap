@@ -30,8 +30,6 @@ The coordinator should not collapse these paths into one generic doc-writing loo
 
 ## Five-Pillar Backbone
 
-![Project shape traceability chain](assets/pillar-traceability.svg)
-
 Every route runs on the same backbone:
 
 - `about/heart-and-soul/` answers **why** the project exists and what it refuses to become.
@@ -55,8 +53,6 @@ Use this when the project has weak or absent shape. The coordinator should:
 Read [`references/bootstrapping.md`](references/bootstrapping.md) for the phase-level checklist and common failure modes.
 
 ## Workflow 2: Translate Ideas Into Requirements
-
-![Idea funnel](assets/idea-funnel.svg)
 
 This route turns a fuzzy idea into work that can be implemented without losing the doctrine:
 
