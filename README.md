@@ -69,7 +69,7 @@ The main personal workflow is:
 2. Start `beads-coordinator` to pull ready work from `bd ready`.
 3. `beads-coordinator` runs `beads-cleanup`, claims work, creates isolated worktrees, and dispatches workers.
 4. `beads-worker` executes one implementation issue in its own worktree.
-5. `beads-pr-reviewer-worker` handles PR review follow-up, review threads, and merge/closure decisions.
+5. `beads-pr-reviewer-worker` handles PR review follow-up, review threads, and merge-or-retry decisions, then reports the outcome back to the coordinator for Beads closure.
 
 This is the preferred model for sustained throughput. The coordinator coordinates; workers implement or review.
 

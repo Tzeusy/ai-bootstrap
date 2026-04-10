@@ -352,13 +352,26 @@ echo "${FOLLOWUPS_JSON}" | jq -e 'type == "array"' >/dev/null
 echo "${BLOCKERS_JSON}" | jq -e 'type == "array"' >/dev/null
 ```
 
+Reviewer-worker report contract:
+- accepted `Status` values:
+  - `merged-pr`
+  - `pushed-review-fixes`
+  - `blocked-awaiting-coordinator`
+  - `invalid-runtime-context`
+- `Review-Actions-JSON`, `Discovered-Follow-Ups-JSON`, and `Blockers-JSON`
+  must be valid JSON arrays
+- `merged-pr` means GitHub merge is complete but Beads closure still belongs to
+  the coordinator
+- `pushed-review-fixes` means the worker changed GitHub state or pushed code,
+  but the review bead should remain blocked for another pass
+
 When a reviewer worker completes:
-- if it reports `merged-awaiting-coordinator-close`, confirm the PR is merged,
+- if it reports `merged-pr`, confirm the PR is merged,
   then renew lease and close the review and original beads
 - if it reports `blocked-awaiting-coordinator`, keep the review bead blocked
   and create any follow-up merge-blocker bead from the structured report if one
   does not already exist
-- if it reports `review-comments-left`, keep the review bead blocked and rely on
+- if it reports `pushed-review-fixes`, keep the review bead blocked and rely on
   the PR-review lane to revisit it later
 - if it reports `invalid-runtime-context`, release the review bead back to
   `blocked`, remove `review-running`, and retry later after environment repair

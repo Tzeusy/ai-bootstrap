@@ -128,8 +128,10 @@ spawn workers (e.g., Task tool in Claude Code, subagent in Codex, etc.).
 >
 > Implementation workers (`beads-worker`) must never call `bd close` and should
 > not run lifecycle mutations (`bd create/update/dep`) for assigned issue flow.
-> `beads-pr-reviewer-worker` reports merge outcome and follow-up needs; the
-> coordinator performs closure after confirming the PR is merged.
+> `beads-pr-reviewer-worker` may update GitHub review state and merge or close
+> the PR when appropriate, but it reports merge outcome and follow-up needs
+> instead of mutating Beads lifecycle state. The coordinator performs closure
+> after confirming the PR is merged.
 
 ### 0. Check PR-review issues (priority lane)
 
@@ -301,8 +303,9 @@ this EXACT JSON format:
 
 Workers operate autonomously following their selected workflow:
 - `beads-worker`: Understand → Implement → Verify → Handoff
-- `beads-pr-reviewer-worker`: review threads/comments and decide merge/close
-  path for `pr-review-task` beads
+- `beads-pr-reviewer-worker`: Resolve context → Review/fix threads →
+  evaluate merge readiness → report merge or retry outcome for
+  `pr-review-task` beads
 
 ### 6a. Bootstrap the worker (mandatory)
 
