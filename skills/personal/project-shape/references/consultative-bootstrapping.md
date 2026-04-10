@@ -108,10 +108,13 @@ This track should produce stack-neutral engineering standards, not tool choices.
 |----------|---------|
 | "When a same-repo refactor is complete, do you prefer deleting the old path or leaving wrappers behind?" | Surface cleanup-vs-compatibility bias |
 | "If a solution is more clever but harder to read, when is that acceptable here?" | Surface simplicity-vs-cleverness bias |
+| "How much hidden framework magic or implicit behavior are you comfortable with here?" | Surface explicitness-vs-magic bias |
 | "What evidence would make you confident this change is safe to merge?" | Surface verification standards |
 | "When a bug is fixed here, what kind of regression protection do you expect?" | Extract testing discipline |
 | "What operational signals would tell you this change is healthy in production?" | Extract observability and operational care expectations |
 | "What kinds of code review feedback should block a merge here?" | Surface review quality bar |
+| "When something goes wrong, should the system fail clearly or try to fall back quietly?" | Surface fail-fast-vs-fallback bias |
+| "If behavior or assumptions change, do you want the relevant docs and contracts updated in the same change?" | Surface same-change-doc-update bias |
 | "If a quick patch would suppress the symptom but a deeper fix would take longer, which do you want?" | Surface durable-fix bias |
 | "What sort of change would technically work but still be unacceptable?" | Expose maintainability, clarity, or hygiene boundaries |
 
@@ -121,6 +124,8 @@ This track should produce stack-neutral engineering standards, not tool choices.
 - If everything is "use best practices": "Which two or three rules would you actually reject work over?"
 - If they want compatibility layers by default: "Is there a real external consumer, or is this just internal inertia?"
 - If they accept vague logging: "When an exception happens at 3am, what should the logs tell you about likely causes?"
+- If they accept hidden magic: "What debugging cost are you willing to pay for that convenience?"
+- If they want quiet fallbacks: "Is graceful degradation actually required, or are we hiding a defect?"
 
 #### Track 6: Design Contracts (feeds → about/law-and-lore/)
 

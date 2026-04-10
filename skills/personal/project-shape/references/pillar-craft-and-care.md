@@ -31,6 +31,14 @@ biases:
 4. **Prefer durable fixes over expedient patches** — Do not optimize for "clear the error for now"
    when a correct, maintainable fix is tractable. Assume engineering time is available; optimize
    for correctness, reliability, and long-term maintainability instead.
+5. **Prefer explicitness over magic** — Prefer visible control flow, explicit data movement, and
+   obvious invariants over hidden side effects, surprising framework behavior, or implicit coupling.
+6. **Prefer fail-fast over silent fallback** — Unless graceful degradation is explicitly required by
+   doctrine, specs, or design contracts, surface incorrect assumptions and invalid states clearly
+   rather than masking them behind quiet fallback behavior.
+7. **Prefer same-change documentation and contract updates** — When behavior, assumptions,
+   interfaces, or standards change, update the relevant docs, specs, RFCs, or standards in the
+   same change rather than relying on follow-up cleanup.
 
 ## Recommended Structure
 
@@ -54,7 +62,7 @@ Must answer:
 - What makes a change complete here?
 - What clarity and maintainability standards are non-negotiable?
 - What kinds of hidden complexity, unclear naming, dead paths, or partial fixes are unacceptable?
-- Which cleanup-vs-compatibility, simplicity-vs-cleverness, and durable-fix biases are expected by default?
+- Which cleanup-vs-compatibility, simplicity-vs-cleverness, explicitness-vs-magic, fail-fast-vs-fallback, and durable-fix biases are expected by default?
 
 ### `testing-and-verification.md`
 
@@ -63,6 +71,7 @@ Must answer:
 - What regression protection is expected for bug fixes and risky refactors?
 - What must be verified before merge or release?
 - What observability evidence or diagnostic instrumentation is required for failure-prone paths?
+- When should the system fail loudly versus degrade gracefully?
 
 ### `review-and-documentation.md`
 
@@ -70,6 +79,7 @@ Must answer:
 - What kind of review feedback should block a merge?
 - What are the obligations of the author versus the reviewer?
 - When behavior changes, what documentation must be updated?
+- Which docs, contracts, or specs must be updated in the same change rather than deferred?
 
 ## Situational Files
 
@@ -90,6 +100,8 @@ Add when the project's risk profile justifies them:
 - Documentation update expectations
 - Observability and operational readiness standards
 - Cleanup expectations for dead internal code paths and same-repo migrations
+- Explicitness and anti-magic expectations
+- Fail-fast and fallback discipline
 - API/interface change hygiene
 - Dependency admission and upgrade standards
 - Maintainability and clarity expectations
@@ -113,7 +125,7 @@ Add when the project's risk profile justifies them:
 - Prefer evidence questions over slogans
 - Explain the reason for each standard when it is not obvious
 - Cross-link the other pillars where the standards apply
-- Make cleanup, simplicity, observability, and durable-fix expectations explicit enough that a reviewer can reject a change for violating them
+- Make cleanup, simplicity, explicitness, fail-fast, observability, same-change-doc-update, and durable-fix expectations explicit enough that a reviewer can reject a change for violating them
 
 ### Don't
 
@@ -123,6 +135,7 @@ Add when the project's risk profile justifies them:
 - Re-state product requirements or architecture details
 - Confuse standards with detailed operating procedures
 - Preserve dead internal compatibility layers, clever abstractions, or under-instrumented failure paths by default unless the project explicitly says to
+- Normalize silent fallback behavior, undocumented behavioral changes, or "we'll update the docs later" as the default way of working
 
 ## Maturity Levels
 

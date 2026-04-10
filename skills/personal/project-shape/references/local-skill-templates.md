@@ -230,6 +230,9 @@ overrides them:
 - Prefer readability and simplicity over cleverness
 - Prefer strong observability, especially diagnosable exception paths
 - Prefer durable, maintainable fixes over short-term patches that merely clear the immediate error
+- Prefer explicit control flow and obvious invariants over hidden magic
+- Prefer fail-fast behavior over silent fallback unless graceful degradation is explicitly required
+- Prefer updating docs, specs, and contracts in the same change when behavior or assumptions move
 
 **Consult relevant craft files before:**
 - Any non-trivial implementation work
@@ -276,6 +279,12 @@ only the narrower standards docs the current change needs.
    likely causes quickly, not just announce failure.
 4. **Fix for the long term** — Prefer maintainable, correct solutions over temporary patches that
    only suppress the immediate symptom.
+5. **Choose explicitness over magic** — Prefer visible control flow, obvious invariants, and
+   explicit data movement over hidden behavior or surprising abstractions.
+6. **Fail fast unless graceful degradation is truly required** — Do not silently fall back from
+   invalid assumptions or broken paths unless another pillar explicitly requires that behavior.
+7. **Update docs and contracts in the same change** — If behavior, assumptions, interfaces, or
+   standards changed, the relevant docs should move with the code.
 
 ## Mandatory Use Rule
 
