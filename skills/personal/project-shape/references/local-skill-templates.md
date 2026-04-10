@@ -233,6 +233,8 @@ overrides them:
 - Prefer explicit control flow and obvious invariants over hidden magic
 - Prefer fail-fast behavior over silent fallback unless graceful degradation is explicitly required
 - Prefer updating docs, specs, and contracts in the same change when behavior or assumptions move
+- Prefer verification depth over throughput for non-trivial work
+- Take feedback seriously, but evaluate it on technical merit and push back on weak or incorrect claims
 
 **Consult relevant craft files before:**
 - Any non-trivial implementation work
@@ -285,6 +287,10 @@ only the narrower standards docs the current change needs.
    invalid assumptions or broken paths unless another pillar explicitly requires that behavior.
 7. **Update docs and contracts in the same change** — If behavior, assumptions, interfaces, or
    standards changed, the relevant docs should move with the code.
+8. **Verify proportionally to risk** — For non-trivial changes, do deliberate second-pass checking
+   rather than optimizing for throughput.
+9. **Handle feedback with humility and rigor** — Incorporate valid criticism quickly and push back
+   clearly on incorrect, low-rigor, or scope-distorting claims.
 
 ## Mandatory Use Rule
 

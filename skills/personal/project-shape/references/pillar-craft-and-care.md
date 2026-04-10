@@ -39,6 +39,12 @@ biases:
 7. **Prefer same-change documentation and contract updates** — When behavior, assumptions,
    interfaces, or standards change, update the relevant docs, specs, RFCs, or standards in the
    same change rather than relying on follow-up cleanup.
+8. **Prefer verification depth over throughput** — Quality beats quantity. For non-trivial work,
+   verification should be deliberate and risk-scaled. Re-check important changes before merge
+   rather than assuming the first pass was sufficient.
+9. **Take pride in the work, but evaluate feedback on merit** — Good engineering work should be
+   defended with rigor, not ego. Incorporate valid feedback quickly, stay humble about blind spots,
+   and push back clearly on incorrect, weak, or scope-distorting claims.
 
 ## Recommended Structure
 
@@ -62,7 +68,7 @@ Must answer:
 - What makes a change complete here?
 - What clarity and maintainability standards are non-negotiable?
 - What kinds of hidden complexity, unclear naming, dead paths, or partial fixes are unacceptable?
-- Which cleanup-vs-compatibility, simplicity-vs-cleverness, explicitness-vs-magic, fail-fast-vs-fallback, and durable-fix biases are expected by default?
+- Which cleanup-vs-compatibility, simplicity-vs-cleverness, explicitness-vs-magic, fail-fast-vs-fallback, verification-depth, review-posture, and durable-fix biases are expected by default?
 
 ### `testing-and-verification.md`
 
@@ -72,6 +78,7 @@ Must answer:
 - What must be verified before merge or release?
 - What observability evidence or diagnostic instrumentation is required for failure-prone paths?
 - When should the system fail loudly versus degrade gracefully?
+- How should verification depth scale with change risk?
 
 ### `review-and-documentation.md`
 
@@ -80,6 +87,7 @@ Must answer:
 - What are the obligations of the author versus the reviewer?
 - When behavior changes, what documentation must be updated?
 - Which docs, contracts, or specs must be updated in the same change rather than deferred?
+- How should valid feedback be incorporated, and what kind of feedback deserves principled pushback?
 
 ## Situational Files
 
@@ -102,6 +110,8 @@ Add when the project's risk profile justifies them:
 - Cleanup expectations for dead internal code paths and same-repo migrations
 - Explicitness and anti-magic expectations
 - Fail-fast and fallback discipline
+- Verification-depth expectations
+- Review posture and feedback-handling expectations
 - API/interface change hygiene
 - Dependency admission and upgrade standards
 - Maintainability and clarity expectations
@@ -125,7 +135,7 @@ Add when the project's risk profile justifies them:
 - Prefer evidence questions over slogans
 - Explain the reason for each standard when it is not obvious
 - Cross-link the other pillars where the standards apply
-- Make cleanup, simplicity, explicitness, fail-fast, observability, same-change-doc-update, and durable-fix expectations explicit enough that a reviewer can reject a change for violating them
+- Make cleanup, simplicity, explicitness, fail-fast, observability, verification-depth, feedback-handling, same-change-doc-update, and durable-fix expectations explicit enough that a reviewer can reject a change for violating them
 
 ### Don't
 
