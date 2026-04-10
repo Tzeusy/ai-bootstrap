@@ -100,9 +100,9 @@ Run these tracks sequentially. Each track should be 3-5 exchanges deep before mo
 | "What breaks if this component goes down?" | Find critical paths |
 | "What's the trust boundary? What can't talk to what?" | Map security boundaries |
 
-#### Track 5: Execution Quality (feeds → about/craft-and-care/)
+#### Track 5: Engineering Character In Practice (feeds → about/craft-and-care/)
 
-This track should produce stack-neutral engineering standards, not tool choices.
+This track should produce stack-neutral engineering standards and expected engineering posture, not tool choices.
 
 | Question | Purpose |
 |----------|---------|

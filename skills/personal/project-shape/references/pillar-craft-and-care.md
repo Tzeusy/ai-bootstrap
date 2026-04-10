@@ -1,16 +1,18 @@
-# Craft and Care — Engineering Standards Layer Guide
+# Craft and Care — Engineering Character and Standards Layer Guide
 
 ## Purpose
 
-The engineering standards layer answers **HOW SHOULD WORK BE EXECUTED WELL?** It defines the
-quality bar for implementation, verification, review, observability, compatibility, security
-hygiene, documentation, and maintainability. It is not product doctrine, not subsystem design,
-not feature requirements, and not topology. It is the project's explicit answer to what good
-engineering work looks like here.
+The engineering-character layer answers **WHO ARE WE WHEN WE BUILD?** It defines the quality bar
+for implementation, verification, review, observability, compatibility, security hygiene,
+documentation, and maintainability. It is not product doctrine, not subsystem design, not feature
+requirements, and not topology. It is the project's explicit answer to what kind of engineer this
+codebase expects in practice.
 
 This pillar should express stack-neutral principles and reviewable expectations. It should tell
-humans and agents what evidence, discipline, and care are required, without prescribing vendors,
-frameworks, or tools unless the project has separately standardized those choices elsewhere.
+humans and agents what evidence, discipline, posture, and care are required, without prescribing
+vendors, frameworks, or tools unless the project has separately standardized those choices
+elsewhere. `heart-and-soul` defines who the project is in purpose; `craft-and-care` defines who we
+must be when we change it.
 
 ## Default Engineering Biases
 

@@ -58,11 +58,11 @@ If the environment supports subagents, doctrine drafting and doctrine revision s
 
 ## Phase 2: Engineering Standards (about/craft-and-care/)
 
-**Goal**: Make the execution-quality bar explicit before implementation planning begins.
+**Goal**: Make the project's engineering character and execution-quality bar explicit before implementation planning begins.
 
 This pillar is mandatory for all non-trivial implementation work. Keep it stack-neutral: define
-what evidence, hygiene, review quality, operability, and maintainability are expected, not which
-libraries or tools to use.
+what evidence, hygiene, review quality, operability, maintainability, and engineering posture are
+expected, not which libraries or tools to use.
 
 ### Step 1: Write engineering-bar.md
 

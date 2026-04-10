@@ -36,13 +36,13 @@ Every route runs on the same backbone:
 - `about/law-and-lore/` records **how** key technical decisions work and why those trade-offs were accepted.
 - `openspec/` states **what** must be built in testable, normative language.
 - `about/lay-and-land/` explains **where** components, boundaries, and deployments live.
-- `about/craft-and-care/` defines **how work is executed well**: the engineering standards for implementation, verification, review, operability, and maintenance.
+- `about/craft-and-care/` defines **who we are when we build**: the project's engineering character made explicit through standards for implementation, verification, review, operability, and maintenance.
 
-The coordinator works top-down through the semantic spine. Doctrine grounds RFCs, RFCs ground specs, and specs ground execution planning. `lay-and-land` is the spatial cross-cut: update it anywhere the placement of components, boundaries, or data flow matters. `craft-and-care` is the execution-quality cross-cut: it defines how changes touching any pillar must be implemented, verified, reviewed, documented, and operated.
+The coordinator works top-down through the semantic spine. Doctrine grounds RFCs, RFCs ground specs, and specs ground execution planning. `lay-and-land` is the spatial cross-cut: update it anywhere the placement of components, boundaries, or data flow matters. `craft-and-care` is the engineering-character cross-cut: it defines the kind of engineer this project expects you to be in practice when changing it, through explicit standards for how changes are implemented, verified, reviewed, documented, and operated.
 
 ![Five pillars as load-bearing structure](assets/five-pillars-load-bearing.svg)
 
-The first visual frames the model positively: all five pillars are structural. `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`, and `craft-and-care` each carry a different kind of project health.
+The first visual frames the model positively: all five pillars are structural. `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`, and `craft-and-care` each carry a different kind of project health, with `craft-and-care` representing engineering character in action rather than abstract advice.
 
 ![Failure modes when a pillar is weak or missing](assets/five-pillars-health-risks.svg)
 
@@ -98,7 +98,7 @@ Use this route when at least two pillars exist and the project needs a human-fri
 
 The coordinator should:
 
-1. Extract only the layman-relevant narrative from each pillar, mentioning `craft-and-care` lightly as the project's execution-quality standards rather than dumping internal process detail.
+1. Extract only the layman-relevant narrative from each pillar, mentioning `craft-and-care` lightly as the project's engineering character and quality bar rather than dumping internal process detail.
 2. Design 3-5 diagrams with `/excalidraw-diagram`, preferring SVG output.
 3. Write the overview in thesis-first order: what it is, what it is not, how it works, what v1 delivers, and how to navigate the docs.
 4. Store overview assets in `about/assets/`.

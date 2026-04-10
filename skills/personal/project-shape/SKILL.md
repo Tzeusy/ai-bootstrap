@@ -14,7 +14,7 @@ description: >
 
 # Project Shape
 
-A project's **shape** is the knowledge architecture that makes it comprehensible to both humans and LLMs. Shape is not code — it's the structured understanding that tells you *what* a project is, *why* it exists, *how* it works, *where* it lives, *what* must be built, and *how work should be executed well*.
+A project's **shape** is the knowledge architecture that makes it comprehensible to both humans and LLMs. Shape is not code — it's the structured understanding that tells you *what* a project is, *why* it exists, *how* it works, *where* it lives, *what* must be built, and *who you are expected to be when you change it*.
 
 **Visualization directive**: Prefer `/excalidraw-diagram` plus SVG rendering when the environment supports it and the diagram materially improves comprehension. If that skill or renderer is unavailable, fall back to Mermaid or concise prose. Do not block shape work on diagram tooling.
 
@@ -28,7 +28,7 @@ Every well-shaped project has five distinct knowledge layers, each answering a d
 | **Design Contracts** | `about/law-and-lore/` | `law-and-lore` | **HOW** will it work? | RFCs, design docs, wire contracts, state machines, reviews, trade-offs |
 | **Capability Specs** | `openspec/` | `spec-and-spine` | **WHAT** exactly must be built? | Normative requirements, WHEN/THEN scenarios, testable acceptance criteria |
 | **Topology** | `about/lay-and-land/` | `lay-and-land` | **WHERE** does everything live and connect? | Component diagrams, dependency boundaries, data flow, deployment topology, integration maps |
-| **Engineering Standards** | `about/craft-and-care/` | `craft-and-care` | **HOW SHOULD WORK BE EXECUTED WELL?** | Implementation quality bar, testing discipline, review expectations, observability, dependency hygiene, documentation, maintainability |
+| **Engineering Standards** | `about/craft-and-care/` | `craft-and-care` | **WHO ARE WE WHEN WE BUILD?** | Engineering character in practice: implementation quality bar, testing discipline, review expectations, observability, dependency hygiene, documentation, maintainability |
 
 Four pillars live under `about/` — the project's self-knowledge with poetic names. `openspec/` stays at root because it's a product with its own structure and conventions.
 
@@ -46,7 +46,7 @@ Elements:
 Argument: Every implementation decision traces back through this chain. Topology is not a phase — it cross-cuts all others.
 -->
 
-Every implementation decision should trace back through this chain. The topology layer cross-cuts all others — it shows *where* the doctrine is embodied, *where* the design contracts apply, and *where* the specs are implemented. The `craft-and-care` layer is the execution-quality cross-cut — it defines how changes touching any part of the chain are implemented, verified, reviewed, documented, and operated.
+Every implementation decision should trace back through this chain. The topology layer cross-cuts all others — it shows *where* the doctrine is embodied, *where* the design contracts apply, *where* the specs are implemented, and *where* work lands in the system. The `craft-and-care` layer is the engineering-character cross-cut — it defines who an engineer is expected to be, in practice, when making changes here: explicit, careful, reviewable, observable, and maintainable.
 
 ## Quick Start: Assess a Project's Shape
 

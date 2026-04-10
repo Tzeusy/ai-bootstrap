@@ -124,7 +124,7 @@ every test traces back to a normative requirement in a spec.
 | Design Contracts | `about/law-and-lore/` | HOW — wire-level contracts |
 | Capability Specs | `openspec/` | WHAT — normative requirements with testable scenarios |
 | Topology | `about/lay-and-land/` | WHERE — component boundaries and connections |
-| Engineering Standards | `about/craft-and-care/` | HOW WORK MUST BE EXECUTED WELL — implementation quality, verification, review, operability, maintainability |
+| Engineering Standards | `about/craft-and-care/` | WHO WE ARE WHEN WE BUILD — engineering character in practice: implementation quality, verification, review, operability, maintainability |
 
 ## Domain Lookup
 
@@ -222,6 +222,9 @@ description: >
 The `about/craft-and-care/` directory contains this project's execution-quality standards.
 These documents do not define what the system is for, how a subsystem works, what a feature
 must do, or where components live. They define how changes must be carried out well here.
+
+Read this pillar as the project's engineering character in action: not just "how to do the work,"
+but what kind of engineer this project expects you to be while doing it.
 
 This pillar should express stack-neutral engineering principles and reviewable expectations,
 not technology recommendations. State standards in terms of evidence, invariants, change
