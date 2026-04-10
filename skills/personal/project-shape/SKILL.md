@@ -1,11 +1,12 @@
 ---
 name: project-shape
 description: >
-  Analyze and bootstrap the four-pillar knowledge architecture of a software project:
+  Analyze and bootstrap the five-pillar knowledge architecture of a software project:
   about/heart-and-soul (doctrine), about/law-and-lore (RFCs/design contracts), about/lay-and-land
-  (topology), and openspec/ (capability specs at root). Use when: starting a new project's
-  knowledge structure, auditing documentation health, onboarding, deciding where ideas should
-  be documented, translating ideas into requirements, or mapping system topology. Triggers:
+  (topology), about/craft-and-care (execution-quality standards), and openspec/ (capability specs
+  at root). Use when: starting a new project's knowledge structure, auditing documentation health,
+  onboarding, deciding where ideas should be documented, translating ideas into requirements, or
+  mapping system topology. Triggers:
   "project shape", "bootstrap docs", "where should this go", "what's this project about",
   "project pillars", "heart and soul", "spec structure", "knowledge architecture", "system
   map", "topology", "lay of the land", "set up project structure".
@@ -13,13 +14,13 @@ description: >
 
 # Project Shape
 
-A project's **shape** is the knowledge architecture that makes it comprehensible to both humans and LLMs. Shape is not code — it's the structured understanding that tells you *what* a project is, *why* it exists, *how* it works, and *what* must be built.
+A project's **shape** is the knowledge architecture that makes it comprehensible to both humans and LLMs. Shape is not code — it's the structured understanding that tells you *what* a project is, *why* it exists, *how* it works, *where* it lives, *what* must be built, and *how work should be executed well*.
 
 **Visualization directive**: Prefer `/excalidraw-diagram` plus SVG rendering when the environment supports it and the diagram materially improves comprehension. If that skill or renderer is unavailable, fall back to Mermaid or concise prose. Do not block shape work on diagram tooling.
 
-## The Four-Pillar Model
+## The Five-Pillar Model
 
-Every well-shaped project has four distinct knowledge layers, each answering a different question:
+Every well-shaped project has five distinct knowledge layers, each answering a different question:
 
 | Pillar | Folder | Local Skill | Question | Content |
 |--------|--------|-------------|----------|---------|
@@ -27,8 +28,9 @@ Every well-shaped project has four distinct knowledge layers, each answering a d
 | **Design Contracts** | `about/law-and-lore/` | `law-and-lore` | **HOW** will it work? | RFCs, design docs, wire contracts, state machines, reviews, trade-offs |
 | **Capability Specs** | `openspec/` | `spec-and-spine` | **WHAT** exactly must be built? | Normative requirements, WHEN/THEN scenarios, testable acceptance criteria |
 | **Topology** | `about/lay-and-land/` | `lay-and-land` | **WHERE** does everything live and connect? | Component diagrams, dependency boundaries, data flow, deployment topology, integration maps |
+| **Engineering Standards** | `about/craft-and-care/` | `craft-and-care` | **HOW SHOULD WORK BE EXECUTED WELL?** | Implementation quality bar, testing discipline, review expectations, observability, dependency hygiene, documentation, maintainability |
 
-Three pillars live under `about/` — the project's self-knowledge with poetic names. `openspec/` stays at root because it's a product with its own structure and conventions.
+Four pillars live under `about/` — the project's self-knowledge with poetic names. `openspec/` stays at root because it's a product with its own structure and conventions.
 
 The pillars form a **traceability chain**:
 
@@ -44,7 +46,7 @@ Elements:
 Argument: Every implementation decision traces back through this chain. Topology is not a phase — it cross-cuts all others.
 -->
 
-Every implementation decision should trace back through this chain. The topology layer cross-cuts all others — it shows *where* the doctrine is embodied, *where* the design contracts apply, and *where* the specs are implemented.
+Every implementation decision should trace back through this chain. The topology layer cross-cuts all others — it shows *where* the doctrine is embodied, *where* the design contracts apply, and *where* the specs are implemented. The `craft-and-care` layer is the execution-quality cross-cut — it defines how changes touching any part of the chain are implemented, verified, reviewed, documented, and operated.
 
 ## Quick Start: Assess a Project's Shape
 
@@ -66,6 +68,7 @@ If scanning isn't available, check for these signals:
 2. **Design contracts exist?** — Look for: `about/law-and-lore/`, `docs/rfcs/`, `docs/adrs/`, numbered design docs, review rounds
 3. **Specs exist?** — Look for: `openspec/`, `specs/`, `requirements/`, files with WHEN/THEN scenarios, formal requirement IDs
 4. **Topology exists?** — Look for: `about/lay-and-land/`, `maps/`, `architecture/`, component diagrams, deployment docs, `ARCHITECTURE.md`
+5. **Engineering standards exist?** — Look for: `about/craft-and-care/`, `engineering-bar.md`, `testing-and-verification.md`, review standards, verification expectations, observability/operability guidance, or implementation-quality doctrine currently scattered through contributor docs
 
 Rate each pillar: **absent** → **nascent** (scattered, informal) → **structured** (dedicated folder, some coverage) → **mature** (comprehensive, traceable, maintained)
 
@@ -118,7 +121,7 @@ Elements:
 Argument: Order matters — each pillar grounds the next. But topology can start early.
 -->
 
-Topology (lay-and-land) can be started in parallel with design contracts once the architecture interview track is complete.
+Topology (lay-and-land) can be started in parallel with design contracts once the architecture interview track is complete. `craft-and-care` should be drafted immediately after doctrine is coherent and before implementation planning begins; it is mandatory for all non-trivial implementation work.
 
 Read `references/bootstrapping.md` for phase-by-phase details.
 
@@ -132,11 +135,11 @@ Layout: vertical funnel/timeline — wide at top, narrowing toward bottom.
 Elements:
   - Top: large cloud shape labeled "Idea / Insight" (abstract, fuzzy)
   - 5 stages descending vertically, each with:
-    - A gate question (free-floating italic text to the right): "Does this align with doctrine?", "Where does this live?", "How would this work?", "What exactly must be built?", "Create beads"
-    - The pillar that answers it (colored node matching the pillar's color): heart-and-soul, lay-and-land, law-and-lore, openspec, bd create
+    - A gate question (free-floating italic text to the right): "Does this align with doctrine?", "Where does this live?", "How would this work?", "What exactly must be built?", "How must this be executed well?", "Plan the work"
+    - The pillar that answers it (colored node matching the pillar's color): heart-and-soul, lay-and-land, law-and-lore, openspec, craft-and-care, task planning
   - Arrows between each stage, narrowing (funnel visual)
   - Left side: a "reject" arrow branching off after the first gate, labeled "doctrine misalignment — idea dies early"
-  - Bottom: small precise rectangle labeled "Implementation beads" (concrete, sharp)
+  - Bottom: small precise rectangle labeled "Implementation tasks" (concrete, sharp)
 Argument: Ideas enter fuzzy and exit precise. Each pillar sharpens them. Bad ideas are killed early by doctrine.
 -->
 
@@ -158,6 +161,7 @@ For an existing project, assess coherence across pillars and keep docs current.
 2. **Freshness** — Are specs current with the code? Are RFCs updated after implementation reveals design flaws?
 3. **Gaps** — Is there code with no spec coverage? Specs with no doctrine backing? Design docs that never became specs?
 4. **Orphans** — Doctrine principles that no RFC references. RFC sections that no spec covers.
+5. **Execution drift** — Have testing, observability, review, compatibility, documentation, dependency, or maintenance standards fallen out of sync with how the project is actually changed?
 
 ### Maintenance Protocol
 
@@ -175,7 +179,7 @@ Use `/project-direction` for a full direction analysis including priority-weight
 
 ## Workflow 4: Generate Project Overview
 
-Synthesize all four pillars into a visual, layman-friendly `about/README.md` with embedded Excalidraw SVG diagrams. This is the public face of the project's shape — it makes someone who knows nothing understand what the project is, why it exists, and how it works.
+Synthesize the project pillars into a visual, layman-friendly `about/README.md` with embedded Excalidraw SVG diagrams. This is the public face of the project's shape — it makes someone who knows nothing understand what the project is, why it exists, and how it works.
 
 ### Requirements
 
@@ -204,6 +208,7 @@ Read `references/generate-overview.md` for the full guide: diagram specs, docume
 | Design Contracts | `references/pillar-law-and-lore.md` | Structuring RFCs, running reviews, capturing trade-offs |
 | Capability Specs | `references/pillar-spec-and-spine.md` | Writing requirements, WHEN/THEN scenarios, spec lifecycle |
 | Topology | `references/pillar-lay-and-land.md` | Mapping components, boundaries, data flow, deployment |
+| Engineering Standards | `references/pillar-craft-and-care.md` | Defining the implementation quality bar, review standards, verification discipline, observability, and maintainability expectations |
 
 ### Process Guides
 
@@ -248,7 +253,7 @@ Markdown body follows...
 
 The key principle: local skills are **indexes with selection guidance**, not duplicates of the content. They tell the agent *which file to read* for a given task, not *what the file says*.
 
-All four pillars should have a corresponding local skill: `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`.
+All five pillars should have a corresponding local skill: `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`.
 
 **After writing skills, validate them:**
 
@@ -262,7 +267,7 @@ The scan checks structural integrity plus common scaffold/template drift. The se
 
 ## Maintenance Expectations
 
-- Keep package metadata, scripts, and references consistent. If the model says "four pillars," adapters and companion files must say the same.
+- Keep package metadata, scripts, and references consistent. If the model says "five pillars," adapters and companion files must say the same.
 - Treat `shape-scan.sh` as an auditor, not a brochure. Prefer conservative assessments over flattering ones.
 - Re-run `scripts/self-test.sh` whenever changing `SKILL.md`, `shape-scan.sh`, or `shape-init.sh`.
 - Re-run `scripts/eval-fallbacks.sh` whenever changing fallback-mode guidance or references.

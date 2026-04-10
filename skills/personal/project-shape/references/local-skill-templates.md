@@ -112,7 +112,7 @@ description: >
 OpenSpec capability specifications are the backbone of this project. Every feature, every task,
 every test traces back to a normative requirement in a spec.
 
-## Four-Pillar Model
+## Five-Pillar Model
 
 | Layer | Location | Role |
 |-------|----------|------|
@@ -120,6 +120,7 @@ every test traces back to a normative requirement in a spec.
 | Design Contracts | `about/law-and-lore/` | HOW — wire-level contracts |
 | Capability Specs | `openspec/` | WHAT — normative requirements with testable scenarios |
 | Topology | `about/lay-and-land/` | WHERE — component boundaries and connections |
+| Engineering Standards | `about/craft-and-care/` | HOW WORK MUST BE EXECUTED WELL — implementation quality, verification, review, operability, maintainability |
 
 ## Domain Lookup
 
@@ -143,6 +144,7 @@ every test traces back to a normative requirement in a spec.
 |------|-------|
 | Underlying wire contracts | `/law-and-lore` |
 | Philosophical foundations | `/heart-and-soul` |
+| Execution-quality standards | `/craft-and-care` |
 ```
 
 ## Template: lay-and-land
@@ -194,6 +196,72 @@ components live, how data flows, what boundaries exist, and how the system is de
 | Why a boundary exists | `/heart-and-soul` |
 | How a boundary communicates | `/law-and-lore` |
 | What a component must do | `/spec-and-spine` |
+| How changes here should be verified and maintained | `/craft-and-care` |
+```
+
+## Template: craft-and-care
+
+```yaml
+---
+name: craft-and-care
+description: >
+  MANDATORY for all non-trivial implementation work. Load the project's execution-quality
+  standards before implementing changes, reviewing pull requests, designing tests, altering
+  APIs, adding dependencies, changing observability, or preparing documentation and operational
+  updates. The about/craft-and-care/ directory defines how work must be implemented, verified,
+  reviewed, documented, operated, and maintained here. Selectively load ONLY the files relevant
+  to the current change.
+---
+
+# Engineering Standards — Craft and Care
+
+The `about/craft-and-care/` directory contains this project's execution-quality standards.
+These documents do not define what the system is for, how a subsystem works, what a feature
+must do, or where components live. They define how changes must be carried out well here.
+
+This pillar should express stack-neutral engineering principles and reviewable expectations,
+not technology recommendations. State standards in terms of evidence, invariants, change
+safety, maintainability, and operational care.
+
+**Consult relevant craft files before:**
+- Any non-trivial implementation work
+- Reviewing a pull request or preparing one for review
+- Modifying a public API, interface, or shared schema
+- Adding, upgrading, or removing dependencies
+- Changing logging, metrics, tracing, alerts, or runtime behavior
+- Deciding whether a bug fix, refactor, or feature is actually done
+
+**Do NOT load the whole directory by default.** Start with `engineering-bar.md`, then load
+only the narrower standards docs the current change needs.
+
+## Document Index
+
+| File | Read when... | Key content |
+|------|-------------|-------------|
+| `about/craft-and-care/README.md` | Orienting to the pillar | Scope boundary, reading order, file map |
+| `about/craft-and-care/engineering-bar.md` | Any non-trivial change | Definition of done, maintainability bar, clarity standards, change hygiene |
+| `about/craft-and-care/testing-and-verification.md` | Planning or judging evidence | Test expectations, regression discipline, verification thresholds |
+| `about/craft-and-care/observability-and-operations.md` | Runtime-sensitive work | Logging, metrics, tracing, operational readiness, rollback/runbook expectations |
+| `about/craft-and-care/interfaces-and-dependencies.md` | API or dependency changes | Compatibility, deprecation, versioning, dependency policy |
+| `about/craft-and-care/review-and-documentation.md` | Review or handoff | Review standards, author/reviewer obligations, documentation update expectations |
+| `about/craft-and-care/security-and-secrets.md` | Sensitive data or privileged changes | Secret handling, least privilege, unsafe-default hygiene |
+| `about/craft-and-care/performance-discipline.md` | Performance-sensitive work | Measurement discipline, regression expectations, benchmark standards |
+
+## Scope Guardrails
+
+| If the question is... | Load... |
+|-----------------------|---------|
+| Why does this trade-off matter? | `/heart-and-soul` |
+| How is this contract or subsystem designed? | `/law-and-lore` |
+| What behavior is required? | `/spec-and-spine` |
+| Where does this component live and connect? | `/lay-and-land` |
+| What quality evidence is required before merge or ship? | `/craft-and-care` |
+
+## Mandatory Use Rule
+
+For non-trivial implementation work, this skill is not optional. If the task requires judgment
+about testing, review quality, observability, compatibility, dependency hygiene, documentation,
+security, performance discipline, or maintainability, load this pillar.
 ```
 
 ## Installation
@@ -204,7 +272,7 @@ For each template:
 2. Replace placeholder tables with your project's actual files and domains
 3. Repeat for `.codex/skills/` and `.gemini/skills/` if using those tools
 
-All four skills should be installed: `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`.
+All five skills should be installed: `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`.
 
 The templates above are starting points — customize heavily for your project's specific domains, files, and conventions.
 

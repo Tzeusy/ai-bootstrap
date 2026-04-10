@@ -38,9 +38,7 @@ Add a domain file when a topic has principles that code must embody:
 | `security.md` | Trust model, auth philosophy, capability scopes |
 | `privacy.md` | Data handling principles, user consent model |
 | `failure.md` | Error philosophy, degradation strategy, recovery contracts |
-| `validation.md` | Testing doctrine (what tests measure, not how) |
-| `development.md` | Workflow principles, contribution model |
-| `performance.md` | Latency budgets, resource constraints, scaling philosophy |
+| `performance.md` | Performance philosophy only when it is constitutional rather than contractual |
 
 ## Writing Doctrine
 
@@ -51,6 +49,7 @@ Add a domain file when a topic has principles that code must embody:
 - Number non-negotiable rules — they become anchors for design reviews
 - Keep files self-contained — each file readable independently
 - Write for a reader who has never seen the codebase
+- Move implementation-quality standards, review rules, testing discipline, and generic contribution hygiene into `about/craft-and-care/`
 
 ### Don't
 
@@ -58,6 +57,7 @@ Add a domain file when a topic has principles that code must embody:
 - List technologies or libraries (that's architecture docs)
 - Write aspirational prose without testable constraints
 - Mix doctrine with operational runbooks
+- Hide execution standards inside doctrine when they belong in `craft-and-care`
 - Exceed ~300 lines per file — split by domain instead
 
 ## Maturity Levels

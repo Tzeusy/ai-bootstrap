@@ -43,7 +43,7 @@ Scope: v1-mandatory | v1-reserved | post-v1
 
 ### Scope Tags
 
-- **v1-mandatory** — Must be implemented. Generates tasks, tests, and beads.
+- **v1-mandatory** — Must be implemented. Generates tasks, tests, and implementation planning.
 - **v1-reserved** — Schema defined, implementation may be minimal or stubbed. Forward-compatible.
 - **post-v1** — Documented for awareness. No implementation required.
 
@@ -90,7 +90,7 @@ Four patterns to watch for and resolve:
 | Pattern | Signal | Resolution |
 |---------|--------|------------|
 | **Code ahead of spec** | Implementation exists, no spec covers it | Create delta spec documenting the capability |
-| **Spec ahead of code** | v1-mandatory requirement, no implementation | Create beads for unimplemented requirements |
+| **Spec ahead of code** | v1-mandatory requirement, no implementation | Create implementation tasks for unimplemented requirements |
 | **Spec-code mismatch** | Behavior contradicts spec | Determine which is correct (consult RFC/doctrine), fix the wrong one |
 | **New feature** | Neither spec nor code exists | Start with explore, then spec, then code |
 

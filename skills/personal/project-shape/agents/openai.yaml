@@ -1,4 +1,4 @@
 interface:
   display_name: "Project Shape"
-  short_description: "Define project shape: doctrine, design, specs, topology"
-  default_prompt: "Use $project-shape to analyze and bootstrap the four-pillar knowledge architecture for this project."
+  short_description: "Define project shape: doctrine, design, specs, topology, engineering standards"
+  default_prompt: "Use $project-shape to analyze and bootstrap the five-pillar knowledge architecture for this project."

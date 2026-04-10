@@ -1,13 +1,13 @@
 # Generate Project Overview
 
-Synthesize all four pillars into a visual, layman-friendly markdown document that serves as `about/README.md`. This is the public face of the project's shape — it should make someone who knows nothing about the project understand what it is, why it exists, how it works, and where everything lives.
+Synthesize the project pillars into a visual, layman-friendly markdown document that serves as `about/README.md`. This is the public face of the project's shape — it should make someone who knows nothing about the project understand what it is, why it exists, how it works, and where everything lives.
 
 ## Output
 
 A single markdown file at `about/README.md` containing:
 - Embedded SVG or PNG diagrams (preferably rendered from Excalidraw, with Mermaid or prose fallbacks allowed)
 - Prose written for a non-technical reader
-- Links into the four pillars for readers who want depth
+- Links into the pillars for readers who want depth
 
 ## Prerequisites
 
@@ -27,6 +27,7 @@ Read each pillar and extract the layman-relevant essence. Not every technical de
 | **law-and-lore** | Key architectural decisions and *why* they were made, major trade-offs | Wire formats, field numbers, protobuf schemas |
 | **spec-and-spine** | Feature areas and what they do (from requirement names), v1 coverage | WHEN/THEN scenarios, requirement IDs, scope tags |
 | **lay-and-land** | Component names and what each one does, how data flows, deployment | Internal dependency details, infrastructure specifics |
+| **craft-and-care** | The existence of a deliberate engineering quality bar | Internal process minutiae, tool recipes, CI commands |
 
 ### Phase 2: Design the Diagrams
 
@@ -72,11 +73,11 @@ Approach:
 
 **What it argues**: How the project's knowledge is structured.
 
-Source: The four-pillar model itself
+Source: The five-pillar model itself
 
 Approach:
-- Show the four pillars with the traceability chain
-- WHY → HOW → WHAT → WHERE with representative content from each
+- Show the semantic spine plus the two cross-cuts
+- WHY → HOW → WHAT with representative content from each, with `lay-and-land` as the spatial map and `craft-and-care` as the execution-quality band
 - This is meta — it explains how to navigate the docs themselves
 
 #### Diagram 5: Domain-Specific (optional)
@@ -143,7 +144,7 @@ A reader should understand WHY each principle exists, not just WHAT it says.]
 
 ![Pillar model diagram](assets/pillars.svg)
 
-This project's documentation follows a four-pillar knowledge architecture:
+This project's documentation follows a five-pillar knowledge architecture:
 
 | Pillar | Location | What You'll Find |
 |--------|----------|-----------------|
@@ -151,11 +152,13 @@ This project's documentation follows a four-pillar knowledge architecture:
 | **Law and Lore** | `about/law-and-lore/` | Technical design decisions and contracts |
 | **Spec and Spine** | `openspec/` | Detailed feature requirements |
 | **Lay and Land** | `about/lay-and-land/` | System maps and component topology |
+| **Craft and Care** | `about/craft-and-care/` | Engineering standards, testing, review, observability, and maintenance expectations |
 
 [Brief guidance: "Start with heart-and-soul/vision.md for the full thesis.
 Read law-and-lore/ when you need to understand a technical decision.
 Check openspec/ for the exact requirements before implementing.
-Consult lay-and-land/ when you need to find where something lives."]
+Consult lay-and-land/ when you need to find where something lives.
+Consult craft-and-care/ when you need to know how work should be executed well here."]
 
 ## [Optional: Domain-Specific Section]
 
@@ -177,7 +180,7 @@ Evaluate:
    Flag jargon, unexplained acronyms, and assumed knowledge.
 2. ACCURACY — Does the overview faithfully represent the project?
    Cross-check claims against the source pillar documents.
-3. COMPLETENESS — Are all four pillars represented?
+3. COMPLETENESS — Are the relevant pillars represented, including a light-touch mention of `craft-and-care` as the execution-quality pillar?
    Is anything important missing?
 4. NARRATIVE — Does it tell a coherent story?
    Is there a clear thread from "why this exists" to "how to navigate"?

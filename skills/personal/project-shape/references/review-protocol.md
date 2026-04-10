@@ -101,6 +101,7 @@ Read all of the following documents, then evaluate their alignment.
 Documents:
 - [about/heart-and-soul/vision.md]: [content]
 - [about/heart-and-soul/v1.md]: [content]
+- [about/craft-and-care/...]: [content]
 - [about/law-and-lore/rfcs/...]: [content]
 - [about/lay-and-land/components.md]: [content]
 - [openspec/...]: [content if exists]
@@ -112,9 +113,12 @@ Evaluate:
    RFCs for deferred features or missing RFCs for v1 features?
 3. TOPOLOGY-DOCTRINE FIT — Does the component map reflect the architectural
    principles? If doctrine says "X must never Y," does the topology enforce that?
-4. VOCABULARY — Are terms used consistently across documents? Flag any term
+4. EXECUTION FIT — Do the doctrine, RFCs, specs, and topology imply verification,
+   observability, review, compatibility, documentation, or maintenance obligations
+   that are made explicit in `craft-and-care`? List missing or weakly specified standards.
+5. VOCABULARY — Are terms used consistently across documents? Flag any term
    that means different things in different pillars.
-5. GAPS — What questions does a new contributor still have after reading all of these?
+6. GAPS — What questions does a new contributor still have after reading all of these?
 
 Output: Ranked list of cross-pillar issues, each with affected documents and fix guidance.
 ```

@@ -70,13 +70,13 @@ Run these tracks sequentially. Each track should be 3-5 exchanges deep before mo
 | "If you could only ship three things, what are they?" | Force prioritization |
 | "What would you love to build but shouldn't build first?" | Identify deferrals |
 | "What's the smallest thing that would be genuinely useful?" | Find the MVP boundary |
-| "What would make you embarrassed to ship?" | Find the quality bar |
+| "What would make you embarrassed to ship?" | Find the minimum credible bar for v1 |
 | "Who will use v1? How is that different from the eventual audience?" | Scope the user base |
 
 **Challenge patterns:**
 - If everything is "v1": "You said X, Y, Z, W are all v1. If you had to cut one, which goes? Why?"
 - If nothing is deferred: "What's the hardest thing on this list? What if that took 3x longer than expected — what would you cut?"
-- If the quality bar is vague: "Give me a number. Latency under what? Uptime of what?"
+- If the minimum bar is vague: "What evidence would make you trust this release? What kind of failure would make you say this was not ready?"
 
 #### Track 3: Principles (feeds → vision.md non-negotiables)
 
@@ -100,7 +100,24 @@ Run these tracks sequentially. Each track should be 3-5 exchanges deep before mo
 | "What breaks if this component goes down?" | Find critical paths |
 | "What's the trust boundary? What can't talk to what?" | Map security boundaries |
 
-#### Track 5: Design Contracts (feeds → about/law-and-lore/)
+#### Track 5: Execution Quality (feeds → about/craft-and-care/)
+
+This track should produce stack-neutral engineering standards, not tool choices.
+
+| Question | Purpose |
+|----------|---------|
+| "What evidence would make you confident this change is safe to merge?" | Surface verification standards |
+| "When a bug is fixed here, what kind of regression protection do you expect?" | Extract testing discipline |
+| "What operational signals would tell you this change is healthy in production?" | Extract observability and operational care expectations |
+| "What kinds of code review feedback should block a merge here?" | Surface review quality bar |
+| "What sort of change would technically work but still be unacceptable?" | Expose maintainability, clarity, or hygiene boundaries |
+
+**Challenge patterns:**
+- If the answers name tools instead of principles: "What outcome do you need from that tool? State the standard without the vendor."
+- If the answers are generic: "What would a concrete violation look like in a PR?"
+- If everything is "use best practices": "Which two or three rules would you actually reject work over?"
+
+#### Track 6: Design Contracts (feeds → about/law-and-lore/)
 
 Only pursue this track if the project is past the idea stage:
 
@@ -121,6 +138,7 @@ After the interview, synthesize — don't transcribe. The human said many things
 3. **Extract principles** — 5-7 non-negotiable rules from Track 3, stated as constraints ("X must never Y")
 4. **Extract the scope** — V1 ships/defers from Track 2
 5. **Extract the topology** — Component map from Track 4
+6. **Extract the engineering bar** — Execution-quality standards from Track 5
 
 ### Synthesis Rules
 

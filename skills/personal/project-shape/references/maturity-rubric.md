@@ -16,7 +16,7 @@ This rubric defines the scanner's intended thresholds. Prefer conservative scori
 
 ### Structured
 
-- Two or three pillars exist
+- Two, three, or four pillars exist
 - Some authored content is present
 - Traceability is partial or absent
 
@@ -24,7 +24,7 @@ This rubric defines the scanner's intended thresholds. Prefer conservative scori
 
 All of the following:
 
-- Four pillars exist in canonical or recognized legacy locations
+- Five pillars exist in canonical or recognized legacy locations
 - Core content is authored, not just scaffolded
 - Local skills exist or are close to installation
 
@@ -33,6 +33,7 @@ Any of the following keeps a project in `shaped` rather than `mature`:
 - Scaffold markers or placeholder tables remain
 - Local skills are still generic templates
 - Doctrine has no explicit non-negotiable rules
+- Craft-and-care has no authored baseline for engineering bar and verification discipline
 - RFCs do not reference doctrine
 - Specs do not cite sources or scenarios
 - Topology docs do not cross-link the other pillars
@@ -41,12 +42,14 @@ Any of the following keeps a project in `shaped` rather than `mature`:
 
 All of the following:
 
-- Four pillars are authored and maintained
+- Five pillars are authored and maintained
 - Local skills are installed and customized
 - Doctrine contains explicit numbered rules
+- Craft-and-care expresses project-specific execution standards rather than generic best-practices filler
 - Every authored RFC references doctrine or principles
 - Every authored spec includes source traceability and scenarios
 - Topology docs describe boundaries and cross-link doctrine/RFC/spec context
+- Craft-and-care documents define how non-trivial work is verified, reviewed, documented, and maintained
 - The project can be navigated by an unfamiliar human or LLM without guesswork
 
 ## Traceability Heuristics
