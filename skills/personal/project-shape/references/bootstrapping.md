@@ -101,7 +101,7 @@ Detailed runbooks, CI recipes, and tool-specific instructions belong elsewhere a
 
 `craft-and-care` benefits from its own subagent because it is especially prone to overlap drift. Keep the context focused on execution quality, not feature behavior, architecture contracts, or topology.
 
-## Phase 3: Design Contracts (about/law-and-lore/)
+## Phase 3: Design Contracts (about/legends-and-lore/)
 
 **Goal**: Capture technical decisions in reviewable, numbered documents.
 
@@ -113,7 +113,7 @@ Start writing RFCs when you're making technical decisions that:
 - Establish performance budgets
 - Will be hard to change later
 
-### Step 1: Create about/law-and-lore/rfcs/
+### Step 1: Create about/legends-and-lore/rfcs/
 
 Write your first RFC for the most foundational subsystem. Number it `0001`.
 
@@ -199,7 +199,7 @@ Topology work should be handled by a dedicated subagent whenever the mapping wor
 ### Step 1: Create skill directories
 
 ```bash
-mkdir -p .claude/skills/{heart-and-soul,law-and-lore,spec-and-spine,lay-and-land}
+mkdir -p .claude/skills/{heart-and-soul,legends-and-lore,spec-and-spine,lay-and-land}
 # Repeat for .codex/skills/ and .gemini/skills/ if needed
 # Note: docs/ pillars use poetic names as folder names; local skills match
 ```

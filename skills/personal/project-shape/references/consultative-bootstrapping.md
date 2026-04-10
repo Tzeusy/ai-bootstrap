@@ -131,7 +131,7 @@ This track should produce stack-neutral engineering standards and expected engin
 - If they optimize for speed over verification: "What class of bug would make that trade-off look irresponsible in hindsight?"
 - If they say 'always accept feedback': "Should engineers agree performatively, or should they push back when a claim is technically wrong?"
 
-#### Track 6: Design Contracts (feeds → about/law-and-lore/)
+#### Track 6: Design Contracts (feeds → about/legends-and-lore/)
 
 Only pursue this track if the project is past the idea stage:
 
@@ -151,7 +151,7 @@ If the environment supports subagents and the scope is substantive, fan out synt
 
 - one subagent for `heart-and-soul`
 - one for `craft-and-care`
-- one for `law-and-lore`
+- one for `legends-and-lore`
 - one for `lay-and-land`
 - one for `spec-and-spine` once the prerequisite pillars are stable enough
 

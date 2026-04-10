@@ -55,13 +55,13 @@ Recommend the minimum precise changes required to reach acceptance.
 Run a `/project-shape` reconciliation pass to ensure all proposed/new features align with the project's central doctrine.
 
 Execution:
-1. Reconcile `about/heart-and-soul/` and `about/law-and-lore/` so they form one coherent doctrine-and-policy baseline.
+1. Reconcile `about/heart-and-soul/` and `about/legends-and-lore/` so they form one coherent doctrine-and-policy baseline.
 2. Map each proposed feature/initiative to this baseline; flag and resolve doctrine conflicts.
 3. Run mandatory reconciliation passes (`R1`-`R4+`) using the protocol above.
 4. Finalize shape docs.
 
 Acceptance criteria:
-- Full synthesis between "heart-and-soul" and "law-and-lore".
+- Full synthesis between "heart-and-soul" and "legends-and-lore".
 - New/proposed features are explicitly aligned (or explicitly rejected/escalated) against doctrine.
 - Shape docs are committed and pushed before Phase 2 begins.
 
@@ -98,12 +98,12 @@ Call `/beads-writer` to create a full, acyclic dependency graph of work from the
 
 Execution:
 1. Generate epics/tasks with explicit dependencies and no cycles.
-2. Ensure each bead traces back to doctrine/law/spec mandates and acceptance criteria.
+2. Ensure each bead traces back to doctrine/lore/spec mandates and acceptance criteria.
 3. Include required reconciliation/report structural beads per `/beads-writer` conventions.
 4. Run mandatory reconciliation passes (`R1`-`R4+`) on the graph (cycle checks, mandate coverage checks, dependency sanity).
 
 Acceptance criteria:
-- Full coherence between generated beads and `/project-shape` doctrine/law plus OpenSpec mandates.
+- Full coherence between generated beads and `/project-shape` doctrine/lore plus OpenSpec mandates.
 - Dependency graph is acyclic, prioritized, and execution-ready.
 - Delivery/execution is NOT handled by `project-direction`; this is separately owned by `beads-coordinator` runs.
 
@@ -113,7 +113,7 @@ Output the direction report per `references/work-plan-template.md`, including:
 - What is the project's real direction?
 - What should it work on next?
 - What should it stop pretending it can do?
-- Which beads graph was generated and why it is coherent with doctrine/law/spec.
+- Which beads graph was generated and why it is coherent with doctrine/lore/spec.
 
 Do not execute or deliver the beads plan here; hand off explicitly to `beads-coordinator`.
 

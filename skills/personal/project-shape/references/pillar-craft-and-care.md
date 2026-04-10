@@ -123,7 +123,7 @@ Add when the project's risk profile justifies them:
 ## Does Not Belong Here
 
 - Mission, identity, philosophy, and non-goals: those belong in `heart-and-soul`
-- Wire-level contracts, state machines, schemas, and RFC decisions: those belong in `law-and-lore`
+- Wire-level contracts, state machines, schemas, and RFC decisions: those belong in `legends-and-lore`
 - Normative feature behavior: that belongs in `spec-and-spine`
 - Component maps, boundaries, deployment, and data-flow topology: that belongs in `lay-and-land`
 - Tool recipes, CI commands, or vendor-specific runbooks: link to them from here if needed, but keep this pillar standards-level

@@ -2,7 +2,7 @@
 name: project-shape
 description: >
   Analyze and bootstrap the five-pillar knowledge architecture of a software project:
-  about/heart-and-soul (doctrine), about/law-and-lore (RFCs/design contracts), about/lay-and-land
+  about/heart-and-soul (doctrine), about/legends-and-lore (RFCs/design contracts), about/lay-and-land
   (topology), about/craft-and-care (execution-quality standards), and openspec/ (capability specs
   at root). Use when: starting a new project's knowledge structure, auditing documentation health,
   onboarding, deciding where ideas should be documented, translating ideas into requirements, or
@@ -25,7 +25,7 @@ Every well-shaped project has five distinct knowledge layers, each answering a d
 | Pillar | Folder | Local Skill | Question | Content |
 |--------|--------|-------------|----------|---------|
 | **Doctrine** | `about/heart-and-soul/` | `heart-and-soul` | **WHY** does this exist? | Vision, principles, non-negotiables, scope boundaries, what it is NOT |
-| **Design Contracts** | `about/law-and-lore/` | `law-and-lore` | **HOW** will it work? | RFCs, design docs, wire contracts, state machines, reviews, trade-offs |
+| **Design Contracts** | `about/legends-and-lore/` | `legends-and-lore` | **HOW** will it work? | RFCs, design docs, wire contracts, state machines, reviews, trade-offs |
 | **Capability Specs** | `openspec/` | `spec-and-spine` | **WHAT** exactly must be built? | Normative requirements, WHEN/THEN scenarios, testable acceptance criteria |
 | **Topology** | `about/lay-and-land/` | `lay-and-land` | **WHERE** does everything live and connect? | Component diagrams, dependency boundaries, data flow, deployment topology, integration maps |
 | **Engineering Standards** | `about/craft-and-care/` | `craft-and-care` | **WHO ARE WE WHEN WE BUILD?** | Engineering character in practice: implementation quality bar, testing discipline, review expectations, observability, dependency hygiene, documentation, maintainability |
@@ -65,7 +65,7 @@ For the scanner's intended thresholds and conservative scoring rules, read `refe
 If scanning isn't available, check for these signals:
 
 1. **Doctrine exists?** — Look for: `about/heart-and-soul/`, `heart-and-soul/`, `vision.md`, `MANIFESTO.md`, `PHILOSOPHY.md`, or doctrine-like content in `README.md`
-2. **Design contracts exist?** — Look for: `about/law-and-lore/`, `docs/rfcs/`, `docs/adrs/`, numbered design docs, review rounds
+2. **Design contracts exist?** — Look for: `about/legends-and-lore/`, `docs/rfcs/`, `docs/adrs/`, numbered design docs, review rounds
 3. **Specs exist?** — Look for: `openspec/`, `specs/`, `requirements/`, files with WHEN/THEN scenarios, formal requirement IDs
 4. **Topology exists?** — Look for: `about/lay-and-land/`, `maps/`, `architecture/`, component diagrams, deployment docs, `ARCHITECTURE.md`
 5. **Engineering standards exist?** — Look for: `about/craft-and-care/`, `engineering-bar.md`, `testing-and-verification.md`, review standards, verification expectations, observability/operability guidance, or implementation-quality doctrine currently scattered through contributor docs
@@ -113,12 +113,12 @@ Layout: horizontal chain of 4 nodes with a parallel bypass arrow.
 Elements:
   - 4 pillars as distinct shapes, left-to-right:
     1. "heart-and-soul" (WHY) — ellipse, warm color (origin/start)
-    2. "law-and-lore" (HOW) — rectangle, cool color (process)
+    2. "legends-and-lore" (HOW) — rectangle, cool color (process)
     3. "openspec" (WHAT) — diamond or hexagon, accent color (decision/spec)
     4. "lay-and-land" (WHERE) — rectangle, earth tone (structure)
   - Sequential arrows connecting 1→2→3→4
   - A dashed bypass arrow from node 2 to node 4, labeled "can start in parallel after architecture track"
-  - Below each node: the folder path (about/heart-and-soul/, about/law-and-lore/, openspec/, about/lay-and-land/) as free-floating small text
+  - Below each node: the folder path (about/heart-and-soul/, about/legends-and-lore/, openspec/, about/lay-and-land/) as free-floating small text
 Argument: Order matters — each pillar grounds the next. But topology can start early.
 -->
 
@@ -137,7 +137,7 @@ Elements:
   - Top: large cloud shape labeled "Idea / Insight" (abstract, fuzzy)
   - 5 stages descending vertically, each with:
     - A gate question (free-floating italic text to the right): "Does this align with doctrine?", "Where does this live?", "How would this work?", "What exactly must be built?", "How must this be executed well?", "Plan the work"
-    - The pillar that answers it (colored node matching the pillar's color): heart-and-soul, lay-and-land, law-and-lore, openspec, craft-and-care, task planning
+    - The pillar that answers it (colored node matching the pillar's color): heart-and-soul, lay-and-land, legends-and-lore, openspec, craft-and-care, task planning
   - Arrows between each stage, narrowing (funnel visual)
   - Left side: a "reject" arrow branching off after the first gate, labeled "doctrine misalignment — idea dies early"
   - Bottom: small precise rectangle labeled "Implementation tasks" (concrete, sharp)
@@ -206,7 +206,7 @@ Read `references/generate-overview.md` for the full guide: diagram specs, docume
 | Pillar | Reference | Read when... |
 |--------|-----------|-------------|
 | Doctrine | `references/pillar-heart-and-soul.md` | Bootstrapping vision, writing non-negotiables, scoping v1 |
-| Design Contracts | `references/pillar-law-and-lore.md` | Structuring RFCs, running reviews, capturing trade-offs |
+| Design Contracts | `references/pillar-legends-and-lore.md` | Structuring RFCs, running reviews, capturing trade-offs |
 | Capability Specs | `references/pillar-spec-and-spine.md` | Writing requirements, WHEN/THEN scenarios, spec lifecycle |
 | Topology | `references/pillar-lay-and-land.md` | Mapping components, boundaries, data flow, deployment |
 | Engineering Standards | `references/pillar-craft-and-care.md` | Defining the implementation quality bar, review standards, verification discipline, observability, and maintainability expectations |
@@ -258,7 +258,7 @@ Markdown body follows...
 
 The key principle: local skills are **indexes with selection guidance**, not duplicates of the content. They tell the agent *which file to read* for a given task, not *what the file says*. If a pillar is accumulating large inline guidance, split it into targeted sub-docs or utilities and keep the skill as the router.
 
-All five pillars should have a corresponding local skill: `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`.
+All five pillars should have a corresponding local skill: `heart-and-soul`, `legends-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`.
 
 **After writing skills, validate them:**
 

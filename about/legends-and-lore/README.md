@@ -1,4 +1,4 @@
-# Law and Lore
+# Legends and Lore
 
 Design contracts for the `genai/` repository.
 
@@ -12,5 +12,5 @@ Reading order:
 Relationship to the other pillars:
 
 - Doctrine says why the repository is skills-first and provenance-sensitive.
-- Law-and-lore says how those rules are enforced structurally.
+- Legends-and-lore says how those rules are enforced structurally.
 - OpenSpec turns those contracts into auditable requirements.

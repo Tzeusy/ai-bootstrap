@@ -13,7 +13,7 @@ If Phase 0 of `project-review` found usable `project-shape` artifacts, treat the
 **Objective**: Build the project map, establish the normative baseline, and infer goals. This grounds all other investigations.
 
 ### What to examine
-- Project-shape artifacts: `about/heart-and-soul/`, `about/law-and-lore/`, `about/lay-and-land/`, `openspec/`
+- Project-shape artifacts: `about/heart-and-soul/`, `about/legends-and-lore/`, `about/lay-and-land/`, `openspec/`
 - README.md, docs/, wiki references
 - Package manifests: package.json, pyproject.toml, Cargo.toml, go.mod, Gemfile, pom.xml, build.gradle
 - Entry points: main.*, index.*, app.*, cmd/, bin/, src/main
@@ -26,7 +26,7 @@ If Phase 0 of `project-review` found usable `project-shape` artifacts, treat the
 
 ### Search patterns (using LLM tools)
 ```
-Glob: "about/heart-and-soul/**/*", "about/law-and-lore/**/*", "about/lay-and-land/**/*", "openspec/**/*"
+Glob: "about/heart-and-soul/**/*", "about/legends-and-lore/**/*", "about/lay-and-land/**/*", "openspec/**/*"
 Glob: "**/main.*", "**/index.*", "**/app.*", "cmd/**/*", "bin/**/*"
 Glob: "**/*.proto", "**/*.graphql", "**/openapi.*", "**/swagger.*"
 Grep: pattern="description" glob="package.json" (extract project description)

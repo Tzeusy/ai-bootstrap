@@ -96,11 +96,11 @@ case_html_comments_do_not_trigger_scaffold() {
   local out
   mkdir -p \
     "$repo/about/heart-and-soul" \
-    "$repo/about/law-and-lore/rfcs" \
+    "$repo/about/legends-and-lore/rfcs" \
     "$repo/about/lay-and-land" \
     "$repo/openspec/changes/core/specs/core" \
     "$repo/.claude/skills/heart-and-soul" \
-    "$repo/.claude/skills/law-and-lore" \
+    "$repo/.claude/skills/legends-and-lore" \
     "$repo/.claude/skills/spec-and-spine" \
     "$repo/.claude/skills/lay-and-land"
 
@@ -121,7 +121,7 @@ EOF
 
 - one thing
 EOF
-  cat > "$repo/about/law-and-lore/rfcs/0001-x.md" <<'EOF'
+  cat > "$repo/about/legends-and-lore/rfcs/0001-x.md" <<'EOF'
 # RFC 0001
 
 Implements doctrine from vision.md.
@@ -141,7 +141,7 @@ Source: RFC 0001
 - **THEN** y
 EOF
 
-  for s in heart-and-soul law-and-lore spec-and-spine lay-and-land; do
+  for s in heart-and-soul legends-and-lore spec-and-spine lay-and-land; do
     cat > "$repo/.claude/skills/$s/SKILL.md" <<EOF
 ---
 name: $s
@@ -167,7 +167,7 @@ case_reviews_only_do_not_create_design_pillar() {
 Review notes only.
 EOF
   out="$(bash "$SCAN_SCRIPT" "$repo")"
-  assert_contains "$out" "[ABSENT] about/law-and-lore/" "review-only docs should not count as design pillar"
+  assert_contains "$out" "[ABSENT] about/legends-and-lore/" "review-only docs should not count as design pillar"
   assert_contains "$out" "docs/reviews/ without RFCs/ADRs" "review-only docs should emit a hint"
   assert_contains "$out" "Assessment: UNSHAPED" "review-only docs should not inflate maturity"
 }

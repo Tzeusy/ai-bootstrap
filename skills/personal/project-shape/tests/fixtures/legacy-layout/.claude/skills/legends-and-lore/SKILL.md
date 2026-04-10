@@ -1,8 +1,8 @@
 ---
-name: law-and-lore
+name: legends-and-lore
 description: Use when reading the design contract pillar in this legacy-layout fixture.
 ---
 
-# law-and-lore
+# legends-and-lore
 
 Read the legacy RFCs selectively.

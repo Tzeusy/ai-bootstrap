@@ -1,8 +1,8 @@
 ---
-name: law-and-lore
+name: legends-and-lore
 description: Use when consulting the design contract pillar in this mature-layout fixture.
 ---
 
-# law-and-lore
+# legends-and-lore
 
 Read the RFCs selectively.

@@ -33,7 +33,7 @@ The coordinator should not collapse these paths into one generic doc-writing loo
 Every route runs on the same backbone:
 
 - `about/heart-and-soul/` answers **why** the project exists and what it refuses to become.
-- `about/law-and-lore/` records **how** key technical decisions work and why those trade-offs were accepted.
+- `about/legends-and-lore/` records **how** key technical decisions work and why those trade-offs were accepted.
 - `openspec/` states **what** must be built in testable, normative language.
 - `about/lay-and-land/` explains **where** components, boundaries, and deployments live.
 - `about/craft-and-care/` defines **who we are when we build**: the project's engineering character made explicit through standards for implementation, verification, review, operability, and maintenance.
@@ -42,7 +42,7 @@ The coordinator works top-down through the semantic spine. Doctrine grounds RFCs
 
 ![Five pillars as load-bearing structure](assets/five-pillars-load-bearing.svg)
 
-The first visual frames the model positively: all five pillars are structural. `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`, and `craft-and-care` each carry a different kind of project health, with `craft-and-care` representing engineering character in action rather than abstract advice.
+The first visual frames the model positively: all five pillars are structural. `heart-and-soul`, `legends-and-lore`, `spec-and-spine`, `lay-and-land`, and `craft-and-care` each carry a different kind of project health, with `craft-and-care` representing engineering character in action rather than abstract advice.
 
 ![Failure modes when a pillar is weak or missing](assets/five-pillars-health-risks.svg)
 
@@ -54,7 +54,7 @@ Use this when the project has weak or absent shape. The coordinator should:
 
 1. Run the consultative interview from [`references/consultative-bootstrapping.md`](references/consultative-bootstrapping.md).
 2. Synthesize draft doctrine first, then draft a minimal `craft-and-care` baseline, then design contracts and specs, while starting topology as soon as the architecture track is clear.
-3. Prefer distinct subagents per pillar for document investigation and refinement. A `heart-and-soul` draft should not share the same generation context as a `law-and-lore` RFC or a `craft-and-care` standards pass unless the work is too small to justify dispatch.
+3. Prefer distinct subagents per pillar for document investigation and refinement. A `heart-and-soul` draft should not share the same generation context as a `legends-and-lore` RFC or a `craft-and-care` standards pass unless the work is too small to justify dispatch.
 4. Scaffold directories with `scripts/shape-init.sh` once the content direction is stable.
 5. Install or refresh local pillar skills from [`references/local-skill-templates.md`](references/local-skill-templates.md).
 6. Validate with `scripts/shape-scan.sh` and `scripts/self-test.sh`.
@@ -113,7 +113,7 @@ See [`references/generate-overview.md`](references/generate-overview.md) for the
 Generated shape artifacts are not considered settled until review completes.
 
 - **Primary mode**: one generation agent plus independent review agents for coherence, adversarial pressure, and cross-pillar alignment.
-- **Generation/curation mode**: for substantive document work, fan out by pillar. Use distinct subagents to investigate and refine `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`, and `craft-and-care` artifacts separately whenever the work can be cleanly partitioned.
+- **Generation/curation mode**: for substantive document work, fan out by pillar. Use distinct subagents to investigate and refine `heart-and-soul`, `legends-and-lore`, `spec-and-spine`, `lay-and-land`, and `craft-and-care` artifacts separately whenever the work can be cleanly partitioned.
 - **Cross-pillar review duty**: check execution fit as well as semantic fit. If doctrine, RFCs, specs, or topology imply testing, observability, documentation, compatibility, or operational obligations, `craft-and-care` should make those standards explicit.
 - **Revision rule**: revise after findings, then run a second round only if the first review surfaced major issues.
 - **Stop rule**: if a third round would be needed, the coordinator should return to the user and reopen the interview rather than papering over unclear intent.

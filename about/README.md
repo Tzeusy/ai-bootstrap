@@ -5,7 +5,7 @@ This repository is the canonical local source for portable AI-assistant configur
 ## The Four Pillars
 
 - `about/heart-and-soul/` answers why this repository exists, what it is trying to preserve, and what it refuses to become.
-- `about/law-and-lore/` captures the design contracts that govern where shared assets live, when tool-specific divergence is allowed, and how distribution works.
+- `about/legends-and-lore/` captures the design contracts that govern where shared assets live, when tool-specific divergence is allowed, and how distribution works.
 - `about/lay-and-land/` maps the repository topology: the tool facades, the shared layers, and the data flow from authored content to installed local environments.
 - `openspec/` turns those design decisions into testable repository requirements and change records.
 
@@ -13,7 +13,7 @@ This repository is the canonical local source for portable AI-assistant configur
 
 1. Read [`heart-and-soul/vision.md`](./heart-and-soul/vision.md) for the thesis and non-negotiables.
 2. Read [`heart-and-soul/v1.md`](./heart-and-soul/v1.md) for scope boundaries.
-3. Read [`law-and-lore/rfcs/0001-repository-shape-and-distribution.md`](./law-and-lore/rfcs/0001-repository-shape-and-distribution.md) for the core structural contract.
+3. Read [`legends-and-lore/rfcs/0001-repository-shape-and-distribution.md`](./legends-and-lore/rfcs/0001-repository-shape-and-distribution.md) for the core structural contract.
 4. Read [`lay-and-land/components.md`](./lay-and-land/components.md) and [`lay-and-land/data-flow.md`](./lay-and-land/data-flow.md) to orient on structure and movement.
 5. Read [`../openspec/changes/bootstrap-project-shape/specs/repository-shape/spec.md`](../openspec/changes/bootstrap-project-shape/specs/repository-shape/spec.md) for the normative repository requirements.
 

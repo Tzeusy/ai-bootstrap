@@ -52,7 +52,7 @@ Phase 1 is a `/project-shape` reconciliation pass. The goal is to establish whet
 
 Expected work in this phase:
 
-- Reconcile `about/heart-and-soul/` and `about/law-and-lore/` into one doctrine-and-policy baseline.
+- Reconcile `about/heart-and-soul/` and `about/legends-and-lore/` into one doctrine-and-policy baseline.
 - Map proposed work back to explicit goals, non-goals, and operational constraints.
 - Surface doctrine/spec contradictions without inventing a resolution.
 - Refuse planning that conflicts with the project's declared identity.

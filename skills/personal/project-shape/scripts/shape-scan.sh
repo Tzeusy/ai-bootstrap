@@ -4,7 +4,7 @@
 #
 # Canonical layout:
 #   about/heart-and-soul/  (doctrine)
-#   about/law-and-lore/    (design contracts / RFCs)
+#   about/legends-and-lore/    (design contracts / RFCs)
 #   about/lay-and-land/    (topology / maps)
 #   openspec/             (capability specs — product, stays at root)
 #
@@ -260,8 +260,8 @@ resolve_pillar() {
 }
 
 resolve_design_contract_dir() {
-  if [ -d "$ROOT/about/law-and-lore" ]; then
-    echo "$ROOT/about/law-and-lore"
+  if [ -d "$ROOT/about/legends-and-lore" ]; then
+    echo "$ROOT/about/legends-and-lore"
   elif [ -d "$ROOT/docs/rfcs" ] || [ -d "$ROOT/docs/adrs" ]; then
     echo "$ROOT/docs"
   elif [ -d "$ROOT/rfcs" ]; then
@@ -342,7 +342,7 @@ if [ -n "$LAL_DIR" ]; then
   law_state=$(classify_content_state "$authored_md" "$total_md")
   check_dir "$label/" "$LAL_DIR"
   emit_content_state "Design Contracts" "$law_state"
-  # Find rfcs — could be at about/law-and-lore/rfcs/ or legacy docs/rfcs/
+  # Find rfcs — could be at about/legends-and-lore/rfcs/ or legacy docs/rfcs/
   RFC_DIR=""
   [ -d "$LAL_DIR/rfcs" ] && RFC_DIR="$LAL_DIR/rfcs"
   [ -z "$RFC_DIR" ] && [ -d "$LAL_DIR/adrs" ] && RFC_DIR="$LAL_DIR/adrs"
@@ -361,16 +361,16 @@ if [ -n "$LAL_DIR" ]; then
   fi
   [ -d "$LAL_DIR/prompts" ] && echo "    - Epic prompts: present"
   [ -d "$LAL_DIR/notes" ] && echo "    - Notes: present"
-  [ "$LAL_DIR" = "$ROOT/docs" ] && echo "    [LEGACY] Consider restructuring as about/law-and-lore/"
+  [ "$LAL_DIR" = "$ROOT/docs" ] && echo "    [LEGACY] Consider restructuring as about/legends-and-lore/"
   echo "  Local skill:"
-  check_skill "law-and-lore"
+  check_skill "legends-and-lore"
 else
-  echo "  [ABSENT] about/law-and-lore/"
+  echo "  [ABSENT] about/legends-and-lore/"
   if [ -d "$ROOT/docs/reviews" ]; then
     echo "  [HINT] Found docs/reviews/ without RFCs/ADRs — review notes alone do not establish the design-contract pillar"
   fi
   for d in design rfcs adrs decisions; do
-    [ -d "$ROOT/$d" ] && echo "  [HINT] Found $d/ in root — consider consolidating under about/law-and-lore/"
+    [ -d "$ROOT/$d" ] && echo "  [HINT] Found $d/ in root — consider consolidating under about/legends-and-lore/"
   done
 fi
 echo ""
@@ -491,10 +491,10 @@ fi
 
 if [ -n "${LAY_DIR:-}" ] && [ -d "$LAY_DIR" ]; then
   topology_docs=$(count_authored_markdown_files "$LAY_DIR")
-  topology_cross_refs=$(count_files_matching "$LAY_DIR" '*.md' 'RFC|heart-and-soul|law-and-lore|openspec|doctrine|spec')
+  topology_cross_refs=$(count_files_matching "$LAY_DIR" '*.md' 'RFC|heart-and-soul|legends-and-lore|openspec|doctrine|spec')
 elif [ -f "$ROOT/ARCHITECTURE.md" ] && ! is_placeholder_file "$ROOT/ARCHITECTURE.md"; then
   topology_docs=1
-  topology_cross_refs=$(count_paths_matching 'RFC|heart-and-soul|law-and-lore|openspec|doctrine|spec' "$ROOT/ARCHITECTURE.md")
+  topology_cross_refs=$(count_paths_matching 'RFC|heart-and-soul|legends-and-lore|openspec|doctrine|spec' "$ROOT/ARCHITECTURE.md")
 fi
 
 emit_traceability_summary "$doctrine_rules" "$rfc_docs" "$rfc_doctrine_refs" "$spec_docs" "$spec_source_refs" "$spec_scenarios" "$topology_docs" "$topology_cross_refs"
@@ -512,7 +512,7 @@ pillars=0
 
 skills=0
 template_skills=0
-for name in heart-and-soul law-and-lore spec-and-spine lay-and-land; do
+for name in heart-and-soul legends-and-lore spec-and-spine lay-and-land; do
   for tool_dir in .claude .codex .gemini .opencode; do
     if [ -f "$ROOT/$tool_dir/skills/$name/SKILL.md" ]; then
       skills=$((skills + 1))

@@ -24,7 +24,7 @@ Read each pillar and extract the layman-relevant essence. Not every technical de
 | Pillar | Extract... | Skip... |
 |--------|-----------|---------|
 | **heart-and-soul** | Core thesis, what it IS and IS NOT, non-negotiable principles (in plain language), v1 scope | Internal workflow rules, development process |
-| **law-and-lore** | Key architectural decisions and *why* they were made, major trade-offs | Wire formats, field numbers, protobuf schemas |
+| **legends-and-lore** | Key architectural decisions and *why* they were made, major trade-offs | Wire formats, field numbers, protobuf schemas |
 | **spec-and-spine** | Feature areas and what they do (from requirement names), v1 coverage | WHEN/THEN scenarios, requirement IDs, scope tags |
 | **lay-and-land** | Component names and what each one does, how data flows, deployment | Internal dependency details, infrastructure specifics |
 | **craft-and-care** | The existence of a deliberate engineering character and quality bar | Internal process minutiae, tool recipes, CI commands |
@@ -149,13 +149,13 @@ This project's documentation follows a five-pillar knowledge architecture:
 | Pillar | Location | What You'll Find |
 |--------|----------|-----------------|
 | **Heart and Soul** | `about/heart-and-soul/` | Vision, principles, scope boundaries |
-| **Law and Lore** | `about/law-and-lore/` | Technical design decisions and contracts |
+| **Legends and Lore** | `about/legends-and-lore/` | Technical design decisions and contracts |
 | **Spec and Spine** | `openspec/` | Detailed feature requirements |
 | **Lay and Land** | `about/lay-and-land/` | System maps and component topology |
 | **Craft and Care** | `about/craft-and-care/` | Engineering character, standards, testing, review, observability, and maintenance expectations |
 
 [Brief guidance: "Start with heart-and-soul/vision.md for the full thesis.
-Read law-and-lore/ when you need to understand a technical decision.
+Read legends-and-lore/ when you need to understand a technical decision.
 Check openspec/ for the exact requirements before implementing.
 Consult lay-and-land/ when you need to find where something lives.
 Consult craft-and-care/ when you need to know what kind of engineering conduct and quality bar this project expects."]

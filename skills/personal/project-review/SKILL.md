@@ -8,7 +8,7 @@ description: Use when auditing a repository's overall health, tech debt, maintai
 Perform a blunt, evidence-based audit of a repository across 15 categories. Start by establishing the project's normative baseline through `/project-shape`. End by handing confirmed findings to `/project-direction` for scheduling. Treat README as a claim to validate, not as the primary source of truth when shape artifacts exist.
 
 Normative source order:
-1. `about/heart-and-soul/` and `about/law-and-lore/`
+1. `about/heart-and-soul/` and `about/legends-and-lore/`
 2. `openspec/`
 3. `about/lay-and-land/`
 4. README / docs / issue tracker

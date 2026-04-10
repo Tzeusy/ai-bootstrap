@@ -1,4 +1,4 @@
-# Law and Lore — Design Contracts Layer Guide
+# Legends and Lore — Design Contracts Layer Guide
 
 ## Purpose
 
@@ -7,7 +7,7 @@ The design contracts layer answers **HOW**: how the system works at the wire/pro
 ## Recommended Structure
 
 ```
-about/law-and-lore/
+about/legends-and-lore/
 ├── rfcs/                    # Numbered design documents
 │   ├── 0001-<name>.md       # Each RFC defines a subsystem contract
 │   ├── 0002-<name>.md
@@ -87,7 +87,7 @@ Review rounds capture *why* a design took its current form. They're the project'
 
 ## Key Contracts
 
-Identify and highlight load-bearing contracts — decisions that, if violated, break cross-subsystem integration. List these prominently in the local `law-and-lore` skill so agents see them immediately.
+Identify and highlight load-bearing contracts — decisions that, if violated, break cross-subsystem integration. List these prominently in the local `legends-and-lore` skill so agents see them immediately.
 
 Examples of load-bearing contracts:
 - Field number allocations in protobuf envelopes
@@ -101,7 +101,7 @@ Examples of load-bearing contracts:
 |-------|--------|
 | Absent | No design docs beyond inline code comments |
 | Nascent | Some design docs exist but unnumbered and unreviewed |
-| Structured | Numbered RFCs in `about/law-and-lore/rfcs/`, some reviews |
+| Structured | Numbered RFCs in `about/legends-and-lore/rfcs/`, some reviews |
 | Mature | Complete RFC coverage of all subsystems, review rounds, cross-references, field allocation maps |
 
 ## Evolution

@@ -4,7 +4,7 @@
 #
 # Canonical layout:
 #   about/heart-and-soul/  (doctrine)
-#   about/law-and-lore/    (design contracts / RFCs)
+#   about/legends-and-lore/    (design contracts / RFCs)
 #   about/lay-and-land/    (topology / maps)
 #   openspec/             (capability specs — product, stays at root)
 #
@@ -137,11 +137,11 @@ $SCAFFOLD_MARKER
 scaffold_law_and_lore() {
   if [ "$SKILLS_ONLY" = true ]; then return; fi
   echo ""
-  echo "## Pillar 2: about/law-and-lore/"
-  create_dir "$ROOT/about/law-and-lore"
-  create_dir "$ROOT/about/law-and-lore/rfcs"
-  create_dir "$ROOT/about/law-and-lore/reviews"
-  create_file "$ROOT/about/law-and-lore/README.md" "# Law and Lore
+  echo "## Pillar 2: about/legends-and-lore/"
+  create_dir "$ROOT/about/legends-and-lore"
+  create_dir "$ROOT/about/legends-and-lore/rfcs"
+  create_dir "$ROOT/about/legends-and-lore/reviews"
+  create_file "$ROOT/about/legends-and-lore/README.md" "# Legends and Lore
 
 $SCAFFOLD_MARKER
 
@@ -151,7 +151,7 @@ Numbered design contracts, RFCs, and review notes live here.
 2. Replace the template with a real RFC before relying on this pillar
 3. Add review notes under \`reviews/\` as decisions evolve"
 
-  create_file "$ROOT/about/law-and-lore/rfcs/0001-TEMPLATE.md" "# RFC 0001: <Title>
+  create_file "$ROOT/about/legends-and-lore/rfcs/0001-TEMPLATE.md" "# RFC 0001: <Title>
 
 $SCAFFOLD_MARKER
 
@@ -338,21 +338,21 @@ These are not documentation — they are doctrine.
 }
 
 scaffold_skill_law_and_lore() {
-  install_skill "law-and-lore" "---
-name: law-and-lore
+  install_skill "legends-and-lore" "---
+name: legends-and-lore
 description: >
-  Load design contracts (RFCs) to contextualize implementation work. The about/law-and-lore/
+  Load design contracts (RFCs) to contextualize implementation work. The about/legends-and-lore/
   directory contains numbered design documents defining wire-level contracts, data models, state
   machines, and quantitative budgets. Consult relevant RFCs before implementing features, writing
   protocol definitions, or resolving cross-subsystem integration questions. Selectively load
   ONLY the RFCs relevant to your current task.
 ---
 
-# Design Contracts — Law and Lore
+# Design Contracts — Legends and Lore
 
 $SCAFFOLD_MARKER
 
-The \`about/law-and-lore/\` directory contains the authoritative design contracts.
+The \`about/legends-and-lore/\` directory contains the authoritative design contracts.
 
 **Consult relevant RFCs before:**
 - Implementing any subsystem or feature
@@ -366,7 +366,7 @@ The \`about/law-and-lore/\` directory contains the authoritative design contract
 
 | RFC | File | Read when... | Key content |
 |-----|------|-------------|-------------|
-| 0001 | \`about/law-and-lore/rfcs/0001-<name>.md\` | [domain] | [summary] |
+| 0001 | \`about/legends-and-lore/rfcs/0001-<name>.md\` | [domain] | [summary] |
 <!-- Add rows for each RFC -->
 
 ## Key Contracts
@@ -398,7 +398,7 @@ every test traces back to a normative requirement in a spec.
 | Layer | Location | Role |
 |-------|----------|------|
 | Doctrine | \`about/heart-and-soul/\` | WHY — philosophical foundations |
-| Design Contracts | \`about/law-and-lore/\` | HOW — wire-level contracts |
+| Design Contracts | \`about/legends-and-lore/\` | HOW — wire-level contracts |
 | Capability Specs | \`openspec/\` | WHAT — normative requirements with testable scenarios |
 | Topology | \`about/lay-and-land/\` | WHERE — component boundaries and connections |
 
@@ -421,7 +421,7 @@ every test traces back to a normative requirement in a spec.
 
 | Need | Skill |
 |------|-------|
-| Underlying wire contracts | \`/law-and-lore\` |
+| Underlying wire contracts | \`/legends-and-lore\` |
 | Philosophical foundations | \`/heart-and-soul\` |
 | System topology | \`/lay-and-land\` |"
 }
@@ -472,7 +472,7 @@ components live, how data flows, what boundaries exist, and how the system is de
 | Need | Skill |
 |------|-------|
 | Why a boundary exists | \`/heart-and-soul\` |
-| How a boundary communicates | \`/law-and-lore\` |
+| How a boundary communicates | \`/legends-and-lore\` |
 | What a component must do | \`/spec-and-spine\` |"
 }
 

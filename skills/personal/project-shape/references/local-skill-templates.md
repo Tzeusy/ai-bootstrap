@@ -57,22 +57,22 @@ not documentation — they are doctrine. They define the principles the code mus
 2. [Rule from doctrine]
 ```
 
-## Template: law-and-lore
+## Template: legends-and-lore
 
 ```yaml
 ---
-name: law-and-lore
+name: legends-and-lore
 description: >
-  Load design contracts (RFCs) to contextualize implementation work. The about/law-and-lore/
+  Load design contracts (RFCs) to contextualize implementation work. The about/legends-and-lore/
   directory contains numbered design documents defining wire-level contracts, data models, state
   machines, and quantitative budgets. Consult relevant RFCs before implementing features, writing
   protocol definitions, designing state machines, or resolving cross-subsystem integration
   questions. Selectively load ONLY the RFCs relevant to your current task.
 ---
 
-# Design Contracts — Law and Lore
+# Design Contracts — Legends and Lore
 
-The `about/law-and-lore/` directory contains the authoritative design contracts. These are
+The `about/legends-and-lore/` directory contains the authoritative design contracts. These are
 wire-level specifications that code must conform to.
 
 **Consult relevant RFCs before:**
@@ -88,7 +88,7 @@ wire-level specifications that code must conform to.
 ### Foundation
 | RFC | File | Read when... | Key content |
 |-----|------|-------------|-------------|
-| 0001 | `about/law-and-lore/rfcs/0001-<name>.md` | [domain] | [summary] |
+| 0001 | `about/legends-and-lore/rfcs/0001-<name>.md` | [domain] | [summary] |
 <!-- Add rows for each RFC -->
 
 ## Key Contracts
@@ -121,7 +121,7 @@ every test traces back to a normative requirement in a spec.
 | Layer | Location | Role |
 |-------|----------|------|
 | Doctrine | `about/heart-and-soul/` | WHY — philosophical foundations |
-| Design Contracts | `about/law-and-lore/` | HOW — wire-level contracts |
+| Design Contracts | `about/legends-and-lore/` | HOW — wire-level contracts |
 | Capability Specs | `openspec/` | WHAT — normative requirements with testable scenarios |
 | Topology | `about/lay-and-land/` | WHERE — component boundaries and connections |
 | Engineering Standards | `about/craft-and-care/` | WHO WE ARE WHEN WE BUILD — engineering character in practice: implementation quality, verification, review, operability, maintainability |
@@ -146,7 +146,7 @@ every test traces back to a normative requirement in a spec.
 
 | Need | Skill |
 |------|-------|
-| Underlying wire contracts | `/law-and-lore` |
+| Underlying wire contracts | `/legends-and-lore` |
 | Philosophical foundations | `/heart-and-soul` |
 | Execution-quality standards | `/craft-and-care` |
 ```
@@ -198,7 +198,7 @@ components live, how data flows, what boundaries exist, and how the system is de
 | Need | Skill |
 |------|-------|
 | Why a boundary exists | `/heart-and-soul` |
-| How a boundary communicates | `/law-and-lore` |
+| How a boundary communicates | `/legends-and-lore` |
 | What a component must do | `/spec-and-spine` |
 | How changes here should be verified and maintained | `/craft-and-care` |
 ```
@@ -272,7 +272,7 @@ only the narrower standards docs the current change needs.
 | If the question is... | Load... |
 |-----------------------|---------|
 | Why does this trade-off matter? | `/heart-and-soul` |
-| How is this contract or subsystem designed? | `/law-and-lore` |
+| How is this contract or subsystem designed? | `/legends-and-lore` |
 | What behavior is required? | `/spec-and-spine` |
 | Where does this component live and connect? | `/lay-and-land` |
 | What quality evidence is required before merge or ship? | `/craft-and-care` |
@@ -314,7 +314,7 @@ For each template:
 2. Replace placeholder tables with your project's actual files and domains
 3. Repeat for `.codex/skills/` and `.gemini/skills/` if using those tools
 
-All five skills should be installed: `heart-and-soul`, `law-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`.
+All five skills should be installed: `heart-and-soul`, `legends-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`.
 
 The templates above are starting points — customize heavily for your project's specific domains, files, and conventions. When a pillar grows beyond a compact routing skill, split detail into targeted sub-docs or utilities instead of expanding `SKILL.md` into a monolith.
 

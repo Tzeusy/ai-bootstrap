@@ -23,7 +23,7 @@ When the task is large enough to justify dispatch, prefer:
 Examples:
 
 - `heart-and-soul/vision.md` and `v1.md` can share one doctrine-focused worker
-- `law-and-lore/rfcs/0001-*.md` and its review notes can share one contracts-focused worker
+- `legends-and-lore/rfcs/0001-*.md` and its review notes can share one contracts-focused worker
 - `lay-and-land/components.md` and `data-flow.md` can share one topology-focused worker
 - `craft-and-care/engineering-bar.md` and `testing-and-verification.md` can share one standards-focused worker
 
@@ -57,7 +57,7 @@ Argument: Independence is the key — review agents have NO access to generation
 You are reviewing a project shape document. You have NOT seen the conversation
 that produced this document. Read it with completely fresh eyes.
 
-Document type: [heart-and-soul/vision.md | law-and-lore/rfc | etc.]
+Document type: [heart-and-soul/vision.md | legends-and-lore/rfc | etc.]
 Document: [full content]
 
 Evaluate:
@@ -120,7 +120,7 @@ Documents:
 - [about/heart-and-soul/vision.md]: [content]
 - [about/heart-and-soul/v1.md]: [content]
 - [about/craft-and-care/...]: [content]
-- [about/law-and-lore/rfcs/...]: [content]
+- [about/legends-and-lore/rfcs/...]: [content]
 - [about/lay-and-land/components.md]: [content]
 - [openspec/...]: [content if exists]
 
