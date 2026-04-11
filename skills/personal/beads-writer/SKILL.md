@@ -1,6 +1,7 @@
 ---
 name: beads-writer
-description: This skill should be used when writing beads issues (bd create) for a project. It guides research, decomposition, and crafting of well-structured, actionable beads with proper fields, dependencies, and acceptance criteria. Use when the user asks to create issues, plan work, break down a feature, write bugs, or populate a backlog.
+description: Use when creating or decomposing Beads issues for a project backlog, including new features, bugs, epics, backlog grooming, or converting vague asks into actionable Beads work in a Beads-backed repository.
+compatibility: Requires a Beads-backed repository with the `bd` CLI available. Assumes the agent can inspect the target project workspace before creating issues.
 ---
 
 # Beads Writer
@@ -27,6 +28,7 @@ Before writing any bead, gather enough context to write it well:
 2. **Survey the codebase** — Read relevant source files to understand current behavior, naming conventions, and architecture. Issues grounded in the actual code are more actionable.
 3. **Check existing issues** — Run `bd list --status open` and `bd search "<keywords>"` to find related or duplicate work. Link rather than duplicate.
 4. **Identify dependencies** — Determine what blocks this work or what this work blocks. Check `bd blocked` for context.
+5. **Work from the target project workspace** — Run Beads commands from the repository whose backlog you are editing so issue discovery and creation target the intended database.
 
 ### Phase 2: Decompose
 
@@ -153,7 +155,7 @@ Every epic **must** include a final child bead that performs a deep-dive spec-to
 **Purpose**: Verify that every requirement from the original spec/feature request has been addressed by the implementation beads. If any features, edge cases, or acceptance criteria were missed, this bead's executor must investigate the gap and create new implementation/fix child beads under the same epic to cover the missing work.
 
 **Template**:
-- **Title**: `Reconcile spec-to-code coverage for <epic summary>`
+- **Title**: `Reconcile spec-to-code (gen-1) for <epic summary>`
 - **Type**: `task`
 - **Priority**: Same as the epic
 - **Description**:
@@ -179,8 +181,8 @@ Every epic **must** include a final child bead that performs a deep-dive spec-to
      gap beads (and any follow-up reconciliation bead) are closed.
   7. Re-run the requirement-to-bead checklist and close this bead only when all
      requirements show full coverage.
-  8. If requirements show full coverage and the epic bead is managed via a OpenSpec change, 
-     run /opsx:sync to synchronize deltas into the authorititative application specification.
+  8. If requirements show full coverage and the epic bead is managed via an OpenSpec change,
+     run /opsx:sync to synchronize deltas into the authoritative application specification.
   ```
 - **Acceptance Criteria**:
   ```
@@ -206,16 +208,6 @@ Use `bd create` with all relevant flags. For multiple issues:
 - Use `bd create --json` and parse the `id` field to capture IDs for subsequent `--parent` or `bd dep add` calls
 - **Do NOT use `bd q` with `-d`/`--description`** — `bd q` is a quick-create command with a limited flag set (only `-t`, `-p`, `-l`). Always use `bd create` when a description is needed.
 - Confirm DB health with `bd doctor` after creation
-
-**Rig routing:** `bd create` targets whichever `.beads/` DB is discovered from
-`$PWD`. If you're running from outside the target project (e.g., from the mayor
-or town root), you **must** pass `--rig <rig>` to file the bead in the correct
-project database. Similarly, use `--rig` on `bd list` and `bd ready` when
-querying a different rig. Commands that accept an existing bead ID (`bd update`,
-`bd close`, `bd dep add`) auto-route via the ID prefix and do not need `--rig`.
-**Note:** `bd search`, `bd blocked`, `bd count`, and `bd query` do **not**
-support `--rig`. To search cross-rig, use `bd list --rig <rig>` with filters
-or `cd` into the rig's workspace directory first.
 
 **Efficient bulk creation pattern:**
 ```bash
@@ -243,7 +235,7 @@ bd create --title="Write auth integration tests" --type=task --priority=2 --pare
 bd dep add $JWT_ID $HASH_ID
 
 # ALWAYS end an epic with a reconciliation bead (depends on all siblings)
-RECON_ID=$(bd create --title="Reconcile spec-to-code coverage for auth system" --type=task --priority=1 --parent=$EPIC \
+RECON_ID=$(bd create --title="Reconcile spec-to-code (gen-1) for auth system" --type=task --priority=1 --parent=$EPIC \
   --description="Deep-dive review: compare the original spec/requirements (see epic description) against the implementation delivered by sibling beads. Audit codebase changes, produce a checklist mapping every spec requirement to its implementing bead. For any requirement NOT covered, create new child beads under this epic. If all covered, close with a coverage summary." \
   --json | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 
