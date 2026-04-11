@@ -12,6 +12,7 @@
 
 # === Codex ===
 .codex/skills
+.codex/installation_id
 .codex/sqlite
 .codex/vendor_imports
 .codex/.codex-global-state.json
