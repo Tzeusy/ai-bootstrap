@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill Standards"
+  short_description: "Quality bar for creating and updating skills"
+  default_prompt: "Use $skill-standards to create or update a skill with clear triggers, grounded project context, explicit ownership, and verified supporting metadata."
