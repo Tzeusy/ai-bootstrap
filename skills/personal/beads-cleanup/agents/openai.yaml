@@ -1,0 +1,4 @@
+interface:
+  display_name: "Beads Cleanup"
+  short_description: "Reconcile stale Beads worker state before coordinator dispatch"
+  default_prompt: "Use $beads-cleanup before a beads-coordinator loop to reconcile stale worker state, PR-review bookkeeping, and orphaned worktrees."
