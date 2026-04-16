@@ -18,6 +18,22 @@ ones.
 The standard is simple: a skill should be easy to discover, cheap to load,
 grounded in the right source of truth, and explicit about who owns it.
 
+## Use This Skill When
+
+- Creating a new skill and you want a quality bar before shipping it
+- Updating an existing skill and you want to check for drift, bloat, or stale
+  package metadata
+- Reviewing whether a skill is discoverable, grounded, concise, and maintainable
+
+## Do Not Use This Skill For
+
+- Replacing `/skill-creator` for initial scaffolding or end-to-end authoring
+  workflow
+- Replacing project-specific doctrine or navigation skills such as
+  `/project-shape`
+- Acting as the domain skill itself; this is a rubric for skill quality, not
+  domain guidance
+
 ## Non-Negotiable Requirements
 
 ### 1. Follow Agent Skills best practices
