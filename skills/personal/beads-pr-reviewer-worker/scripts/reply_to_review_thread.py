@@ -4,6 +4,8 @@ import json
 import subprocess
 import sys
 
+from review_text_policy import validate_review_text
+
 
 THREAD_QUERY = """
 query($threadId:ID!, $after:String) {
@@ -72,6 +74,10 @@ def main():
     args = parser.parse_args()
 
     try:
+        problems = validate_review_text(args.body, "reply")
+        if problems:
+            raise RuntimeError("; ".join(problems))
+
         comments = fetch_comments(args.thread_id)
         for comment in comments:
             if args.dedupe_key in (comment.get("body") or ""):

@@ -1,4 +1,4 @@
 interface:
   display_name: "Beads PR Reviewer"
   short_description: "Handle one pr-review-task bead against an existing GitHub PR"
-  default_prompt: "Use $beads-pr-reviewer-worker to handle one assigned pr-review-task bead in its dedicated worktree, process review follow-up, and produce the structured PR Reviewer Report."
+  default_prompt: "Use $beads-pr-reviewer-worker to handle one assigned pr-review-task bead in its dedicated worktree, scrub PII or secrets from replies and commit messages, validate terminal review replies before resolving threads, and produce the structured PR Reviewer Report."

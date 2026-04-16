@@ -4,6 +4,8 @@ import json
 import subprocess
 import sys
 
+from review_text_policy import validate_review_text
+
 
 def run_json(cmd):
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -46,6 +48,10 @@ def main():
     args = parser.parse_args()
 
     try:
+        problems = validate_review_text(args.body, "comment")
+        if problems:
+            raise RuntimeError("; ".join(problems))
+
         comments = existing_comments(args.owner, args.repo, args.pr_number)
         for comment in comments:
             if (

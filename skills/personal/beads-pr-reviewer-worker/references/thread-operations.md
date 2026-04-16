@@ -22,10 +22,20 @@ gh api "repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}/comments" \
 ```
 
 Guidance:
-- use `fixed`, `answered`, or `won't-fix` language explicitly
-- reference the concrete change or rationale
-- do not resolve the thread until the reply is truthful
+- do a semantic close-out pass first: restate the request, compare it against
+  the current diff and tests, and check repo-local doctrine or contract docs if
+  the concern touches behavior or wording
+- use `Accepted in <commit>.` followed by `Reason: ...` or `Wontfix.` followed
+  by `Reason: ...` explicitly
+- include the concrete change, verification, or justification in one sentence
+- do not resolve the thread until the reply is truthful and terminal
 - include a stable `--dedupe-key` on retries so duplicate replies are skipped
+- validate the body with `python3 scripts/validate_review_text.py --kind reply`
+  before posting if you are building the reply text manually
+- do not quote reviewer text verbatim if it contains personal data, secrets, or
+  other sensitive material; paraphrase and redact instead
+- the bundled reply and resolve helpers enforce the same terminal/safety
+  contract, so let them fail closed instead of bypassing them
 
 ## Resolve A Review Thread
 
@@ -44,7 +54,12 @@ gh api graphql \
 
 Only resolve when:
 - the fix is committed and verified, or
-- the answer fully addresses the concern
+- the answer fully addresses the concern, and
+- the latest reply passes the terminal reply and text-safety validator
+
+If the latest reply is not terminal or contains unsafe text, fix the reply
+first. Closing the thread without a valid terminal reply is a contract
+violation, not a convenience step.
 
 ## Create A New Inline Review Comment
 
@@ -67,6 +82,19 @@ Guidance:
 - do not use top-level timeline comments for merge-readiness tracking when a
   code anchor exists
 - include a stable `--dedupe-key` on retries so duplicate comments are skipped
+- validate the body with `python3 scripts/validate_review_text.py --kind comment`
+  before posting if you are drafting the text manually
+
+## Close Out Semantics
+
+Before you close a thread, run the semantic pass in your head:
+
+1. Rephrase the review request without changing its meaning.
+2. Check the current diff, tests, and repository guidance against that request.
+3. Decide whether the request is now satisfied or whether the correct outcome is
+   a reasoned `Wontfix`.
+4. If the reply would expose PII or secrets, rewrite it before posting.
+5. Only then call the resolve helper.
 
 ## Close A PR Instead Of Merging
 
