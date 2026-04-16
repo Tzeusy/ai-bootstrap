@@ -1,4 +1,4 @@
 interface:
   display_name: "Skill Standards"
-  short_description: "Quality bar for creating and updating skills"
-  default_prompt: "Use $skill-standards to create or update a skill with clear triggers, grounded project context, explicit ownership, and verified supporting metadata."
+  short_description: "Review bar for skill packaging and upkeep"
+  default_prompt: "Use $skill-standards to review or update a skill for trigger quality, project-shape grounding, explicit ownership, progressive discovery, and aligned metadata."
