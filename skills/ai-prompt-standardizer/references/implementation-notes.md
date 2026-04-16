@@ -8,7 +8,7 @@
 ## Cleaning Strategy
 
 - `--clean` removes orphaned generated files that no longer map to a source.
-- Skills cleaning is scoped to `genai/.*/skills/**` only.
+- Skills cleaning is scoped to `ai-bootstrap/.*/skills/**` only.
 - Agents cleaning is scoped to managed agent outputs only:
   - `.codex/**/AGENTS.override.md` and `.codex/AGENTS.md`
   - `.claude/**/CLAUDE.md`
@@ -19,7 +19,7 @@
 ## Path Normalization
 
 - All input and output paths use `pathlib.Path.resolve()`.
-- Relative mapping is computed from the canonical root (`genai/skills` and `genai/agents`).
+- Relative mapping is computed from the canonical root (`ai-bootstrap/skills` and `ai-bootstrap/agents`).
 - GitHub agent filenames use `Path.parts` to remain OS-agnostic.
 
 ## Read-Only Protection

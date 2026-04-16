@@ -16,7 +16,7 @@ This skill follows a documented TDD approach using fixtures and a failing test h
 
 ## Scenario 3: Clean removes orphans
 
-- Setup: Add a stray file under `genai/.codex/skills/` in a fixture copy.
+- Setup: Add a stray file under `ai-bootstrap/.codex/skills/` in a fixture copy.
 - Expected: `--clean` removes the stray file and leaves mapped outputs intact.
 - Purpose: Validates safe cleanup rules.
 

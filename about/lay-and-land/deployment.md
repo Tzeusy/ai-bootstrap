@@ -4,7 +4,7 @@ This repository is not deployed as a service. Its deployment model is local inst
 
 ## Runtime Topology
 
-1. A user clones `genai/` directly or includes it as a git submodule.
+1. A user clones `ai-bootstrap/` directly or includes it as a git submodule.
 2. Tool-specific directories such as `.claude/`, `.codex/`, and `.gemini/` are symlinked or copied into home-directory config paths.
 3. `opencode/` is installed as config under `$HOME/.config/opencode`.
 4. Shared skills from `skills/` are mirrored into tool-specific skill-entrypoint directories such as `.claude/skills`, `.codex/skills`, `.gemini/skills`, and `.gemini/antigravity/skills`, then exposed to the runtime through the installed paths.

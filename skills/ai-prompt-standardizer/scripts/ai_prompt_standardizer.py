@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Synchronize canonical genai/skills and genai/agents into tool-specific folders.
+Synchronize canonical ai-bootstrap/skills and ai-bootstrap/agents into tool-specific folders.
 """
 
 from __future__ import annotations
@@ -39,13 +39,13 @@ class Summary:
 
 
 def default_base_dir() -> Path:
-    # .../genai/skills/ai-prompt-standardizer/scripts/ai_prompt_standardizer.py
+    # .../ai-bootstrap/skills/ai-prompt-standardizer/scripts/ai_prompt_standardizer.py
     return Path(__file__).resolve().parents[3]
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Sync genai skills and professions into tool-specific prompt folders."
+        description="Sync ai-bootstrap skills and professions into tool-specific prompt folders."
     )
     parser.add_argument("--dry-run", action="store_true", help="Print planned operations without writing")
     parser.add_argument("--verbose", action="store_true", help="Print detailed operation info")
@@ -68,7 +68,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--base",
         default=str(default_base_dir()),
-        help="Base directory containing skills/ and professions/ (default: genai)",
+        help="Base directory containing skills/ and professions/ (default: ai-bootstrap)",
     )
     return parser.parse_args()
 

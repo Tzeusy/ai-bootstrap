@@ -4,9 +4,9 @@
 
 GitHub Copilot prompt artifacts are still evolving. This skill keeps outputs minimal and agnostic so downstream tooling can layer tool-specific metadata later.
 
-## Why is `genai/` the base directory?
+## Why is `ai-bootstrap/` the base directory?
 
-This repo stores prompt assets under `genai/`. The sync tool treats `genai/skills` and `genai/agents` as canonical sources, and mirrors into tool-specific folders under `genai/`.
+This repo stores prompt assets under `ai-bootstrap/`. The sync tool treats `ai-bootstrap/skills` and `ai-bootstrap/agents` as canonical sources, and mirrors into tool-specific folders under `ai-bootstrap/`.
 
 ## Can I add new tool targets?
 

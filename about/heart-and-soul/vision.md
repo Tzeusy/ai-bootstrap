@@ -2,7 +2,7 @@
 
 ## What This Repository Is
 
-`genai/` is the canonical local home for reusable AI-assistant operating knowledge: a skills-first shared workflow library, Beads-backed execution patterns, tool-specific configuration layers, and a smaller agent-prompt corpus kept for selective reuse. It exists so one repository can define a coherent engineering workflow and then project that workflow into multiple agent runtimes without hiding the logic inside private local state.
+`ai-bootstrap/` is the canonical local home for reusable AI-assistant operating knowledge: a skills-first shared workflow library, Beads-backed execution patterns, tool-specific configuration layers, and a smaller agent-prompt corpus kept for selective reuse. It exists so one repository can define a coherent engineering workflow and then project that workflow into multiple agent runtimes without hiding the logic inside private local state.
 
 ## What This Repository Is Not
 

@@ -139,9 +139,9 @@ Unless the user specifies otherwise:
 
 Each agent's full specification lives in its own file. Load only the agent(s) needed for the current phase.
 
-- `genai/agents/project-manager/AGENTS.md` — Plan, coordinate, delegate, ship
-- `genai/agents/designer/AGENTS.md` — Design system, component specs, visual review
-- `genai/agents/developer/AGENTS.md` — Architecture, implementation, integration
-- `genai/agents/security/AGENTS.md` — Threat model, security requirements, audit
-- `genai/agents/tester/AGENTS.md` — Test strategy, test suites, verification
-- `genai/agents/reviewer/AGENTS.md` — Code review, architecture audit, release gate
+- `ai-bootstrap/agents/project-manager/AGENTS.md` — Plan, coordinate, delegate, ship
+- `ai-bootstrap/agents/designer/AGENTS.md` — Design system, component specs, visual review
+- `ai-bootstrap/agents/developer/AGENTS.md` — Architecture, implementation, integration
+- `ai-bootstrap/agents/security/AGENTS.md` — Threat model, security requirements, audit
+- `ai-bootstrap/agents/tester/AGENTS.md` — Test strategy, test suites, verification
+- `ai-bootstrap/agents/reviewer/AGENTS.md` — Code review, architecture audit, release gate

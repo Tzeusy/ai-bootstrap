@@ -1,6 +1,6 @@
 # Lay and Land
 
-Topology for the `genai/` repository.
+Topology for the `ai-bootstrap/` repository.
 
 This pillar answers where repository structure becomes operational: which paths are canonical source, which are mirrors, which are installed runtime destinations, and which paths are deliberately local-only.
 

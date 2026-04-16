@@ -2,7 +2,7 @@
 
 ## Why
 
-The `genai/` repository already contains substantial shared content and multiple tool-specific configuration surfaces, but it had no explicit doctrine, no repository-level RFC, no topology maps, and no normative spec describing what must remain true about its structure.
+The `ai-bootstrap/` repository already contains substantial shared content and multiple tool-specific configuration surfaces, but it had no explicit doctrine, no repository-level RFC, no topology maps, and no normative spec describing what must remain true about its structure.
 
 ## Impact
 

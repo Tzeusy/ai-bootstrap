@@ -2,19 +2,19 @@
 
 ## Base Directories
 
-- Canonical sources live under `genai/skills/` and `genai/agents/`.
-- Generated outputs mirror into `genai/.codex/`, `genai/.claude/`, `genai/.gemini/`, and `genai/.github/`.
+- Canonical sources live under `ai-bootstrap/skills/` and `ai-bootstrap/agents/`.
+- Generated outputs mirror into `ai-bootstrap/.codex/`, `ai-bootstrap/.claude/`, `ai-bootstrap/.gemini/`, and `ai-bootstrap/.github/`.
 
 ## Skills Sync (Verbatim)
 
 Source:
-- `genai/skills/**` (recursive)
+- `ai-bootstrap/skills/**` (recursive)
 
 Destinations (verbatim mirror):
-- `genai/.codex/skills/**`
-- `genai/.claude/skills/**`
-- `genai/.gemini/skills/**`
-- `genai/.github/skills/**`
+- `ai-bootstrap/.codex/skills/**`
+- `ai-bootstrap/.claude/skills/**`
+- `ai-bootstrap/.gemini/skills/**`
+- `ai-bootstrap/.github/skills/**`
 
 Rules:
 - Preserve relative paths.
@@ -24,32 +24,32 @@ Rules:
 ## Professions Sync (Tool-Specific)
 
 Source of truth:
-- `genai/agents/AGENTS.md`
-- `genai/agents/<path...>/AGENTS.md`
+- `ai-bootstrap/agents/AGENTS.md`
+- `ai-bootstrap/agents/<path...>/AGENTS.md`
 
 ### Codex
 
-- `genai/agents/AGENTS.md` → `genai/.codex/AGENTS.md`
-- `genai/agents/<path...>/AGENTS.md` → `genai/.codex/<path...>/AGENTS.override.md`
+- `ai-bootstrap/agents/AGENTS.md` → `ai-bootstrap/.codex/AGENTS.md`
+- `ai-bootstrap/agents/<path...>/AGENTS.md` → `ai-bootstrap/.codex/<path...>/AGENTS.override.md`
 
 ### Claude
 
-- `genai/agents/AGENTS.md` → `genai/.claude/CLAUDE.md`
-- `genai/agents/<path...>/AGENTS.md` → `genai/.claude/<path...>/CLAUDE.md`
+- `ai-bootstrap/agents/AGENTS.md` → `ai-bootstrap/.claude/CLAUDE.md`
+- `ai-bootstrap/agents/<path...>/AGENTS.md` → `ai-bootstrap/.claude/<path...>/CLAUDE.md`
 
 ### Gemini
 
-- `genai/agents/AGENTS.md` → `genai/.gemini/GEMINI.md`
-- `genai/agents/<path...>/AGENTS.md` → `genai/.gemini/<path...>/GEMINI.md`
+- `ai-bootstrap/agents/AGENTS.md` → `ai-bootstrap/.gemini/GEMINI.md`
+- `ai-bootstrap/agents/<path...>/AGENTS.md` → `ai-bootstrap/.gemini/<path...>/GEMINI.md`
 
 ### GitHub Copilot (Agnostic Prompt Mirrors)
 
-For each `genai/agents/<path...>/AGENTS.md`, generate one file under `genai/.github/agents/`.
+For each `ai-bootstrap/agents/<path...>/AGENTS.md`, generate one file under `ai-bootstrap/.github/agents/`.
 
 Naming:
 - Replace `/` with `__` in the path.
-- `genai/agents/AGENTS.md` → `genai/.github/agents/root.agent.md`
-- `genai/agents/application/backend/AGENTS.md` → `genai/.github/agents/application__backend.agent.md`
+- `ai-bootstrap/agents/AGENTS.md` → `ai-bootstrap/.github/agents/root.agent.md`
+- `ai-bootstrap/agents/application/backend/AGENTS.md` → `ai-bootstrap/.github/agents/application__backend.agent.md`
 
 Content:
 - Prepend a generated header pointing to the source path.

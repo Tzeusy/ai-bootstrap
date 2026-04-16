@@ -2,7 +2,7 @@
 
 ## Domain
 
-This spec covers the repository-level structure and placement rules for shared AI-assistant knowledge in `genai/`.
+This spec covers the repository-level structure and placement rules for shared AI-assistant knowledge in `ai-bootstrap/`.
 
 ### Requirement: Skills-First Shared Assets
 

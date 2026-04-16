@@ -1,6 +1,6 @@
 # Legends and Lore
 
-Design contracts for the `genai/` repository.
+Design contracts for the `ai-bootstrap/` repository.
 
 This pillar answers how repository shape decisions are made durable: where the load-bearing placement rules live, how review rounds are recorded, and what has to happen before a draft contract becomes accepted project law.
 

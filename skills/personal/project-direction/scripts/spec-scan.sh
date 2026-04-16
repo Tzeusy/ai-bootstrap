@@ -84,7 +84,7 @@ for pattern in AGENTS.md CLAUDE.md CODEX.md .cursorrules .clinerules; do
     fi
   done < <(find . -maxdepth 3 -name "$pattern" "${EXCLUDES[@]}" 2>/dev/null | head -5)
 done
-for d in .claude .codex .gemini .genai genai; do
+for d in .claude .codex .gemini .genai genai ai-bootstrap; do
   if [ -d "$d" ]; then
     echo "  $d/ (AI tool config)"
   fi

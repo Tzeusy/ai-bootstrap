@@ -39,4 +39,4 @@ Use this skill to guide LLM behavior for the Bitwarden Secrets Manager CLI. Prio
 
 ## Reference
 
-For detailed CLI subcommands and authentication setup, read `genai/skills/bws-cli-skill/references/secrets-manager-cli.md` and the official docs at https://bitwarden.com/help/secrets-manager-cli/.
+For detailed CLI subcommands and authentication setup, read `ai-bootstrap/skills/bws-cli-skill/references/secrets-manager-cli.md` and the official docs at https://bitwarden.com/help/secrets-manager-cli/.

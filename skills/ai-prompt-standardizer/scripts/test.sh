@@ -14,7 +14,7 @@ trap cleanup EXIT
 cp -R "${FIXTURES_DIR}/base/." "${TMP_DIR}/"
 
 python "${SKILL_DIR}/scripts/ai_prompt_standardizer.py" \
-  --base "${TMP_DIR}/genai" \
+  --base "${TMP_DIR}/ai-bootstrap" \
   --only all
 
 diff -ru "${FIXTURES_DIR}/expected" "${TMP_DIR}"

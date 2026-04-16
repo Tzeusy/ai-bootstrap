@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart TD
-    R[genai repo]
+    R[ai-bootstrap repo]
     R --> TF[Tool facades]
     R --> SH[Shared authoring]
     R --> SU[Support utilities]

@@ -1,6 +1,6 @@
 # Heart and Soul
 
-Doctrine for the `genai/` repository.
+Doctrine for the `ai-bootstrap/` repository.
 
 Read this pillar first when you need to understand what the repository is optimizing for, which operating model it treats as primary, and which boundaries are constitutional rather than incidental.
 

@@ -1,13 +1,13 @@
 ---
 name: ai-prompt-standardizer
-description: Use when synchronizing canonical genai prompt assets into tool-specific folders or enforcing prompt mirror consistency in CI.
+description: Use when synchronizing canonical ai-bootstrap prompt assets into tool-specific folders or enforcing prompt mirror consistency in CI.
 ---
 
 # AI Prompt Standardizer
 
 ## Overview
 
-Standardize prompt assets by mirroring canonical `genai/skills` and `genai/agents` into tool-specific folders (`.codex`, `.claude`, `.gemini`, `.github`) with deterministic, idempotent sync.
+Standardize prompt assets by mirroring canonical `ai-bootstrap/skills` and `ai-bootstrap/agents` into tool-specific folders (`.codex`, `.claude`, `.gemini`, `.github`) with deterministic, idempotent sync.
 
 ## When To Use
 
@@ -24,7 +24,7 @@ Standardize prompt assets by mirroring canonical `genai/skills` and `genai/agent
 
 ## Quick Reference
 
-- CLI entrypoint: `genai/skills/ai-prompt-standardizer/scripts/ai_prompt_standardizer.py`
+- CLI entrypoint: `ai-bootstrap/skills/ai-prompt-standardizer/scripts/ai_prompt_standardizer.py`
 - Dry run: `scripts/dry-run.sh`
 - Example: `scripts/example.sh`
 - Tests: `scripts/test.sh`
@@ -34,10 +34,10 @@ Standardize prompt assets by mirroring canonical `genai/skills` and `genai/agent
 ## Usage
 
 ```bash
-python genai/skills/ai-prompt-standardizer/scripts/ai_prompt_standardizer.py --dry-run --only all
-python genai/skills/ai-prompt-standardizer/scripts/ai_prompt_standardizer.py --only skills
-python genai/skills/ai-prompt-standardizer/scripts/ai_prompt_standardizer.py --only agents --clean
-python genai/skills/ai-prompt-standardizer/scripts/ai_prompt_standardizer.py --check --only all
+python ai-bootstrap/skills/ai-prompt-standardizer/scripts/ai_prompt_standardizer.py --dry-run --only all
+python ai-bootstrap/skills/ai-prompt-standardizer/scripts/ai_prompt_standardizer.py --only skills
+python ai-bootstrap/skills/ai-prompt-standardizer/scripts/ai_prompt_standardizer.py --only agents --clean
+python ai-bootstrap/skills/ai-prompt-standardizer/scripts/ai_prompt_standardizer.py --check --only all
 ```
 
 ## Resources
