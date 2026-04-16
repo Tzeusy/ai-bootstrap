@@ -1,6 +1,6 @@
 ---
 name: beads-pr-reviewer-worker
-description: Use when a coordinator dispatches a dedicated `pr-review-task` bead for an open GitHub PR that needs review follow-up, thread triage, merge assessment, or retry handling in an isolated worktree.
+description: Use when a coordinator dispatches a dedicated `pr-review-task` bead for an open GitHub PR that needs review follow-up, thread triage, merge assessment, or retry handling in an isolated worktree, especially when review replies, commit messages, or thread closure need safety and validation.
 compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, gh, and python3 available, plus authenticated GitHub access and network access for review, push, and merge operations.
 ---
 
@@ -80,21 +80,28 @@ Use the bundled helpers in `scripts/` for deterministic read-only operations:
   details in JSON.
 - `scripts/evaluate_merge_readiness.py`
   Computes merge gates in one place, failing closed when required checks cannot
-  be verified.
+  be verified or when resolved threads lack a terminal reply.
 - `scripts/discover_quality_gates.py`
   Discovers likely lint, typecheck, and test commands from common project
   manifests when project docs do not name them explicitly.
+- `scripts/validate_review_text.py`
+  Validates PR text, replies, commit messages, and review comments for the
+  terminal reply contract and basic secret/PII hygiene.
 - `scripts/reply_to_review_thread.py`
-  Adds an idempotent reply to an existing review thread.
+  Adds an idempotent reply to an existing review thread after validating the
+  terminal reply contract and text safety.
 - `scripts/resolve_review_thread.py`
-  Resolves a review thread idempotently.
+  Resolves a review thread idempotently after confirming the closure reply is
+  terminal and safe.
 - `scripts/create_inline_review_comment.py`
-  Adds an idempotent line-level review comment for a newly discovered issue.
+  Adds an idempotent line-level review comment for a newly discovered issue
+  after validating the body for basic text safety.
 
 Use the bundled references in `references/` when you need the exact GitHub
 review-thread operations or the failure protocol:
 
 - `references/thread-operations.md`
+- `references/text-safety.md`
 - `references/failure-protocol.md`
 - `references/evaluation.md`
 
@@ -181,12 +188,18 @@ THREADS_JSON=$(python3 scripts/list_review_threads.py \
    report `blocked-awaiting-coordinator`. Do not review from partial thread
    context.
 3. For each unresolved thread:
-   - inspect the feedback in code and tests,
+   - restate the thread in your own words and do a semantic close-out pass
+     against the current diff, tests, and repo-local doctrine or contract
+     guidance,
    - if a fix is needed, apply the minimal durable fix on the PR head branch,
    - run the relevant quality gates for that fix,
-   - reply in-thread with a concrete verdict: `fixed`, `answered`, or
-     `won't-fix`,
-   - resolve the thread only after the fix or answer is real.
+   - before posting the reply, validate the body with
+     `python3 scripts/validate_review_text.py --kind reply --text "${BODY}"`,
+   - reply in-thread with a terminal verdict:
+     `Accepted in <commit>.` followed by `Reason: ...`, or
+     `Wontfix.` followed by `Reason: ...`,
+   - resolve the thread only after the fix or answer is real and the reply has
+     passed validation.
 4. Use the bundled thread helpers instead of raw ad hoc API calls:
 
 ```bash
@@ -222,6 +235,10 @@ python3 scripts/create_inline_review_comment.py \
 6. Keep commits focused:
 
 ```bash
+python3 scripts/validate_review_text.py \
+  --kind commit \
+  --text "fix: <summary> [${ISSUE_ID}]"
+
 git add <files>
 git commit -m "fix: <summary> [${ISSUE_ID}]"
 ```

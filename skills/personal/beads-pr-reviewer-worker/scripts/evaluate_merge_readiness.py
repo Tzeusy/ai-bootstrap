@@ -3,14 +3,25 @@ import argparse
 import json
 import subprocess
 import sys
+from typing import Any
+
+from review_text_policy import validate_review_text
 
 
-THREAD_COUNT_QUERY = """
+THREADS_QUERY = """
 query($owner:String!, $repo:String!, $number:Int!, $after:String) {
   repository(owner:$owner, name:$repo) {
     pullRequest(number:$number) {
       reviewThreads(first:100, after:$after) {
-        nodes { isResolved }
+        nodes {
+          id
+          isResolved
+          comments(last:1) {
+            nodes {
+              body
+            }
+          }
+        }
         pageInfo {
           hasNextPage
           endCursor
@@ -42,8 +53,9 @@ def run_json(cmd):
     return json.loads(run(cmd))
 
 
-def unresolved_count(owner, repo, pr_number):
+def review_thread_closure_state(owner, repo, pr_number):
     total = 0
+    threads: list[dict[str, Any]] = []
     after = None
     while True:
         cmd = [
@@ -51,7 +63,7 @@ def unresolved_count(owner, repo, pr_number):
             "api",
             "graphql",
             "-f",
-            f"query={THREAD_COUNT_QUERY}",
+            f"query={THREADS_QUERY}",
             "-F",
             f"owner={owner}",
             "-F",
@@ -63,10 +75,35 @@ def unresolved_count(owner, repo, pr_number):
             cmd.extend(["-F", f"after={after}"])
         payload = run_json(cmd)
         review_threads = payload["data"]["repository"]["pullRequest"]["reviewThreads"]
-        total += sum(1 for node in review_threads["nodes"] if not node["isResolved"])
+        threads.extend(review_threads["nodes"])
         if not review_threads["pageInfo"]["hasNextPage"]:
-            return total
+            break
         after = review_threads["pageInfo"]["endCursor"]
+
+    total = sum(1 for node in threads if not node["isResolved"])
+    non_terminal_resolved = []
+    for node in threads:
+        comments = node.get("comments", {}).get("nodes", []) or []
+        latest = comments[-1] if comments else None
+        if node["isResolved"] and latest is not None:
+            problems = validate_review_text(latest.get("body", ""), "reply")
+            if problems:
+                non_terminal_resolved.append(
+                    {
+                        "thread_id": node.get("id"),
+                        "latest_comment_body": latest.get("body", ""),
+                        "problems": problems,
+                    }
+                )
+        elif node["isResolved"] and latest is None:
+            non_terminal_resolved.append(
+                {
+                    "thread_id": node.get("id"),
+                    "latest_comment_body": "",
+                    "problems": ["resolved thread has no comments"],
+                }
+            )
+    return total, non_terminal_resolved
 
 
 def fetch_required_checks(pr_number):
@@ -101,7 +138,9 @@ def main():
             "--json",
             "state,isDraft,mergeStateStatus,reviewDecision,mergedAt,url,baseRefName,headRefName",
         ])
-        unresolved = unresolved_count(args.owner, args.repo, args.pr_number)
+        unresolved, non_terminal_resolved = review_thread_closure_state(
+            args.owner, args.repo, args.pr_number
+        )
         checks = fetch_required_checks(args.pr_number)
     except RuntimeError as exc:
         fail("command-failed", str(exc), pr_number=args.pr_number)
@@ -127,6 +166,8 @@ def main():
         reasons.append("review_decision=CHANGES_REQUESTED")
     if (pr.get("mergeStateStatus") or "UNKNOWN") not in ALLOWED_MERGE_STATES:
         reasons.append(f"merge_state={pr.get('mergeStateStatus') or 'UNKNOWN'}")
+    if non_terminal_resolved:
+        reasons.append(f"resolved_threads_missing_terminal_reply={len(non_terminal_resolved)}")
 
     output = {
         "ok": True,
@@ -139,6 +180,7 @@ def main():
         "base_branch": pr.get("baseRefName"),
         "head_branch": pr.get("headRefName"),
         "unresolved_count": unresolved,
+        "resolved_threads_missing_terminal_reply": non_terminal_resolved,
         "required_non_green": required_non_green,
         "merge_ok": len(reasons) == 0,
         "reasons": reasons,
