@@ -76,7 +76,12 @@ def fetch_required_checks(pr_number):
         text=True,
     )
     if result.returncode != 0:
-        fail("required-checks-unavailable", result.stderr.strip() or "unable to fetch required checks", pr_number=pr_number)
+        stderr = result.stderr.strip()
+        # Repos without branch protection rules report no required checks.
+        # Treat this as zero required checks rather than a hard failure.
+        if "no required checks" in stderr.lower():
+            return []
+        fail("required-checks-unavailable", stderr or "unable to fetch required checks", pr_number=pr_number)
     return json.loads(result.stdout)
 
 
