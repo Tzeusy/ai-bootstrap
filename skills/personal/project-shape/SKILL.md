@@ -101,7 +101,7 @@ The skill still applies in constrained environments. Degrade the presentation, n
 
 4. **Revise and present** — Incorporate review findings, present to user for validation. If the user says "not quite right," return to the interview — don't patch.
 
-5. **Scaffold and install** — Run `shape-init.sh` for directory structure, populate with reviewed documents, install local skills.
+5. **Scaffold and install** — Run `shape-init.sh` for directory structure, populate with reviewed documents, install local skills. When generating or customizing local skill packages such as `/heart-and-soul`, `/legends-and-lore`, `/spec-and-spine`, or `/lay-and-land`, use `/skill-standards` as the quality bar before relying on them.
 
 ### Pillar Order
 
@@ -124,7 +124,7 @@ Argument: Order matters — each pillar grounds the next. But topology can start
 
 Topology (lay-and-land) can be started in parallel with design contracts once the architecture interview track is complete. `craft-and-care` should be drafted immediately after doctrine is coherent and before implementation planning begins; it is mandatory for all non-trivial implementation work.
 
-Read `references/bootstrapping.md` for phase-by-phase details.
+Read `references/bootstrapping.md` for phase-by-phase details, including the local-skill authoring and `/skill-standards` review loop.
 
 ## Workflow 2: Translate Ideas into Requirements
 

@@ -4,11 +4,13 @@ Install these as `.claude/skills/<name>/SKILL.md` (and equivalents for `.codex/`
 
 **CRITICAL FORMAT REQUIREMENT:** Every SKILL.md file **MUST** begin with YAML frontmatter delimited by `---`. Without frontmatter, skill loaders silently reject the file. Supported fields: `name` and `description`. Do not omit the opening or closing `---` delimiters. Do not start the file with a markdown heading.
 
-**Authoring mandate:** These local skills **MUST** follow current `agentskills.io` conventions and `/skill-creator` best practices. In practice that means: valid minimal frontmatter, a trigger-oriented `description`, a concise SKILL body that routes rather than repeats source material, and explicit navigation cues that help the agent select only the files needed for the current task.
+**Authoring mandate:** These local skills **MUST** follow current `agentskills.io` conventions and `/skill-creator` best practices, and they should be reviewed against `/skill-standards` before shipping. In practice that means: valid minimal frontmatter, a trigger-oriented `description`, a concise SKILL body that routes rather than repeats source material, explicit navigation cues that help the agent select only the files needed for the current task, and package-level alignment between `SKILL.md` and any directly referenced support files.
 
 **Progressive discovery mandate:** Design every pillar skill for targeted retrieval. Keep `SKILL.md` as the discovery/index layer, and fan heavier or narrower content out into supporting files such as `references/*.md` and `scripts/*`. Supporting files should not be hidden sidecars: link them directly from `SKILL.md` with "read when..." guidance so the agent can progressively discover and load only the relevant slice.
 
 Customize the tables and rules for your project's specific domains.
+
+After customizing any generated pillar skill, run `/skill-standards` as the final rubric pass for trigger quality, grounding, metadata hygiene, and progressive discovery.
 
 ## Template: heart-and-soul
 

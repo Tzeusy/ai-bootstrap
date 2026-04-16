@@ -208,7 +208,7 @@ mkdir -p .claude/skills/{heart-and-soul,legends-and-lore,spec-and-spine,lay-and-
 
 **Preferred:** Run `shape-init.sh --skills-only` which generates correctly-formatted skills automatically.
 
-**If writing manually:** Every SKILL.md **MUST** start with YAML frontmatter (`---` delimiters with `name` and `description` fields). Without frontmatter, skill loaders silently reject the file. Manual pillar skills **MUST** follow current `agentskills.io` expectations and `/skill-creator` best practices: keep the description about when to use the skill, keep the body concise, and structure the skill as an index/router instead of copying whole docs into it. Use the templates from `references/local-skill-templates.md`, customize the index tables with your actual files and domains, and fan deeper guidance into `references/`, `scripts/`, and other supporting files that `SKILL.md` links with explicit "read when..." cues.
+**If writing manually:** Every SKILL.md **MUST** start with YAML frontmatter (`---` delimiters with `name` and `description` fields). Without frontmatter, skill loaders silently reject the file. Manual pillar skills **MUST** follow current `agentskills.io` expectations and `/skill-creator` best practices: keep the description about when to use the skill, keep the body concise, and structure the skill as an index/router instead of copying whole docs into it. Use the templates from `references/local-skill-templates.md`, customize the index tables with your actual files and domains, and fan deeper guidance into `references/`, `scripts/`, and other supporting files that `SKILL.md` links with explicit "read when..." cues. Before you call a generated skill package done, run `/skill-standards` against it as the review bar for trigger quality, grounding, metadata, and progressive discovery.
 
 ### Step 3: Validate format
 
@@ -224,6 +224,10 @@ bash <skill-path>/scripts/self-test.sh
 ```
 
 Interpret the scan using `references/maturity-rubric.md`. A fully scaffolded project should not be considered mature until authored content and traceability are in place.
+
+### Step 4.5: Review customized skills
+
+Run `/skill-standards` on each generated pillar skill after you replace placeholders or add support files. This is especially important for `heart-and-soul`-style doctrine skills, which are easy to bloat or turn into document dumps instead of navigation layers.
 
 ### Step 5: Test navigation
 

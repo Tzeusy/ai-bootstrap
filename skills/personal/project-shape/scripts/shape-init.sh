@@ -505,5 +505,6 @@ if [ "$created" -gt 0 ]; then
   echo "Next steps:"
   echo "  1. Fill in the TODO/placeholder content in the scaffolded files"
   echo "  2. Customize local skill index tables with your actual files and domains"
-  echo "  3. Run shape-scan.sh to verify the result"
+  echo "  3. Review each generated local skill with /skill-standards before relying on it"
+  echo "  4. Run shape-scan.sh to verify the result"
 fi
