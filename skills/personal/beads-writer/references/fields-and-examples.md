@@ -13,7 +13,7 @@
 ### Content Fields
 | Field | Flag | Purpose |
 |-------|------|---------|
-| description | `-d` / `--description` | Detailed body: what, why, context, repro steps |
+| description | `-d` / `--description` | Detailed body: what, why, context, repro steps, and enough background for an independent session to execute without hidden creator-session context; subbeads should read like full standalone prompts |
 | notes | `--notes` | Implementation notes, caveats, references |
 | design | `--design` | Architecture decisions, technical approach |
 | acceptance | `--acceptance` | Testable success criteria |
@@ -66,6 +66,8 @@
 ---
 
 ## Exemplary Beads by Type
+
+Write examples and real beads for a cold-start executor. Assume the person or agent picking up the bead later does not have access to the bead writer's current conversational context. Subbeads should be written as if they are full prompts by themselves, not shorthand continuations of the current planning session.
 
 ### Bug Report
 
