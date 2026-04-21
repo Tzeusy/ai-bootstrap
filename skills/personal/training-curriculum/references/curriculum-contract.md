@@ -4,6 +4,8 @@ Write the curriculum into the target repository's `curriculum/` path.
 
 Use this contract unless the user explicitly asks for a different shape.
 
+The curriculum is concept-first. Repository evidence selects the topics, but the generated teaching material should mainly explain underlying technical concepts rather than project scaffolding.
+
 ## Required Output Tree
 
 ```text
@@ -64,10 +66,13 @@ Include:
 - the key mental-model gaps that would block comprehension without preparation
 - clear statements of uncertainty when the repo is underdocumented
 - a brief note on whether the curriculum is mostly evidence-backed or inference-heavy
+- a short explanation that repo orientation is included only to justify why each technical concept matters here
 
 ### `curriculum/evidence-map.md`
 
 A table that ties repository evidence to prerequisite topics.
+
+The `topic` column should usually contain transferable technical concepts, not project scaffolding labels.
 
 Recommended columns:
 
@@ -158,12 +163,13 @@ Include:
   - prerequisite dependencies
   - progress checkboxes
 - a short "stop here if" note for learners who do not need deeper material
+- keep the overview concept-first; repo-local orientation should be brief and subordinate
 
 ## Module Contract
 
 Each `modules/NN-topic-slug.md` file should include:
 
-- module title
+- module title centered on a technical concept rather than a project subsystem whenever possible
 - estimated smart-human study time, capped at 10 hours
 - why this module matters before the repo makes sense
 - learning goals
@@ -177,6 +183,8 @@ Each `modules/NN-topic-slug.md` file should include:
 - self-check questions or small exercises
 - a module-level mastery gate that defines what completion means
 - what this module unlocks next
+
+The technical deep dive should do most of the teaching work. `Where It Appears In The Repo` should stay concise and explanatory rather than turning into a tour of local scaffolding.
 
 ## Subsection Template
 
@@ -224,6 +232,7 @@ The completed `curriculum/` should:
 - distinguish required knowledge from deferable depth
 - stay specific enough that a learner can return from the curriculum to the codebase with purpose
 - avoid pretending the repo demands broader mastery than the evidence supports
+- teach technical concepts first and use repo context mainly to justify inclusion
 - begin with a clear overview of sections and why they matter
 - include deep-dive technical treatment rather than shallow glossaries alone
 - include sample Q&A at the end of every subsection
@@ -232,3 +241,4 @@ The completed `curriculum/` should:
 - label weak evidence and unresolved questions instead of inventing certainty
 - show that prerequisite discovery used at least 3 independent deep-dive passes and a reconciliation artifact
 - respect the 10-hour module cap and 100-hour path cap
+- avoid standalone modules whose primary content is project scaffolding, setup steps, or directory orientation unless explicitly requested

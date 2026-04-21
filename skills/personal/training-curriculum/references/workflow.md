@@ -8,11 +8,11 @@ Produce a `curriculum/` directory that teaches the minimum technical background 
 
 The research standard is comprehensive rather than merely plausible: prerequisite discovery must use multiple independent deep-dive passes so hidden concepts are less likely to be missed.
 
-The curriculum should move through three layers:
+The curriculum should move through two primary teaching layers plus one light contextual layer:
 
 1. Foundation topics the learner may need before the repo makes sense
 2. System-model topics that explain how the repo's main technical domain behaves
-3. Repo-specific orientation that connects those concepts back to concrete files, subsystems, and contribution paths
+3. Repo context that briefly explains why those concepts matter here and where they appear, without becoming the main teaching target
 
 Every curriculum path must stay within these pacing limits:
 
@@ -55,6 +55,8 @@ Capture strong signals such as:
 - domain math or algorithms
 - framework/runtime constraints
 
+Translate those signals into underlying technical concepts. Prefer "streaming RPC semantics" over "this repo's gRPC service layout," "timing and clock domains" over "this crate owns timestamps," and "NAT traversal and relay mechanics" over "this module configures TURN."
+
 If the repo lacks docs, infer from code and configuration, but label that inference later in the curriculum.
 
 ## Phase 2: Reconcile The Deep-Dive Passes
@@ -92,6 +94,7 @@ Use the depth levels from `topic-discovery.md`:
 
 Delete any topic that does not materially improve comprehension or contribution readiness.
 If a topic only survives on `weak-inference`, prefer surfacing it as an open question or deferable area instead of presenting it as a firm prerequisite.
+If a topic is mostly repo scaffolding, local naming, or project topology rather than a transferable technical concept, demote it to contextual notes instead of a standalone module.
 
 ## Phase 4: Sequence The Curriculum
 
@@ -102,7 +105,7 @@ Good ordering usually looks like:
 1. core domain model
 2. transport/runtime/storage fundamentals
 3. failure modes and constraints
-4. this repo's architecture and vocabulary
+4. repo-context notes that explain where those concepts appear here
 5. safe-first contribution guidance
 
 Group closely related topics into modules rather than writing one file per buzzword. A strong curriculum usually lands around 4-8 modules.
@@ -151,7 +154,7 @@ Each module should explain:
 Within each module, structure subsections so they all include:
 
 - a short reason this subsection matters here
-- the actual technical deep dive
+- the actual technical deep dive, focused on the underlying concept rather than project scaffolding
 - sample Q&A that challenges recall and reasoning
 - an explicit progress checklist using Markdown checkboxes
 - mastery criteria aligned with `references/mastery-rubric.md`
@@ -170,6 +173,7 @@ Check the finished curriculum against these questions:
 - Does `research-ledger.md` show at least 3 independent deep-dive passes and a real reconciliation step?
 - Is the sequence dependency-aware, or does it assume concepts before teaching them?
 - Does it separate background learning from repo-specific onboarding?
+- Is the curriculum still technically valuable if the repo's local filenames and subsystem names are removed?
 - Are must-know topics distinguished from deferable topics?
 - Is jargon defined before use or captured in `glossary.md`?
 - Would a new contributor know what they can safely read or change after finishing the curriculum?
@@ -190,3 +194,4 @@ Check the finished curriculum against these questions:
 - Creating oversized mega-modules instead of splitting the learning path
 - Treating progress tracking or Q&A as optional polish instead of part of the contract
 - Stopping after the first plausible pass instead of pushing for comprehensive coverage
+- Teaching the repo's scaffolding as if it were the prerequisite concept itself

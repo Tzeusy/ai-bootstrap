@@ -9,8 +9,34 @@ Keep a topic only if at least one statement is true:
 - Without this topic, a reader will misread the repository's core architecture
 - Without this topic, a contributor cannot safely reason about important changes
 - Without this topic, the project's vocabulary, invariants, or failure modes stay opaque
+- The topic names a real technical concept, model, protocol, or systems principle rather than just a local project surface
 
 If a topic is merely adjacent, interesting, or future-facing, move it to "nice to know later" or omit it.
+
+## Concept-First Filter
+
+Prefer modules that would still teach something meaningful outside the target repository.
+
+Keep as a main curriculum topic:
+
+- transport semantics
+- concurrency or scheduling models
+- timing and clock domains
+- serialization and compatibility rules
+- security and trust-boundary concepts
+- media, graphics, storage, or protocol fundamentals
+
+Demote to brief repo-context notes instead of standalone modules:
+
+- directory layout
+- crate or package names
+- entrypoint binaries
+- local file naming conventions
+- project scaffolding or setup surfaces
+
+Exception:
+
+Keep a repo-specific topic only when it is the only practical way to explain a prerequisite concept or a safety-critical invariant.
 
 ## Signal Families
 
@@ -53,6 +79,10 @@ After all passes complete, ask one more reconciliation question:
 
 5. Which concept clusters appeared repeatedly across passes, and which only surfaced in one angle of analysis?
 
+Then apply one final filter:
+
+6. Which items are genuine technical concepts to teach, and which are only repo-local context that should stay secondary?
+
 ## Illustrative Examples
 
 These examples are intentionally non-normative. They show how to apply the signal families without turning them into a fixed menu.
@@ -83,7 +113,7 @@ Keep the curriculum explicit about which class a topic belongs to:
 - `system-model`
   Domain models that explain how the project category behaves, such as WebRTC session setup or event-stream processing.
 - `repo-orientation`
-  Concepts unique to this codebase, such as subsystem names, internal jargon, or contribution boundaries.
+  Concepts unique to this codebase, such as subsystem names, internal jargon, or contribution boundaries. This class is contextual glue, not the default center of a module.
 
 The curriculum should usually move through those classes in that order.
 
@@ -116,6 +146,8 @@ Convergence across passes should influence confidence. A topic that appears inde
 ## Scope Control
 
 When a repo suggests a very broad domain, tighten the curriculum to what the codebase actually needs.
+
+When a repo suggests a lot of scaffolding or topology detail, tighten even harder: use those details only to justify why a technical concept belongs in the curriculum, not as the curriculum's main payload.
 
 Examples:
 

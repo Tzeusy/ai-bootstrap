@@ -2,8 +2,8 @@
 name: training-curriculum
 description: >
   Use when you need to inspect a target repository and generate a repo-grounded prerequisite
-  curriculum in `curriculum/` that teaches what someone must know before the codebase will make
-  sense or be safe to change.
+  curriculum in `curriculum/` that teaches the fundamental technical concepts someone must know
+  before the codebase will make sense or be safe to change.
 metadata:
   owner: tze
   authors:
@@ -15,9 +15,9 @@ metadata:
 
 # Training Curriculum
 
-This skill answers a specific onboarding question: "What do I need to know before this repository will make sense?"
+This skill answers a specific onboarding question: "What fundamental technical concepts do I need to know before this repository will make sense?"
 
-The output is not a generic technology explainer and not a normal repo walkthrough. It is a repo-grounded prerequisite curriculum that bridges foundational concepts to the project's actual architecture, vocabulary, and contribution surface.
+The output is not a generic technology explainer and not a normal repo walkthrough. It is a concept-first prerequisite curriculum: the repository is used to decide which technical fundamentals matter, but the curriculum should mainly teach transferable concepts such as transport, concurrency, serialization, timing, media, storage, and security.
 
 Assume read access to the target repository and permission to create or update a `curriculum/` directory there before using this skill.
 
@@ -26,7 +26,7 @@ Assume read access to the target repository and permission to create or update a
 - A user asks what they need to learn before they can understand or contribute to a repository
 - A codebase depends on unfamiliar protocols, runtimes, infrastructure, math, media, security, or systems concepts
 - You need an ordered learning path that starts before repo-specific onboarding docs
-- A project needs a `curriculum/` directory that teaches prerequisite concepts with direct links back to repository evidence
+- A project needs a `curriculum/` directory that teaches prerequisite technical concepts with direct links back to repository evidence
 - A repository already has a curriculum and it needs to be refreshed, split, or validated against the current codebase
 
 ## Do Not Use This Skill When
@@ -35,23 +35,27 @@ Assume read access to the target repository and permission to create or update a
 - The task is to write capability specs, RFCs, or implementation plans rather than educational material
 - The user needs quick bug triage, code review, or feature delivery instead of a learning path
 - The user wants generic topic tutoring detached from any target repository
+- The primary need is project onboarding, setup, scaffolding, or directory-orientation guidance rather than technical fundamentals
 
 ## Core Rules
 
 - Derive every prerequisite topic from repository evidence, not vibes.
 - Favor comprehensiveness during prerequisite discovery. It is better to reconcile and trim a broad candidate set after repeated analysis than to miss a critical enabling concept.
+- Teach fundamental technical concepts first. "Learn WebRTC" or "learn TCP vs UDP" is the center of gravity; the repo only explains why those concepts matter here.
 - Separate prerequisite knowledge from repo-specific orientation. "Learn WebRTC" and "understand this project's signaling layer" are different layers.
 - Prefer the minimum complete curriculum that unlocks real comprehension. Do not pad it into a textbook.
 - Mark uncertainty explicitly when a topic is inferred from weak evidence or missing docs.
 - Record evidence confidence for every inferred topic. Fail closed with open questions when the repo does not justify a confident prerequisite claim.
 - Perform a hard minimum of 3 deep-dive prerequisite-discovery passes using independent subagents with isolated context. Do not treat a single sweep as comprehensive research.
 - Do not build the prerequisite map until all 3 isolated discovery passes have completed.
+- Repo orientation belongs only in "why this matters here" and "where it appears in the repo" sections unless the user explicitly asks for more onboarding detail.
 - Distinguish `must know before reading code`, `must know before making safe changes`, and `nice to know later`.
 - Start every curriculum with an overview that names the major sections, estimated study time, and why each section matters before reading or changing code.
 - Every technical subsection must end with challenge-style sample Q&A plus explicit Markdown progress checkboxes that the learner can update over time.
 - Progress checkboxes should reflect mastery, not just reading completion. Use explicit criteria for recall, explanation, and repo-grounded reasoning.
 - Cap any single curriculum path at 100 hours of estimated smart-human study time and any single module at 10 hours. Split anything larger into separate curriculum paths.
 - Treat existing project docs as evidence inputs, not output targets to duplicate. The curriculum should complement architecture and onboarding docs, not fork them.
+- Do not create standalone modules whose main content is project scaffolding, directory layout, build commands, or local naming unless that context is strictly necessary to motivate a technical concept.
 
 ## Operational Boundaries
 

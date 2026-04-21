@@ -22,15 +22,16 @@ from pathlib import Path
 BASE_FILES = {
     "README.md": (
         "# Curriculum\n\n"
-        "Use this directory as the hub for one or more prerequisite curricula for this repository.\n\n"
+        "Use this directory as the hub for one or more prerequisite curricula for this repository.\n"
+        "Teach fundamental technical concepts first; use repo context only to explain why those concepts matter here.\n\n"
         "## Overview\n\n"
         "| Path or Section | Why You Need It | Estimated Hours | Progress |\n"
         "|---|---|---:|---|\n"
-        "| Replace with real paths | Explain why each path exists before code reading or safe contribution. | 0 | [ ] |\n"
+        "| Replace with real paths | Explain which technical concepts this path teaches and why they matter here. | 0 | [ ] |\n"
     ),
     "repository-thesis.md": (
         "# Repository Thesis\n\n"
-        "Explain what this repository does, why the curriculum exists, and which prerequisite "
+        "Explain what this repository does, why the curriculum exists, and which technical concept "
         "domains block comprehension without preparation.\n"
     ),
     "evidence-map.md": (
@@ -126,11 +127,12 @@ def build_module_template(module_title: str) -> str:
         "- Goal 2\n\n"
         "## Subsection: Replace Me\n\n"
         "### Why This Matters Here\n\n"
-        "Connect this concept directly to the repository.\n\n"
+        "Connect this concept directly to the repository without turning the subsection into a repo tour.\n\n"
         "### Technical Deep Dive\n\n"
-        "Teach the concept in enough depth for the learner to reason about this codebase.\n\n"
+        "Teach the underlying technical concept in enough depth that it would still be meaningful outside this repository.\n\n"
         "### Where It Appears In The Repo\n\n"
-        "- path/to/file\n\n"
+        "- path/to/file\n"
+        "- Keep this section concise and justify relevance rather than teaching scaffolding\n\n"
         "### Sample Q&A\n\n"
         "- Q: Replace with a challenge question.\n"
         "  A: Replace with the expected answer.\n\n"
