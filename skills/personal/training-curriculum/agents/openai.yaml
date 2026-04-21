@@ -1,0 +1,4 @@
+interface:
+  display_name: "Training Curriculum"
+  short_description: "Build prerequisite curricula from repos"
+  default_prompt: "Use $training-curriculum to inspect this repository, generate or refresh its curriculum/ prerequisite learning paths, and validate the result before finishing."
