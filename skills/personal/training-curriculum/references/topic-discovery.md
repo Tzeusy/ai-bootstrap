@@ -30,7 +30,9 @@ Use the families below as heuristics, not as an exhaustive catalog.
 
 ## Discovery Procedure
 
-When mapping a repo to prerequisite topics, inspect these evidence surfaces first:
+Do prerequisite discovery across several independent deep-dive passes, not one monolithic sweep. Use the mandatory protocol in `deep-dive-passes.md`, then use this file to structure what each pass notices.
+
+Within a given pass, inspect these evidence surfaces:
 
 - dependency manifests and lockfiles
 - config files and environment variable names
@@ -46,6 +48,10 @@ Then ask:
 2. What kinds of failure modes does the code seem designed around?
 3. Which concepts would make the architecture, logs, and tests understandable to a new contributor?
 4. Which of those concepts require only vocabulary, and which require working or contribution-ready understanding?
+
+After all passes complete, ask one more reconciliation question:
+
+5. Which concept clusters appeared repeatedly across passes, and which only surfaced in one angle of analysis?
 
 ## Illustrative Examples
 
@@ -104,6 +110,8 @@ Use these labels consistently in the evidence map:
   Multiple independent signals point to the prerequisite even if the repo does not state it outright.
 - `weak-inference`
   The prerequisite is plausible but under-supported. Treat it as a question, caveat, or deferable topic instead of a firm requirement.
+
+Convergence across passes should influence confidence. A topic that appears independently in multiple passes usually deserves higher confidence than one that appeared only once.
 
 ## Scope Control
 

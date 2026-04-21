@@ -21,6 +21,7 @@ ROOT_REQUIRED = {
     "README.md",
     "repository-thesis.md",
     "evidence-map.md",
+    "research-ledger.md",
     "glossary.md",
     "mastery-rubric.md",
     "contribution-readiness.md",
@@ -52,6 +53,13 @@ MODULE_MARKERS = [
     "### Progress",
     "### Mastery Check",
     "## Module Mastery Gate",
+]
+
+RESEARCH_LEDGER_MARKERS = [
+    "## Pass 1",
+    "## Pass 2",
+    "## Pass 3",
+    "## Reconciliation",
 ]
 
 
@@ -95,6 +103,17 @@ def parse_hours(pattern: re.Pattern[str], text: str) -> float | None:
     if not match:
         return None
     return float(match.group(1))
+
+
+def validate_research_ledger(curriculum_dir: Path, errors: list[str]) -> None:
+    ledger = curriculum_dir / "research-ledger.md"
+    if not ledger.exists():
+        errors.append("Missing required file: research-ledger.md")
+        return
+    text = read_text(ledger, errors)
+    for marker in RESEARCH_LEDGER_MARKERS:
+        if marker not in text:
+            errors.append(f"{ledger} is missing required marker: {marker}")
 
 
 def validate_path_dir(path_dir: Path, errors: list[str]) -> None:
@@ -148,6 +167,7 @@ def validate_module(module_file: Path, errors: list[str]) -> None:
 def validate_curriculum(curriculum_dir: Path) -> list[str]:
     errors: list[str] = []
     require_files(curriculum_dir, errors)
+    validate_research_ledger(curriculum_dir, errors)
 
     paths_dir = curriculum_dir / "paths"
     if not paths_dir.is_dir():

@@ -39,10 +39,13 @@ Assume read access to the target repository and permission to create or update a
 ## Core Rules
 
 - Derive every prerequisite topic from repository evidence, not vibes.
+- Favor comprehensiveness during prerequisite discovery. It is better to reconcile and trim a broad candidate set after repeated analysis than to miss a critical enabling concept.
 - Separate prerequisite knowledge from repo-specific orientation. "Learn WebRTC" and "understand this project's signaling layer" are different layers.
 - Prefer the minimum complete curriculum that unlocks real comprehension. Do not pad it into a textbook.
 - Mark uncertainty explicitly when a topic is inferred from weak evidence or missing docs.
 - Record evidence confidence for every inferred topic. Fail closed with open questions when the repo does not justify a confident prerequisite claim.
+- Perform a hard minimum of 3 deep-dive prerequisite-discovery passes using independent subagents with isolated context. Do not treat a single sweep as comprehensive research.
+- Do not build the prerequisite map until all 3 isolated discovery passes have completed.
 - Distinguish `must know before reading code`, `must know before making safe changes`, and `nice to know later`.
 - Start every curriculum with an overview that names the major sections, estimated study time, and why each section matters before reading or changing code.
 - Every technical subsection must end with challenge-style sample Q&A plus explicit Markdown progress checkboxes that the learner can update over time.
@@ -54,12 +57,14 @@ Assume read access to the target repository and permission to create or update a
 
 - If the repository itself lacks intelligible shape docs, use `project-shape` or `project-review` separately; do not silently turn this skill into a repo-architecture authoring workflow.
 - If `curriculum/` already exists, update it in place and validate the result instead of generating a competing second structure.
+- If independent subagents are unavailable, do not claim the curriculum is comprehensive. Stop and report that the hard 3-pass requirement could not be satisfied.
+- If fewer than 3 isolated discovery passes complete, or any pass reused another pass's notes or conclusions before completion, discard the run and fail closed.
 - Use `scripts/scaffold_curriculum.py` to create structure and `scripts/validate_curriculum.py` before finalizing a generated or updated curriculum.
 
 ## Workflow Summary
 
-1. Inspect the target repo's README, manifests, top-level layout, tests, CI, docs, deployment, and architecture artifacts before deciding what must be learned.
-2. Build an evidence-backed prerequisite map: topic, why it matters here, what file or pattern proves it, what confidence it deserves, and what depth is required.
+1. Run the hard-minimum 3-pass research protocol in `references/deep-dive-passes.md` using independent subagents with isolated context.
+2. Reconcile the pass outputs into an evidence-backed prerequisite map: topic, why it matters here, what file or pattern proves it, what confidence it deserves, and what depth is required.
 3. Sequence the prerequisite topics into a shortest-path curriculum that moves from fundamentals to this repo's own abstractions while respecting the 100-hour total and 10-hour module caps.
 4. Generate or update the curriculum in the target repo's `curriculum/` path using the contract in `references/curriculum-contract.md`.
 5. Run `scripts/validate_curriculum.py` and fix contract drift before considering the curriculum done.
@@ -69,6 +74,7 @@ Assume read access to the target repository and permission to create or update a
 | File | Read when | Content |
 |------|-----------|---------|
 | `references/workflow.md` | Every real use of this skill | Repo analysis flow, prerequisite extraction, sequencing rules, and final quality checks |
+| `references/deep-dive-passes.md` | Before selecting curriculum topics | Hard-minimum 3-pass subagent research protocol and reconciliation rules for comprehensive discovery |
 | `references/topic-discovery.md` | You are mapping repo evidence to prerequisite topics | Heuristics for identifying hidden prerequisite domains and calibrating required depth |
 | `references/curriculum-contract.md` | Before writing into `curriculum/` | Required output tree, file purposes, and per-module content contract |
 | `references/mastery-rubric.md` | You are defining completion criteria or progress checkboxes | Shared mastery levels and how to convert them into updateable curriculum criteria |
@@ -88,6 +94,7 @@ Assume read access to the target repository and permission to create or update a
 
 ### references/
 - `workflow.md` — End-to-end process for repo inspection, prerequisite extraction, sequencing, writing, and review.
+- `deep-dive-passes.md` — Mandatory 3-pass independent-subagent protocol for comprehensive prerequisite discovery and reconciliation.
 - `topic-discovery.md` — Topic-finding heuristics, depth calibration, and evidence rules for deciding what belongs in the curriculum.
 - `curriculum-contract.md` — Required `curriculum/` layout and the content contract for each generated file.
 - `mastery-rubric.md` — Shared rubric for when a learner can legitimately mark a section or module complete.

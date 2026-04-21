@@ -6,6 +6,8 @@ Use this flow every time you build a repo-specific prerequisite curriculum.
 
 Produce a `curriculum/` directory that teaches the minimum technical background someone needs before the repository's own code and docs become legible.
 
+The research standard is comprehensive rather than merely plausible: prerequisite discovery must use multiple independent deep-dive passes so hidden concepts are less likely to be missed.
+
 The curriculum should move through three layers:
 
 1. Foundation topics the learner may need before the repo makes sense
@@ -21,6 +23,15 @@ Every curriculum path must stay within these pacing limits:
 ## Phase 1: Survey The Repository
 
 Start with evidence gathering, not curriculum writing.
+
+Before choosing topics, run the hard-minimum 3-pass protocol from `deep-dive-passes.md`.
+
+This is a gate, not a suggestion:
+
+- use 3 fresh independent subagents
+- keep the passes isolated until they all complete
+- do not share notes, conclusions, or evolving prerequisite lists across passes
+- do not synthesize the curriculum from partial, single-pass, or non-isolated discovery
 
 Inspect at least:
 
@@ -46,7 +57,23 @@ Capture strong signals such as:
 
 If the repo lacks docs, infer from code and configuration, but label that inference later in the curriculum.
 
-## Phase 2: Build The Prerequisite Map
+## Phase 2: Reconcile The Deep-Dive Passes
+
+Do not move directly from one pass to writing topics. Reconcile the independent pass outputs first.
+
+For reconciliation, record:
+
+- concepts that appeared in all 3 passes
+- concepts that appeared in 2 passes
+- concepts that appeared in only 1 pass
+- concepts that surfaced only late in the process
+- disagreements or ambiguities that should remain open questions
+
+If major concept clusters appear late or the passes disagree materially about the prerequisite surface, run more passes before finalizing the map.
+
+Write the reconciliation summary into `curriculum/research-ledger.md`.
+
+## Phase 3: Build The Prerequisite Map
 
 For each candidate topic, record:
 
@@ -66,7 +93,7 @@ Use the depth levels from `topic-discovery.md`:
 Delete any topic that does not materially improve comprehension or contribution readiness.
 If a topic only survives on `weak-inference`, prefer surfacing it as an open question or deferable area instead of presenting it as a firm prerequisite.
 
-## Phase 3: Sequence The Curriculum
+## Phase 4: Sequence The Curriculum
 
 Create the shortest learning path that respects dependency order.
 
@@ -93,7 +120,7 @@ Use splitting to preserve coherence, not to game the limits. Good split points i
 - runtime/concurrency foundations vs deployment/operations depth
 - generic domain fundamentals vs repo-specific advanced architecture
 
-## Phase 4: Write The Curriculum
+## Phase 5: Write The Curriculum
 
 Before writing, scaffold the output tree if needed:
 
@@ -135,11 +162,12 @@ After writing or updating the curriculum, validate it:
 uv run <skill-path>/scripts/validate_curriculum.py --target /path/to/repo
 ```
 
-## Phase 5: Final Review
+## Phase 6: Final Review
 
 Check the finished curriculum against these questions:
 
 - Does every module trace back to repo evidence?
+- Does `research-ledger.md` show at least 3 independent deep-dive passes and a real reconciliation step?
 - Is the sequence dependency-aware, or does it assume concepts before teaching them?
 - Does it separate background learning from repo-specific onboarding?
 - Are must-know topics distinguished from deferable topics?
@@ -161,3 +189,4 @@ Check the finished curriculum against these questions:
 - Hiding inference behind overconfident prose
 - Creating oversized mega-modules instead of splitting the learning path
 - Treating progress tracking or Q&A as optional polish instead of part of the contract
+- Stopping after the first plausible pass instead of pushing for comprehensive coverage

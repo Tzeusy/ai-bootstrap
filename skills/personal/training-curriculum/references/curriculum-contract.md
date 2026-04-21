@@ -11,6 +11,7 @@ curriculum/
   README.md
   repository-thesis.md
   evidence-map.md
+  research-ledger.md
   glossary.md
   mastery-rubric.md
   contribution-readiness.md
@@ -77,6 +78,19 @@ Recommended columns:
 - why it matters here
 - repo evidence
 - when it becomes necessary
+
+### `curriculum/research-ledger.md`
+
+The audit trail for comprehensive prerequisite discovery.
+
+Include:
+
+- a short summary of pass 1, pass 2, and pass 3
+- the angle each pass used
+- the major concept clusters each pass surfaced
+- concepts that appeared across multiple passes
+- concepts that surfaced late and changed the curriculum
+- whether additional passes were needed beyond the hard minimum of 3
 
 ### `curriculum/glossary.md`
 
@@ -216,4 +230,5 @@ The completed `curriculum/` should:
 - include explicit progress checkboxes throughout
 - include a learner-facing mastery rubric plus concrete mastery checks at subsection and module level
 - label weak evidence and unresolved questions instead of inventing certainty
+- show that prerequisite discovery used at least 3 independent deep-dive passes and a reconciliation artifact
 - respect the 10-hour module cap and 100-hour path cap

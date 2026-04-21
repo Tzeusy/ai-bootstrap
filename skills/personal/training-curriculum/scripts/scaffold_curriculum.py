@@ -38,6 +38,26 @@ BASE_FILES = {
         "| Topic | Class | Depth | Confidence | Why It Matters Here | Repo Evidence | When Needed |\n"
         "|---|---|---|---|---|---|---|\n"
     ),
+    "research-ledger.md": (
+        "# Research Ledger\n\n"
+        "Document the hard-minimum 3 independent deep-dive passes used to discover prerequisite concepts.\n\n"
+        "## Pass 1\n\n"
+        "- Angle:\n"
+        "- Major concept clusters surfaced:\n"
+        "- Evidence notes:\n\n"
+        "## Pass 2\n\n"
+        "- Angle:\n"
+        "- Major concept clusters surfaced:\n"
+        "- Evidence notes:\n\n"
+        "## Pass 3\n\n"
+        "- Angle:\n"
+        "- Major concept clusters surfaced:\n"
+        "- Evidence notes:\n\n"
+        "## Reconciliation\n\n"
+        "- Concepts that appeared across multiple passes:\n"
+        "- Concepts that surfaced late and changed the curriculum:\n"
+        "- Additional passes run beyond the minimum:\n"
+    ),
     "glossary.md": "# Glossary\n\nDefine the essential vocabulary and acronyms.\n",
     "mastery-rubric.md": (
         "# Mastery Rubric\n\n"
