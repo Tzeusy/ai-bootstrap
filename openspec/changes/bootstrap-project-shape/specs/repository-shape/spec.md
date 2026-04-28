@@ -125,15 +125,48 @@ Scope: v1-mandatory
 
 ### Requirement: Pillar Presence
 
-The repository MUST maintain doctrine, topology, design-contract, and specification documents covering repository shape.
+The repository MUST maintain doctrine, design-contract, engineering-standard,
+topology, and specification documents covering repository shape.
 
-Source: Doctrine rule 7; RFC 0001 §Documentation Contract
+Source: Doctrine rule 7; RFC 0001 §Documentation Contract;
+about/craft-and-care/README.md
 Scope: v1-mandatory
 
 #### Scenario: Pillar inventory
 
 - **WHEN** the repository is inspected for shape coverage
-- **THEN** each of the four pillars has an authored home with project-specific content
+- **THEN** each of the five pillars has an authored home with project-specific
+  content
+
+#### Scenario: Execution standards live in the standards pillar
+
+- **WHEN** the repository defines how changes must be implemented, verified,
+  reviewed, and documented
+- **THEN** those expectations live under `about/craft-and-care/` instead of
+  being left only in doctrine, RFC prose, or reviewer folklore
+
+### Requirement: Project-Local Pillar Skills
+
+When tool-specific skill-entrypoint directories exist for this repository, they
+MUST provide all five pillar skills as navigation surfaces that route back to
+the canonical docs rather than becoming a second authored source of truth.
+
+Source: RFC 0001 §Distribution Model, §Documentation Contract;
+about/craft-and-care/interfaces-and-dependencies.md
+Scope: v1-mandatory
+
+#### Scenario: Five pillar entrypoints
+
+- **WHEN** `.claude/skills`, `.codex/skills`, or `.gemini/skills` are installed
+  for this repository
+- **THEN** each installed surface exposes `heart-and-soul`,
+  `legends-and-lore`, `spec-and-spine`, `lay-and-land`, and `craft-and-care`
+
+#### Scenario: Skill routes to canonical docs
+
+- **WHEN** a project-local pillar skill is loaded
+- **THEN** it routes the agent to `about/` or `openspec/` content rather than
+  acting as a second authored documentation layer
 
 ### Requirement: Traceable Navigation
 

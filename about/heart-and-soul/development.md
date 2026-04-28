@@ -5,10 +5,9 @@
 1. Prefer editing canonical shared content before touching downstream tool-specific copies.
 2. Introduce tool-specific files only when the target platform's syntax or execution model requires it.
 3. Preserve provenance. If a non-`personal/` skill came from upstream, update from upstream or fork intentionally instead of silently treating the vendored copy as wholly local authorship.
-4. Keep regeneration scripts with the artifacts they justify; do not hand-edit vendored outputs without updating their regeneration path.
-5. Treat repository docs as part of the product. If a structural rule changes, doctrine, RFCs, and specs must move with it.
-6. Preserve local-only boundaries. New runtime files belong in ignored paths unless they are deliberately portable, non-secret defaults.
-7. Keep the Beads operating model explicit when touching project workflow docs. If the main execution path changes, doctrine and topology must change with it.
+4. Preserve local-only boundaries. New runtime files belong in ignored paths unless they are deliberately portable, non-secret defaults.
+5. Keep regeneration scripts with the artifacts they justify; do not hand-edit vendored outputs without updating their regeneration path.
+6. Keep the Beads operating model explicit when touching project workflow docs. If the main execution path changes, doctrine and topology must change with it.
 
 ## Review Questions
 
@@ -17,6 +16,9 @@
 - If it is generated, where is the checked-in regeneration path?
 - Does this change introduce local state that should be ignored?
 - Will a new contributor know where to find the authoritative version after this change?
+
+For the execution-quality bar that governs how a change is implemented, verified,
+reviewed, and documented, use [`../craft-and-care/`](../craft-and-care/README.md).
 
 ## Anti-Patterns
 

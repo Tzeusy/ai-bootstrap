@@ -45,7 +45,7 @@ case_fresh_scaffold_not_mature() {
   bash "$INIT_SCRIPT" "$repo" --tools=claude >/dev/null
   out="$(bash "$SCAN_SCRIPT" "$repo")"
   assert_contains "$out" "Assessment: SHAPED — Full structure present, but authored content is still incomplete" "fresh scaffold should not be mature"
-  assert_contains "$out" "Pillars needing authoring: 4/4" "fresh scaffold should report scaffolded pillars"
+  assert_contains "$out" "Pillars needing authoring: 5/5" "fresh scaffold should report scaffolded pillars"
   assert_not_contains "$out" "Assessment: MATURE" "fresh scaffold must never report mature"
 }
 
@@ -79,7 +79,7 @@ case_authored_repo_can_be_mature() {
 
   out="$(bash "$SCAN_SCRIPT" "$repo")"
   assert_contains "$out" "Assessment: MATURE — Full shape with agent navigation" "authored repo should be mature"
-  assert_contains "$out" "Pillars needing authoring: 0/4" "authored repo should not report scaffolded pillars"
+  assert_contains "$out" "Pillars needing authoring: 0/5" "authored repo should not report scaffolded pillars"
 }
 
 case_legacy_layout_detected() {

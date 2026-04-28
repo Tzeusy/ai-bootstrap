@@ -2,9 +2,12 @@
 
 ## Approach
 
-Bootstrap the four-pillar shape with repository-level documents only:
+Bootstrap the five-pillar shape with repository-level documents plus
+project-local pillar-skill routing:
 
 - doctrine for identity, boundaries, and contribution rules;
+- engineering standards for verification, review, interface hygiene, and
+  local-only state discipline;
 - one repository RFC for layer boundaries and distribution flow;
 - topology maps for major components and data movement; and
 - one OpenSpec domain covering repository-shape invariants.
@@ -12,8 +15,11 @@ Bootstrap the four-pillar shape with repository-level documents only:
 ## Traceability
 
 - Doctrine rules D1-D7 are defined in `about/heart-and-soul/vision.md`.
+- `about/craft-and-care/` defines the repository's execution-quality bar for
+  shape changes.
 - RFC 0001 translates those rules into a concrete repository contract.
-- The repository-shape spec converts the contract into testable requirements and scenarios.
+- The repository-shape spec converts the contract into testable requirements and
+  scenarios.
 
 ## Risks
 

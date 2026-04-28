@@ -10,6 +10,7 @@ The current operating model is **skills-first**, not `agents/`-first. Shared wor
 - Tool-native configs under `.claude/`, `.codex/`, and `.gemini/`.
 - Beads-backed work management with explicit workflows instead of ad hoc TODOs.
 - Isolated implementation via worktrees and PR-review follow-up via dedicated review workers.
+- Five-pillar repository self-knowledge under `about/` plus `openspec/` so both humans and agents can navigate the source of truth.
 
 ## Structure
 
@@ -21,6 +22,8 @@ opencode/          # OpenCode config
 skills/            # Canonical shared skill library
 skills/personal/   # Primary home of Beads and project workflow skills
 agents/            # Older agent prompts kept for reference / selective reuse
+about/             # Five-pillar project-shape docs for doctrine, contracts, topology, and standards
+openspec/          # Normative repository-shape requirements and change records
 scripts/           # Helper scripts used by the ai-bootstrap setup
 ```
 
@@ -78,6 +81,7 @@ This is the preferred model for sustained throughput. The coordinator coordinate
 Related personal workflow skills include:
 
 - `th-projects` — superskill routing to `project-shape` (doctrine/spec/topology setup), `project-review` (repo audits), and `project-direction` (spec-driven prioritization)
+- `craft-and-care` for the repository's execution-quality bar once the local pillar skill is installed
 - `reconcile-spec-to-project` for spec/code reconciliation
 
 ## Quick Start

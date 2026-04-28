@@ -6,6 +6,7 @@
 #   about/heart-and-soul/  (doctrine)
 #   about/legends-and-lore/    (design contracts / RFCs)
 #   about/lay-and-land/    (topology / maps)
+#   about/craft-and-care/  (engineering standards / execution quality)
 #   openspec/             (capability specs — product, stays at root)
 #
 # Also detects legacy layouts (heart-and-soul/ at root, docs/rfcs/, maps/, etc.)
@@ -293,14 +294,31 @@ resolve_topology_dir() {
   fi
 }
 
+resolve_standards_dir() {
+  if [ -d "$ROOT/about/craft-and-care" ]; then
+    echo "$ROOT/about/craft-and-care"
+  elif [ -d "$ROOT/docs/engineering" ]; then
+    echo "$ROOT/docs/engineering"
+  elif [ -d "$ROOT/docs/standards" ]; then
+    echo "$ROOT/docs/standards"
+  elif [ -d "$ROOT/engineering" ]; then
+    echo "$ROOT/engineering"
+  elif [ -d "$ROOT/standards" ]; then
+    echo "$ROOT/standards"
+  else
+    echo ""
+  fi
+}
+
 emit_traceability_summary() {
-  local doctrine_rules="$1" rfc_docs="$2" rfc_doctrine_refs="$3" spec_docs="$4" spec_source_refs="$5" spec_scenarios="$6" topology_docs="$7" topology_cross_refs="$8"
+  local doctrine_rules="$1" rfc_docs="$2" rfc_doctrine_refs="$3" spec_docs="$4" spec_source_refs="$5" spec_scenarios="$6" topology_docs="$7" topology_cross_refs="$8" standards_docs="$9" standards_cross_refs="${10}"
   echo "## Traceability"
   echo "  Doctrine rules detected: $doctrine_rules"
   echo "  Design contracts referencing doctrine: $rfc_doctrine_refs/$rfc_docs"
   echo "  Specs with source references: $spec_source_refs/$spec_docs"
   echo "  Specs with scenarios: $spec_scenarios/$spec_docs"
   echo "  Topology docs cross-linking other pillars: $topology_cross_refs/$topology_docs"
+  echo "  Standards docs cross-linking other pillars: $standards_cross_refs/$standards_docs"
 }
 
 # --- Pillar 1: Doctrine ---
@@ -459,6 +477,39 @@ else
 fi
 echo ""
 
+# --- Pillar 5: Engineering Standards ---
+echo "## Pillar 5: Engineering Standards (WHO WE ARE WHEN WE BUILD)"
+CRAFT_DIR=$(resolve_standards_dir)
+if [ -n "$CRAFT_DIR" ]; then
+  label="${CRAFT_DIR#$ROOT/}"
+  total_md=$(find "$CRAFT_DIR" -name '*.md' -type f 2>/dev/null | wc -l)
+  authored_md=$(count_authored_markdown_files "$CRAFT_DIR")
+  craft_state=$(classify_content_state "$authored_md" "$total_md")
+  check_dir "$label/" "$CRAFT_DIR"
+  emit_content_state "Engineering Standards" "$craft_state"
+  [ "$CRAFT_DIR" = "$ROOT/docs/engineering" ] && echo "    [LEGACY] Consider moving to about/craft-and-care/"
+  [ "$CRAFT_DIR" = "$ROOT/docs/standards" ] && echo "    [LEGACY] Consider moving to about/craft-and-care/"
+  [ "$CRAFT_DIR" = "$ROOT/engineering" ] && echo "    [LEGACY] Consider moving to about/craft-and-care/"
+  [ "$CRAFT_DIR" = "$ROOT/standards" ] && echo "    [LEGACY] Consider moving to about/craft-and-care/"
+  check_file "engineering-bar.md" "$CRAFT_DIR/engineering-bar.md" || true
+  check_file "testing-and-verification.md" "$CRAFT_DIR/testing-and-verification.md" || true
+  check_file "observability-and-operations.md" "$CRAFT_DIR/observability-and-operations.md" || true
+  check_file "interfaces-and-dependencies.md" "$CRAFT_DIR/interfaces-and-dependencies.md" || true
+  check_file "review-and-documentation.md" "$CRAFT_DIR/review-and-documentation.md" || true
+  check_file "security-and-secrets.md" "$CRAFT_DIR/security-and-secrets.md" || true
+  check_file "performance-discipline.md" "$CRAFT_DIR/performance-discipline.md" || true
+  check_file "README.md" "$CRAFT_DIR/README.md" || true
+  echo "  Local skill:"
+  check_skill "craft-and-care"
+else
+  echo "  [ABSENT] about/craft-and-care/"
+  for d in docs/engineering docs/standards engineering standards; do
+    [ -d "$ROOT/$d" ] && echo "  [HINT] Found $d/ — consider consolidating under about/craft-and-care/"
+  done
+  craft_state="absent"
+fi
+echo ""
+
 # --- Traceability ---
 doctrine_rules=0
 rfc_docs=0
@@ -468,6 +519,8 @@ spec_source_refs=0
 spec_scenarios=0
 topology_docs=0
 topology_cross_refs=0
+standards_docs=0
+standards_cross_refs=0
 
 if [ -n "${HAS_DIR:-}" ] && [ -f "$HAS_DIR/vision.md" ] && ! is_placeholder_file "$HAS_DIR/vision.md"; then
   doctrine_rules=$(count_numbered_list_items "$HAS_DIR/vision.md")
@@ -497,7 +550,12 @@ elif [ -f "$ROOT/ARCHITECTURE.md" ] && ! is_placeholder_file "$ROOT/ARCHITECTURE
   topology_cross_refs=$(count_paths_matching 'RFC|heart-and-soul|legends-and-lore|openspec|doctrine|spec' "$ROOT/ARCHITECTURE.md")
 fi
 
-emit_traceability_summary "$doctrine_rules" "$rfc_docs" "$rfc_doctrine_refs" "$spec_docs" "$spec_source_refs" "$spec_scenarios" "$topology_docs" "$topology_cross_refs"
+if [ -n "${CRAFT_DIR:-}" ] && [ -d "$CRAFT_DIR" ]; then
+  standards_docs=$(count_authored_markdown_files "$CRAFT_DIR")
+  standards_cross_refs=$(count_files_matching "$CRAFT_DIR" '*.md' 'heart-and-soul|legends-and-lore|openspec|spec-and-spine|lay-and-land|RFC|topology|doctrine|spec')
+fi
+
+emit_traceability_summary "$doctrine_rules" "$rfc_docs" "$rfc_doctrine_refs" "$spec_docs" "$spec_source_refs" "$spec_scenarios" "$topology_docs" "$topology_cross_refs" "$standards_docs" "$standards_cross_refs"
 echo ""
 
 # --- Summary ---
@@ -507,12 +565,13 @@ pillars=0
 [ -n "$(resolve_design_contract_dir)" ] && pillars=$((pillars + 1))
 [ -d "$ROOT/openspec" ] && pillars=$((pillars + 1))
 [ -n "$(resolve_topology_dir)" ] && pillars=$((pillars + 1))
-[ -f "$ROOT/ARCHITECTURE.md" ] && [ "$pillars" -lt 4 ] && topology_present_by_file=1 || topology_present_by_file=0
+[ -n "$(resolve_standards_dir)" ] && pillars=$((pillars + 1))
+[ -f "$ROOT/ARCHITECTURE.md" ] && [ "$pillars" -lt 5 ] && topology_present_by_file=1 || topology_present_by_file=0
 [ "$topology_present_by_file" -eq 1 ] && pillars=$((pillars + 1))
 
 skills=0
 template_skills=0
-for name in heart-and-soul legends-and-lore spec-and-spine lay-and-land; do
+for name in heart-and-soul legends-and-lore spec-and-spine lay-and-land craft-and-care; do
   for tool_dir in .claude .codex .gemini .opencode; do
     if [ -f "$ROOT/$tool_dir/skills/$name/SKILL.md" ]; then
       skills=$((skills + 1))
@@ -523,30 +582,30 @@ for name in heart-and-soul legends-and-lore spec-and-spine lay-and-land; do
 done
 
 scaffolded_pillars=0
-for state in "${doctrine_state:-absent}" "${law_state:-absent}" "${spec_state:-absent}" "${topology_state:-absent}"; do
+for state in "${doctrine_state:-absent}" "${law_state:-absent}" "${spec_state:-absent}" "${topology_state:-absent}" "${craft_state:-absent}"; do
   case "$state" in
     scaffolded|mixed|empty) scaffolded_pillars=$((scaffolded_pillars + 1)) ;;
   esac
 done
 
-echo "  Pillars present: $pillars/4"
-echo "  Local skills installed: $skills/4"
-echo "  Pillars needing authoring: $scaffolded_pillars/4"
-echo "  Local skill templates still uncustomized: $template_skills/4"
+echo "  Pillars present: $pillars/5"
+echo "  Local skills installed: $skills/5"
+echo "  Pillars needing authoring: $scaffolded_pillars/5"
+echo "  Local skill templates still uncustomized: $template_skills/5"
 
 if [ "$pillars" -eq 0 ]; then
   echo "  Assessment: UNSHAPED — No knowledge architecture detected"
 elif [ "$pillars" -eq 1 ]; then
   echo "  Assessment: NASCENT — Beginning to take shape"
-elif [ "$pillars" -le 3 ]; then
-  echo "  Assessment: STRUCTURED — $(( 4 - pillars )) pillar(s) missing"
-elif [ "$pillars" -eq 4 ] && [ "$scaffolded_pillars" -gt 0 ]; then
+elif [ "$pillars" -le 4 ]; then
+  echo "  Assessment: STRUCTURED — $(( 5 - pillars )) pillar(s) missing"
+elif [ "$pillars" -eq 5 ] && [ "$scaffolded_pillars" -gt 0 ]; then
   echo "  Assessment: SHAPED — Full structure present, but authored content is still incomplete"
-elif [ "$pillars" -eq 4 ] && [ "$skills" -lt 4 ]; then
+elif [ "$pillars" -eq 5 ] && [ "$skills" -lt 5 ]; then
   echo "  Assessment: SHAPED — All pillars present, install remaining local skills"
-elif [ "$pillars" -eq 4 ] && [ "$template_skills" -gt 0 ]; then
+elif [ "$pillars" -eq 5 ] && [ "$template_skills" -gt 0 ]; then
   echo "  Assessment: SHAPED — Pillars are authored, but local skill templates still need customization"
-elif [ "$pillars" -eq 4 ] && {
+elif [ "$pillars" -eq 5 ] && {
   [ "$doctrine_rules" -eq 0 ] ||
   [ "$rfc_docs" -eq 0 ] ||
   [ "$rfc_doctrine_refs" -lt "$rfc_docs" ] ||
@@ -554,9 +613,11 @@ elif [ "$pillars" -eq 4 ] && {
   [ "$spec_source_refs" -lt "$spec_docs" ] ||
   [ "$spec_scenarios" -lt "$spec_docs" ] ||
   [ "$topology_docs" -eq 0 ] ||
-  [ "$topology_cross_refs" -eq 0 ];
+  [ "$topology_cross_refs" -eq 0 ] ||
+  [ "$standards_docs" -eq 0 ] ||
+  [ "$standards_cross_refs" -eq 0 ];
 }; then
   echo "  Assessment: SHAPED — Structure is complete, but traceability is not yet strong enough for mature status"
-elif [ "$pillars" -eq 4 ] && [ "$skills" -eq 4 ]; then
+elif [ "$pillars" -eq 5 ] && [ "$skills" -eq 5 ]; then
   echo "  Assessment: MATURE — Full shape with agent navigation"
 fi

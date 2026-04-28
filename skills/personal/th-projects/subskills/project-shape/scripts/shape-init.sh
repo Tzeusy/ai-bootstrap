@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # shape-init.sh — Scaffold project shape: pillar directories and local skills
-# Usage: shape-init.sh [project-root] [--pillars=1,2,3,4] [--skills-only] [--tools=claude,codex,gemini]
+# Usage: shape-init.sh [project-root] [--pillars=1,2,3,4,5] [--skills-only] [--tools=claude,codex,gemini]
 #
 # Canonical layout:
 #   about/heart-and-soul/  (doctrine)
 #   about/legends-and-lore/    (design contracts / RFCs)
 #   about/lay-and-land/    (topology / maps)
+#   about/craft-and-care/  (engineering standards / execution quality)
 #   openspec/             (capability specs — product, stays at root)
 #
 # Idempotent: skips anything that already exists.
@@ -14,7 +15,7 @@ set -euo pipefail
 ROOT="${1:-.}"
 mkdir -p "$ROOT"
 ROOT="$(cd "$ROOT" && pwd)"
-PILLARS="1,2,3,4"
+PILLARS="1,2,3,4,5"
 SKILLS_ONLY=false
 TOOLS="claude"
 
@@ -285,6 +286,53 @@ $SCAFFOLD_MARKER
 <!-- Deployment budgets, scaling, or availability constraints -->"
 }
 
+scaffold_craft_and_care() {
+  if [ "$SKILLS_ONLY" = true ]; then return; fi
+  echo ""
+  echo "## Pillar 5: about/craft-and-care/"
+  create_dir "$ROOT/about/craft-and-care"
+  create_file "$ROOT/about/craft-and-care/README.md" "# Craft and Care
+
+$SCAFFOLD_MARKER
+
+Engineering standards for how changes must be carried out well in this project.
+
+| File | Purpose |
+|------|---------|
+| \`engineering-bar.md\` | Definition of done, maintainability, clarity, cleanup rules |
+| \`testing-and-verification.md\` | Evidence standards and verification expectations |
+
+Add narrower standards docs only when the project's risk profile justifies them."
+
+  create_file "$ROOT/about/craft-and-care/engineering-bar.md" "# Engineering Bar
+
+$SCAFFOLD_MARKER
+
+## Definition of Done
+
+- 
+
+## Default Biases
+
+1.
+2.
+3."
+
+  create_file "$ROOT/about/craft-and-care/testing-and-verification.md" "# Testing and Verification
+
+$SCAFFOLD_MARKER
+
+## Evidence Scales With Risk
+
+| Change type | Minimum evidence |
+|-------------|------------------|
+| | |
+
+## Required Posture
+
+- "
+}
+
 # --- Local skill scaffolds ---
 install_skill() {
   local name="$1" content="$2"
@@ -393,7 +441,7 @@ $SCAFFOLD_MARKER
 OpenSpec capability specifications are the backbone of this project. Every feature, every task,
 every test traces back to a normative requirement in a spec.
 
-## Four-Pillar Model
+## Five-Pillar Model
 
 | Layer | Location | Role |
 |-------|----------|------|
@@ -401,6 +449,7 @@ every test traces back to a normative requirement in a spec.
 | Design Contracts | \`about/legends-and-lore/\` | HOW — wire-level contracts |
 | Capability Specs | \`openspec/\` | WHAT — normative requirements with testable scenarios |
 | Topology | \`about/lay-and-land/\` | WHERE — component boundaries and connections |
+| Engineering Standards | \`about/craft-and-care/\` | WHO WE ARE WHEN WE BUILD — implementation quality, verification, review, operability, maintainability |
 
 ## Domain Lookup
 
@@ -473,7 +522,44 @@ components live, how data flows, what boundaries exist, and how the system is de
 |------|-------|
 | Why a boundary exists | \`/heart-and-soul\` |
 | How a boundary communicates | \`/legends-and-lore\` |
-| What a component must do | \`/spec-and-spine\` |"
+| What a component must do | \`/spec-and-spine\` |
+| How changes here should be carried out | \`/craft-and-care\` |"
+}
+
+scaffold_skill_craft_and_care() {
+  install_skill "craft-and-care" "---
+name: craft-and-care
+description: >
+  MANDATORY for all non-trivial implementation work. Load the project's
+  execution-quality standards before implementing changes, reviewing pull
+  requests, changing observability, adding dependencies, or preparing
+  documentation and operational updates.
+---
+
+# Engineering Standards — Craft and Care
+
+$SCAFFOLD_MARKER
+
+The \`about/craft-and-care/\` directory contains this project's execution-quality
+standards. Start with \`engineering-bar.md\`, then load only the narrower
+standards the current change needs.
+
+## Document Index
+
+| File | Read when... | Key content |
+|------|-------------|-------------|
+| \`about/craft-and-care/README.md\` | Orienting to the pillar | Scope boundary and reading order |
+| \`about/craft-and-care/engineering-bar.md\` | Any non-trivial change | Definition of done, clarity standards, change hygiene |
+| \`about/craft-and-care/testing-and-verification.md\` | Planning evidence | Test expectations, regression discipline, verification thresholds |
+
+## Quick Reference
+
+| Need | Skill |
+|------|-------|
+| Mission or scope boundary | \`/heart-and-soul\` |
+| Structural contract text | \`/legends-and-lore\` |
+| Path placement and install topology | \`/lay-and-land\` |
+| Normative requirement or scenario | \`/spec-and-spine\` |"
 }
 
 # --- Main ---
@@ -492,7 +578,8 @@ for p in "${PILLAR_LIST[@]}"; do
     2) scaffold_law_and_lore; scaffold_skill_law_and_lore ;;
     3) scaffold_openspec; scaffold_skill_spec_and_spine ;;
     4) scaffold_lay_and_land; scaffold_skill_lay_and_land ;;
-    *) echo "Unknown pillar: $p (use 1-4)"; exit 1 ;;
+    5) scaffold_craft_and_care; scaffold_skill_craft_and_care ;;
+    *) echo "Unknown pillar: $p (use 1-5)"; exit 1 ;;
   esac
 done
 

@@ -1,4 +1,4 @@
 interface:
   display_name: "Cruft Cleanup"
-  short_description: "Kill shims, keep only new code paths"
-  default_prompt: "Review changes and eliminate backward-compatibility shims, dead code paths, or legacy wrappers"
+  short_description: "Finish same-repo migrations and delete legacy shims"
+  default_prompt: "Review this same-repo refactor or migration and remove compatibility shims, dead branches, legacy wrappers, and old interfaces that should no longer exist."

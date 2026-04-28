@@ -6,11 +6,20 @@
 
 ## Summary
 
-This RFC defines the repository's structural contract: which directories are canonical local shared layers, which are tool-specific facades, how assets are distributed into local tool homes, and what kinds of runtime state must never be treated as canonical source.
+This RFC defines the repository's structural contract: which directories are
+canonical local shared layers, which are tool-specific facades, how assets are
+distributed into local tool homes, how project-local pillar skills route back
+into canonical docs, and what kinds of runtime state must never be treated as
+canonical source.
 
 ## Motivation
 
-The repository already spans multiple agent runtimes and mixes shared assets with tool-specific configuration. Without an explicit contract, contributors can easily create silent divergence, bury source-of-truth decisions inside one tool's prompt, or commit machine-local runtime state. This RFC operationalizes doctrine rules 1 through 7.
+The repository already spans multiple agent runtimes and mixes shared assets
+with tool-specific configuration. Without an explicit contract, contributors can
+easily create silent divergence, bury source-of-truth decisions inside one
+tool's prompt, or commit machine-local runtime state. This RFC operationalizes
+doctrine rules 1 through 7 and provides the structural basis for the
+engineering-standards pillar and project-local pillar-skill routing.
 
 ## Design
 
@@ -37,6 +46,9 @@ The repository is divided into three logical layers:
 - Tool-specific roots are then symlinked or copied into home-directory config locations.
 - Shared skills may be copied or symlinked into tool-specific skill directories, but their authored source remains under `skills/`.
 - In practice, local installation may pass through in-repo mirror surfaces such as `.claude/skills` or directly into home-directory skill paths; neither mirror layer supersedes the source tree.
+- When project-local pillar skills are installed under `.claude/skills`,
+  `.codex/skills`, or `.gemini/skills`, they act as navigation entrypoints into
+  `about/` and `openspec/`, not as a second authored documentation tree.
 - OpenCode currently installs as config under `$HOME/.config/opencode` rather than participating in the in-repo skill-mirror layout used by Claude, Codex, and Gemini.
 - Regeneration or refresh flows must be explicit and scriptable. For example, `scripts/refresh.sh` is the supported way to rebuild the vendored Excalidraw bundle used by the personal Excalidraw skill.
 
@@ -50,8 +62,12 @@ The repository is divided into three logical layers:
 
 - Top-level README material explains repository purpose and installation.
 - Doctrine explains placement rules and boundaries.
+- Craft-and-care explains the execution-quality bar for changes to shared
+  assets, adapters, documentation, and local-only boundaries.
 - Topology explains where repository layers live and how they connect.
 - OpenSpec records normative requirements so future audits can test whether the repo still matches its intended shape.
+- Project-local pillar skills route agents back to the canonical doctrine,
+  topology, standards, and spec documents instead of redefining them.
 
 ### Governance and Lifecycle
 
@@ -69,6 +85,8 @@ RFC 0001 governs every top-level component:
 - `agents/` is a secondary reference corpus rather than the main execution path.
 - `.claude/`, `.codex/`, `.gemini/`, and `opencode/` are adapter surfaces.
 - `about/` and `openspec/` document and constrain the structure above.
+- Project-local pillar skills in tool skill directories are routing surfaces into
+  those canonical docs.
 
 ## Alternatives Considered
 
