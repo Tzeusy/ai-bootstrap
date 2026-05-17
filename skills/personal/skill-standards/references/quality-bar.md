@@ -60,7 +60,31 @@ Every skill should make ownership obvious.
   when" guidance.
 - Avoid vague umbrella skills unless they are intentionally routing skills.
 
-## 5. Progressive Disclosure And Context Discipline
+## 5. Skills Have Two Valid Shapes
+
+Every package should be either a standard `skill` or a `superskill`.
+
+- A `skill` follows the full agentskills.io package model: one top-level
+  `SKILL.md`, optional `references/`, `scripts/`, and `assets/`, and no
+  internal `subskills/` tree.
+- A `superskill` is a router package: one top-level `SKILL.md` plus
+  `subskills/`, where each subskill follows the standard skill shape.
+- Superskills are valid when the larger scope is real and the package preserves
+  progressive discovery as a structural property, not just a writing style.
+- A superskill is a top-level router whose frontmatter is the only metadata
+  that should load into the global skill catalog.
+- Internal subskills should live under the router package, typically
+  `subskills/<workflow>/SKILL.md`, and should not be mirrored or installed as
+  separate top-level skills by default.
+- The router should provide concise selection rules and a cheap way to inspect
+  subskill frontmatter. It should not duplicate every subskill body.
+- Subskills must remain independently coherent after selection: valid
+  frontmatter, trigger-oriented descriptions, direct links to support files, and
+  no hidden dependency on unrelated sibling content.
+- Use [`superskills.md`](./superskills.md) when deciding whether a broad skill
+  should become a superskill or be split into independent top-level skills.
+
+## 6. Progressive Disclosure And Context Discipline
 
 - Emphasize progressive discovery, not just brevity. `SKILL.md` should help the
   agent decide what to load next rather than trying to carry the whole skill in
@@ -79,7 +103,7 @@ Every skill should make ownership obvious.
   when the subject naturally splits by task, framework, domain, or workflow
   step.
 
-## 6. Evidence Over Generic Prose
+## 7. Evidence Over Generic Prose
 
 - Skills should capture proven workflows, recurring failure modes, or durable
   repo knowledge.
@@ -88,7 +112,7 @@ Every skill should make ownership obvious.
 - Do not preserve stale workaround text after the underlying problem or tooling
   has changed.
 
-## 7. Script Repeated Or Complex Workflows
+## 8. Script Repeated Or Complex Workflows
 
 - When a workflow is complex, fragile, repeated, or expensive to reconstruct
   from prose, prefer a standardized script over long inline instructions.
@@ -105,7 +129,7 @@ Every skill should make ownership obvious.
 - Scripts should include a short purpose statement, clear usage examples, and
   stable flags so agents can invoke them correctly without rereading large docs.
 
-## 8. Safe And Explicit Operational Boundaries
+## 9. Safe And Explicit Operational Boundaries
 
 - State prerequisites, destructive edges, and hard stops clearly.
 - Fail closed when the environment is missing required tools, auth, or context.

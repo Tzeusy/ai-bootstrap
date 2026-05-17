@@ -13,6 +13,7 @@ When updating a skill:
    compatibility notes.
 4. Verify that referenced files, commands, and paths still exist.
 5. Keep examples, scripts, and UI metadata synchronized with the revised skill.
+6. For superskills, keep the router and every internal subskill aligned.
 
 ## Verification Before Calling It Done
 
@@ -20,6 +21,8 @@ When updating a skill:
 - If scope is subtle, test one "should not trigger" case too.
 - For updates, verify the revised skill still matches the package layout and
   referenced files.
+- For superskills, test router selection against at least one matching subskill
+  and one no-fit or router-only case.
 - If the skill contains executable helpers, verify the documented invocation is
   still correct.
 
@@ -29,12 +32,14 @@ When updating a skill:
 2. Is the skill grounded in the right source of truth?
 3. Does `SKILL.md` route well, or should more content fan out into
    `references/` or `scripts/`?
-4. Should any repeated or fragile workflow be turned into a standardized
+4. If the skill is broad, should it become a superskill with internal
+   subskills instead of a monolith or many global skills?
+5. Should any repeated or fragile workflow be turned into a standardized
    script?
-5. Are metadata, authorship, and compatibility fields clear and factual?
-6. Are related files and `agents/openai.yaml` aligned with the current skill?
-7. Does the skill define boundaries, prerequisites, and failure modes?
-8. Would another agent find this skill from the way a real user asks for help?
+6. Are metadata, authorship, and compatibility fields clear and factual?
+7. Are related files and `agents/openai.yaml` aligned with the current skill?
+8. Does the skill define boundaries, prerequisites, and failure modes?
+9. Would another agent find this skill from the way a real user asks for help?
 
 ## Anti-Patterns
 
@@ -44,6 +49,7 @@ When updating a skill:
 - Re-explaining the same complex workflow in prose instead of encapsulating it
   in a reusable script
 - Descriptions that summarize the process instead of describing triggers
+- Broad router skills that flatten internal subskills into the global catalog
 - Project-specific rules invented without checking project-shape docs
 - Skills with no accountable owner or review date
 - Stale references, dead scripts, or mismatched `agents/openai.yaml`

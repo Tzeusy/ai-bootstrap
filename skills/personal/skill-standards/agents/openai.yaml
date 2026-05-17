@@ -1,4 +1,4 @@
 interface:
   display_name: "Skill Standards"
-  short_description: "Review bar for skill packaging and upkeep"
-  default_prompt: "Use $skill-standards to review or update a skill for trigger quality, project-shape grounding, explicit ownership, progressive discovery, and aligned metadata."
+  short_description: "Review bar for skill and superskill packaging"
+  default_prompt: "Use $skill-standards to review or update a skill or superskill for trigger quality, project-shape grounding, explicit ownership, router design, progressive discovery, and aligned metadata."
