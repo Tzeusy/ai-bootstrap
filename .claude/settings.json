@@ -33,5 +33,7 @@
   },
   "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
-  "teammateMode": "tmux"
+  "autoCompactEnabled": true,
+  "teammateMode": "tmux",
+  "remoteControlAtStartup": true
 }
