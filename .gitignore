@@ -29,6 +29,8 @@
 .codex/state_*
 .codex/shell_snapshots/
 .codex/logs*
+.codex/*.lock
+.codex/memories/
 
 # === Gemini ===
 .gemini/tmp
@@ -51,3 +53,4 @@ __pycache__/
 
 # === Private / machine-specific ===
 skills/homelab-opentelemetry/
+skills/mattpocock-skills/
