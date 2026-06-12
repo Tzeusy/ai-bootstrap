@@ -36,6 +36,13 @@ last_heartbeat_at=<iso8601>
 [/beads-lease]
 ```
 
+Lease and stall parameters (canonical; do not restate elsewhere):
+- Lease TTL: 20 minutes.
+- Renewal target: every 5 minutes while active, and before every mutation.
+- Worker stall threshold: at least 30 minutes without a progress signal before
+  force-release, unless a runtime-specific note below states otherwise. Team
+  Leads get 3x this threshold (see `epic-coordination.md`).
+
 Repeat this rule during long runs:
 
 Before any `bd` mutation: verify lease ownership, renew if near expiry, then
@@ -125,8 +132,8 @@ These rules are mandatory when the coordinator runtime is Codex:
 1. Dispatch workers with `fork_context=false`.
 2. Treat `wait_agent` timeout as "still running", not failure.
 3. Require bootstrap evidence (`pwd`, branch) before a worker counts as active.
-4. For implementation beads, require at least 30 minutes of no progress signal
-   before force-releasing.
+4. Apply the default 30-minute stall threshold above; a `wait_agent` timeout is
+   not itself a stall.
 5. Send one interrupt heartbeat requesting a 2-line status before classifying a
    worker as stalled.
 6. Close completed probe/worker agents promptly so thread limits do not block

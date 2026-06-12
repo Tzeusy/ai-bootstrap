@@ -6,8 +6,8 @@ and stale `review-running` locks.
 
 ## Preconditions
 
-- Run from the target repository root, or pass `--rig <rig>` to `bd list` and
-  `bd ready` when operating from outside the target rig.
+- Run from the target repository root, or prefix `bd -C <rig-path>` to `bd list`
+  and `bd ready` when operating from outside the target rig.
 - Before any `bd` mutation, inspect lease state using
   `../beads-coordinator/references/runtime-and-safety.md`.
 - If a live foreign lease or recent heartbeat exists, skip mutation and record

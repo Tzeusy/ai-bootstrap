@@ -41,8 +41,8 @@ Codex add-on:
 
 | Action | Command |
 |---|---|
-| Ready work | `bd ready --json` (add `--rig <rig>` if outside target rig) |
-| All open | `bd list --status=open --json` (add `--rig <rig>` if outside target rig) |
+| Ready work | `bd ready --json` (prefix with `bd -C /path/to/rig` if outside target rig) |
+| All open | `bd list --status=open --json` (prefix with `bd -C /path/to/rig` if outside target rig) |
 | PR-review issues | `bd list --status=blocked --label pr-review --json` |
 | PR-review-task issues | `bd list --status=blocked --label pr-review-task --json` |
 | Issue detail | `bd show <id> --json` |
@@ -55,6 +55,6 @@ Codex add-on:
 | Close issue | `bd close <id> --reason "<reason>"` |
 | Add dependency | `bd dep add <issue> <depends-on>` |
 | Children | `bd children <id> --json` |
-| Blocked | `bd blocked --json` (no `--rig` support; use `bd list --rig <rig> --status=blocked` cross-rig) |
+| Blocked | `bd blocked --json` (cross-rig: `bd -C /path/to/rig list --status=blocked`) |
 | Dolt server status | `bd dolt status` |
 | Dolt version control | `bd vc status` |

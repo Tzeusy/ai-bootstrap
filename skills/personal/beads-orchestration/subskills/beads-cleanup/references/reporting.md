@@ -5,14 +5,19 @@ or command quick reference.
 
 ## Rig Routing Note
 
-If running from outside the target rig, pass `--rig <rig>` to `bd list` and
-`bd ready` so they query the correct project database.
+If running from outside the target rig, use `bd -C <rig-path>` as a global
+flag prefix so all commands query the correct project database. For example:
+
+```bash
+bd -C <rig-path> list --status=in_progress --json --limit 0
+bd -C <rig-path> ready
+```
 
 Commands that take an existing bead ID (`bd update`, `bd close`, `bd show`,
-`bd dep`) auto-route via the ID prefix.
+`bd dep`) auto-route via the ID prefix and do not require `-C`.
 
-`bd search`, `bd blocked`, `bd count`, and `bd query` do not support `--rig`.
-Use `bd list --rig <rig>` with filters as a workaround.
+`bd search`, `bd blocked`, `bd count`, and `bd query` do not support the rig
+routing shorthand. Use `bd -C <rig-path> list` with filters as a workaround.
 
 ## Cleanup Report
 

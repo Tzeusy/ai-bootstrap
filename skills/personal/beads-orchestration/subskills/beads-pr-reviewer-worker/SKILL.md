@@ -1,6 +1,13 @@
 ---
 name: beads-pr-reviewer-worker
 description: Use when a coordinator dispatches a dedicated `pr-review-task` bead for an open GitHub PR that needs review follow-up, thread triage, merge assessment, or retry handling in an isolated worktree.
+metadata:
+  owner: tze
+  authors:
+    - tze
+    - OpenAI Codex
+  status: active
+  last_reviewed: "2026-06-12"
 compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, gh, and python3 available, plus authenticated GitHub access and network access for review, push, and merge operations.
 ---
 
@@ -24,7 +31,8 @@ You do **not** mutate Beads lifecycle state.
 ## Use This Skill When
 
 - the coordinator dispatches one dedicated `pr-review-task` bead
-- you are given `ISSUE_ID`, `ISSUE_JSON`, `WORKTREE_PATH`, and `REPO_ROOT`
+- you are given `ISSUE_ID`, `WORKTREE_PATH`, and `REPO_ROOT` (plus an optional
+  2-4 line summary/acceptance-criteria excerpt from the coordinator)
 - the PR already exists and needs review follow-up, retry triage, or merge
   evaluation
 
@@ -37,9 +45,9 @@ by users.
 | Variable | Description |
 |---|---|
 | `ISSUE_ID` | Assigned PR-review bead ID |
-| `ISSUE_JSON` | Full issue details from `bd show <id> --json` |
 | `WORKTREE_PATH` | Dedicated isolated git worktree for this worker |
 | `REPO_ROOT` | Main repository root for read-only orientation |
+| `ISSUE_JSON` | (Optional/legacy) Full issue JSON if inlined by an older coordinator. When absent, self-fetch: `bd show "${ISSUE_ID}" --json` |
 
 ## Non-Negotiable Boundaries
 
@@ -103,7 +111,13 @@ review-thread operations or the failure protocol:
 ### Phase 1: Bootstrap
 
 1. `cd "${WORKTREE_PATH}"`.
-2. Verify runtime context:
+2. Fetch full issue details when `ISSUE_JSON` was not inlined by the coordinator:
+
+```bash
+ISSUE_JSON=$(bd show "${ISSUE_ID}" --json)
+```
+
+3. Verify runtime context:
 
 ```bash
 PWD_REAL=$(pwd -P)
@@ -119,14 +133,14 @@ if [ "${PWD_REAL}" != "${WORKTREE_PATH}" ] || \
 fi
 ```
 
-3. Confirm GitHub access before doing anything expensive:
+4. Confirm GitHub access before doing anything expensive:
 
 ```bash
 gh auth status
 ```
 
-4. If a repository-level `craft-and-care` skill exists, read it now.
-5. Resolve review context with the bundled helper. The output must include:
+5. If a repository-level `craft-and-care` skill exists, read it now.
+6. Resolve review context with the bundled helper. The output must include:
    - `original_id`
    - `pr_number`
    - `pr_url`

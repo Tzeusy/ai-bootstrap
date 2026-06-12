@@ -7,13 +7,12 @@ renewal rules, worker bootstrap rules, monitoring details, or adaptive polling.
 
 - Before entering the loop, run `../beads-cleanup/SKILL.md`. This is mandatory.
 - Create a fresh coordinator session ID and lease token for this run.
-- If running from outside the target rig, pass `--rig <rig>` to `bd create`,
-  `bd list`, and `bd ready`.
+- If running from outside the target rig, point `bd` at the rig workspace with
+  the global `-C <path>` flag, e.g. `bd -C /path/to/rig ready --json`. The
+  removed `--rig` flag is no longer supported (bd 1.0.4+).
 - Commands that accept an existing bead ID (`bd update`, `bd close`, `bd show`,
-  `bd dep`) auto-route via prefix-based routing and do not need `--rig`.
-- `bd search`, `bd blocked`, `bd count`, `bd stale`, and `bd query` do not
-  support `--rig`. Use `bd list --rig <rig>` with filters, or `cd` into the
-  rig workspace first.
+  `bd dep`) auto-route via prefix-based routing and need neither `-C` nor a
+  rig flag.
 
 ## Constraints
 
@@ -28,9 +27,10 @@ renewal rules, worker bootstrap rules, monitoring details, or adaptive polling.
 | Issue tracker | `bd` CLI only |
 | Metadata persistence | Dolt DB via auto-started sql-server |
 | PR review cooldown | 5 minutes after PR `createdAt` |
-| Lease TTL | 20 minutes |
-| Lease renewal target | every 5 minutes, and before every `bd` mutation |
-| Codex worker stall threshold | at least 30 minutes without progress signal |
+
+Lease model (TTL, renewal cadence), the per-runtime stall threshold, and the
+model-selection tables live in `runtime-and-safety.md`. Do not restate them
+here.
 
 Repeat this rule during the whole run:
 
@@ -66,6 +66,11 @@ If multiple review beads refer to the same original bead or PR:
 
 Never create a new `pr-review-task` bead while a canonical open or blocked one
 already exists for the same original bead / PR.
+
+Run this dedupe check immediately before **any** `bd create` of a review bead,
+not only at the start of a cycle. Step 0c and Step 7 both create review beads;
+each must rerun this check (by original bead ID and `external_ref` PR number)
+right before creating, and skip creation if a canonical review bead exists.
 
 ### 0a1. Claim review beads before dispatch
 
@@ -207,15 +212,16 @@ Choose worker skill by issue type:
 - default implementation issue: `../beads-worker/SKILL.md`
 - `pr-review-task` issue: `../beads-pr-reviewer-worker/SKILL.md`
 
-Inject:
+Inject only:
 - `ISSUE_ID`
-- `ISSUE_JSON` from `bd show <id> --json`
 - `WORKTREE_PATH`
 - `REPO_ROOT`
+- a 2-4 line issue summary plus its acceptance criteria
 
-Keep the prompt compact. Prefer a short issue summary, acceptance criteria, and
-likely edit targets over giant Beads JSON blobs unless the extra detail is
-needed.
+Do not inline full `bd show <id> --json` output. `ISSUE_JSON` is deprecated as a
+dispatch field: the worker runs `bd show <id> --json` itself when it needs more
+detail. Keep the prompt compact; carry only the summary, acceptance criteria,
+and likely edit targets.
 
 ## Step 6: Dispatch The Worker
 
@@ -294,7 +300,8 @@ Report first, then verify the reported branch / PR state:
      - require a verified open PR
      - renew lease, then block the original bead and set
        `external_ref=gh-pr:<N>`
-     - ensure exactly one dedicated `pr-review-task` bead exists
+     - run the Step 0a dedupe check, then ensure exactly one dedicated
+       `pr-review-task` bead exists (create only if the dedupe check finds none)
      - create any discovered follow-up beads from
        `Discovered-Follow-Ups-JSON`
      - re-run Step 0 immediately so review/merge is prioritized
@@ -410,6 +417,39 @@ Prefer low-cost evidence over narrative heartbeats:
 - new commit
 - PR state changed
 
-At the start of each cycle, check whether any beads changed status in the last
-window. If there has been progress, print a progress report before continuing
-to Step 0.
+After each cycle, return to Step 0.
+
+## Progress Report
+
+Render a progress report only when bead status actually changed since the last
+report. Never derive the report from an unfiltered `bd list --json`; use
+filtered queries plus targeted checks of the ids dispatched this cycle.
+
+1. Query active work and the ids you dispatched or reconciled this cycle:
+   ```bash
+   bd list --status=in_progress --json
+   ```
+   Then `bd show <id> --json` for each recently dispatched / reconciled id to
+   confirm closures, merges, or status moves.
+2. If nothing changed, skip the report and proceed to Step 0.
+3. If something changed, print the table once. For each closed bead, confirm
+   the merge route:
+   ```bash
+   gh pr view <number> --json state,mergedAt   # PR-based merges
+   ```
+   The "Merged to main?" column shows `Yes`, `No`, or `—`.
+
+```
+═══════════════════════════════════════════════════════════════
+  Beads Coordinator — Progress Report
+  <TZ=Asia/Singapore date '+%Y-%m-%d %H:%M SGT'>
+═══════════════════════════════════════════════════════════════
+
+| # | Bead ID   | Title                    | Status      | Merged to main? |
+|---|-----------|--------------------------|-------------|-----------------|
+| 1 | beads-042 | Fix login redirect       | closed      | Yes             |
+| 2 | beads-045 | Add pagination           | in_progress | —               |
+
+Total closed this session: 1 / 10 open at start
+═══════════════════════════════════════════════════════════════
+```

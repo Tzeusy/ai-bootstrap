@@ -1,6 +1,13 @@
 ---
 name: beads-worker
 description: Use when implementing exactly one Beads issue in a dedicated worker worktree after a coordinator or operator provides ISSUE_ID and WORKTREE_PATH.
+metadata:
+  owner: tze
+  authors:
+    - tze
+    - OpenAI Codex
+  status: active
+  last_reviewed: "2026-06-12"
 compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, gh, and python3 available, plus authenticated GitHub access and network access for push and PR operations.
 ---
 
@@ -18,7 +25,8 @@ create hidden parallel implementation tracks under one claimed bead.
 ## Use This Skill When
 
 - a coordinator dispatches one implementation bead
-- you are given `ISSUE_ID`, `ISSUE_JSON`, `WORKTREE_PATH`, and `REPO_ROOT`
+- you are given `ISSUE_ID`, `WORKTREE_PATH`, and `REPO_ROOT` (plus an optional
+  2-4 line summary/acceptance-criteria excerpt from the coordinator)
 - the job is to implement one bead, not coordinate multiple beads
 
 This skill is typically invoked by
@@ -30,9 +38,9 @@ by users.
 | Variable | Description |
 |---|---|
 | `ISSUE_ID` | Assigned Beads issue ID |
-| `ISSUE_JSON` | Full issue details from `bd show <id> --json` |
 | `WORKTREE_PATH` | Dedicated isolated git worktree for this worker |
 | `REPO_ROOT` | Main repository root for read-only orientation |
+| `ISSUE_JSON` | (Optional/legacy) Full issue JSON if inlined by an older coordinator. When absent, self-fetch: `bd show "${ISSUE_ID}" --json` |
 
 ## Non-Negotiables
 
@@ -110,14 +118,22 @@ python3 scripts/emit_worker_report.py \
 
 ### Phase 2: Understand
 
-1. Read the assigned issue carefully.
-2. Inspect referenced dependencies if needed: `bd show <dep-id> --json`.
-3. Read `AGENTS.md` / `CLAUDE.md` or equivalent project guidance.
-4. If a repository-level `craft-and-care` skill exists, read it before
+1. Fetch full issue details:
+
+```bash
+ISSUE_JSON=$(bd show "${ISSUE_ID}" --json)
+```
+
+   If the coordinator already inlined `ISSUE_JSON`, use that; otherwise run the
+   command above.
+2. Read the assigned issue carefully.
+3. Inspect referenced dependencies if needed: `bd show <dep-id> --json`.
+4. Read `AGENTS.md` / `CLAUDE.md` or equivalent project guidance.
+5. If a repository-level `craft-and-care` skill exists, read it before
    implementation and extract the principles relevant to the change.
-5. Understand the relevant code before editing.
-6. If the task needs research or design help, use read-only helpers only.
-7. Form a concrete file and test plan, then start editing.
+6. Understand the relevant code before editing.
+7. If the task needs research or design help, use read-only helpers only.
+8. Form a concrete file and test plan, then start editing.
 
 ## Phase 3: Implement
 

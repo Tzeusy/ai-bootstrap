@@ -1,0 +1,4 @@
+interface:
+  display_name: "Beads Coordinator"
+  short_description: "Continuously dispatch ready Beads issues to isolated parallel workers"
+  default_prompt: "Use $beads-coordinator to run an unattended loop that claims ready Beads issues with leases and dispatches isolated parallel workers for throughput."

@@ -40,7 +40,7 @@ workflow rules.
 
 This skill is a routing layer over the existing Beads operating model.
 
-- Repository workflow and ownership model: `../../../README.md`
+- Repository workflow and ownership model: `../../../../../README.md`
 - Coordinator mutation authority and lease rules:
   `../beads-coordinator/references/runtime-and-safety.md`
 - Coordinator loop and PR-review lane behavior:

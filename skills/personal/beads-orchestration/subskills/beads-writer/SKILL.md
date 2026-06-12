@@ -13,7 +13,7 @@ compatibility: Requires a Beads-backed repository with the `bd` CLI available. A
 
 # Beads Writer
 
-Create high-quality beads issues through repo-grounded research and deliberate field selection. This skill is a routing layer over the Beads operating model described in [`../../../README.md`](../../../README.md): issue writing should reinforce that workflow, not compete with it.
+Create high-quality beads issues through repo-grounded research and deliberate field selection. This skill is a routing layer over the Beads operating model described in [`../../../../../README.md`](../../../../../README.md): issue writing should reinforce that workflow, not compete with it.
 
 Every bead must be a self-contained handoff for a future independent session. Subbeads are not reminders; they must read like full standalone prompts, with enough context that a fresh session can execute them without the bead-creation chat.
 

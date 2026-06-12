@@ -57,7 +57,7 @@ Each skill lives in `skills/<name>/SKILL.md` or `skills/personal/<name>/SKILL.md
 - `~/.gemini/skills/`
 - `~/.gemini/antigravity/skills/`
 
-The linked name is flattened, so `skills/personal/beads-worker/` becomes `beads-worker` in the tool-specific skills directory.
+The linked name is flattened, so `skills/personal/beads-orchestration/subskills/beads-worker/` becomes `beads-worker` in the tool-specific skills directory.
 
 Because the linked namespace is flattened by basename, the canonical source remains the `skills/` tree. Provenance and ownership should always be reasoned about from the source directory, not from the mirrored tool-specific link.
 

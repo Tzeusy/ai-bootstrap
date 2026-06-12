@@ -1,0 +1,4 @@
+interface:
+  display_name: Beads Orchestration
+  short_description: Route Beads issue workflows — coordinate, implement, review PRs, clean up, or write backlog issues.
+  default_prompt: Use $beads-orchestration to route this Beads task to the right subskill.
