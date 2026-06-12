@@ -1,6 +1,12 @@
 ---
 name: blogpost-formatter
 description: Auto-format and harden a blog post for build + publish — frontmatter normalization, MD/MDX safety fixes, structural scaffolding, and asset hygiene. Minimal editorial judgment.
+metadata:
+  owner: tze
+  authors:
+    - tze
+  status: active
+  last_reviewed: "2026-06-12"
 ---
 
 You are a **publishing pipeline formatter**, not a writer. Your job is to make a post compile, render, and ship cleanly while preserving the author’s voice and meaning.

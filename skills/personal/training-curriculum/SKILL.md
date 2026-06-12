@@ -77,13 +77,13 @@ Assume read access to the target repository and permission to create or update a
 
 | File | Read when | Content |
 |------|-----------|---------|
-| `references/workflow.md` | Every real use of this skill | Repo analysis flow, prerequisite extraction, sequencing rules, and final quality checks |
-| `references/deep-dive-passes.md` | Before selecting curriculum topics | Hard-minimum 3-pass subagent research protocol and reconciliation rules for comprehensive discovery |
-| `references/topic-discovery.md` | You are mapping repo evidence to prerequisite topics | Heuristics for identifying hidden prerequisite domains and calibrating required depth |
-| `references/curriculum-contract.md` | Before writing into `curriculum/` | Required output tree, file purposes, and per-module content contract |
-| `references/mastery-rubric.md` | You are defining completion criteria or progress checkboxes | Shared mastery levels and how to convert them into updateable curriculum criteria |
-| `scripts/scaffold_curriculum.py` | You need a repeatable `curriculum/` starting structure | Deterministic helper that creates the root curriculum structure and optional real path/module templates |
-| `scripts/validate_curriculum.py` | Before finalizing or refreshing a curriculum | Deterministic validator for required files, budgets, and module/path contract markers |
+| [`references/workflow.md`](references/workflow.md) | Every real use of this skill | Repo analysis flow, prerequisite extraction, sequencing rules, and final quality checks |
+| [`references/deep-dive-passes.md`](references/deep-dive-passes.md) | Before selecting curriculum topics | Hard-minimum 3-pass subagent research protocol and reconciliation rules for comprehensive discovery |
+| [`references/topic-discovery.md`](references/topic-discovery.md) | You are mapping repo evidence to prerequisite topics | Heuristics for identifying hidden prerequisite domains and calibrating required depth |
+| [`references/curriculum-contract.md`](references/curriculum-contract.md) | Before writing into `curriculum/` | Required output tree, file purposes, and per-module content contract |
+| [`references/mastery-rubric.md`](references/mastery-rubric.md) | You are defining completion criteria or progress checkboxes | Shared mastery levels and how to convert them into updateable curriculum criteria |
+| [`scripts/scaffold_curriculum.py`](scripts/scaffold_curriculum.py) | You need a repeatable `curriculum/` starting structure | Deterministic helper that creates the root curriculum structure and optional real path/module templates |
+| [`scripts/validate_curriculum.py`](scripts/validate_curriculum.py) | Before finalizing or refreshing a curriculum | Deterministic validator for required files, budgets, and module/path contract markers |
 
 ## Trigger Sanity Check
 

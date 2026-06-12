@@ -104,9 +104,9 @@ Every package should be either a standard `skill` or a `superskill`.
 - Fan heavy or domain-specific reference material into `references/`,
   deterministic helpers into `scripts/`, and output-only resources into
   `assets/`.
-- A `tests/` directory for skill self-tests and fixtures is allowed and
-  encouraged for skills with executable helpers; it is never loaded as agent
-  context and is exempt from linking requirements.
+- `tests/` (self-tests and fixtures) and `evals/` (trigger/eval datasets) are
+  allowed and encouraged for skills with executable helpers; they are never
+  loaded as agent context and are exempt from linking requirements.
 - Link every important support file from `SKILL.md` with explicit selection
   guidance: say what question the file answers and when to load it. A bare
   link list is not a routing layer.

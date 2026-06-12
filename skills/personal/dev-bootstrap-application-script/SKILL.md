@@ -1,6 +1,12 @@
 ---
 name: dev-bootstrap-application-script
 description: This skill should be used when asked to create a dev.sh (or similar) bash script that launches an application's full stack in tmux. It guides research of the project's services, generates an idempotent tmux bootstrap script with named windows, pane-ID-based splits, health checks, env loading, and sanitized per-run stdout/stderr logs.
+metadata:
+  owner: tze
+  authors:
+    - tze
+  status: active
+  last_reviewed: "2026-06-12"
 ---
 
 # Dev Bootstrap Application Script
@@ -348,6 +354,15 @@ Before delivering the script, verify:
 - [ ] Script prints local URLs and (if configured) the remote/tailnet URL
 - [ ] A short post-split delay exists before `tmux send-keys` to avoid dropped keystrokes on fast reruns
 
-## Assets
+## Support Files
 
-- `assets/dev.sh.template` — Skeleton script with all placeholders. Copy and fill in.
+- [`assets/dev.sh.template`](assets/dev.sh.template) — Default skeleton script
+  with all placeholders. Copy and fill in.
+- [`assets/dev.three-window.sh.template`](assets/dev.three-window.sh.template) —
+  Variant for a three-window layout.
+- [`assets/dev.multi-window.sh.template`](assets/dev.multi-window.sh.template) —
+  Variant for larger stacks needing one window per service group.
+- [`references/patterns.md`](references/patterns.md) — Exact tmux layout and
+  proxy patterns; load when filling in non-trivial splits or remote access.
+- [`scripts/validate_dev_bootstrap.py`](scripts/validate_dev_bootstrap.py) —
+  Run against a generated dev.sh before delivering it.

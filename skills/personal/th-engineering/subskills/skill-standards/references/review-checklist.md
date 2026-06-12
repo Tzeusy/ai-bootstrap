@@ -12,14 +12,11 @@ uv run <skill-standards>/scripts/audit_skill.py <target-skill-dir>
 # batch/CI: --all <skills-root> [--skip NAME] [--json]
 ```
 
-CI runs the same audit over `skills/personal/` on every push and PR
-(`.github/workflows/skill-audit.yml`); errors block, warnings are advisory.
-Links inside fenced code blocks are treated as illustrative examples and
-ignored — fence your templates.
-
-Ratchet intent: existing warnings are being burned down per package
-(dotfiles-hyd); once `skills/personal/` is warning-free, CI flips to
-`--strict`. Do not add new warnings to a clean package.
+CI runs the same audit over `skills/personal/` in `--strict` mode on every
+push and PR (`.github/workflows/skill-audit.yml`) — errors AND warnings
+block. The tree is warning-free; a change that introduces either does not
+merge. Links inside fenced code blocks are treated as illustrative examples
+and ignored — fence your templates.
 
 - Fix every ERROR: invalid/missing frontmatter, spec-limit violations,
   placeholder descriptions, broken links, missing routing-table entries,

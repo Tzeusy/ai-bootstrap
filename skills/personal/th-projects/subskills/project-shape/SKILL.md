@@ -213,6 +213,21 @@ Read `references/generate-overview.md` for the full guide: diagram specs, docume
 
 ## Reference Index
 
+### Diagrams
+
+Rendered visuals for the shape model (each `.svg` has an editable
+`.excalidraw` source alongside; regenerate via the `<!-- [DIAGRAM: ...] -->`
+specs with /th-engineering's excalidraw-diagram):
+
+| Diagram | Shows |
+|---------|-------|
+| [`assets/five-pillars-load-bearing.svg`](assets/five-pillars-load-bearing.svg) ([source](assets/five-pillars-load-bearing.excalidraw)) | How the five pillars bear load, and in what order |
+| [`assets/five-pillars-health-risks.svg`](assets/five-pillars-health-risks.svg) ([source](assets/five-pillars-health-risks.excalidraw)) | Failure modes when a pillar is missing or weak |
+| [`assets/pillar-traceability.svg`](assets/pillar-traceability.svg) ([source](assets/pillar-traceability.excalidraw)) | Traceability chain from doctrine down to execution |
+| [`assets/idea-funnel.svg`](assets/idea-funnel.svg) ([source](assets/idea-funnel.excalidraw)) | Idea-to-spec funnel and the gate each pillar answers |
+| [`assets/review-fanout.svg`](assets/review-fanout.svg) ([source](assets/review-fanout.excalidraw)) | Audit fan-out across pillars in Workflow 3 |
+| [`assets/coordinator-workflow.svg`](assets/coordinator-workflow.svg) ([source](assets/coordinator-workflow.excalidraw)) | End-to-end coordinator workflow across shape phases |
+
 ### Pillar Guides
 
 | Pillar | Reference | Read when... |

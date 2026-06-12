@@ -45,7 +45,7 @@ PEP723_RE = re.compile(r"^# /// script\s*$.*?^# ///\s*$", re.MULTILINE | re.DOTA
 PLACEHOLDER_RE = re.compile(r"replace with|todo|tbd|fixme", re.IGNORECASE)
 # Markdown links to local files; skips http(s), mailto, and anchors.
 LOCAL_LINK_RE = re.compile(r"\[[^\]]*\]\((?!https?://|mailto:|#)([^)#\s]+)")
-KNOWN_DIRS = {"references", "scripts", "assets", "subskills", "agents", "tests"}
+KNOWN_DIRS = {"references", "scripts", "assets", "subskills", "agents", "tests", "evals"}
 MAIN_GUARD_RE = re.compile(r"""__name__\s*==\s*["']__main__["']""")
 VALID_STATUS = {"active", "draft", "deprecated"}
 

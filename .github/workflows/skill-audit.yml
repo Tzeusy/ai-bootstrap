@@ -20,7 +20,7 @@ jobs:
       - name: Self-test the audit script
         run: uv run skills/personal/th-engineering/subskills/skill-standards/tests/run_tests.py
       - name: Audit personal skill packages
-        # Errors gate the merge; warnings are advisory (no --strict yet, see dotfiles-hyd).
+        # --strict: skills/personal is warning-free as of dotfiles-hyd; keep it that way.
         run: >
           uv run skills/personal/th-engineering/subskills/skill-standards/scripts/audit_skill.py
-          --all skills/personal
+          --all skills/personal --strict

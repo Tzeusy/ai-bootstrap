@@ -60,6 +60,7 @@ def main() -> int:
     check("assets/orphan-asset.txt is never linked" in out, "orphan asset is a WARN")
     check("deep-chain.md is linked only transitively" in out, "deep reference chain is a WARN")
     check("unexpected top-level directory tests/" not in out, "tests/ is an accepted directory")
+    check("unexpected top-level directory evals/" not in out, "evals/ is an accepted directory")
 
     # --- broken-superskill: router and subskill defects ---
     res = run_audit(str(FIXTURES / "broken-superskill"))

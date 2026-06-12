@@ -1,6 +1,12 @@
 ---
 name: blogpost-editor
 description: Deep editorial review for publication readiness — narrative, structure, scannability, factual risk, tone, and reader usefulness. No silent rewrites.
+metadata:
+  owner: tze
+  authors:
+    - tze
+  status: active
+  last_reviewed: "2026-06-12"
 ---
 
 Serve as a **professional editor** reviewing a blog post for publication readiness. Do a comprehensive editorial review and present findings organized by severity, with quotes and specific fixes.
