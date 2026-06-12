@@ -2,6 +2,12 @@
 
 This rubric defines the scanner's intended thresholds. Prefer conservative scoring. If a project looks partly mature and partly scaffolded, score the lower state.
 
+> **Maintenance contract**: this rubric is the human-readable spec that
+> `scripts/shape-scan.sh` implements. When you change a threshold, level
+> boundary, or traceability heuristic in the scanner, update the matching level
+> here in the same change (and re-run `scripts/self-test.sh`). If the two drift,
+> the scanner is authoritative — fix this doc to match it.
+
 ## Levels
 
 ### Unshaped

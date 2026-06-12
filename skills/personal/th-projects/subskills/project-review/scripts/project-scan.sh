@@ -286,12 +286,11 @@ src_files=$(find . -type f \
 
 if [ -n "$src_files" ]; then
   src_count=$(echo "$src_files" | wc -l | tr -d ' ')
-  # Use xargs with batch size to avoid ARG_MAX
-  src_lines=$(echo "$src_files" | xargs -L 500 wc -l 2>/dev/null | awk '/total$/{s+=$1} END{print s+0}')
-  # If no "total" lines (single batch), sum all
-  if [ "$src_lines" = "0" ]; then
-    src_lines=$(echo "$src_files" | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
-  fi
+  # NUL-delimit so paths containing spaces are not split mid-name; xargs -0
+  # still batches to respect ARG_MAX. Sum per-file counts and skip wc's
+  # per-batch "total" lines, which works for one file or many (portable
+  # across GNU and BSD/macOS xargs).
+  src_lines=$(printf '%s' "$src_files" | tr '\n' '\0' | xargs -0 wc -l 2>/dev/null | awk '$NF=="total"{next} {s+=$1} END{print s+0}')
   echo "  Source files: $src_count"
   echo "  Source lines: ~$src_lines"
 fi

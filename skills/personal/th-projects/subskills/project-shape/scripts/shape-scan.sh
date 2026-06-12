@@ -566,7 +566,9 @@ pillars=0
 [ -d "$ROOT/openspec" ] && pillars=$((pillars + 1))
 [ -n "$(resolve_topology_dir)" ] && pillars=$((pillars + 1))
 [ -n "$(resolve_standards_dir)" ] && pillars=$((pillars + 1))
-[ -f "$ROOT/ARCHITECTURE.md" ] && [ "$pillars" -lt 5 ] && topology_present_by_file=1 || topology_present_by_file=0
+# Count a root ARCHITECTURE.md as topology ONLY when no topology dir was found,
+# so it is a true fallback and never double-counts the topology pillar.
+[ -z "$(resolve_topology_dir)" ] && [ -f "$ROOT/ARCHITECTURE.md" ] && topology_present_by_file=1 || topology_present_by_file=0
 [ "$topology_present_by_file" -eq 1 ] && pillars=$((pillars + 1))
 
 skills=0

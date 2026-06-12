@@ -14,6 +14,8 @@ metadata:
 
 Determine what a project should work on next. Ground decisions in specifications, repository evidence, and implementation reality. Optimize for spec alignment, tractability, leverage, and low-churn execution — not feature count.
 
+Do not use when: you want to take ONE concrete new feature from idea to spec (use `../project-feature-request/SKILL.md`); you want to score repo health or confirm findings (use `../project-review/SKILL.md`, which hands its packet here); or you only need backlog mechanics with no direction analysis (use `/beads-orchestration` (beads-writer)).
+
 ## Core Rules
 
 1. **Specifications are source of truth** — every work item must link to a spec section. If a feature lacks spec coverage, recommend spec work first.
@@ -178,3 +180,14 @@ Focus modes change which phases do real work and which tier applies — the phas
 
 - [`scripts/spec-scan.sh`](scripts/spec-scan.sh) `<repo_root>` — Discovers specs, design docs, roadmap, agent context, issue tracking, git activity by area. Required in Phase 2.
 - [`scripts/epic-report-scaffold.sh`](scripts/epic-report-scaffold.sh) `<epic-id> [repo_root]` — Used by report bead executors created in Phase 3. Bootstraps report markdown from beads epic data, creates `docs/reports/` with metadata pre-filled.
+
+## Diagrams
+
+Workflow visuals for this skill (each `.svg` has an editable `.excalidraw`
+source alongside; regenerate with `/th-engineering` (excalidraw-diagram),
+`--format svg`):
+
+| Diagram | Shows |
+|---------|-------|
+| [`references/diagrams/project-direction-workflow.svg`](references/diagrams/project-direction-workflow.svg) ([source](references/diagrams/project-direction-workflow.excalidraw)) | Phase-by-phase direction workflow, preflight through handoff |
+| [`references/diagrams/project-direction-artifacts.svg`](references/diagrams/project-direction-artifacts.svg) ([source](references/diagrams/project-direction-artifacts.excalidraw)) | Analysis-agent and report-bead artifact flow |

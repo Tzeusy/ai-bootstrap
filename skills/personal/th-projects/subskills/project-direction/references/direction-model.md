@@ -76,7 +76,8 @@ If the project has specs (openspec/, spec/, design docs):
 
 **Step 1**: Inventory all spec documents and their sections.
 ```
-Glob: "openspec/**/*.md", "spec/**/*.md", "docs/design/**/*.md"
+# Glob tool (Claude Code/Codex): openspec/**/*.md, spec/**/*.md, docs/design/**/*.md
+# or shell-side: find openspec spec docs/design -name '*.md' 2>/dev/null
 ```
 
 **Step 2**: For each spec section, determine status:

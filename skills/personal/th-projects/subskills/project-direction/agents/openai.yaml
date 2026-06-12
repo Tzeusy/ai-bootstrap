@@ -1,4 +1,4 @@
 interface:
   display_name: "Project Direction"
-  short_description: "Analyze project direction and produce spec-driven work plans"
+  short_description: "Prioritize features, check spec-to-code drift, evaluate 'should we build X', sequence a roadmap, and produce a spec-driven work plan with a beads handoff"
   default_prompt: "What should this project work on next?"

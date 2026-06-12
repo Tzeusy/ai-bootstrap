@@ -53,7 +53,7 @@ stop and report it — do not hand-write changeset files into
   or an observed implementation behavior — cite it in the artifact.
 - Delta semantics: active changes override main specs. Extend existing specs;
   never fork a parallel truth.
-- Spec format follows `../../project-review/references/spec-format.md`
+- Spec format follows `../../../references/spec-format.md`
   (heading hierarchy, WHEN/THEN bullets, naming, `[TARGET-STATE]` tags for
   aspirational requirements).
 - A changeset proposes; it does not sequence. Sequencing happens in Phase 3.

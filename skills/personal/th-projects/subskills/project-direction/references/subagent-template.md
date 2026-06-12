@@ -40,7 +40,7 @@ Type: {type} | Maturity: {maturity} | Users: {users}
   - Agent D: alignment-review.md (full file)}
 
 ## Investigation rules
-- Use Glob and Grep tools for file/content search (not bash grep/find)
+- Search for files and content with the harness's structured tools where available (Glob + Grep in Claude Code/Codex), else `rg`/`find` shell-side — not unstructured one-offs that silently miss files
 - Cite specific files and line numbers: `path/to/file.ts:42` or `spec/feature.md:§3.2`
 - Label claims: [Observed], [Inferred], [Unknown]
 - Specifications are source of truth unless user says otherwise

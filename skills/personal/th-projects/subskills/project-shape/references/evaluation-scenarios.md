@@ -2,6 +2,11 @@
 
 Use these scenarios to pressure-test the skill package itself, not just the target project.
 
+> **Maintenance contract**: append a row when a new environment or failure mode
+> is found in real use (a model tier, a tooling gap, a repo layout the package
+> mishandled). Update a row when its expected outcome changes. Drop a row only
+> when the scenario is no longer realistic.
+
 ## Scenario Matrix
 
 | Scenario | Environment | Expected outcome |

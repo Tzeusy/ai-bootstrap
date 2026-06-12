@@ -80,7 +80,7 @@ RFC stub stating what would have to become true, and park.
 
 ## Gate 5 — Specification
 
-**Input**: all prior gates; `../../project-review/references/spec-format.md`;
+**Input**: all prior gates; `../../../references/spec-format.md`;
 existing `openspec/` tree.
 **Do**:
 - Extend an existing spec when the capability fits its scope; create

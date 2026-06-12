@@ -261,50 +261,13 @@ specs with /th-engineering's excalidraw-diagram):
 
 ## Local Skill Installation
 
-Each pillar should have a corresponding local skill in `.claude/skills/` (and equivalent for other tools). These skills teach LLM agents how to navigate and use each pillar.
-
-**Skill-generation mandate:** Generated local skills **MUST** follow current `agentskills.io` expectations and `/skill-creator` best practices. Keep frontmatter valid, keep descriptions focused on triggering conditions, and keep the SKILL body lean enough to act as a routing/index layer rather than a monolith.
-
-**Progressive discovery mandate:** Local skills should optimize for targeted context retrieval. Treat `SKILL.md` as the discovery surface, then fan detailed guidance out into narrower files such as `references/*.md`, deterministic helpers in `scripts/`, and only the output-facing resources in `assets/`. Every supporting file that an agent may need should be linked from `SKILL.md` with explicit "read when..." guidance so the agent can load only the relevant slice.
-
-**Preferred method:** Run `shape-init.sh` which generates correctly-formatted skills automatically:
+Each pillar gets a local navigation skill in `.claude/skills/` (and equivalents for other tools) — an **index with selection guidance**, not a copy of the pillar's content. It tells the agent *which file to read* for a task, not *what the file says*. The preferred path generates correctly-formatted skills automatically:
 
 ```bash
 bash <skill-path>/scripts/shape-init.sh [project-root] --skills-only --tools=claude,codex
 ```
 
-**If writing skills manually**, every SKILL.md **MUST** start with YAML frontmatter. Without it, skill loaders reject the file silently. Use only the currently supported metadata keys:
-
-```yaml
----
-name: <pillar-name>
-description: >
-  Multi-line description of when this skill should be used.
-  This is the triggering mechanism — be specific about contexts.
----
-
-# Skill Title
-
-Markdown body follows...
-```
-
-- The `---` delimiters on lines 1 and N are mandatory — without them the file is invalid
-- `name` and `description` are the supported fields; do not add extra frontmatter keys unless the target platform explicitly documents them
-- Read `references/local-skill-templates.md` for full customizable templates per pillar plus the required progressive-discovery structure
-
-The key principle: local skills are **indexes with selection guidance**, not duplicates of the content. They tell the agent *which file to read* for a given task, not *what the file says*. If a pillar is accumulating large inline guidance, split it into targeted sub-docs or utilities and keep the skill as the router.
-
-All five pillars should have a corresponding local skill: `heart-and-soul`, `legends-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`.
-
-**After writing skills, validate them:**
-
-```bash
-bash <skill-path>/scripts/shape-scan.sh [project-root]
-bash <skill-path>/scripts/self-test.sh
-bash <skill-path>/scripts/eval-fallbacks.sh
-```
-
-The scan checks structural integrity plus common scaffold/template drift. The self-test script exercises the scanner and scaffolder against known scenarios. The fallback eval script checks that constrained-environment behavior is still explicitly supported in the package docs. Fix any reported issues before committing.
+All five pillars should have one: `heart-and-soul`, `legends-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`. For the manual path — per-pillar templates, the mandatory `name`/`description`-only frontmatter (the scanner rejects extra keys), and the required progressive-discovery structure — read [`references/local-skill-templates.md`](references/local-skill-templates.md). After writing, validate with `scripts/shape-scan.sh` + `scripts/self-test.sh` + `scripts/eval-fallbacks.sh` (see the Scripts table) and fix every reported issue before committing.
 
 ## Maintenance Expectations
 

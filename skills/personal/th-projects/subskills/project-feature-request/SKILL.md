@@ -79,7 +79,7 @@ record one sentence on why no sketch is needed.
 
 **Gate 5 — Specification.** Write the spec delta: WHEN/THEN scenarios,
 acceptance criteria, and an explicit **out of scope** list, following
-`../project-review/references/spec-format.md` and the project's existing
+`../../references/spec-format.md` and the project's existing
 `openspec/` conventions (active changes override main specs — extend, don't
 fork).
 

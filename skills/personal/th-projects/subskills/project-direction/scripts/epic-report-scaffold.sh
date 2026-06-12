@@ -154,7 +154,7 @@ $epic_desc
   - Removed: #fecaca (red)
   - External: #ddd6fe (purple)
 
-  Generate .excalidraw file using /th-engineering (excalidraw-diagram) skill, then render to PNG.
+  Generate .excalidraw file using /th-engineering (excalidraw-diagram) skill, then render to SVG.
 -->
 
 <!-- ![Architecture overview](diagrams/${EPIC_ID}-architecture.svg) -->
@@ -276,7 +276,7 @@ echo "=== Scaffold generated: $report_file ==="
 echo ""
 echo "Next steps:"
 echo "  1. Fill in TODO sections"
-echo "  2. Generate excalidraw diagrams and render to PNG"
+echo "  2. Generate excalidraw diagrams and render to SVG"
 echo "  3. Create follow-up beads for remaining work"
 echo "  4. Link report to epic: bd update $EPIC_ID --append-notes \"Report: $report_file\""
 echo "  5. Commit report + diagrams"

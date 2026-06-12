@@ -91,7 +91,10 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   `openspec/`, `about/lay-and-land`, `about/craft-and-care`) is the single
   normative vocabulary; subskills must not redefine it.
 - Specifications are the source of truth for work planning; implementation
-  without spec coverage is a finding, not a baseline.
+  without spec coverage is a finding, not a baseline. The OpenSpec file format
+  these subskills read and write is one shared contract,
+  [`references/spec-format.md`](references/spec-format.md) at this package root,
+  not owned by any single subskill.
 - Every major claim cites evidence and is labeled [Observed], [Inferred], or
   [Unknown].
 - Subskills reference each other by relative path (`../project-shape/…`) inside

@@ -162,71 +162,9 @@ The report must make the boundary explicit:
 
 **Quick health check** (fast answer): Run shape scan + project scan + Agent A, then do a brief orchestrator sweep of obvious high-risk areas (tests, CI, auth/secrets, docs). Output: executive summary, provisional scorecard, top 5 risks, explicit low-confidence markers where evidence is thin. Do not pretend this is equivalent to a full review.
 
-**Third-party deep-dive review synthesis** ("process this review/audit"): Fact-check external findings, filter them through the project's actual context, convert confirmed findings into a planning handoff packet, and route execution planning to `/project-direction`.
+**Third-party deep-dive review synthesis** ("process this review/audit"): Fact-check external findings, filter them through the project's actual context, convert confirmed findings into a planning handoff packet, and route execution planning to `/project-direction`. Read [`references/third-party-review.md`](references/third-party-review.md) for the five-step extraction protocol.
 
 **Spec reconciliation** ("reconcile spec vs implementation", "what's implemented but undocumented", "what's specified but missing"): Exhaustive bidirectional spec↔code mapping with remediation — undocumented features get specs, unimplemented requirements get beads, strategic gaps escalate to `/project-direction`. Read `references/spec-reconciliation.md` for the full protocol. Unlike the health audit this mode samples nothing, and it is the one mode permitted to create remediation artifacts, because each artifact traces 1:1 to a confirmed spec gap.
-
-## Handling Third-Party Deep-Dive Reviews
-
-When an external reviewer produces a comprehensive project review, extract value without inheriting its mistakes.
-
-### Step 1: Fact-check before synthesizing
-
-Before accepting any external claim:
-- Verify quantitative claims: line counts, dependency counts, file sizes, test counts
-- Verify referenced paths and named features
-- Verify process claims against actual CI, docs, and code
-- Label each finding: [Confirmed], [Overstated], [Incorrect], or [Unverifiable]
-
-Only [Confirmed] findings enter the planning handoff packet.
-
-### Step 2: Filter for the project's actual context
-
-Not all best-practice advice applies equally. Explicitly deprioritize recommendations that do not fit the project:
-
-| Filter | Example of what to deprioritize |
-|--------|---------------------------------|
-| Single-user project | Multi-tenant scaling, contributor governance overhead |
-| Solo maintainer | Formal compatibility matrices for internal APIs |
-| Early-stage project | Heavy conformance harnesses before interfaces stabilize |
-| Self-hosted/internal tool | SaaS-style auth hardening beyond the real threat model |
-
-If doctrine or lore artifacts exist, use them to justify deprioritization. If they do not exist, say that the filter is inferential rather than explicit.
-
-### Step 3: Synthesize actionables by ROI
-
-Sort confirmed findings into tiers:
-
-**Tier 1 — High ROI, do soon**
-- Structural improvements with measurable before/after evidence
-- Test upgrades that materially change regression detection
-- Small CI/docs fixes that close documented-vs-actual gaps
-
-**Tier 2 — Good practice, medium effort**
-- Coverage and observability improvements for critical paths
-- Proportional security hardening
-- Operability improvements that unlock debugging and safer releases
-
-**Tier 3 — Deprioritized with reason**
-- Items filtered out by project context
-- Enterprise-scale recommendations that do not fit
-- Strategic suggestions without a concrete first step
-
-### Step 4: Prepare planning inputs, not execution artifacts
-
-For structural refactors or major risks identified by the review, prepare a packet for `/project-direction` that includes:
-1. Baseline evidence to preserve: public interfaces, startup/shutdown behavior, critical-path tests, current constraints
-2. Logical workstream boundaries: what could be split into separate epics/tasks
-3. Required reconciliation gates: how to prove behavior stayed equivalent after changes
-
-Do not create beads directly from `project-review`. `project-direction` owns the dependency graph and planning graph generation.
-
-### Step 5: Handle episodic artifacts
-
-The review document itself is transitory. After extracting actionables:
-- Do not commit the review as permanent doctrine
-- If the review surfaces genuine doctrine or design insight, update the relevant `project-shape` pillar instead
-- Keep the durable artifacts as updated shape/spec docs plus the `/project-direction` handoff packet
 
 ## Anti-Patterns
 
@@ -249,7 +187,8 @@ The review document itself is transitory. After extracting actionables:
 | [`references/report-template.md`](references/report-template.md) | Phase 3-4 | Output structure, scorecard, handoff packet layout |
 | [`references/project-type-adaptations.md`](references/project-type-adaptations.md) | Phase 1-3 | Category weighting by project type, maturity expectations, hybrid handling |
 | [`references/spec-reconciliation.md`](references/spec-reconciliation.md) | Spec reconciliation mode | Bidirectional spec↔code inventory, coverage table, gap analysis, remediation protocol |
-| [`references/spec-format.md`](references/spec-format.md) | Writing or extending specs during reconciliation | OpenSpec file format: heading hierarchy, WHEN/THEN rules, naming conventions |
+| [`references/third-party-review.md`](references/third-party-review.md) | Processing an external review/audit | Five-step protocol: fact-check, context-filter, ROI tiers, planning-input prep, episodic-artifact handling |
+| [`../../references/spec-format.md`](../../references/spec-format.md) | Writing or extending specs during reconciliation | OpenSpec file format: heading hierarchy, WHEN/THEN rules, naming conventions (shared package-level contract) |
 
 ## Scripts
 

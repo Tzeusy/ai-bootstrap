@@ -76,7 +76,7 @@ analysis is being smuggled in.
 **Gap list B (undocumented implementations) — write specs:**
 1. If the feature fits an existing spec's scope, extend that spec; otherwise
    create `openspec/specs/{spec-name}/spec.md`
-2. Follow [`spec-format.md`](./spec-format.md) exactly (heading hierarchy,
+2. Follow [`spec-format.md`](../../../references/spec-format.md) exactly (heading hierarchy,
    WHEN/THEN bullet format, naming conventions)
 3. Extract requirements from observed behavior; describe purpose and
    observable behavior, never internal architecture
