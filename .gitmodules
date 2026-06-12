@@ -7,11 +7,11 @@
 	url = https://github.com/yusufkaraaslan/Skill_Seekers
 	branch = main
 [submodule "skills/anthropic-skills"]
-	path = skills/anthropic-skills
+	path = skills/archive/anthropic-skills
 	url = https://github.com/anthropics/skills
 	branch = main
 [submodule "skills/notebooklm-skill"]
-	path = skills/notebooklm-skill
+	path = skills/archive/notebooklm-skill
 	url = https://github.com/Tzeusy/notebooklm-skill.git
 [submodule ".claude/plugins/marketplaces/claude-plugins-official"]
 	path = .claude/plugins/marketplaces/claude-plugins-official
