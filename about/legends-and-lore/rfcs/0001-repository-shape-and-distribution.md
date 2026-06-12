@@ -46,14 +46,14 @@ The repository is divided into three logical layers:
 - Tool-specific roots are then symlinked or copied into home-directory config locations.
 - Shared skills may be copied or symlinked into tool-specific skill directories, but their authored source remains under `skills/`.
 - In practice, local installation may pass through in-repo mirror surfaces such as `.claude/skills` or directly into home-directory skill paths; neither mirror layer supersedes the source tree.
-- When project-local pillar skills are installed under `.claude/skills`,
-  `.codex/skills`, or `.gemini/skills`, they act as navigation entrypoints into
-  `about/` and `openspec/`, not as a second authored documentation tree.
-- Project-local pillar skills are authored under `about/skills/`, beside the
-  docs they index, and reach the tool skill surfaces through the standard
-  mirror flow; installing them directly into ignored mirror directories without
-  a tracked source is a contract violation, because mirror cleanup may
-  legitimately delete them.
+- Repo-scoped pillar skills are authored under `about/skills/`, beside the
+  docs they index, as navigation entrypoints into `about/` and `openspec/` —
+  never a second authored documentation tree.
+- Pillar skills MUST NOT be mirrored into `.claude/skills`, `.codex/skills`,
+  or `.gemini/skills`: on installed machines those surfaces double as the
+  user's global skill catalogs, and repo-specific navigation must not leak
+  into unrelated sessions. In-repo sessions are routed to `about/skills/` by
+  the project instruction files (`CLAUDE.md`, `AGENTS.md`) instead.
 - OpenCode currently installs as config under `$HOME/.config/opencode` rather than participating in the in-repo skill-mirror layout used by Claude, Codex, and Gemini.
 - Regeneration or refresh flows must be explicit and scriptable. For example, `scripts/refresh.sh` is the supported way to rebuild the vendored Excalidraw bundle used by the personal Excalidraw skill.
 

@@ -145,28 +145,37 @@ Scope: v1-mandatory
 - **THEN** those expectations live under `about/craft-and-care/` instead of
   being left only in doctrine, RFC prose, or reviewer folklore
 
-### Requirement: Project-Local Pillar Skills
+### Requirement: Repo-Scoped Pillar Skills
 
-When tool-specific skill-entrypoint directories exist for this repository, they
-MUST provide all five pillar skills as navigation surfaces that route back to
-the canonical docs rather than becoming a second authored source of truth.
+The repository MUST author all five pillar navigation skills under
+`about/skills/`, beside the docs they index, and MUST keep them out of the
+tool skill surfaces (`.claude/skills`, `.codex/skills`, `.gemini/skills`):
+on installed machines those surfaces double as the user's global skill
+catalogs, and repo-specific navigation must not leak into unrelated sessions.
+Project instruction files MUST route in-repo sessions to them instead.
 
 Source: RFC 0001 §Distribution Model, §Documentation Contract;
 about/craft-and-care/interfaces-and-dependencies.md
 Scope: v1-mandatory
 
-#### Scenario: Five pillar entrypoints
+#### Scenario: Five pillar sources
 
-- **WHEN** `.claude/skills`, `.codex/skills`, or `.gemini/skills` are installed
-  for this repository
-- **THEN** each installed surface exposes `heart-and-soul`,
-  `legends-and-lore`, `spec-and-spine`, `lay-and-land`, and `craft-and-care`
+- **WHEN** `about/skills/` is inspected
+- **THEN** it contains `heart-and-soul`, `legends-and-lore`, `spec-and-spine`,
+  `lay-and-land`, and `craft-and-care`, each routing to `about/` or `openspec/`
+  content rather than acting as a second authored documentation layer
 
-#### Scenario: Skill routes to canonical docs
+#### Scenario: No global mirroring
 
-- **WHEN** a project-local pillar skill is loaded
-- **THEN** it routes the agent to `about/` or `openspec/` content rather than
-  acting as a second authored documentation layer
+- **WHEN** the skill mirror populates `.claude/skills`, `.codex/skills`, or
+  `.gemini/skills`
+- **THEN** the pillar skills are not among the mirrored entries
+
+#### Scenario: In-repo discovery
+
+- **WHEN** an agent session starts inside this repository
+- **THEN** the project instruction files (`CLAUDE.md`, `AGENTS.md`) route it to
+  `about/skills/` for pillar navigation
 
 ### Requirement: Traceable Navigation
 

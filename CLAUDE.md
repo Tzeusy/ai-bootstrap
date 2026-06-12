@@ -75,6 +75,18 @@ Symlinks into tool homes (`~/.claude/skills` etc.) are managed by the parent
 repo's `bootstrap.sh`, which prunes `subskills/` so superskills install as one
 catalog entry.
 
+## Project Shape Navigation
+
+The five-pillar shape docs live under `about/` and `openspec/`. Their
+repo-scoped navigation skills are authored in `about/skills/<pillar>/SKILL.md`
+(`heart-and-soul`, `legends-and-lore`, `spec-and-spine`, `lay-and-land`,
+`craft-and-care`). They are deliberately NOT in the skill catalog — this
+repo's `.claude/skills` doubles as the user's global `~/.claude/skills`, so
+mirroring them would leak repo-specific skills into every session. Before
+structural, placement, or quality-bar decisions here, read the relevant
+`about/skills/*/SKILL.md` index and follow its routing. `craft-and-care` is
+mandatory for non-trivial changes.
+
 ## Architecture Overview
 
 Skills-first (see README.md). Canonical skills live in `skills/`;

@@ -23,9 +23,11 @@ This repository is the canonical local source for portable AI-assistant configur
 
 The repo's job is to keep shared AI-assistant knowledge stable, explicit, and portable while still allowing each tool to have its own thin adapter layer. For local mirroring and placement, `skills/` is the primary source of truth even when some non-`personal/` skills are upstream-derived. When contributors add or modify content, the default question is not "what command runs this?" but "where should this live so humans and agents can find it, maintain it, and reuse it across tools?"
 
-Project-local pillar skills under `.claude/skills`, `.codex/skills`, and
-`.gemini/skills` should route agents back into these canonical docs rather than
-becoming a second authored documentation layer. Their authored source lives in
-[`about/skills/`](./skills/), beside the docs they index; the tool-surface
-copies are managed mirror symlinks produced by the standard skill-mirror flow,
-never hand-authored in place.
+Repo-scoped pillar skills live in [`about/skills/`](./skills/), beside the
+docs they index, and route agents back into these canonical docs rather than
+becoming a second authored documentation layer. They are deliberately not
+mirrored into the tool skill surfaces (`.claude/skills`, `.codex/skills`,
+`.gemini/skills`): on installed machines those double as the user's global
+skill catalogs, and repo-specific navigation must not leak into unrelated
+sessions. Sessions started inside this repository are routed to them by
+`CLAUDE.md` and `AGENTS.md`.

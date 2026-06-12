@@ -30,7 +30,7 @@ flowchart TD
 | `skills/` non-`personal/` | Upstream-derived submodules, vendored skills, and intentional forks that still mirror from this repo locally | Canonical local mirror source with upstream provenance |
 | `agents/` | Older tool-agnostic role prompts retained for reference or selective reuse | Secondary reference layer |
 | `scripts/` | Repository-level maintenance utilities | Narrow support layer |
-| `about/` | Human-and-agent orientation docs, plus authored pillar-skill sources in `about/skills/` mirrored into tool skill surfaces | New canonical documentation layer |
+| `about/` | Human-and-agent orientation docs, plus repo-scoped pillar-skill indexes in `about/skills/` (deliberately excluded from the global skill mirror) | New canonical documentation layer |
 | `openspec/` | Normative requirements and change records | New canonical requirements layer |
 
 ## Boundary Notes
