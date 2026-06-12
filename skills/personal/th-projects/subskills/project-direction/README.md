@@ -26,7 +26,7 @@ This skill is for questions like:
 The workflow is intentionally serialized at the phase level:
 
 1. Preflight: infer project type, users, maturity, spec location, and analysis focus.
-2. Phase 1: run `/project-shape` reconciliation so doctrine, law, and spec intent are coherent before planning.
+2. Phase 1: run `/project-shape` reconciliation so doctrine, lore, and spec intent are coherent before planning.
 3. Phase 2: assess project spirit, spec adherence, workflows, architecture, tests, observability, and delivery readiness.
 4. Phase 3: evaluate tractability and alignment, then materialize a sequenced beads graph.
 5. Reconciliation: every phase must survive at least four dedicated review passes (`R1`-`R4+`).
@@ -146,7 +146,7 @@ The final artifact is a direction report shaped by `references/work-plan-templat
 - What is the project's real direction?
 - What should it work on next?
 - What should it stop pretending it can do?
-- Which work graph was generated, and why is it coherent with doctrine, law, and spec?
+- Which work graph was generated, and why is it coherent with doctrine, lore, and spec?
 
 This skill does not execute the beads. It hands off explicitly to `beads-coordinator`.
 

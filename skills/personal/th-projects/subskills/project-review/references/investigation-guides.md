@@ -2,7 +2,7 @@
 
 Per-domain checklists for subagent investigators. Each section is self-contained — pass only the relevant domain section to the assigned subagent.
 
-If Phase 0 of `project-review` found usable `project-shape` artifacts, treat them as the normative baseline for every domain. README claims are still evidence, but they do not override doctrine, law, or spec.
+If Phase 0 of `project-review` found usable `project-shape` artifacts, treat them as the normative baseline for every domain. README claims are still evidence, but they do not override doctrine, lore, or spec.
 
 **Tool usage**: Use Glob for file discovery and Grep for content search. Fall back to Bash only for commands that require piping (e.g., `wc -l`, `sort`).
 

@@ -77,9 +77,7 @@ This is the preferred model for sustained throughput. The coordinator coordinate
 
 Related personal workflow skills include:
 
-- `project-shape` for doctrine/spec/topology setup
-- `project-review` for repo audits
-- `project-direction` for spec-driven prioritization
+- `th-projects` — superskill routing to `project-shape` (doctrine/spec/topology setup), `project-review` (repo audits), and `project-direction` (spec-driven prioritization)
 - `reconcile-spec-to-project` for spec/code reconciliation
 
 ## Quick Start

@@ -20,7 +20,7 @@ For **quick health check** scope, output only: Normative Baseline, Executive Sum
 - **Design-contract maturity**: {absent | nascent | structured | mature}
 - **Spec maturity**: {absent | nascent | structured | mature}
 - **Topology maturity**: {absent | nascent | structured | mature}
-- **Source-of-truth order used**: {doctrine/law/spec/topology/README/code}
+- **Source-of-truth order used**: {doctrine/lore/spec/topology/README/code}
 - **Normative artifacts reviewed**: {list of pillar files or "none"}
 - **Missing or weak pillars**: {list}
 - **Known contradictions before scoring**: {list or "none"}
@@ -166,7 +166,7 @@ For **quick health check** scope, output only: Normative Baseline, Executive Sum
 ## 10. Planning Handoff for `/project-direction`
 
 ### Required shape work before implementation planning
-- {doctrine/law/topology gap or "none"}
+- {doctrine/lore/topology gap or "none"}
 
 ### Required spec work before implementation planning
 - {spec update, missing requirement, contract clarification, or "none"}

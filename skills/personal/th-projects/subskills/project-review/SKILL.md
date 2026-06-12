@@ -1,6 +1,11 @@
 ---
 name: project-review
 description: Use when auditing a repository's overall health, tech debt, maintainability, architecture quality, or a third-party repo-wide audit. Use for repository-level assessment requests such as "review this project", "audit the codebase", or "assess project health", not for single-PR review or exhaustive spec-to-code reconciliation.
+metadata:
+  owner: tze
+  authors:
+    - tze
+    - Claude Fable 5
 ---
 
 # Project Review
@@ -47,7 +52,7 @@ Output of Phase 0: a short baseline packet containing:
 - Per-pillar maturity and missing pillars
 - Source-of-truth order used for this review
 - Explicit doctrine/spec requirements that the code must satisfy
-- Any unresolved contradictions across doctrine, law, spec, README, or code
+- Any unresolved contradictions across doctrine, lore, spec, README, or code
 
 ### Phase 1: Automated Repository Scan
 
@@ -59,7 +64,7 @@ bash scripts/project-scan.sh <repo_root>
 
 Before proceeding, read `references/project-type-adaptations.md` to calibrate scoring by project type and maturity.
 
-Calibration rule: `project-shape` sets the project's normative requirements; `project-type-adaptations.md` adjusts emphasis and expectations. If generic project-type advice conflicts with doctrine, law, or spec, the shaped project artifacts win.
+Calibration rule: `project-shape` sets the project's normative requirements; `project-type-adaptations.md` adjusts emphasis and expectations. If generic project-type advice conflicts with doctrine, lore, or spec, the shaped project artifacts win.
 
 #### Edge cases
 
@@ -109,7 +114,7 @@ Collect all subagent reports. Read `references/report-template.md` for the outpu
 1. Merge scores conservatively. When subagents disagree on a category, take the lower score and record the disagreement.
 2. Mark genuinely inapplicable categories as `N/A`; exclude them from the average.
 3. Classify findings into four buckets:
-   - Normative violations: doctrine/law/spec/topology contradicted by implementation
+   - Normative violations: doctrine/lore/spec/topology contradicted by implementation
    - Generic health risks: code quality, reliability, tooling, security, performance, DX
    - Shape gaps: missing or stale pillars that weaken review confidence or decision quality
    - Deprioritized items: theoretically good ideas that do not fit the project's actual context
@@ -128,7 +133,7 @@ Collect all subagent reports. Read `references/report-template.md` for the outpu
 7. Prepare the `/project-direction` handoff packet:
    - Confirmed findings only
    - Phase 0 baseline packet
-   - Required doctrine/law/spec updates before implementation planning
+   - Required doctrine/lore/spec updates before implementation planning
    - Recommended sequencing constraints and dependency hints
    - Deprioritized items with reasons
    - Evidence index
@@ -178,7 +183,7 @@ Not all best-practice advice applies equally. Explicitly deprioritize recommenda
 | Early-stage project | Heavy conformance harnesses before interfaces stabilize |
 | Self-hosted/internal tool | SaaS-style auth hardening beyond the real threat model |
 
-If doctrine or law artifacts exist, use them to justify deprioritization. If they do not exist, say that the filter is inferential rather than explicit.
+If doctrine or lore artifacts exist, use them to justify deprioritization. If they do not exist, say that the filter is inferential rather than explicit.
 
 ### Step 3: Synthesize actionables by ROI
 
@@ -228,7 +233,7 @@ The review document itself is transitory. After extracting actionables:
 
 | File | Read when | Content |
 |------|-----------|---------|
-| `../project-shape/SKILL.md` | Phase 0 | Four-pillar model, shape assessment workflow, normative source hierarchy |
+| `../project-shape/SKILL.md` | Phase 0 | Five-pillar model, shape assessment workflow, normative source hierarchy |
 | `../project-direction/SKILL.md` | Phase 3-4 | Planning contract, sequencing expectations, and handoff target |
 | `references/scoring-rubric.md` | Phase 2 | 1-5 criteria per category with evidence guidance |
 | `references/investigation-guides.md` | Phase 2 | Per-domain checklists, search patterns, deliverables |
@@ -248,6 +253,6 @@ Once findings are confirmed, invoke `/project-direction`.
 Handoff contract:
 - Feed it the Phase 0 baseline packet, not just the scorecard
 - Separate normative violations from generic health risks
-- Identify which findings require doctrine/law/spec updates before any implementation planning
+- Identify which findings require doctrine/lore/spec updates before any implementation planning
 - Include sequencing constraints, dependency hints, and explicit deprioritized items
 - Keep execution ownership separate: `project-review` audits, `/project-direction` plans

@@ -10,6 +10,11 @@ description: >
   "project shape", "bootstrap docs", "where should this go", "what's this project about",
   "project pillars", "heart and soul", "spec structure", "knowledge architecture", "system
   map", "topology", "lay of the land", "set up project structure".
+metadata:
+  owner: tze
+  authors:
+    - tze
+    - Claude Fable 5
 ---
 
 # Project Shape

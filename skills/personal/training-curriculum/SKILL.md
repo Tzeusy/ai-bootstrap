@@ -31,7 +31,7 @@ Assume read access to the target repository and permission to create or update a
 
 ## Do Not Use This Skill When
 
-- The task is to explain the repository as it already exists for a contributor who has the prerequisite background: use `project-shape`, `project-review`, or the repo's own docs
+- The task is to explain the repository as it already exists for a contributor who has the prerequisite background: use `th-projects` (project-shape or project-review subskills) or the repo's own docs
 - The task is to write capability specs, RFCs, or implementation plans rather than educational material
 - The user needs quick bug triage, code review, or feature delivery instead of a learning path
 - The user wants generic topic tutoring detached from any target repository
@@ -59,7 +59,7 @@ Assume read access to the target repository and permission to create or update a
 
 ## Operational Boundaries
 
-- If the repository itself lacks intelligible shape docs, use `project-shape` or `project-review` separately; do not silently turn this skill into a repo-architecture authoring workflow.
+- If the repository itself lacks intelligible shape docs, use `th-projects` (project-shape or project-review subskills) separately; do not silently turn this skill into a repo-architecture authoring workflow.
 - If `curriculum/` already exists, update it in place and validate the result instead of generating a competing second structure.
 - If independent subagents are unavailable, do not claim the curriculum is comprehensive. Stop and report that the hard 3-pass requirement could not be satisfied.
 - If fewer than 3 isolated discovery passes complete, or any pass reused another pass's notes or conclusions before completion, discard the run and fail closed.

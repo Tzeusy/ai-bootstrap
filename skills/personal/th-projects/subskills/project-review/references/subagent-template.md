@@ -12,7 +12,7 @@ Type: {type} | Maturity: {maturity} | Users: {users}
 Shape maturity summary: doctrine={absent|nascent|structured|mature}, design={...}, specs={...}, topology={...}
 
 ## Normative baseline
-{Paste the Phase 0 baseline packet from project-review. Include doctrine/law/spec/topology sources, missing pillars, and contradictions.}
+{Paste the Phase 0 baseline packet from project-review. Include doctrine/lore/spec/topology sources, missing pillars, and contradictions.}
 
 ## Scan output
 {Paste the full scan output from project-scan.sh}
@@ -27,7 +27,7 @@ Calibrate for project type using these adjustments:
 {Paste the relevant section from project-type-adaptations.md}
 
 ## Investigation rules
-- If shaped artifacts exist, treat doctrine/law/spec/topology as more authoritative than README marketing copy.
+- If shaped artifacts exist, treat doctrine/lore/spec/topology as more authoritative than README marketing copy.
 - Use repository search tools (Glob/Grep/rg or equivalent), not ad-hoc broad scans, for file/content discovery.
 - Cite specific files and line numbers for every claim: `path/to/file.ts:42`
 - Label each claim: [Observed], [Inferred], or [Unknown]
