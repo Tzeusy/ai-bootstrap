@@ -99,7 +99,7 @@ Use this route when at least two pillars exist and the project needs a human-fri
 The coordinator should:
 
 1. Extract only the layman-relevant narrative from each pillar, mentioning `craft-and-care` lightly as the project's engineering character and quality bar rather than dumping internal process detail.
-2. Design 3-5 diagrams with `/excalidraw-diagram`, preferring SVG output.
+2. Design 3-5 diagrams with `/th-engineering` (excalidraw-diagram), preferring SVG output.
 3. Write the overview in thesis-first order: what it is, what it is not, how it works, what v1 delivers, and how to navigate the docs.
 4. Store overview assets in `about/assets/`.
 5. Review for accessibility and adversarial clarity before treating the overview as done.
@@ -132,11 +132,11 @@ bash scripts/self-test.sh
 bash scripts/eval-fallbacks.sh
 ```
 
-Use `/excalidraw-diagram` when diagrams materially improve comprehension. If the renderer is unavailable, degrade to Mermaid or prose without weakening the review discipline or the five-pillar ordering.
+Use `/th-engineering` (excalidraw-diagram) when diagrams materially improve comprehension. If the renderer is unavailable, degrade to Mermaid or prose without weakening the review discipline or the five-pillar ordering.
 
 ## Related Skills
 
-- `/excalidraw-diagram`: render conceptual and technical SVG diagrams used by shape docs and overviews.
+- `/th-engineering` (excalidraw-diagram): render conceptual and technical SVG diagrams used by shape docs and overviews.
 - `/project-direction`: turn reconciled shape into priority-weighted work planning.
 - `../project-review/` (spec-reconciliation mode): compare `openspec/` against actual implementation.
 

@@ -61,7 +61,7 @@ The chain: `doctrine principle → RFC §section → spec requirement → WHEN/T
 Specs evolve through a managed lifecycle:
 
 <!-- [DIAGRAM: spec-lifecycle]
-Style: conceptual, simple. Use /excalidraw-diagram.
+Style: conceptual, simple. Use /th-engineering (excalidraw-diagram).
 Layout: horizontal timeline with spiral/cycle return.
 Elements:
   - 7 stages as small dots on a horizontal timeline line, each with a free-floating label above:

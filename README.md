@@ -35,7 +35,7 @@ The `skills/` tree is intentionally split by ownership:
 
 - `skills/personal/` is the layer built and maintained by me.
 - These are the primary place for custom workflow logic, project-shaping methods, and Beads execution patterns.
-- Some personal skills are original; some are maintained forks adapted to my workflow. `skills/personal/excalidraw-diagram/` is an example of that pattern.
+- Some personal skills are original; some are maintained forks adapted to my workflow. `skills/personal/th-engineering/subskills/excalidraw-diagram/` is an example of that pattern.
 
 Everything else under top-level `skills/` should be treated as upstream-derived material:
 

@@ -74,8 +74,11 @@ rg -n "^name:|^description:" subskills/*/SKILL.md
   competing priorities or "what next" → direction. A feature request that
   survives its funnel hands its spec delta to direction for sequencing.
 - **Scope guard**: single-PR or diff review is not project-level — use
-  `/code-review`. Backlog mechanics without direction analysis belong to
-  `/beads-orchestration` (beads-writer).
+  `/code-review`. Change-level engineering-quality judgment (the engineering
+  bar, readability, test rigor, dependency hygiene, cruft cleanup, skill
+  reviews, diagrams) belongs to `/th-engineering`; project-shape's
+  craft-and-care pillar adopts that bar by reference. Backlog mechanics
+  without direction analysis belong to `/beads-orchestration` (beads-writer).
 - **Fallback**: if the task is project-adjacent but none of the rows fit,
   answer from router-level context or ask — do not load a subskill to browse.
 

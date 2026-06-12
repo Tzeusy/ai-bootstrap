@@ -12,7 +12,7 @@ A single markdown file at `about/README.md` containing:
 ## Prerequisites
 
 - At least two pillars must exist (heart-and-soul + one other)
-- Prefer `/excalidraw-diagram` plus a working renderer for visualization
+- Prefer `/th-engineering` (excalidraw-diagram) plus a working renderer for visualization
 - If Excalidraw tooling is unavailable, use Mermaid or skip diagrams that do not materially improve understanding
 
 ## Process
@@ -40,7 +40,7 @@ Plan 3-5 diagrams that visually argue the project's story. Prefer Excalidraw whe
 Source: `about/heart-and-soul/vision.md`
 
 Approach:
-- Use the `/excalidraw-diagram` skill's conceptual/simple mode
+- Use the `/th-engineering` (excalidraw-diagram) skill's conceptual/simple mode
 - Show the core transformation or value proposition
 - Include what the project IS NOT as a visual contrast (crossed-out or dimmed alternatives)
 - This should be the hero image at the top of the document
@@ -52,7 +52,7 @@ Approach:
 Source: `about/lay-and-land/components.md`, `about/heart-and-soul/architecture.md`
 
 Approach:
-- Use `/excalidraw-diagram` at the comprehensive level
+- Use `/th-engineering` (excalidraw-diagram) at the comprehensive level
 - Show components as distinct shapes reflecting their roles
 - Show data flow with labeled arrows
 - Mark boundaries (trust, ownership, deployment)
@@ -94,7 +94,7 @@ Approach:
 
 For each diagram:
 
-1. **Design** using `/excalidraw-diagram` methodology (depth assessment → concept mapping → pattern selection → sketch → JSON)
+1. **Design** using `/th-engineering` (excalidraw-diagram) methodology (depth assessment → concept mapping → pattern selection → sketch → JSON)
 2. **Render** using the best available pipeline for the environment
 3. **Prefer SVG** for clean markdown embedding; PNG is acceptable when SVG export is unavailable
 4. **Validate** through the render-view-fix loop until the diagram passes quality checks

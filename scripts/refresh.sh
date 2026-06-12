@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SKILL_DIR="$ROOT/skills/personal/excalidraw-diagram"
+SKILL_DIR="$ROOT/skills/personal/th-engineering/subskills/excalidraw-diagram"
 VENDOR_DIR="$SKILL_DIR/references/vendor"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT

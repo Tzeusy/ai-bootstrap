@@ -4,13 +4,13 @@ Install these as `.claude/skills/<name>/SKILL.md` (and equivalents for `.codex/`
 
 **CRITICAL FORMAT REQUIREMENT:** Every SKILL.md file **MUST** begin with YAML frontmatter delimited by `---`. Without frontmatter, skill loaders silently reject the file. Supported fields: `name` and `description`. Do not omit the opening or closing `---` delimiters. Do not start the file with a markdown heading.
 
-**Authoring mandate:** These local skills **MUST** follow current `agentskills.io` conventions and `/skill-creator` best practices, and they should be reviewed against `/skill-standards` before shipping. In practice that means: valid minimal frontmatter, a trigger-oriented `description`, a concise SKILL body that routes rather than repeats source material, explicit navigation cues that help the agent select only the files needed for the current task, and package-level alignment between `SKILL.md` and any directly referenced support files.
+**Authoring mandate:** These local skills **MUST** follow current `agentskills.io` conventions and `/skill-creator` best practices, and they should be reviewed against `/th-engineering` (skill-standards) before shipping. In practice that means: valid minimal frontmatter, a trigger-oriented `description`, a concise SKILL body that routes rather than repeats source material, explicit navigation cues that help the agent select only the files needed for the current task, and package-level alignment between `SKILL.md` and any directly referenced support files.
 
 **Progressive discovery mandate:** Design every pillar skill for targeted retrieval. Keep `SKILL.md` as the discovery/index layer, and fan heavier or narrower content out into supporting files such as `references/*.md` and `scripts/*`. Supporting files should not be hidden sidecars: link them directly from `SKILL.md` with "read when..." guidance so the agent can progressively discover and load only the relevant slice.
 
 Customize the tables and rules for your project's specific domains.
 
-After customizing any generated pillar skill, run `/skill-standards` as the final rubric pass for trigger quality, grounding, metadata hygiene, and progressive discovery.
+After customizing any generated pillar skill, run `/th-engineering` (skill-standards) as the final rubric pass for trigger quality, grounding, metadata hygiene, and progressive discovery.
 
 ## Template: heart-and-soul
 
@@ -232,18 +232,11 @@ This pillar should express stack-neutral engineering principles and reviewable e
 not technology recommendations. State standards in terms of evidence, invariants, change
 safety, maintainability, and operational care.
 
-By default, this pillar should encode a few explicit engineering biases unless the project
-overrides them:
-- Prefer `/cruft-cleanup` principles for same-repo refactors and migrations; remove dead
-  internal compatibility paths rather than preserving them by default
-- Prefer readability and simplicity over cleverness
-- Prefer strong observability, especially diagnosable exception paths
-- Prefer durable, maintainable fixes over short-term patches that merely clear the immediate error
-- Prefer explicit control flow and obvious invariants over hidden magic
-- Prefer fail-fast behavior over silent fallback unless graceful degradation is explicitly required
-- Prefer updating docs, specs, and contracts in the same change when behavior or assumptions move
-- Prefer verification depth over throughput for non-trivial work
-- Take feedback seriously, but evaluate it on technical merit and push back on weak or incorrect claims
+This pillar adopts the canonical default quality bar from `/th-engineering` (engineering-bar
+subskill) — nine default biases, definition of done, and the change-level subskills that
+operationalize them — **by reference**. The documents here record only this project's
+deviations: overridden biases (with reasons) and project-specific standards the default bar
+does not cover. When this pillar conflicts with the default bar, this pillar wins.
 
 **Consult relevant craft files before:**
 - Any non-trivial implementation work
@@ -281,25 +274,11 @@ only the narrower standards docs the current change needs.
 
 ## Default Biases
 
-1. **Finish migrations cleanly** — For same-repo refactors or renames, prefer removing retired
-   wrappers, aliases, fallback branches, dead flags, and old paths. Use `/cruft-cleanup` when
-   this question is in play.
-2. **Choose clarity over cleverness** — Prefer readable, straightforward implementations unless
-   a more complex design is clearly necessary for correctness or reliability.
-3. **Instrument failures for diagnosis** — Exception paths should emit enough context to narrow
-   likely causes quickly, not just announce failure.
-4. **Fix for the long term** — Prefer maintainable, correct solutions over temporary patches that
-   only suppress the immediate symptom.
-5. **Choose explicitness over magic** — Prefer visible control flow, obvious invariants, and
-   explicit data movement over hidden behavior or surprising abstractions.
-6. **Fail fast unless graceful degradation is truly required** — Do not silently fall back from
-   invalid assumptions or broken paths unless another pillar explicitly requires that behavior.
-7. **Update docs and contracts in the same change** — If behavior, assumptions, interfaces, or
-   standards changed, the relevant docs should move with the code.
-8. **Verify proportionally to risk** — For non-trivial changes, do deliberate second-pass checking
-   rather than optimizing for throughput.
-9. **Handle feedback with humility and rigor** — Incorporate valid criticism quickly and push back
-   clearly on incorrect, low-rigor, or scope-distorting claims.
+The default biases are not restated here. Load `/th-engineering` (engineering-bar subskill)
+for the canonical list and definition of done; the narrower th-engineering subskills
+(code-readability, test-rigor, dependency-hygiene, cruft-cleanup) operationalize individual
+biases. This project's overrides and additions live in the Document Index files above and
+take precedence over the defaults.
 
 ## Mandatory Use Rule
 

@@ -16,37 +16,20 @@ must be when we change it.
 
 ## Default Engineering Biases
 
-Unless a project explicitly overrides them, `craft-and-care` should default to these engineering
-biases:
+The canonical default quality bar — the nine engineering biases, the definition of done, and
+the change-level subskills that operationalize them (readability, test rigor, dependency
+hygiene, cruft cleanup) — lives in `/th-engineering` (engineering-bar subskill). This pillar
+**adopts that bar by reference**; it does not restate it.
 
-1. **Prefer cleanup over same-repo compatibility cruft** — Follow `/cruft-cleanup` principles
-   wherever possible. When a refactor, rename, or migration can be completed atomically inside the
-   same repo, prefer deleting retired wrappers, aliases, fallback branches, dead flags, and unused
-   paths over preserving them "just in case." Preserve backward compatibility only when there is a
-   verified external consumer or a real cross-repo migration constraint.
-2. **Prefer readability and simplicity over cleverness** — When two approaches can achieve the
-   same correctness and reliability, prefer the simpler and more readable one. Dense, overly
-   abstract, or surprising code needs a strong justification.
-3. **Bias toward observability** — Failure paths should be diagnosable. At minimum, logs should be
-   instrumented so exceptions can be investigated quickly, with enough structured context to narrow
-   plausible causes rather than merely report that something failed.
-4. **Prefer durable fixes over expedient patches** — Do not optimize for "clear the error for now"
-   when a correct, maintainable fix is tractable. Assume engineering time is available; optimize
-   for correctness, reliability, and long-term maintainability instead.
-5. **Prefer explicitness over magic** — Prefer visible control flow, explicit data movement, and
-   obvious invariants over hidden side effects, surprising framework behavior, or implicit coupling.
-6. **Prefer fail-fast over silent fallback** — Unless graceful degradation is explicitly required by
-   doctrine, specs, or design contracts, surface incorrect assumptions and invalid states clearly
-   rather than masking them behind quiet fallback behavior.
-7. **Prefer same-change documentation and contract updates** — When behavior, assumptions,
-   interfaces, or standards change, update the relevant docs, specs, RFCs, or standards in the
-   same change rather than relying on follow-up cleanup.
-8. **Prefer verification depth over throughput** — Quality beats quantity. For non-trivial work,
-   verification should be deliberate and risk-scaled. Re-check important changes before merge
-   rather than assuming the first pass was sufficient.
-9. **Take pride in the work, but evaluate feedback on merit** — Good engineering work should be
-   defended with rigor, not ego. Incorporate valid feedback quickly, stay humble about blind spots,
-   and push back clearly on incorrect, weak, or scope-distorting claims.
+When authoring a project's `craft-and-care/`:
+
+1. Point `engineering-bar.md` at `/th-engineering`'s engineering-bar as the default, then record
+   only the project's **deviations**: biases the project overrides (with the reason), and
+   project-specific standards the default bar does not cover.
+2. Do not copy the bias list into the project. A copied bar drifts; a referenced bar stays
+   current. The override mechanism is the project pillar itself — when it conflicts with the
+   default bar, the pillar wins.
+3. Reviewers enforce the merged result: default biases plus project overrides.
 
 ## Recommended Structure
 

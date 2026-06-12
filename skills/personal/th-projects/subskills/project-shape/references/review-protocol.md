@@ -32,7 +32,7 @@ Do not split work so aggressively that the coordinator spends more time stitchin
 ## Review Architecture
 
 <!-- [DIAGRAM: review-architecture]
-Style: conceptual, simple. Use /excalidraw-diagram.
+Style: conceptual, simple. Use /th-engineering (excalidraw-diagram).
 Layout: vertical pipeline with fan-out and convergence.
 Elements:
   - Top: hero rectangle "Generator Agent" labeled "(highest capability model, max thinking)", warm/primary color
