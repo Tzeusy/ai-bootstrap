@@ -1,0 +1,4 @@
+interface:
+  display_name: Project Feature Request
+  short_description: "Concretize one feature request into a signed-off spec delta: motif, doctrine gate, topology, design sketch, WHEN/THEN scenarios"
+  default_prompt: "Use $project-feature-request to run this feature request through the idea funnel and produce a signed-off spec delta."

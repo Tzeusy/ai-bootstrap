@@ -82,6 +82,72 @@ case_authored_repo_can_be_mature() {
   assert_contains "$out" "Pillars needing authoring: 0/5" "authored repo should not report scaffolded pillars"
 }
 
+case_four_pillars_without_craft_not_mature() {
+  local repo="$TMP_ROOT/no-craft"
+  local out
+  mkdir -p \
+    "$repo/about/heart-and-soul" \
+    "$repo/about/legends-and-lore/rfcs" \
+    "$repo/about/lay-and-land" \
+    "$repo/openspec/changes/core/specs/core" \
+    "$repo/.claude/skills/heart-and-soul" \
+    "$repo/.claude/skills/legends-and-lore" \
+    "$repo/.claude/skills/spec-and-spine" \
+    "$repo/.claude/skills/lay-and-land"
+
+  cat > "$repo/about/heart-and-soul/vision.md" <<'EOF'
+# Vision
+
+Real doctrine for a project with no engineering-standards pillar.
+
+## Non-Negotiable Rules
+1. Rule one.
+EOF
+  cat > "$repo/about/heart-and-soul/v1.md" <<'EOF'
+# V1 Scope
+
+## V1 Ships
+
+- one thing
+EOF
+  cat > "$repo/about/legends-and-lore/rfcs/0001-x.md" <<'EOF'
+# RFC 0001
+
+Implements doctrine from vision.md.
+EOF
+  cat > "$repo/about/lay-and-land/components.md" <<'EOF'
+# Components
+
+Topology reflects RFC and spec boundaries.
+EOF
+  cat > "$repo/openspec/changes/core/specs/core/spec.md" <<'EOF'
+# Spec
+
+Source: RFC 0001
+
+### Scenario: one
+- **WHEN** x
+- **THEN** y
+EOF
+
+  for s in heart-and-soul legends-and-lore spec-and-spine lay-and-land; do
+    cat > "$repo/.claude/skills/$s/SKILL.md" <<EOF
+---
+name: $s
+description: Use when reading $s.
+---
+
+# $s
+EOF
+  done
+
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "[ABSENT] about/craft-and-care/" "missing craft-and-care should be reported absent"
+  assert_contains "$out" "Pillars present: 4/5" "four authored pillars should count 4/5"
+  assert_contains "$out" "Assessment: STRUCTURED" "four pillars without craft-and-care should be structured"
+  assert_not_contains "$out" "Assessment: MATURE" "four pillars without craft-and-care must never be mature"
+}
+
 case_legacy_layout_detected() {
   local repo="$FIXTURES_DIR/legacy-layout"
   local out
@@ -175,6 +241,7 @@ EOF
 run_case "fresh scaffold is not mature" case_fresh_scaffold_not_mature
 run_case "unsupported frontmatter keys are rejected" case_invalid_frontmatter_rejected
 run_case "fully authored repo is mature" case_authored_repo_can_be_mature
+run_case "four pillars without craft-and-care is not mature" case_four_pillars_without_craft_not_mature
 run_case "legacy layout is detected conservatively" case_legacy_layout_detected
 run_case "html comments do not trigger scaffold classification" case_html_comments_do_not_trigger_scaffold
 run_case "review-only docs do not create design pillar" case_reviews_only_do_not_create_design_pillar

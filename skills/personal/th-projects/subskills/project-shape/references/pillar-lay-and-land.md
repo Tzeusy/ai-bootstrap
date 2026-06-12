@@ -4,7 +4,7 @@
 
 The topology layer answers **WHERE**: where components live, how they connect, what boundaries exist, and how the system is deployed. It's the spatial understanding of the project — the map you'd draw on a whiteboard to orient a new contributor.
 
-Topology cross-cuts the other three pillars. Doctrine says *why* a boundary exists, RFCs say *how* it communicates, specs say *what* it must do — but topology shows *where* it sits in relation to everything else.
+Topology cross-cuts the other four pillars. Doctrine says *why* a boundary exists, RFCs say *how* it communicates, specs say *what* it must do, craft-and-care says *who we must be* when we change it — but topology shows *where* it sits in relation to everything else.
 
 ## Recommended Structure
 
@@ -75,6 +75,7 @@ Store diagram sources in `about/lay-and-land/assets/` so they can be updated.
 | **Doctrine** (heart-and-soul) | Topology shows *where* doctrine principles are embodied. A non-negotiable rule like "agents never sit in the frame loop" implies a boundary on the topology map. |
 | **Design Contracts** (docs) | Each RFC governs a region of the topology. The component map shows which RFC applies where. |
 | **Specs** (openspec) | Spec domains map to components. The topology shows which specs govern which parts of the system. |
+| **Engineering Standards** (craft-and-care) | Topology shows *where* the engineering bar applies. A component's risk profile and boundaries determine how strictly verification, observability, and review standards bite there. |
 
 ## Writing Topology Docs
 

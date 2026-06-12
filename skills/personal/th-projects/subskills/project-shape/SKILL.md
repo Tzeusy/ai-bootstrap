@@ -114,17 +114,18 @@ Work top-down — each pillar grounds the next:
 
 <!-- [DIAGRAM: pillar-order]
 Style: conceptual, simple. Use /excalidraw-diagram.
-Layout: horizontal chain of 4 nodes with a parallel bypass arrow.
+Layout: horizontal chain of 5 nodes with a parallel bypass arrow.
 Elements:
-  - 4 pillars as distinct shapes, left-to-right:
+  - 5 pillars as distinct shapes, left-to-right:
     1. "heart-and-soul" (WHY) — ellipse, warm color (origin/start)
-    2. "legends-and-lore" (HOW) — rectangle, cool color (process)
-    3. "openspec" (WHAT) — diamond or hexagon, accent color (decision/spec)
-    4. "lay-and-land" (WHERE) — rectangle, earth tone (structure)
-  - Sequential arrows connecting 1→2→3→4
-  - A dashed bypass arrow from node 2 to node 4, labeled "can start in parallel after architecture track"
-  - Below each node: the folder path (about/heart-and-soul/, about/legends-and-lore/, openspec/, about/lay-and-land/) as free-floating small text
-Argument: Order matters — each pillar grounds the next. But topology can start early.
+    2. "craft-and-care" (WHO WE ARE WHEN WE BUILD) — rounded rectangle, distinct color (engineering character) — drafted immediately after doctrine is coherent
+    3. "legends-and-lore" (HOW) — rectangle, cool color (process)
+    4. "openspec" (WHAT) — diamond or hexagon, accent color (decision/spec)
+    5. "lay-and-land" (WHERE) — rectangle, earth tone (structure)
+  - Sequential arrows connecting 1→2→3→4→5
+  - A dashed bypass arrow from node 3 to node 5, labeled "can start in parallel after architecture track"
+  - Below each node: the folder path (about/heart-and-soul/, about/craft-and-care/, about/legends-and-lore/, openspec/, about/lay-and-land/) as free-floating small text
+Argument: Order matters — each pillar grounds the next. Craft-and-care follows doctrine directly; topology can start early.
 -->
 
 Topology (lay-and-land) can be started in parallel with design contracts once the architecture interview track is complete. `craft-and-care` should be drafted immediately after doctrine is coherent and before implementation planning begins; it is mandatory for all non-trivial implementation work.
@@ -133,7 +134,11 @@ Read `references/bootstrapping.md` for phase-by-phase details, including the loc
 
 ## Workflow 2: Translate Ideas into Requirements
 
-The shape model provides a natural funnel for turning ideas into code:
+The shape model provides a natural funnel for turning ideas into code. To run
+this funnel end-to-end for one concrete feature request — through doctrine
+gate, topology placement, design sketch, and WHEN/THEN spec scenarios — use
+`../project-feature-request/SKILL.md`; this section describes the model it
+implements:
 
 <!-- [DIAGRAM: idea-funnel]
 Style: conceptual, simple. Use /excalidraw-diagram.
@@ -181,7 +186,7 @@ When code changes diverge from documentation:
 
 ### Related Skills
 
-Use `/project-direction` for a full direction analysis including priority-weighted work plans. Use `/reconcile-spec-to-project` for detailed spec-code divergence detection.
+Use `../project-direction/SKILL.md` for a full direction analysis including priority-weighted work plans. Use `../project-review/SKILL.md` (spec-reconciliation mode) for detailed spec-code divergence detection. Use `../project-feature-request/SKILL.md` to take a single new idea through the funnel.
 
 ## Workflow 4: Generate Project Overview
 

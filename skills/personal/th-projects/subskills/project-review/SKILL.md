@@ -1,6 +1,6 @@
 ---
 name: project-review
-description: Use when auditing a repository's overall health, tech debt, maintainability, architecture quality, or a third-party repo-wide audit. Use for repository-level assessment requests such as "review this project", "audit the codebase", or "assess project health", not for single-PR review or exhaustive spec-to-code reconciliation.
+description: Use when auditing a repository's overall health, tech debt, maintainability, architecture quality, processing a third-party repo-wide audit, or reconciling OpenSpec specs against the implementation (bidirectional gap analysis and remediation). Use for repository-level assessment requests such as "review this project", "audit the codebase", "assess project health", or "reconcile spec vs implementation", not for single-PR review.
 metadata:
   owner: tze
   authors:
@@ -156,7 +156,7 @@ The report must make the boundary explicit:
 
 **Third-party deep-dive review synthesis** ("process this review/audit"): Fact-check external findings, filter them through the project's actual context, convert confirmed findings into a planning handoff packet, and route execution planning to `/project-direction`.
 
-**OpenSpec reconciliation request** ("reconcile spec vs implementation", "what's implemented but undocumented", "what's specified but missing"): Route to `$reconcile-spec-to-project`. That skill performs exhaustive bidirectional spec/code mapping and remediation, which is outside this skill's primary health-audit flow.
+**Spec reconciliation** ("reconcile spec vs implementation", "what's implemented but undocumented", "what's specified but missing"): Exhaustive bidirectional spec↔code mapping with remediation — undocumented features get specs, unimplemented requirements get beads, strategic gaps escalate to `/project-direction`. Read `references/spec-reconciliation.md` for the full protocol. Unlike the health audit this mode samples nothing, and it is the one mode permitted to create remediation artifacts, because each artifact traces 1:1 to a confirmed spec gap.
 
 ## Handling Third-Party Deep-Dive Reviews
 
@@ -226,7 +226,7 @@ The review document itself is transitory. After extracting actionables:
 - Accepting severity assessments from an external review at face value
 - Treating all recommendations as equally important
 - Enterprise-framing a personal project
-- Creating beads or other execution artifacts directly from `project-review`
+- Creating beads or other execution artifacts directly from `project-review` (the scoped exception: spec-reconciliation remediation per `references/spec-reconciliation.md`)
 - Preserving the review as canon instead of extracting durable doctrine/spec/planning updates
 
 ## References
@@ -240,6 +240,8 @@ The review document itself is transitory. After extracting actionables:
 | `references/subagent-template.md` | Phase 2 | Dispatch template and required prompt fields |
 | `references/report-template.md` | Phase 3-4 | Output structure, scorecard, handoff packet layout |
 | `references/project-type-adaptations.md` | Phase 1-3 | Category weighting by project type, maturity expectations, hybrid handling |
+| `references/spec-reconciliation.md` | Spec reconciliation mode | Bidirectional spec↔code inventory, coverage table, gap analysis, remediation protocol |
+| `references/spec-format.md` | Writing or extending specs during reconciliation | OpenSpec file format: heading hierarchy, WHEN/THEN rules, naming conventions |
 
 ## Scripts
 

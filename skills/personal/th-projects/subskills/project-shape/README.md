@@ -138,6 +138,6 @@ Use `/excalidraw-diagram` when diagrams materially improve comprehension. If the
 
 - `/excalidraw-diagram`: render conceptual and technical SVG diagrams used by shape docs and overviews.
 - `/project-direction`: turn reconciled shape into priority-weighted work planning.
-- `/reconcile-spec-to-project`: compare `openspec/` against actual implementation.
+- `../project-review/` (spec-reconciliation mode): compare `openspec/` against actual implementation.
 
 The coordinator owns the routing decision; these related skills execute focused subtasks once the route is clear.

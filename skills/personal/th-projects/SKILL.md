@@ -3,11 +3,13 @@ name: th-projects
 description: >
   Use for project-level engineering governance in any repository — establishing or auditing a
   project's knowledge architecture (doctrine, design contracts, specs, topology, engineering
-  standards), deciding what to work on next via spec-driven planning, or running a repo-wide
-  health audit. Route to exactly one subskill per task. Triggers: "project shape", "bootstrap
-  docs", "where should this be documented", "knowledge architecture", "what should we work on
-  next", "prioritize features", "does the code match the spec", "should we build this", "break
-  this down into chunks", "review this project", "audit the codebase", "assess project health".
+  standards), deciding what to work on next via spec-driven planning, running a repo-wide
+  health audit, concretizing a feature request into a spec delta, or reconciling specs against
+  implementation. Route to exactly one subskill per task. Triggers: "project shape", "bootstrap
+  docs", "knowledge architecture", "what should we work on next", "prioritize features",
+  "does the code match the spec", "should we build this", "break this down into chunks",
+  "review this project", "audit the codebase", "assess project health", "I want to add X",
+  "spec this feature", "turn this idea into requirements", "reconcile spec vs implementation".
 metadata:
   owner: tze
   authors:
@@ -20,7 +22,7 @@ compatibility: Subskill scripts require bash, git, grep, find. project-direction
 
 # TH Projects
 
-Superskill router for spec-driven project governance. Three subskills live under
+Superskill router for spec-driven project governance. Four subskills live under
 `subskills/`; each is a complete standard skill package (own `SKILL.md`,
 `references/`, `scripts/`). Subskills are **not** installed in the global skill
 catalog — discover them lazily from this package and load **at most one**
@@ -28,15 +30,18 @@ subskill body per task. A subskill may itself tell you to consult a sibling
 (e.g. project-review runs project-shape's scanner); follow those links from the
 subskill, not from here.
 
-The three subskills cover one lifecycle:
+The four subskills cover one lifecycle:
 
 1. **Shape** establishes the normative baseline — what the project believes,
    how it is designed, what exactly must be built, where everything lives, and
    the engineering bar for changing it.
-2. **Review** audits the implementation against that baseline and generic
-   health criteria, producing confirmed findings.
-3. **Direction** turns baseline + findings into a prioritized, spec-linked work
-   plan and hands execution to beads tooling.
+2. **Feature request** runs one concrete proposal through the idea funnel
+   against that baseline, producing a signed-off spec delta.
+3. **Review** audits the implementation against the baseline and generic
+   health criteria (including exhaustive spec↔code reconciliation), producing
+   confirmed findings.
+4. **Direction** turns baseline + spec deltas + findings into a prioritized,
+   spec-linked work plan and hands execution to beads tooling.
 
 ## Discover subskills
 
@@ -50,8 +55,9 @@ rg -n "^name:|^description:" subskills/*/SKILL.md
 | Task intent | Subskill | Typical trigger |
 |---|---|---|
 | Bootstrap or audit the project's knowledge architecture (five pillars: heart-and-soul, legends-and-lore, openspec, lay-and-land, craft-and-care); decide where an idea should be documented; generate a layman overview. | [subskills/project-shape/SKILL.md](subskills/project-shape/SKILL.md) | "set up project structure", "bootstrap docs", "where should this go", "audit documentation health" |
-| Decide what to work on next; evaluate a feature proposal; check spec-to-code drift; turn an approved spec into a prioritized beads work plan. | [subskills/project-direction/SKILL.md](subskills/project-direction/SKILL.md) | "what's highest leverage", "should we build this", "break this down", "is this roadmap aligned" |
-| Repo-wide health audit: code quality, reliability, security, docs, maintainability — scored, evidence-based, with a planning handoff packet. | [subskills/project-review/SKILL.md](subskills/project-review/SKILL.md) | "review this project", "audit the codebase", "assess project health", "process this external audit" |
+| Concretize ONE fuzzy feature/project request into a signed-off spec delta: motif, doctrine gate, topology placement, design sketch, WHEN/THEN scenarios. | [subskills/project-feature-request/SKILL.md](subskills/project-feature-request/SKILL.md) | "I want to add X", "spec this feature", "turn this idea into requirements", "what would it take to build X" |
+| Decide what to work on next; evaluate competing priorities; check roadmap alignment; turn approved specs into a prioritized beads work plan. | [subskills/project-direction/SKILL.md](subskills/project-direction/SKILL.md) | "what's highest leverage", "what should we work on next", "break this down", "is this roadmap aligned" |
+| Repo-wide health audit: code quality, reliability, security, docs, maintainability — scored, evidence-based, with a planning handoff packet. Includes the exhaustive spec-reconciliation mode (bidirectional spec↔code gap audit + remediation). | [subskills/project-review/SKILL.md](subskills/project-review/SKILL.md) | "review this project", "audit the codebase", "assess project health", "reconcile spec vs implementation", "what's implemented but undocumented" |
 
 ## Routing rules
 
@@ -64,10 +70,12 @@ rg -n "^name:|^description:" subskills/*/SKILL.md
   wrong with this repo" → review. "What should we do about it / next" →
   direction. A full review naturally hands off to direction — that handoff
   happens inside the subskills.
+- **Feature vs. direction**: one concrete proposal → feature-request; many
+  competing priorities or "what next" → direction. A feature request that
+  survives its funnel hands its spec delta to direction for sequencing.
 - **Scope guard**: single-PR or diff review is not project-level — use
-  `/code-review`. Exhaustive bidirectional spec↔code reconciliation belongs to
-  `/reconcile-spec-to-project`. Backlog mechanics without direction analysis
-  belong to `/beads-orchestration` (beads-writer).
+  `/code-review`. Backlog mechanics without direction analysis belong to
+  `/beads-orchestration` (beads-writer).
 - **Fallback**: if the task is project-adjacent but none of the rows fit,
   answer from router-level context or ask — do not load a subskill to browse.
 
