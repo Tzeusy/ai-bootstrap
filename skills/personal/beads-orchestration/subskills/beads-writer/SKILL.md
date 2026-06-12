@@ -27,7 +27,7 @@ Every bead must be a self-contained handoff for a future independent session. Su
 ## Do Not Use This Skill When
 
 - The work already exists as a well-formed bead and should now be implemented: use `beads-worker`
-- The task is to review a whole repository or generate a roadmap from audit findings: use `project-review` or `project-direction`
+- The task is to review a whole repository or generate a roadmap from audit findings: use `th-projects` (project-review or project-direction subskills)
 - The task is exhaustive spec-versus-code reconciliation rather than issue writing: use `reconcile-spec-to-project`
 
 ## Core Rules

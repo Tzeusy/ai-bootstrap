@@ -49,7 +49,8 @@ rg -n "^name:|^description:" subskills/*/SKILL.md
   coordinator; it never dispatches execution.
 - **Fallback**: if the task is Beads-adjacent but none of the rows fit (e.g.
   one-off `bd` queries, project prioritization), do not load a subskill — use
-  plain `bd` commands or a dedicated skill such as `project-direction`.
+  plain `bd` commands or a dedicated skill such as `th-projects`
+  (project-direction subskill).
 
 ## Shared invariants (all subskills)
 
