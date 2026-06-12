@@ -217,23 +217,32 @@ Read `references/generate-overview.md` for the full guide: diagram specs, docume
 
 | Pillar | Reference | Read when... |
 |--------|-----------|-------------|
-| Doctrine | `references/pillar-heart-and-soul.md` | Bootstrapping vision, writing non-negotiables, scoping v1 |
-| Design Contracts | `references/pillar-legends-and-lore.md` | Structuring RFCs, running reviews, capturing trade-offs |
-| Capability Specs | `references/pillar-spec-and-spine.md` | Writing requirements, WHEN/THEN scenarios, spec lifecycle |
-| Topology | `references/pillar-lay-and-land.md` | Mapping components, boundaries, data flow, deployment |
-| Engineering Standards | `references/pillar-craft-and-care.md` | Defining the implementation quality bar, review standards, verification discipline, observability, and maintainability expectations |
+| Doctrine | [`references/pillar-heart-and-soul.md`](references/pillar-heart-and-soul.md) | Bootstrapping vision, writing non-negotiables, scoping v1 |
+| Design Contracts | [`references/pillar-legends-and-lore.md`](references/pillar-legends-and-lore.md) | Structuring RFCs, running reviews, capturing trade-offs |
+| Capability Specs | [`references/pillar-spec-and-spine.md`](references/pillar-spec-and-spine.md) | Writing requirements, WHEN/THEN scenarios, spec lifecycle |
+| Topology | [`references/pillar-lay-and-land.md`](references/pillar-lay-and-land.md) | Mapping components, boundaries, data flow, deployment |
+| Engineering Standards | [`references/pillar-craft-and-care.md`](references/pillar-craft-and-care.md) | Defining the implementation quality bar, review standards, verification discipline, observability, and maintainability expectations |
 
 ### Process Guides
 
 | Guide | Reference | Read when... |
 |-------|-----------|-------------|
-| Consultative Bootstrapping | `references/consultative-bootstrapping.md` | Extracting shape from a human for a new project — interview tracks, challenge patterns, synthesis rules |
-| Review Protocol | `references/review-protocol.md` | Reviewing generated docs with independent subagents — agent specs, iteration rules, anti-patterns |
-| Bootstrapping Phases | `references/bootstrapping.md` | Step-by-step phase guide for establishing shape from scratch |
-| Local Skill Templates | `references/local-skill-templates.md` | Installing agent navigation skills for each pillar |
-| Generate Project Overview | `references/generate-overview.md` | Creating a layman-friendly about/README.md with Excalidraw diagrams |
-| Maturity Rubric | `references/maturity-rubric.md` | Understanding scanner thresholds and what qualifies as structured/shaped/mature |
-| Evaluation Scenarios | `references/evaluation-scenarios.md` | Testing the skill package itself across strong/weak environments and legacy/scaffolded repos |
+| Consultative Bootstrapping | [`references/consultative-bootstrapping.md`](references/consultative-bootstrapping.md) | Extracting shape from a human for a new project — interview tracks, challenge patterns, synthesis rules |
+| Review Protocol | [`references/review-protocol.md`](references/review-protocol.md) | Reviewing generated docs with independent subagents — agent specs, iteration rules, anti-patterns |
+| Bootstrapping Phases | [`references/bootstrapping.md`](references/bootstrapping.md) | Step-by-step phase guide for establishing shape from scratch |
+| Local Skill Templates | [`references/local-skill-templates.md`](references/local-skill-templates.md) | Installing agent navigation skills for each pillar |
+| Generate Project Overview | [`references/generate-overview.md`](references/generate-overview.md) | Creating a layman-friendly about/README.md with Excalidraw diagrams |
+| Maturity Rubric | [`references/maturity-rubric.md`](references/maturity-rubric.md) | Understanding scanner thresholds and what qualifies as structured/shaped/mature |
+| Evaluation Scenarios | [`references/evaluation-scenarios.md`](references/evaluation-scenarios.md) | Testing the skill package itself across strong/weak environments and legacy/scaffolded repos |
+
+### Scripts
+
+| Script | Run when... |
+|--------|-------------|
+| [`scripts/shape-scan.sh`](scripts/shape-scan.sh) `[project-root]` | Assessing an existing project's shape — reports which pillars exist, their maturity, and gaps |
+| [`scripts/shape-init.sh`](scripts/shape-init.sh) `[project-root] [--skills-only] [--tools=...]` | Scaffolding pillar directories and generating correctly-formatted local skills |
+| [`scripts/self-test.sh`](scripts/self-test.sh) | Verifying the scanner/scaffolder against known fixtures after changing `SKILL.md`, `shape-scan.sh`, or `shape-init.sh` |
+| [`scripts/eval-fallbacks.sh`](scripts/eval-fallbacks.sh) | Confirming constrained-environment fallback behavior is still documented after changing fallback guidance |
 
 ## Local Skill Installation
 

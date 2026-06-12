@@ -17,7 +17,7 @@ Use this template when dispatching investigation subagents for project direction
 - Launch A, B, C in parallel (B can start with scan output; it doesn't strictly need A's full output to begin reading specs)
 - Launch D after A, B, C complete (it synthesizes their findings)
 - The Handoff Output (direction report + beads handoff) is assembled by the orchestrator using all agent outputs; it is not a numbered phase
-- **Receiver protocol**: when a fresh `../project-review/` handoff packet exists, Agent C's dispatch must explicitly list the dimensions to SKIP (the ones the review already scored — typically test confidence, observability, delivery readiness) and narrow C to architectural fitness for the proposed direction
+- **Receiver protocol**: when a fresh `../../project-review/` handoff packet exists, Agent C's dispatch must explicitly list the dimensions to SKIP (the ones the review already scored — typically test confidence, observability, delivery readiness) and narrow C to architectural fitness for the proposed direction
 
 ---
 

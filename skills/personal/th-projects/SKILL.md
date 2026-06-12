@@ -46,8 +46,9 @@ The four subskills cover one lifecycle:
 ## Discover subskills
 
 ```bash
-find "$(dirname "$SKILL_PATH")/subskills" -maxdepth 2 -name SKILL.md
-rg -n "^name:|^description:" subskills/*/SKILL.md
+PKG="$(dirname "$SKILL_PATH")"
+find "$PKG/subskills" -maxdepth 2 -name SKILL.md
+rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 ```
 
 ## Routing table

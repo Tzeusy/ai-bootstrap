@@ -167,14 +167,14 @@ Focus modes change which phases do real work and which tier applies — the phas
 
 | File | Read when | Content |
 |------|-----------|---------|
-| `references/direction-model.md` | Phase 2 (agents A, B, C) | Project spirit, requirement classification, current-state assessment |
-| `references/alignment-review.md` | Phase 2 (agent D); feature evaluation | 8-dimension evaluation framework, classification buckets, push-back checklist, gap analysis |
-| `references/openspec-changeset.md` | Phase 2 step 3 | Tool-agnostic OpenSpec changeset synthesis via the `openspec` CLI |
-| `references/work-plan-template.md` | Handoff output | Output format, sequencing presentation, reconciliation reporting |
-| `references/subagent-template.md` | Phases 1-3 (reconciliation and dispatch) | Agent roles, dispatch template, depth limits, per-agent notes |
-| `references/epic-report.md` | Phase 3 (beads structure) | Report bead structure, diagram integration, spec compliance matrix |
+| [`references/direction-model.md`](references/direction-model.md) | Phase 2 (agents A, B, C) | Project spirit, requirement classification, current-state assessment |
+| [`references/alignment-review.md`](references/alignment-review.md) | Phase 2 (agent D); feature evaluation | 8-dimension evaluation framework, classification buckets, push-back checklist, gap analysis |
+| [`references/openspec-changeset.md`](references/openspec-changeset.md) | Phase 2 step 3 | Tool-agnostic OpenSpec changeset synthesis via the `openspec` CLI |
+| [`references/work-plan-template.md`](references/work-plan-template.md) | Handoff output | Output format, sequencing presentation, reconciliation reporting |
+| [`references/subagent-template.md`](references/subagent-template.md) | Phases 1-3 (reconciliation and dispatch) | Agent roles, dispatch template, depth limits, per-agent notes |
+| [`references/epic-report.md`](references/epic-report.md) | Phase 3 (beads structure) | Report bead structure, diagram integration, spec compliance matrix |
 
 ## Scripts
 
-- `scripts/spec-scan.sh <repo_root>` — Discovers specs, design docs, roadmap, agent context, issue tracking, git activity by area. Required in Phase 2.
-- `scripts/epic-report-scaffold.sh <epic-id> [repo_root]` — Used by report bead executors created in Phase 3. Bootstraps report markdown from beads epic data, creates `docs/reports/` with metadata pre-filled.
+- [`scripts/spec-scan.sh`](scripts/spec-scan.sh) `<repo_root>` — Discovers specs, design docs, roadmap, agent context, issue tracking, git activity by area. Required in Phase 2.
+- [`scripts/epic-report-scaffold.sh`](scripts/epic-report-scaffold.sh) `<epic-id> [repo_root]` — Used by report bead executors created in Phase 3. Bootstraps report markdown from beads epic data, creates `docs/reports/` with metadata pre-filled.

@@ -7,7 +7,7 @@ creep and doctrine drift enter.
 ## Gate 0 — Baseline
 
 **Input**: repository; `about/` and `openspec/` if present.
-**Do**: run `../project-shape/scripts/shape-scan.sh <repo>` when available;
+**Do**: run `../../project-shape/scripts/shape-scan.sh <repo>` when available;
 otherwise glance for the five pillars manually.
 **Output**: one line per pillar — present/absent and whether it constrains this
 request.
@@ -28,7 +28,7 @@ separately, continue in lite mode.
   right amount and no further)
 
 Challenge patterns (borrow freely from
-`../project-shape/references/consultative-bootstrapping.md`):
+`../../project-shape/references/consultative-bootstrapping.md`):
 - "Give me the last time this actually happened."
 - "If we shipped only half of this, which half is the point?"
 - "What are you doing today instead, and why is that intolerable?"
@@ -69,7 +69,7 @@ not a feature — return to Gate 1 and split by motif.
 ## Gate 4 — Design Sketch
 
 **Input**: Gates 1-3; `about/legends-and-lore/` conventions
-(`../project-shape/references/pillar-legends-and-lore.md`).
+(`../../project-shape/references/pillar-legends-and-lore.md`).
 **Do** (medium+): draft the minimal RFC delta — the state machine, wire
 contract, or data shape that is genuinely new, plus the trade-offs considered
 and rejected. Reuse existing contracts by reference.
@@ -80,7 +80,7 @@ RFC stub stating what would have to become true, and park.
 
 ## Gate 5 — Specification
 
-**Input**: all prior gates; `../project-review/references/spec-format.md`;
+**Input**: all prior gates; `../../project-review/references/spec-format.md`;
 existing `openspec/` tree.
 **Do**:
 - Extend an existing spec when the capability fits its scope; create

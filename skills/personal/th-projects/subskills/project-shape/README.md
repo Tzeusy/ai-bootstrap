@@ -38,6 +38,10 @@ Every route runs on the same backbone:
 - `about/lay-and-land/` explains **where** components, boundaries, and deployments live.
 - `about/craft-and-care/` defines **who we are when we build**: the project's engineering character made explicit through standards for implementation, verification, review, operability, and maintenance.
 
+The pillars form a traceability chain — every implementation decision should trace back through doctrine, design contract, spec, code, and test:
+
+![Traceability chain across the pillars](assets/pillar-traceability.svg)
+
 The coordinator works top-down through the semantic spine. Doctrine grounds RFCs, RFCs ground specs, and specs ground execution planning. `lay-and-land` is the spatial cross-cut: update it anywhere the placement of components, boundaries, or data flow matters. `craft-and-care` is the engineering-character cross-cut: it defines the kind of engineer this project expects you to be in practice when changing it, through explicit standards for how changes are implemented, verified, reviewed, documented, and operated.
 
 ![Five pillars as load-bearing structure](assets/five-pillars-load-bearing.svg)
@@ -72,7 +76,9 @@ This route turns a fuzzy idea into work that can be implemented without losing t
 5. Apply the `craft-and-care` gate so the change has explicit expectations for verification, observability, review, compatibility, documentation, and operational care.
 6. Hand the sharpened output to task planning or downstream execution workflows.
 
-This is the route that prevents "good sounding" ideas from skipping directly to code.
+![Idea funnel: fuzzy in, precise out, doctrine kills early](assets/idea-funnel.svg)
+
+This is the route that prevents "good sounding" ideas from skipping directly to code. To run the funnel end-to-end for one concrete feature request, use the `project-feature-request` sibling subskill.
 
 ## Workflow 3: Audit And Maintain Shape Health
 

@@ -235,20 +235,20 @@ The review document itself is transitory. After extracting actionables:
 
 | File | Read when | Content |
 |------|-----------|---------|
-| `../project-shape/SKILL.md` | Phase 0 | Five-pillar model, shape assessment workflow, normative source hierarchy |
-| `../project-direction/SKILL.md` | Phase 3-4 | Planning contract, sequencing expectations, and handoff target |
-| `references/scoring-rubric.md` | Phase 2 | 1-5 criteria per category with evidence guidance |
-| `references/investigation-guides.md` | Phase 2 | Per-domain checklists, search patterns, deliverables |
-| `references/subagent-template.md` | Phase 2 | Dispatch template and required prompt fields |
-| `references/report-template.md` | Phase 3-4 | Output structure, scorecard, handoff packet layout |
-| `references/project-type-adaptations.md` | Phase 1-3 | Category weighting by project type, maturity expectations, hybrid handling |
-| `references/spec-reconciliation.md` | Spec reconciliation mode | Bidirectional spec↔code inventory, coverage table, gap analysis, remediation protocol |
-| `references/spec-format.md` | Writing or extending specs during reconciliation | OpenSpec file format: heading hierarchy, WHEN/THEN rules, naming conventions |
+| [`../project-shape/SKILL.md`](../project-shape/SKILL.md) | Phase 0 | Five-pillar model, shape assessment workflow, normative source hierarchy |
+| [`../project-direction/SKILL.md`](../project-direction/SKILL.md) | Phase 3-4 | Planning contract, sequencing expectations, and handoff target |
+| [`references/scoring-rubric.md`](references/scoring-rubric.md) | Phase 2 | 1-5 criteria per category with evidence guidance |
+| [`references/investigation-guides.md`](references/investigation-guides.md) | Phase 2 | Per-domain checklists, search patterns, deliverables |
+| [`references/subagent-template.md`](references/subagent-template.md) | Phase 2 | Dispatch template and required prompt fields |
+| [`references/report-template.md`](references/report-template.md) | Phase 3-4 | Output structure, scorecard, handoff packet layout |
+| [`references/project-type-adaptations.md`](references/project-type-adaptations.md) | Phase 1-3 | Category weighting by project type, maturity expectations, hybrid handling |
+| [`references/spec-reconciliation.md`](references/spec-reconciliation.md) | Spec reconciliation mode | Bidirectional spec↔code inventory, coverage table, gap analysis, remediation protocol |
+| [`references/spec-format.md`](references/spec-format.md) | Writing or extending specs during reconciliation | OpenSpec file format: heading hierarchy, WHEN/THEN rules, naming conventions |
 
 ## Scripts
 
-- `../project-shape/scripts/shape-scan.sh <repo_root>` — Establishes the normative baseline and shape maturity. Run first.
-- `scripts/project-scan.sh <repo_root>` — Structural repository scan covering languages, deps, tests, CI, infra, governance, git signals, and size.
+- [`../project-shape/scripts/shape-scan.sh`](../project-shape/scripts/shape-scan.sh) `<repo_root>` — Establishes the normative baseline and shape maturity. Run first.
+- [`scripts/project-scan.sh`](scripts/project-scan.sh) `<repo_root>` — Structural repository scan covering languages, deps, tests, CI, infra, governance, git signals, and size.
 
 ## After Review: Schedule with `/project-direction`
 
