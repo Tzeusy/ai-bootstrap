@@ -25,6 +25,19 @@ pinned to a recorded commit, plugin clones. They go stale silently when the
 source moves. Every flow here is idempotent — re-running a fresh one is a
 cheap no-op.
 
+## Health check without refreshing
+
+To answer "is my harness healthy" without changing anything, run the
+doctor — it executes every flow's *verify* check (broken links, submodule
+drift, shell load, bd doctor, required binaries) as one pass/fail report:
+
+```bash
+bash <this-subskill>/scripts/harness_doctor.sh
+```
+
+Keep [`scripts/harness_doctor.sh`](./scripts/harness_doctor.sh) in sync
+when adding a flow to the catalog.
+
 ## Workflow
 
 1. Read the flow catalog:

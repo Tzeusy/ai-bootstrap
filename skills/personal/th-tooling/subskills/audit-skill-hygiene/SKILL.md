@@ -38,7 +38,11 @@ reversible with one `git mv`.
 
    It inventories installed skills (mirroring bootstrap.sh's discovery,
    including its `subskills`/`archive` prunes), counts real invocations, and
-   prints used/unused/new tables plus `git mv` recommendations.
+   prints used/unused/new tables plus `git mv` recommendations — each with
+   its estimated per-session catalog token cost, so recommendations rank by
+   tokens reclaimed. It also warns on duplicate skill names (two dirs, one
+   name): link resolution is filesystem-order, so duplicates are a latent
+   bug — archive or delete the shadowed copy.
 
 2. Interpret with the known measurement caveats (below). Spot-check any
    surprising "unused" verdict by grepping a transcript before recommending

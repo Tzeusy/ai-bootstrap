@@ -35,22 +35,45 @@ CODEX_PATH_RE = re.compile(r"skills\\?/([a-zA-Z0-9_-]+)\\?/SKILL\.md")
 
 
 def discover_skills(skills_root: Path):
-    """Map installed skill name -> dir, and subskill name -> parent superskill."""
-    skills, sub_to_super = {}, {}
+    """Map installed skill name -> dir, subskill name -> parent superskill,
+    and name -> [shadowed duplicate dirs] (resolution is filesystem-order
+    in bootstrap.sh, so duplicates deserve a warning)."""
+    skills, sub_to_super, dupes = {}, {}, {}
     def walk(d: Path):
         for child in sorted(d.iterdir()):
             if not child.is_dir() or child.name in PRUNE_DIRS:
                 continue
-            if (child / "SKILL.md").is_file() and child.name not in skills:
-                skills[child.name] = child
-                subs = child / "subskills"
-                if subs.is_dir():
-                    for s in sorted(subs.iterdir()):
-                        if (s / "SKILL.md").is_file():
-                            sub_to_super[s.name] = child.name
+            if (child / "SKILL.md").is_file():
+                if child.name in skills:
+                    dupes.setdefault(child.name, []).append(child)
+                else:
+                    skills[child.name] = child
+                    subs = child / "subskills"
+                    if subs.is_dir():
+                        for s in sorted(subs.iterdir()):
+                            if (s / "SKILL.md").is_file():
+                                sub_to_super[s.name] = child.name
             walk(child)
     walk(skills_root)
-    return skills, sub_to_super
+    return skills, sub_to_super, dupes
+
+
+def frontmatter_tokens(skill_dir: Path) -> int:
+    """Rough token estimate (chars/4) of the SKILL.md frontmatter — the
+    recurring per-session catalog cost of keeping the skill installed."""
+    chars, fences = 0, 0
+    try:
+        for line in (skill_dir / "SKILL.md").read_text(errors="ignore").splitlines():
+            if line.strip() == "---":
+                fences += 1
+                if fences == 2:
+                    break
+                continue
+            if fences == 1:
+                chars += len(line) + 1
+    except OSError:
+        pass
+    return chars // 4
 
 
 def recent_files(root: Path, cutoff: float):
@@ -105,7 +128,7 @@ def main():
     args = ap.parse_args()
 
     cutoff = time.time() - args.since_days * 86400
-    skills, sub_to_super = discover_skills(args.skills_root)
+    skills, sub_to_super, dupes = discover_skills(args.skills_root)
     if not skills:
         sys.exit(f"no skills found under {args.skills_root}")
 
@@ -136,7 +159,10 @@ def main():
         "earliest_transcript": time.strftime("%Y-%m-%d", time.localtime(earliest)) if earliest else None,
         "used": dict(sorted(used.items(), key=lambda kv: -kv[1])),
         "new_exempt": sorted(new),
-        "recommend_archive": sorted(removable),
+        "recommend_archive": sorted(removable, key=lambda n: -frontmatter_tokens(skills[n])),
+        "catalog_cost_tokens": {n: frontmatter_tokens(skills[n])
+                                for n in sorted(skills, key=lambda n: -frontmatter_tokens(skills[n]))},
+        "shadowed_duplicates": {n: [str(p) for p in ps] for n, ps in sorted(dupes.items())},
         # Only skills this repo owns directly are movable; skills nested in
         # vendored submodules are reported above but cannot be git mv'd here.
         "commands": [
@@ -156,8 +182,13 @@ def main():
     for n in report["new_exempt"]:
         print(f"{'new':>6}  {n}  (added within window — exempt)")
     for n in report["recommend_archive"]:
-        print(f"{0:>6}  {n}")
-    print(f"\n{len(used)} used, {len(removable)} unused (recommend archive), {len(new)} new-exempt.")
+        print(f"{0:>6}  {n}  (~{report['catalog_cost_tokens'][n]} catalog tokens/session)")
+    reclaim = sum(report["catalog_cost_tokens"][n] for n in removable)
+    print(f"\n{len(used)} used, {len(removable)} unused (recommend archive, "
+          f"~{reclaim} catalog tokens/session reclaimable), {len(new)} new-exempt.")
+    for n, ps in report["shadowed_duplicates"].items():
+        print(f"WARNING: duplicate skill name '{n}' — linked copy is {skills[n]}, "
+              f"shadowed: {', '.join(ps)} (resolution is filesystem-order; remove one)")
     if report["commands"]:
         print("\nRecommended (run inside the skills repo, then re-run bootstrap linking):")
         for c in report["commands"]:

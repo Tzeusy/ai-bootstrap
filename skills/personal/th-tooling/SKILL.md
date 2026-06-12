@@ -5,12 +5,15 @@ description: >
   the ai-bootstrap skills tree, and the installed tool homes (~/.claude,
   ~/.codex, ~/.gemini). Covers auditing real skill usage from session
   transcripts and recommending what to archive, reviewing dotfiles for
-  conflicting aliases/config and best practices, and refreshing snapshot
-  state (skill symlinks, git submodules, mirrored assets). Route to exactly
-  one subskill per task. Triggers: "audit my skills", "which skills are
-  unused", "skill catalog is bloating my context", "review my dotfiles",
-  "clean up my zshrc/aliases", "refresh snapshots", "update submodules and
-  symlinks", "harness hygiene".
+  conflicting aliases/config and best practices, refreshing snapshot state
+  (skill symlinks, git submodules, mirrored assets), managing transcript
+  disk retention, compacting agent memory stores (AGENTS.md notes, bd
+  memories), and auditing MCP/permission/hook config against actual use.
+  Route to exactly one subskill per task. Triggers: "audit my skills",
+  "which skills are unused", "skill catalog is bloating my context",
+  "review my dotfiles", "clean up my zshrc/aliases", "refresh snapshots",
+  "update submodules and symlinks", "old transcripts eating disk", "compact
+  my notes to self", "audit my MCP servers", "harness hygiene".
 metadata:
   owner: tze
   authors:
@@ -47,7 +50,10 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 |---|---|---|
 | Measure real skill usage from Claude Code / Codex transcripts; recommend archiving non-new skills with no real usage in the window. | [subskills/audit-skill-hygiene/SKILL.md](subskills/audit-skill-hygiene/SKILL.md) | "audit my skills", "which skills are unused", "frontmatter is bloating my context" |
 | Review dotfiles (rc files, aliases, env, tool config) for conflicts, dead config, and best practices — without touching secret files. | [subskills/dotfiles-review/SKILL.md](subskills/dotfiles-review/SKILL.md) | "review my dotfiles", "clean up my zshrc", "are my aliases conflicting" |
-| Re-run every snapshot/mirror flow so installed state matches source: skill symlinks, git submodules, plugin updates. | [subskills/refresh-snapshots/SKILL.md](subskills/refresh-snapshots/SKILL.md) | "refresh snapshots", "update submodules", "relink skills", "is my installed state stale" |
+| Re-run every snapshot/mirror flow so installed state matches source: skill symlinks, git submodules, plugin updates. Also hosts the read-only harness doctor (all verify checks, no refresh). | [subskills/refresh-snapshots/SKILL.md](subskills/refresh-snapshots/SKILL.md) | "refresh snapshots", "update submodules", "relink skills", "is my harness healthy" |
+| Disk retention for session transcripts and tool logs: inventory, age-tiered compress/delete policy, audit-window trade-off. | [subskills/transcript-retention/SKILL.md](subskills/transcript-retention/SKILL.md) | "transcripts eating disk", "clean up old sessions" |
+| Compact append-only agent memory: AGENTS.md notes-to-self, bd memories — dedupe, merge superseded, retire orphans, keep guardrails. | [subskills/memory-hygiene/SKILL.md](subskills/memory-hygiene/SKILL.md) | "AGENTS.md is huge", "compact my notes", "stale memories" |
+| Audit non-skill context surfaces: MCP servers, permission allowlists, hooks — configured vs. actually used in transcripts. | [subskills/config-surface-audit/SKILL.md](subskills/config-surface-audit/SKILL.md) | "audit my MCP servers", "stale permissions", "config bloat" |
 
 ## Routing rules
 
