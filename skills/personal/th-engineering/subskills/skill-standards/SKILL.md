@@ -41,6 +41,9 @@ designed", "audit our skills for quality", "should this be a superskill",
   `/th-projects`
 - Acting as the domain skill itself; this is a rubric for skill quality, not
   domain guidance
+- Measuring whether installed skills are actually *used* and archiving dead
+  ones — `/th-tooling` (audit-skill-hygiene); this skill judges content
+  quality, not catalog hygiene
 
 ## Workflow
 

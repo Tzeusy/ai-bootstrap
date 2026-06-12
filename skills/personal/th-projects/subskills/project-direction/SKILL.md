@@ -20,7 +20,7 @@ Determine what a project should work on next. Ground decisions in specifications
 2. **No coding before signoff** — spec must be written/updated and approved before implementation begins.
 3. **Evidence over assumption** — cite files, functions, spec sections. Label claims: [Observed], [Inferred], [Unknown].
 4. **Push back when needed** — flag misaligned, premature, unrealistic, or infeasible work directly.
-5. **Minimize churn** — favor removing dead paths over backward-compatibility shims; serialize work that would conflict.
+5. **Minimize churn** — favor removing dead paths over backward-compatibility shims (`/th-engineering` cruft-cleanup is the bar); serialize work that would conflict.
 6. **Rigor where truth changes** — deep reconciliation guards *changes to normative artifacts*; consuming them takes one verification pass, not four.
 
 ## Workflow

@@ -98,6 +98,12 @@ Dispatch subagents per this plan:
 Dispatch strategy:
 - Launch A-F in parallel for a full review.
 - Pass both the Phase 0 baseline packet and the Phase 1 scan output to every subagent.
+- The canonical change-level quality expectations live in `/th-engineering`'s
+  subskills — B: code-readability + dependency-hygiene; C: test-rigor (+
+  diagnosis for flake/root-cause evidence); E: documentation. When craft-and-care
+  is absent or silent on a domain, agents cite those bars rather than inventing
+  criteria; `references/investigation-guides.md` stays the evidence-gathering
+  checklist, not a second bar.
 - Agent F can work independently, but during synthesis its roadmap draft remains advisory only. It does not create beads or own scheduling.
 
 Each subagent receives:

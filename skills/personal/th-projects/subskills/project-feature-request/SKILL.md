@@ -86,7 +86,9 @@ fork).
 **Gate 6 — Engineering bar.** Pull the relevant standards from
 `about/craft-and-care/` (testing discipline, observability, review
 expectations) into the acceptance criteria so quality is specified, not
-hoped for. If craft-and-care is absent, state the assumed bar explicitly.
+hoped for. If craft-and-care is absent, the assumed bar is `/th-engineering`'s
+engineering-bar default biases — cite that explicitly rather than inventing
+one.
 
 ## Sign-off and Handoff
 

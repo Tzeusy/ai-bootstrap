@@ -80,6 +80,8 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   reviews, diagrams) belongs to `/th-engineering`; project-shape's
   craft-and-care pillar adopts that bar by reference. Backlog mechanics
   without direction analysis belong to `/beads-orchestration` (beads-writer).
+  Hygiene of this machine's AI-tooling harness (installed skills, dotfiles,
+  snapshot state) belongs to `/th-tooling`.
 - **Fallback**: if the task is project-adjacent but none of the rows fit,
   answer from router-level context or ask — do not load a subskill to browse.
 

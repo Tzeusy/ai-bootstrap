@@ -61,7 +61,21 @@ command, verification, and last-verified date.
 - **Verify**: `zsh -ic exit` loads cleanly.
 - **Last verified**: 2026-06-12
 
-## 4. Beads issue export
+## 4. Vendored Excalidraw browser bundle
+
+- **Snapshot**: `ai-bootstrap/skills/personal/th-engineering/subskills/excalidraw-diagram/references/vendor/excalidraw.bundle.mjs`
+  (+ `excalidraw.bundle.version.json`), a minified build of
+  `@excalidraw/excalidraw` used by that skill's local renderer.
+- **Refresh**: `ai-bootstrap/scripts/refresh.sh`. This is an *advancing*
+  operation (bundles `@latest` from npm, like submodule `--remote`) — run it
+  only when the task asks for an upstream update, then commit the bundle and
+  version file together.
+- **Verify**: `cat .../references/vendor/excalidraw.bundle.version.json`
+  shows the new version, and a sample render succeeds
+  (`uv run <skill>/scripts/render_excalidraw.py <some>.excalidraw`).
+- **Last verified**: 2026-06-12
+
+## 5. Beads issue export
 
 - **Snapshot**: `.beads/issues.jsonl` (passive export of the Dolt DB,
   regenerated automatically on `bd` writes; gitignored in these repos).

@@ -30,9 +30,10 @@ catalog — discover them lazily, load **at most one** subskill body per
 subdomain, and prefer one subagent per subskill when a task spans several
 (see "Subagent dispatch").
 
-`/th-projects` governs the project (doctrine, specs, topology, audits); this
-superskill governs the change: the bar code must clear while being written,
-reviewed, or cleaned up.
+`/th-projects` governs the project (doctrine, specs, topology, audits);
+`/th-tooling` governs this machine's harness (installed skills, dotfiles,
+snapshot state); this superskill governs the change: the bar code must clear
+while being written, reviewed, or cleaned up.
 
 ## Discover subskills
 
@@ -67,6 +68,9 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 - **Docs craft vs. knowledge architecture**: README/docs/doc-site quality →
   documentation (it consumes excalidraw-diagram for its diagrams — an
   expected pairing); five-pillar shape work → `/th-projects`.
+- **Skill content vs. harness state**: skill quality, authoring, and review →
+  skill-standards; whether installed skills are used, linked, and fresh on
+  this machine → `/th-tooling` (audit-skill-hygiene, refresh-snapshots).
 - **Fallback**: quality-adjacent but no row fits → answer from router-level
   context or ask; do not load a subskill to browse.
 
