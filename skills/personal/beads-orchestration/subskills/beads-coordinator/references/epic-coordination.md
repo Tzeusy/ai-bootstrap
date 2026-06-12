@@ -23,6 +23,22 @@ to choose between independent dispatch and team coordination mode.
 Default to independent dispatch. Escalate to team coordination mode only when
 two or more positive signals are present.
 
+### Epic Complexity Tiers
+
+Count the positive signals from the table above to assign a tier. The same
+count drives both the dispatch decision and the reconciliation-model floor.
+
+| Positive signals | Tier | Dispatch | Reconciliation model floor |
+|---|---|---|---|
+| 0 | low / trivial | independent dispatch | `MEDIUM_COMPLEXITY_MODEL` |
+| 1 | medium | independent dispatch | `EPIC_COMPLEXITY_MODEL` |
+| 2+ | high | team coordination mode | `EPIC_COMPLEXITY_MODEL` |
+
+"Medium or higher" therefore means **1+ positive signals**, or any epic that
+carries the `team-coordination` label. For those epics the terminal
+reconciliation bead MUST be dispatched at `EPIC_COMPLEXITY_MODEL` (Opus or
+Fable on Claude); see "Reconciliation Floor" in `runtime-and-safety.md`.
+
 ## Independent Dispatch
 
 1. Inspect children:

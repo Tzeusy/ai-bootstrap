@@ -95,6 +95,6 @@ After creation:
 2. Run `bd dep tree <epic-id>` for epics.
 3. Run `bd ready` to make sure the intended work is unblocked.
 4. Run `bd lint`.
-5. For each epic, confirm there is exactly one terminal reconciliation child depending on every other child.
+5. For each epic, confirm there is exactly one terminal reconciliation child, carrying the `reconciliation` label, depending on every other child.
 
 Present created beads with at least ID, title, type, and priority.

@@ -252,6 +252,11 @@ Choose worker skill by issue type:
 - default implementation issue: `../beads-worker/SKILL.md`
 - `pr-review-task` issue: `../beads-pr-reviewer-worker/SKILL.md`
 
+A `reconciliation`-labelled bead still uses `../beads-worker/SKILL.md`, but its
+model is floored at `EPIC_COMPLEXITY_MODEL` for medium-or-higher epics — apply
+the "Reconciliation Floor" in `runtime-and-safety.md` when picking the model in
+Step 6.
+
 Inject only:
 - `ISSUE_ID`
 - `WORKTREE_PATH`

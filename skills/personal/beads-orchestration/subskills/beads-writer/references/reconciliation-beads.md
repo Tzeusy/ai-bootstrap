@@ -9,6 +9,11 @@ Every epic must end with one final child bead that performs spec-to-code reconci
 - Use the same priority as the epic.
 - Tag the title with generation: `gen-1`, `gen-2`, or `gen-3`.
 - `gen-3` is the hard limit. Do not create `gen-4`.
+- Add the `reconciliation` label (`--label reconciliation`). The coordinator
+  keys model selection off this label: for a medium-or-higher epic the
+  reconciliation bead is dispatched at `EPIC_COMPLEXITY_MODEL` (Opus or Fable
+  on Claude), not the default coding tier. See "Reconciliation Floor" in the
+  coordinator's `runtime-and-safety.md`.
 
 Purpose: verify that every requirement from the original epic or spec has a corresponding implementation bead and code change. If gaps exist, create missing child beads and, if needed, the next-generation reconciliation bead.
 
@@ -17,6 +22,7 @@ Purpose: verify that every requirement from the original epic or spec has a corr
 - Title: `Reconcile spec-to-code (gen-1) for <epic summary>`
 - Type: `task`
 - Priority: same as the epic
+- Label: `reconciliation`
 - Description:
 
 ```text

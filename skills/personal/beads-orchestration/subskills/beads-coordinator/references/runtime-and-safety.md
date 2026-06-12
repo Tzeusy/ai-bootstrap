@@ -72,7 +72,7 @@ The coordinator has discretion on subagent model choice based on task type.
 
 | Strategy | Models (subject to change) |
 |---|---|
-| `EPIC_COMPLEXITY_MODEL` | Opus 4.6, gpt-5.3-codex, gemini-3-pro |
+| `EPIC_COMPLEXITY_MODEL` | Opus 4.8 / Fable 5, gpt-5.3-codex, gemini-3-pro |
 | `HIGH_COMPLEXITY_MODEL` | Sonnet 4.6, gpt-5.3-codex, gemini-3-pro |
 | `MEDIUM_COMPLEXITY_MODEL` | Sonnet 4.6, gpt-5.3-codex, gemini-3-pro |
 | `LOW_COMPLEXITY_MODEL` | 4.5 Haiku, gpt-5.3-codex-spark, gemini-3-flash-preview |
@@ -82,11 +82,35 @@ The coordinator has discretion on subagent model choice based on task type.
 | Task Type | Model Complexity |
 |---|---|
 | Epic / team-coordinated work | `EPIC_COMPLEXITY_MODEL` |
+| Reconciliation bead for a medium-or-higher epic | `EPIC_COMPLEXITY_MODEL` (floor — see below) |
 | Planning, research, architecting | `HIGH_COMPLEXITY_MODEL` |
 | Coding | `MEDIUM_COMPLEXITY_MODEL` unless trivial |
 | Orchestration | `HIGH_COMPLEXITY_MODEL` |
 | Simple bugfixes | `MEDIUM_COMPLEXITY_MODEL` |
 | Formatting, linting | `LOW_COMPLEXITY_MODEL` |
+
+### Reconciliation Floor (mandatory)
+
+A reconciliation bead (label `reconciliation`, title `Reconcile spec-to-code
+(gen-N) …`) is a deep spec-to-code audit, not ordinary coding. Its `task` type
+would otherwise route it to `MEDIUM_COMPLEXITY_MODEL`, which is too weak to
+catch coverage gaps across a large epic.
+
+Rule: before dispatching a reconciliation bead, resolve its parent epic's
+complexity tier (see `epic-coordination.md` → "Epic Complexity Tiers"). If the
+epic is **medium or higher** (1+ positive classification signal, or it carries
+the `team-coordination` label), you MUST dispatch the reconciliation bead at
+`EPIC_COMPLEXITY_MODEL` — i.e. Opus or Fable on Claude. This is a floor, not a
+target: never drop below it for a qualifying epic, regardless of the bead's
+`task` type. Only a low/trivial epic (0 signals) may reconcile at
+`MEDIUM_COMPLEXITY_MODEL`.
+
+To find the parent epic and its tier:
+
+```bash
+EPIC_ID=$(bd show <recon-id> --json | jq -r '.parent // .epic // empty')
+bd show "${EPIC_ID}" --json   # inspect scope + labels for the tier signals
+```
 
 ## Central Mutation Authority
 

@@ -166,8 +166,8 @@ TEST_ID=$(bd create --title="Write auth integration tests" --type=task --priorit
 # Optional cross-dependency among implementation children
 bd dep add $JWT_ID $HASH_ID
 
-# Final reconciliation bead (always create last)
-RECON_ID=$(bd create --title="Reconcile spec-to-code (gen-1) for auth system" --type=task --priority=1 --parent=$EPIC \
+# Final reconciliation bead (always create last; label drives the model floor)
+RECON_ID=$(bd create --title="Reconcile spec-to-code (gen-1) for auth system" --type=task --priority=1 --parent=$EPIC --label reconciliation \
   --description="Deep-dive review: map each epic requirement to implementing child beads and code changes. For uncovered requirements, create implementation/fix child beads under this epic. If gaps remain after those beads close, create a follow-up reconciliation bead for the next generation (up to gen-3). Keep this bead open until all gap beads close, then re-run the checklist and close with a coverage summary." \
   --json | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 
