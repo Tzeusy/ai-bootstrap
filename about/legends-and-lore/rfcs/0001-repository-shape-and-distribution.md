@@ -49,6 +49,10 @@ The repository is divided into three logical layers:
 - When project-local pillar skills are installed under `.claude/skills`,
   `.codex/skills`, or `.gemini/skills`, they act as navigation entrypoints into
   `about/` and `openspec/`, not as a second authored documentation tree.
+- Project-local pillar skills are authored under `skills/personal/pillars/` and
+  reach the tool skill surfaces through the standard mirror flow; installing
+  them directly into ignored mirror directories without a tracked source is a
+  contract violation, because mirror cleanup may legitimately delete them.
 - OpenCode currently installs as config under `$HOME/.config/opencode` rather than participating in the in-repo skill-mirror layout used by Claude, Codex, and Gemini.
 - Regeneration or refresh flows must be explicit and scriptable. For example, `scripts/refresh.sh` is the supported way to rebuild the vendored Excalidraw bundle used by the personal Excalidraw skill.
 
