@@ -35,6 +35,10 @@ Against [`quality-bar.md`](./quality-bar.md), answer:
    global skills?
 6. Should any repeated or fragile workflow become a script instead of prose?
 7. Does the skill define boundaries, prerequisites, and failure modes?
+8. Does any reference doc hold living state (error catalogs, project
+   inventories, compatibility matrices)? If so, does it open with a
+   maintenance contract (quality-bar section 10), and does the skill's
+   workflow tell agents to write back when they surface new facts?
 
 ## Step 3: Update Discipline
 
@@ -72,4 +76,6 @@ When changing an existing skill:
 - Project-specific rules invented without checking project-shape docs
 - Skills with no accountable owner or review date
 - Stale references, dead scripts, or mismatched tool adapter files
+- Stateful catalogs without a write-back maintenance contract, so entries rot
+  silently
 - Session stories disguised as reusable guidance

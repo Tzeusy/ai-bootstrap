@@ -177,3 +177,29 @@ reconstruct, encapsulate it.
 - Do not hide risky actions inside broad workflow language.
 - Do not create misleading or surprise behavior relative to the skill's stated
   purpose.
+
+## 10. Stateful Reference Docs Carry A Maintenance Contract
+
+Some reference docs are living state rather than static guidance: catalogs of
+known errors or quirks, inventories of projects or environments,
+compatibility matrices, theme or template registries. These rot silently
+unless the agents that consume them also write back to them.
+
+- Every stateful reference doc must open with an explicit **maintenance
+  contract**: a short section telling the consuming agent when and how to
+  update the doc as part of normal use. The exemplar is
+  `beads-orchestration/references/known-errors.md` ("Maintenance contract
+  (read this first)").
+- The contract should cover at least: append a new entry when a new class of
+  item is discovered during use (new error, new project, new quirk); update
+  an entry when its facts change; remove an entry when it is disproved or
+  fixed upstream — note the disproving evidence or version first, drop the
+  entry one revision later.
+- Entries follow a stable format and carry the evidence needed to trust or
+  retire them later: date observed, tool version, symptom verbatim.
+- Writing back happens in the same change that surfaced the new fact, not as
+  follow-up work. A skill whose workflow can surface catalog-worthy facts
+  should say so in its workflow steps, not rely on agent goodwill.
+- When reviewing a skill, treat a stateful reference doc with no maintenance
+  contract as a finding: add the contract, or convert the doc to static
+  guidance if it does not actually need to live.

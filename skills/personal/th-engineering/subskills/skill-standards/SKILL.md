@@ -65,7 +65,9 @@ designed", "audit our skills for quality", "should this be a superskill",
 3. Judge what the script cannot, using
    [`references/quality-bar.md`](./references/quality-bar.md):
    trigger quality, scope sharpness, project grounding, progressive
-   discovery, script-vs-prose decisions, and operational safety.
+   discovery, script-vs-prose decisions, operational safety, and maintenance
+   contracts on stateful reference docs (catalogs of errors, projects, or
+   quirks must tell consuming agents when to write back).
 4. Use [`references/superskills.md`](./references/superskills.md) only when
    the skill is broad enough to act as a router over internal workflows
    instead of a single narrow procedure.
