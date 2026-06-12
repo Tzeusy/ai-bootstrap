@@ -26,5 +26,6 @@ The repo's job is to keep shared AI-assistant knowledge stable, explicit, and po
 Project-local pillar skills under `.claude/skills`, `.codex/skills`, and
 `.gemini/skills` should route agents back into these canonical docs rather than
 becoming a second authored documentation layer. Their authored source lives in
-`skills/personal/pillars/`; the tool-surface copies are managed mirror symlinks
-produced by the standard skill-mirror flow, never hand-authored in place.
+[`about/skills/`](./skills/), beside the docs they index; the tool-surface
+copies are managed mirror symlinks produced by the standard skill-mirror flow,
+never hand-authored in place.
