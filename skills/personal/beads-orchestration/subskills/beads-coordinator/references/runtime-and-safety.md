@@ -2,42 +2,44 @@
 
 Load this file before dispatching workers or mutating Beads state.
 
-## Durable Lease Model
+## Claiming And The Stall Heartbeat
 
-The coordinator must use durable leases for every bead it claims.
+Mutual exclusion comes from two real mechanisms, **not** from notes-based
+tokens:
 
-Assume Beads v1.0.0 supports atomic conditional updates on the Dolt-backed
-store. Use them. Do not model claiming as an unconditional overwrite when a
-compare-and-swap style update is available.
+1. **Atomic claim** — `bd update <id> --claim` atomically sets the bead's
+   `assignee` to you and `status=in_progress` in one operation. It is idempotent
+   if you already hold it. This is the cross-actor mutual-exclusion primitive:
+   only one actor can win the `assignee`. Verify success from the command
+   result (`assignee` is this coordinator), not from a later reread.
+2. **Worktree creation backstop** — `bd worktree create` fails when the
+   `agent/<id>` branch already exists. This prevents a same-actor session from
+   double-dispatching a bead it already has in flight. If worktree creation
+   fails on an existing branch, do not dispatch a second worker.
 
-Preferred machine-readable fields:
-- `lease_owner`
-- `lease_token`
-- `lease_expires_at`
-- `last_heartbeat_at`
+Never model claiming as a read-then-write of a token in `notes`/`design`. There
+is no atomic conditional update / compare-and-swap via the notes field; that
+would be a read-then-write race. The `bd update --claim` flag is the atomic
+operation.
 
-Preferred claim semantics:
-- read current lease state
-- perform an atomic conditional update that succeeds only if:
-  - no live lease exists, or
-  - the existing lease already belongs to this coordinator session/token
-- verify success from the command result, not just from a later reread
+### Stall heartbeat (stall detection only)
 
-If Beads does not support custom per-bead fields, store exactly one canonical
-lease block in `notes` or `design` and replace that block atomically instead of
-appending duplicates:
+The coordinator writes a heartbeat timestamp so a crashed/abandoned claim can be
+detected and reclaimed by a recovery pass (cleanup or another coordinator). This
+heartbeat is **explicitly not a mutual-exclusion mechanism** — `assignee` is.
+
+Store exactly one canonical heartbeat block in `notes` (replace it in place;
+never append duplicates):
 
 ```text
-[beads-lease]
+[beads-heartbeat]
 owner=coordinator:<session-id>
-token=<lease-token>
-expires_at=<iso8601>
 last_heartbeat_at=<iso8601>
-[/beads-lease]
+[/beads-heartbeat]
 ```
 
-Lease and stall parameters (canonical; do not restate elsewhere):
-- Lease TTL: 20 minutes.
+Heartbeat and stall parameters (canonical; do not restate elsewhere):
+- Heartbeat TTL: 20 minutes.
 - Renewal target: every 5 minutes while active, and before every mutation.
 - Worker stall threshold: at least 30 minutes without a progress signal before
   force-release, unless a runtime-specific note below states otherwise. Team
@@ -45,24 +47,22 @@ Lease and stall parameters (canonical; do not restate elsewhere):
 
 Repeat this rule during long runs:
 
-Before any `bd` mutation: verify lease ownership, renew if near expiry, then
-mutate.
+Before any `bd` mutation: confirm you are the bead's `assignee`, renew the stall
+heartbeat if near expiry, then mutate.
 
-Mandatory renewal points:
+Mandatory heartbeat-renewal points:
 1. Immediately after claim.
 2. Before every `bd create`, `bd update`, `bd dep add`, or `bd close`.
 3. After any long external action such as `gh`, tests, rebase, or merge work.
 4. Before sleeping, polling, or waiting on agents for a long window.
 
-If the lease is expired or owned by another live session:
-- stop mutating Beads state
-- append a note only if safe to do so under ownership rules
-- fall back to human triage or cleanup flow
-
-If a live foreign lease exists:
-- do not overwrite it
-- do not "win" by writing a newer timestamp
-- do not dispatch a worker for that bead
+Ownership rule:
+- If the `assignee` is another actor, do not touch the bead — its claim wins.
+- If the bead is assigned to another actor but its heartbeat is expired past the
+  stall threshold, a recovery pass (cleanup or coordinator) may reclaim it:
+  re-claim with `bd update <id> --claim` and reset the heartbeat.
+- Never "win" a live foreign claim by writing a newer timestamp; the heartbeat
+  does not arbitrate ownership.
 
 ## Model Selection Strategy
 
@@ -168,8 +168,8 @@ Rules:
    the bead first, then wire dependencies with `bd dep add`.
 5. Use `bd dolt commit/push/pull` for Dolt version control, not manual file
    surgery. Use `bd vc status` to check for uncommitted changes.
-6. Before any `bd` mutation: verify lease ownership, renew if near expiry, then
-   mutate.
+6. Before any `bd` mutation: confirm you are the bead's `assignee`, renew the
+   stall heartbeat if near expiry, then mutate.
 
 ## Bead Closure Rule
 

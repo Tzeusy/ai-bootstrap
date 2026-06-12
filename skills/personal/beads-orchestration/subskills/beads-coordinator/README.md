@@ -2,7 +2,7 @@
 
 `beads-coordinator` is the orchestration subskill for unattended Beads
 throughput. It does not implement code. It continuously normalizes Beads state,
-gives PR-review work priority, claims ready issues with durable leases,
+gives PR-review work priority, claims ready issues atomically with `bd update --claim`,
 dispatches isolated workers, and reconciles worker outcomes back into Beads.
 Workers push code and report; the coordinator owns the Beads state machine.
 
@@ -32,9 +32,9 @@ single owning reference. See the read-order table in [`SKILL.md`](SKILL.md).
   PR-review lane, bootstrap, report contracts, reconciliation, progress report,
   adaptive polling.
 - [`references/runtime-and-safety.md`](references/runtime-and-safety.md) —
-  model selection, lease model + stall thresholds, mutation safety, closure rule,
+  model selection, atomic claim + stall-heartbeat model, mutation safety, closure rule,
   runtime dispatch notes.
 - [`references/epic-coordination.md`](references/epic-coordination.md) — epic
   classification, Team Lead mode + prompt, blocker handling.
 - [`references/commands.md`](references/commands.md) — `bd` quick reference,
-  lease checklist, session-completion checklist.
+  claim/heartbeat checklist, session-completion checklist.

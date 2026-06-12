@@ -294,11 +294,15 @@ MERGE_JSON=$(python3 scripts/evaluate_merge_readiness.py \
 3. Never call `gh pr merge` unless the merge-readiness helper returns
    `merge_ok: true`. If required checks could not be fetched or validated, that
    is a blocker and must fail closed.
-4. If merge is safe, merge the PR:
+4. If merge is safe, merge the PR (do **not** delete the branch):
 
 ```bash
-gh pr merge "${PR_NUMBER}" --squash --delete-branch
+gh pr merge "${PR_NUMBER}" --squash
 ```
+
+Leave the `agent/<id>` branch in place. Branch deletion is deferred to the
+coordinator after it closes the bead, so the branch-name → bead correlation
+survives a crash between merge and the worker report.
 
 Then confirm the PR is actually merged before reporting success.
 

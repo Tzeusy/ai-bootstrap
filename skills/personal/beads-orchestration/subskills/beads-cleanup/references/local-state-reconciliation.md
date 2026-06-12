@@ -8,10 +8,10 @@ and stale `review-running` locks.
 
 - Run from the target repository root, or prefix `bd -C <rig-path>` to `bd list`
   and `bd ready` when operating from outside the target rig.
-- Before any `bd` mutation, inspect lease state using
-  `../beads-coordinator/references/runtime-and-safety.md`.
-- If a live foreign lease or recent heartbeat exists, skip mutation and record
-  the bead as manual triage.
+- Before any `bd` mutation, inspect the bead's `assignee` and stall heartbeat
+  using `../beads-coordinator/references/runtime-and-safety.md`.
+- If a bead is assigned to another actor whose heartbeat is still fresh (within
+  the stall threshold), skip mutation and record the bead as manual triage.
 - Append a note for every mutation.
 - Never mutate `.beads/dolt/` manually.
 
@@ -23,7 +23,10 @@ PROG_JSON=$(bd list --status=in_progress --json --limit 0)
 
 For each `in_progress` bead:
 
-1. Confirm there is no live foreign lease.
+1. Inspect `assignee` and the stall heartbeat. Staleness is judged by an expired
+   heartbeat timestamp (past the stall threshold) together with the `assignee`,
+   not by any lease token. If the bead is assigned to another actor whose
+   heartbeat is still fresh, leave it alone and record it as manual triage.
 2. Check for a live worktree:
 
 ```bash
@@ -52,9 +55,9 @@ git -C "${WORKTREE_PATH}" log --oneline origin/HEAD..HEAD
 
 | Worktree exists | Remote branch | Labels | Action |
 |---|---|---|---|
-| yes | yes | `direct-merge` | Do not close here. Record it for coordinator-style merge handling after confirming no live foreign lease. |
+| yes | yes | `direct-merge` | Do not close here. Record it for coordinator-style merge handling after confirming the bead is not held by a live actor (fresh heartbeat). |
 | yes | yes | `pr-review` | Defer to PR reconciliation in `pr-review-reconciliation.md`. |
-| yes | yes | none | Treat as stalled only when stale age is high and no live lease or worker activity remains. Then `bd update <id> --status open --append-notes "Cleanup: released stale in_progress claim (no active worker evidence)"`, then remove the worktree. |
+| yes | yes | none | Treat as stalled only when the heartbeat is expired past the stall threshold and no worker activity remains. Then `bd update <id> --status open --append-notes "Cleanup: released stale in_progress claim (no active worker evidence)"`, then remove the worktree. |
 | yes | no | any | If meaningful commits exist, push `agent/<id>` first if safe, then release to `open`. If no commits exist, remove the worktree and release to `open`. |
 | no | yes | `direct-merge` | Record for coordinator-style merge handling. |
 | no | yes | `pr-review` | Defer to PR reconciliation. |
@@ -62,7 +65,7 @@ git -C "${WORKTREE_PATH}" log --oneline origin/HEAD..HEAD
 | no | no | any | `bd update <id> --status open --append-notes "Cleanup: released orphaned in_progress claim (no worktree, no branch)"` |
 
 If a bead still carries `review-running` but has no active worktree, remove the
-label after lease checks:
+label after confirming it is not held by a live actor (fresh heartbeat):
 
 ```bash
 bd update <id> --remove-label review-running \
@@ -77,7 +80,8 @@ ALL_BLOCKED=$(bd list --status=blocked --json --limit 0)
 
 For each blocked bead not already handled by PR reconciliation:
 
-1. Confirm there is no live foreign lease.
+1. Confirm the bead is not held by a live actor (no fresh heartbeat from another
+   `assignee`).
 2. Read dependencies:
 
 ```bash
@@ -132,14 +136,18 @@ BASE_ID=$(echo "${WT_NAME}" | sed -E 's/(-coord-|-stalefix-|-revive-|-review-|-c
 bd show "${BASE_ID}" --json
 ```
 
-3. Reconcile using this table:
+3. Reconcile using this table. Note: a merged PR's `agent/<id>` branch normally
+   still exists here, because the reviewer merges without `--delete-branch` and
+   the coordinator deletes the branch post-closure. So for a closed bead, the
+   branch surviving is expected, not evidence of unpublished work — cleanup may
+   delete it as the post-closure cleanup the coordinator would otherwise do.
 
 | Bead state | Action |
 |---|---|
-| closed | Remove the worktree. Delete local and remote worker branches only after confirming they are not needed for unpublished work. |
+| closed | Remove the worktree, then delete the local and remote `agent/<id>` branches (this finishes the coordinator's post-closure branch cleanup). The squash-merged branch contains no unpublished work; preserve only if it carries commits absent from the merged result. |
 | open | Remove the worktree only. Preserve the branch if it may still contain useful commits. |
 | missing | Remove the worktree. Delete local and remote worker branches if they still exist and no unpublished work needs to be preserved. |
-| in_progress or blocked | Leave the worktree alone unless other evidence proves it is stale and unleased. |
+| in_progress or blocked | Leave the worktree alone unless other evidence proves it is stale and not held by a live actor (no fresh heartbeat). |
 
 Typical removal commands:
 
@@ -157,12 +165,17 @@ bd list --label review-running --json --limit 0
 
 For each bead with `review-running`:
 
-- If status is not `in_progress`, or no active worktree exists, and no live
-  foreign lease exists, remove the label:
+- If status is not `in_progress`, or no active worktree exists, and the bead is
+  not held by a live actor (no fresh heartbeat), remove the label:
 
 ```bash
 bd update <id> --remove-label review-running \
   --append-notes "Cleanup: removed stale review-running label (no active worker)"
 ```
 
-- If a live worker or lease still exists, leave it alone.
+- If a live worker or fresh heartbeat still exists, leave it alone.
+
+This `review-running` release is a **liveness repair** of a stale lock label —
+it is not PR-state reconciliation. Cleanup never closes, reopens, or otherwise
+mutates PR-review bead state in response to PR outcome; that is the coordinator's
+Step 0 alone.

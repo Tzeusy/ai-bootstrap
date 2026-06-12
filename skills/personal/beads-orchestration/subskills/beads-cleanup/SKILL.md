@@ -41,7 +41,7 @@ workflow rules.
 This skill is a routing layer over the existing Beads operating model.
 
 - Repository workflow and ownership model: `../../../../../README.md`
-- Coordinator mutation authority and lease rules:
+- Coordinator mutation authority, atomic claim, and stall-heartbeat rules:
   `../beads-coordinator/references/runtime-and-safety.md`
 - Coordinator loop and PR-review lane behavior:
   `../beads-coordinator/references/coordinator-loop.md`
@@ -54,10 +54,16 @@ become a competing doctrine.
 ## Non-Negotiable Boundaries
 
 - Never implement code.
-- Never mutate a bead that has a live foreign lease. Use the lease rules from
+- Never mutate a bead held by a live actor. Decide ownership by the bead's
+  `assignee` plus a fresh stall heartbeat, per
   `../beads-coordinator/references/runtime-and-safety.md`.
-- Never close or reopen a bead without confirming the external state that
-  justifies it.
+- **Never mutate PR-review bead state from PR outcome.** Cleanup does not run
+  `bd close` / reopen / PR-driven label changes in response to a PR being
+  `MERGED` or `CLOSED`. It inspects PR state and **reports** the finding plus a
+  recommended action; the coordinator's Step 0 is the sole PR-state mutator.
+- Cleanup retains ownership of worktree / branch / Dolt hygiene and stale
+  `review-running` lock release (a liveness repair, not PR-state
+  reconciliation — see Pass 5b/Pass 6 in `local-state-reconciliation.md`).
 - Never create new beads from cleanup. Missing wiring should be reported for the
   coordinator loop to self-heal.
 - Never touch `.beads/dolt/` manually.
@@ -79,9 +85,11 @@ become a competing doctrine.
 ## Workflow
 
 1. Read `../beads-coordinator/references/runtime-and-safety.md` if you need the
-   exact lease and mutation-authority rules before touching Beads state.
+   exact claim, stall-heartbeat, and mutation-authority rules before touching
+   Beads state.
 2. Run the relevant passes from the reference files in order, skipping mutation
-   when evidence is incomplete or a live foreign lease exists.
+   when evidence is incomplete or a bead is held by a live actor (fresh
+   heartbeat). For PR-review beads, run detection only and report findings.
 3. Keep canonical PR metadata on the original implementation bead only; review
    beads must not invent their own `external_ref`.
 4. Clean worktrees and branches conservatively. Preserve anything that may still

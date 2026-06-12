@@ -53,7 +53,9 @@ Retries must be idempotent:
 ### `merged-pr`
 
 Use only when:
-- `gh pr merge` succeeded, and
+- `gh pr merge --squash` succeeded (without `--delete-branch`), and
 - a follow-up `gh pr view` confirms the PR is merged
 
-Do not close review or original beads here. The coordinator handles closure.
+Do not delete the `agent/<id>` branch; the coordinator deletes it after closure
+so the branch-name → bead correlation survives a crash. Do not close review or
+original beads here either. The coordinator handles closure and branch cleanup.

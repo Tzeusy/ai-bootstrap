@@ -32,13 +32,14 @@ Passes completed: 6/6
 - <id>: deferred to PR reconciliation
 - (none found)
 
-### Pass 2: PR-review beads
-- <id>: closed (PR #N merged)
-- <id>: reopened for re-triage (PR #N closed without merge)
+### Pass 2: PR-review beads (findings only — no mutation here)
+- <id>: PR #N MERGED; recommend close + branch cleanup (coordinator Step 0)
+- <id>: PR #N CLOSED-unmerged; recommend reopen + re-triage
+- <id>: missing canonical external_ref gh-pr:N; recommend manual triage
 - (none found)
 
-### Pass 3: PR-review-task beads
-- <id>: closed (PR #N merged), original <orig-id> also closed
+### Pass 3: PR-review-task beads (findings only — no mutation here)
+- <id>: PR #N MERGED; recommend close review + original <orig-id>
 - <id>: skipped (missing canonical PR reference)
 - (none found)
 
@@ -58,6 +59,18 @@ Passes completed: 6/6
 ### Pass 6: Stale labels
 - <id>: removed review-running label
 - (none found)
+
+### PR-state findings (for coordinator Step 0)
+
+Cleanup only reports these; the coordinator's Step 0 performs the mutation and
+re-verifies with `gh` immediately before acting.
+
+| Bead ID | PR # | Observed state | Recommended action |
+|---|---|---|---|
+| <id> | <N> | MERGED | close review + original bead; delete branch post-closure |
+| <orig-id> | <N> | CLOSED-unmerged | reopen original, remove `pr-review`, re-triage |
+| <id> | <N> | OPEN, no `pr-review-task` | coordinator self-heal: create/wire review bead |
+| <id> | — | unresolved / `gh` failure | manual triage; do not mutate |
 
 ### Summary
 | Metric | Count |

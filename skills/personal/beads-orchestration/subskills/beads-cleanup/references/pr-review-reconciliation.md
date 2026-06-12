@@ -1,14 +1,19 @@
 # PR Review Reconciliation
 
-Load this file when cleanup needs to reconcile blocked Beads that are tied to a
-GitHub pull request.
+Load this file when cleanup needs to inspect blocked Beads that are tied to a
+GitHub pull request and report PR-state findings for the coordinator.
 
-The cleanup skill does not create missing review beads or mutate GitHub review
-threads. It only normalizes existing Beads state after confirming PR state.
+**Report-only for PR state.** Cleanup is NOT the PR-state mutator. It does not
+`bd close` on `MERGED`, reopen on `CLOSED`-unmerged, or relabel beads from PR
+outcome, and it does not create missing review beads or mutate GitHub review
+threads. It runs the detection logic below, then records each finding (bead id,
+PR number, observed state, recommended action) in the cleanup report's
+"PR-state findings" section. The coordinator's Step 0 consumes those findings
+and performs the actual mutations (and the post-closure branch deletion).
 
 ## Preconditions
 
-- Confirm there is no live foreign lease before mutating any bead.
+- This pass performs no PR-driven bead mutation; it only inspects and reports.
 - Canonical PR metadata (`external_ref=gh-pr:<N>`) lives on the original
   implementation bead only.
 - `pr-review-task` beads must not set their own `external_ref`.
@@ -31,11 +36,9 @@ PR_NUMBER=$(echo "${BEAD_JSON}" | jq -r '
   ($ref | capture("^gh-pr:(?<n>[0-9]+)$")?.n) // empty')
 ```
 
-2. If no PR number is present, append a note and skip mutation:
-
-```bash
-bd update <id> --append-notes "Cleanup: no canonical external_ref gh-pr:N found; needs manual triage"
-```
+2. If no PR number is present, record a report finding (no bead mutation):
+   `bead <id>: no canonical external_ref gh-pr:N found; recommend manual
+   triage`.
 
 3. Query GitHub:
 
@@ -43,14 +46,14 @@ bd update <id> --append-notes "Cleanup: no canonical external_ref gh-pr:N found;
 PR_STATE_JSON=$(gh pr view "${PR_NUMBER}" --json state,mergedAt 2>&1)
 ```
 
-4. Reconcile by PR state:
+4. Record a PR-state finding by observed state (detect, do not execute):
 
-| PR state | Action |
+| PR state | Report finding + recommended action (for coordinator Step 0) |
 |---|---|
-| `MERGED` | `bd close <id> --reason "Cleanup: PR #${PR_NUMBER} already merged"` and clean the matching worktree/branch if safe. |
-| `CLOSED` and not merged | `bd update <id> --status open --remove-label pr-review --append-notes "Cleanup: PR #${PR_NUMBER} closed without merge; needs re-triage"` |
-| `OPEN` | Leave the original bead blocked. Verify a corresponding `pr-review-task` bead exists; if missing, append a note for coordinator self-heal rather than creating one here. |
-| `gh` failure | Append a note or record it in the report, then skip mutation. |
+| `MERGED` | Record: `<id>` blocked on merged PR #N; recommend close + post-closure worktree/branch cleanup. |
+| `CLOSED` and not merged | Record: `<id>` blocked on closed-unmerged PR #N; recommend reopen, remove `pr-review`, re-triage. |
+| `OPEN` | Record whether a corresponding `pr-review-task` bead exists; if missing, recommend coordinator self-heal. Do not create one here. |
+| `gh` failure | Record the transient failure in the report; do not infer state. |
 
 ## Pass 3: Blocked `pr-review-task` Review Beads
 
@@ -94,22 +97,19 @@ do not write a new canonical `external_ref` onto the review bead.
 gh pr view "${PR_NUMBER}" --json state,mergedAt
 ```
 
-4. Reconcile by PR state:
+4. Record a PR-state finding by observed state (detect, do not execute):
 
-| PR state | Original bead state | Action |
+| PR state | Original bead state | Report finding + recommended action (for coordinator Step 0) |
 |---|---|---|
-| `MERGED` | open / in_progress / blocked | Close the review bead and the original bead after confirming no live foreign lease. Clean matching worktree/branch if safe. |
-| `MERGED` | already closed | Close only the review bead. |
-| `CLOSED` and not merged | any | Close the review bead. Reopen the original bead and remove `pr-review` so it can be re-triaged. |
-| `OPEN` | any | Leave both beads as-is. Remove stale `review-running` only if no active worktree and no live foreign lease exist. |
-| PR cannot be resolved | any | Append a note and skip mutation. |
+| `MERGED` | open / in_progress / blocked | Record: recommend closing the review bead and the original bead, plus post-closure worktree/branch cleanup. |
+| `MERGED` | already closed | Record: recommend closing only the review bead. |
+| `CLOSED` and not merged | any | Record: recommend closing the review bead, reopening the original and removing `pr-review` for re-triage. |
+| `OPEN` | any | Leave both beads as-is. The only mutation cleanup may do here is the liveness `review-running` release (Pass 6) when no active worktree and no live actor exist — that is a lock repair, not PR-state mutation. |
+| PR cannot be resolved | any | Record the unresolved finding in the report; do not mutate. |
 
-When reopening the original bead after a closed-unmerged PR, use a note like:
-
-```bash
-bd update <original-id> --status open --remove-label pr-review \
-  --append-notes "Cleanup: PR #${PR_NUMBER} closed, review bead closed; needs re-triage"
-```
+Cleanup does not run `bd close`, reopen, or `--remove-label pr-review` on the
+basis of PR outcome. Capture the recommendation in the report and let the
+coordinator's Step 0 execute it.
 
 ## Missing Review Wiring
 

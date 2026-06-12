@@ -1,12 +1,13 @@
 # Coordinator Loop
 
-Load this file when you need the exact cycle, PR-review priority lane, lease
-renewal rules, worker bootstrap rules, monitoring details, or adaptive polling.
+Load this file when you need the exact cycle, PR-review priority lane, claim and
+heartbeat rules, worker bootstrap rules, monitoring details, or adaptive polling.
 
 ## Preflight
 
 - Before entering the loop, run `../beads-cleanup/SKILL.md`. This is mandatory.
-- Create a fresh coordinator session ID and lease token for this run.
+- Create a fresh coordinator session ID for this run (used as the stall-heartbeat
+  owner; atomic claiming is handled by `bd update --claim`).
 - If running from outside the target rig, point `bd` at the rig workspace with
   the global `-C <path>` flag, e.g. `bd -C /path/to/rig ready --json`. The
   removed `--rig` flag is no longer supported (bd 1.0.4+).
@@ -28,16 +29,28 @@ renewal rules, worker bootstrap rules, monitoring details, or adaptive polling.
 | Metadata persistence | Dolt DB via auto-started sql-server |
 | PR review cooldown | 5 minutes after PR `createdAt` |
 
-Lease model (TTL, renewal cadence), the per-runtime stall threshold, and the
-model-selection tables live in `runtime-and-safety.md`. Do not restate them
-here.
+The stall-heartbeat model (TTL, renewal cadence), the per-runtime stall
+threshold, and the model-selection tables live in `runtime-and-safety.md`. Do
+not restate them here.
 
 Repeat this rule during the whole run:
 
-Before any `bd` mutation: verify lease ownership, renew if near expiry, then
-mutate.
+Before any `bd` mutation: confirm you are the bead's `assignee`, renew the stall
+heartbeat if near expiry, then mutate. Never mutate a bead assigned to another
+live actor.
 
 ## Step 0: Normalize PR-Review State
+
+Step 0 is the **sole PR-state mutator** in the system. Only the coordinator
+closes, reopens, or relabels beads in response to PR state (`MERGED`,
+`CLOSED`-unmerged, etc.). `beads-cleanup` only inspects and reports PR-state
+findings; it never mutates PR-review bead state.
+
+When a `beads-cleanup` pass ran immediately before this loop, consume its
+"PR-state findings (for coordinator Step 0)" report section instead of
+re-querying `gh pr view` for those same PRs. Re-verify with `gh` only in the
+moment right before an actual mutation, so a stale finding never drives an
+irreversible close/reopen.
 
 Before discovering new work, and whenever a worker frees a slot, check:
 
@@ -74,27 +87,24 @@ right before creating, and skip creation if a canonical review bead exists.
 
 ### 0a1. Claim review beads before dispatch
 
-Review-lane dispatch must use the same atomic lease claim discipline as ready
+Review-lane dispatch must use the same atomic `--claim` discipline as ready
 work. A blocked `pr-review-task` bead is not dispatchable until the coordinator
 has claimed it successfully.
 
 Required sequence:
-1. Read the review bead and inspect current lease state.
-2. If a live foreign lease exists, skip it.
-3. Perform an atomic conditional update that:
-   - writes coordinator lease owner / token / expiry / heartbeat
-   - transitions the review bead to `in_progress`
-   - adds `review-running`
-   - succeeds only if no live foreign lease exists
-4. Verify success from the command result.
+1. Read the review bead and inspect its `assignee`.
+2. If it is assigned to another live actor, skip it.
+3. Claim atomically with `bd update <id> --claim --json` (sets `assignee` and
+   `status=in_progress`), then add the `review-running` label and write the
+   stall heartbeat note.
+4. Verify success from the command result (`assignee` is this coordinator).
 5. Only then dispatch the reviewer worker.
 
 If dispatch fails after the claim:
-- renew lease
 - return the bead to `blocked`
 - remove `review-running`
-- preserve the same coordinator lease token so cleanup can identify the failed
-  attempt deterministically
+- renew the stall heartbeat note so cleanup can see when the failed attempt
+  went idle
 
 ### 0b. Reconcile blocked PR-review beads
 
@@ -115,11 +125,29 @@ Handle each case:
 
 | PR State | Action |
 |---|---|
-| `MERGED` | renew lease, then close review/original beads as appropriate and clean worktrees + branches |
-| `CLOSED` and not merged | renew lease, then reopen original for re-triage; block/close review bead as appropriate |
-| `OPEN` with `pr-review-task` | wait for cooldown; once elapsed, atomically claim the review bead with a lease, then dispatch review worker if slot is open |
+| `MERGED` | renew heartbeat, then close review/original beads as appropriate; then run the post-closure branch/worktree cleanup below |
+| `CLOSED` and not merged | renew heartbeat, then reopen original for re-triage; block/close review bead as appropriate |
+| `OPEN` with `pr-review-task` | wait for cooldown; once elapsed, atomically claim the review bead with `bd update <id> --claim`, then dispatch review worker if slot is open |
 | `OPEN` without `pr-review-task` | ensure exactly one dedicated review bead exists |
 | `gh` failure | log warning, skip; do not mutate on transient errors |
+
+### Post-closure branch and worktree cleanup (merged PRs)
+
+The reviewer merges with `gh pr merge --squash` and does **not** delete the
+branch, so the `agent/<id>` branch name survives until the coordinator removes
+it. This keeps branch-name → bead correlation intact if a crash happens between
+merge and the worker report. Branch deletion is therefore the coordinator's
+responsibility, performed only **after** the relevant bead(s) are closed:
+
+```bash
+# After bd close on the review/original beads:
+git push origin --delete "agent/<id>" 2>/dev/null \
+  || gh api -X DELETE "repos/<owner>/<repo>/git/refs/heads/agent/<id>" 2>/dev/null || true
+bd worktree remove ".worktrees/parallel-agents/<id>" --force 2>/dev/null || true
+git branch -D "agent/<id>" 2>/dev/null || true
+```
+
+Do not delete the branch before closure; correlation depends on it.
 
 Priority rule:
 - if any `pr-review-task` bead is dispatchable and a slot is open, dispatch it
@@ -174,27 +202,39 @@ If the list is empty, enter idle polling mode.
 Pick the issue with the lowest `priority` number, breaking ties by oldest
 `created_at`. Skip any issue that:
 - is already assigned to a running worker
-- has a live foreign lease
+- is assigned to another live actor (per `assignee`)
 - is blocked by a dispatchable review task that should run first
 
-## Step 3: Claim The Issue With A Lease
+## Step 3: Claim The Issue
 
-Claiming is an atomic conditional lease acquisition, not a blind status update.
+Claim atomically with `bd update <id> --claim`. This is the real mutual-exclusion
+mechanism, not the notes-based heartbeat.
 
-1. Read the bead and inspect current lease state.
-2. If a live foreign lease exists, skip this bead.
-3. Perform an atomic conditional update that writes:
-   - `status=in_progress`
-   - current coordinator lease owner / token / expiry / heartbeat
-   and succeeds only if no live foreign lease exists.
-4. Verify success from the command result, then re-read if needed to confirm
-   the written lease token matches.
-5. Only after that verification may the coordinator create the worktree or
+1. Read the bead and confirm its `assignee` is empty or already this coordinator.
+   If it is assigned to another live actor, skip this bead.
+2. Claim atomically:
+
+```bash
+bd update <id> --claim --json
+```
+
+   `--claim` sets `assignee` to you and `status=in_progress` in one atomic,
+   idempotent operation (a no-op if you already hold it). This provides
+   cross-actor mutual exclusion: only one actor wins the assignee.
+3. Verify success from the command result (`assignee` is this coordinator,
+   `status=in_progress`).
+4. Write the initial stall heartbeat note (see the durable-heartbeat model in
+   `runtime-and-safety.md`). The heartbeat is stall detection only; it is NOT
+   the claim mechanism.
+5. Only after a verified claim may the coordinator create the worktree or
    dispatch a worker.
 
-If custom fields are unavailable, update the single canonical lease block in
-`notes` or `design` rather than appending another block, and still require the
-write itself to be atomic/conditional.
+Mutual exclusion comes from two layers:
+- **Atomic `--claim`** (cross-actor): only one actor can win the assignee.
+- **`bd worktree create` failing when `agent/<id>` already exists** (the
+  dispatch-level backstop, including a same-actor session that double-dispatches).
+  If worktree creation fails because the branch exists, treat the bead as
+  already in flight and do not dispatch a second worker.
 
 ## Step 4: Prepare Worker Environment
 
@@ -247,7 +287,7 @@ Bootstrap contract:
 If the runtime supports interim updates, require a short bootstrap
 acknowledgement before continuing. If bootstrap never arrives, or if the worker
 reports repo-root / `main` / `master` context, treat dispatch as failed and
-renew the lease before releasing the bead.
+renew the heartbeat before releasing the bead.
 
 Codex note: a missing completion event is not a bootstrap failure. Bootstrap
 failure requires explicit invalid context or no bootstrap evidence within the
@@ -263,7 +303,7 @@ bootstrap window.
 - If `main` or the repo-root checkout advances unexpectedly while a worker is
   supposedly active, stop and investigate worktree misbinding before
   dispatching more workers.
-- Renew the coordinator lease before every mutation and after long external
+- Renew the coordinator stall heartbeat before every mutation and after long external
   checks.
 
 Implementation-worker report contract:
@@ -298,7 +338,7 @@ Report first, then verify the reported branch / PR state:
 3. Handle by `Status`:
    - `completed-pr-opened`:
      - require a verified open PR
-     - renew lease, then block the original bead and set
+     - renew heartbeat, then block the original bead and set
        `external_ref=gh-pr:<N>`
      - run the Step 0a dedupe check, then ensure exactly one dedicated
        `pr-review-task` bead exists (create only if the dedupe check finds none)
@@ -314,12 +354,12 @@ Report first, then verify the reported branch / PR state:
        git merge --ff-only origin/agent/<id>
        git push origin main
        ```
-     - on success: renew lease, then `bd close <id> --reason "Simple change merged to main"`
+     - on success: renew heartbeat, then `bd close <id> --reason "Simple change merged to main"`
      - on failure: open a PR, set `external_ref`, ensure the review bead, and
        route through the PR-review lane
    - `blocked-awaiting-coordinator`:
      - do not treat this as stalled
-     - renew lease
+     - renew heartbeat
      - convert `Blockers-JSON` entries into blocker beads and wire the original
        bead to depend on them
      - convert `Discovered-Follow-Ups-JSON` entries into linked follow-up beads
@@ -334,7 +374,7 @@ Report first, then verify the reported branch / PR state:
          local progress
        - if `Recovery-State=no-code-changes`, no quarantine is needed
    - `invalid-runtime-context`:
-     - renew lease, release the bead back to `open`, and clean the worktree
+     - renew heartbeat, release the bead back to `open`, and clean the worktree
      - do not create blocker beads unless the report includes a separate
        project-level blocker that truly belongs in Beads
 4. Only treat the run as stalled if the worker disappears after bootstrap or
@@ -373,8 +413,10 @@ Reviewer-worker report contract:
   but the review bead should remain blocked for another pass
 
 When a reviewer worker completes:
-- if it reports `merged-pr`, confirm the PR is merged,
-  then renew lease and close the review and original beads
+- if it reports `merged-pr`, confirm the PR is merged, then renew the heartbeat,
+  close the review and original beads, and run the post-closure branch/worktree
+  cleanup in Step 0b (`git push origin --delete agent/<id>`, remove the worktree
+  and local branch) — the reviewer left the branch in place on purpose
 - if it reports `blocked-awaiting-coordinator`, keep the review bead blocked
   and create any follow-up merge-blocker bead from the structured report if one
   does not already exist
@@ -386,7 +428,7 @@ When a reviewer worker completes:
 If a worker fails bootstrap, or stalls after bootstrap:
 - log the failure
 - in Codex, send one interrupt heartbeat/status request before release
-- renew lease
+- renew heartbeat
 - release the issue:
   - `pr-review-task`: `bd update <id> --status blocked --remove-label review-running --json`
   - otherwise: `bd update <id> --status open --json`

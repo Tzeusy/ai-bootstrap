@@ -76,7 +76,7 @@ While a Team Lead is active:
    ```bash
    bd update <epic-id> --add-label team-coordination
    ```
-2. Claim it with the coordinator lease.
+2. Claim it atomically with `bd update <epic-id> --claim` and write the stall heartbeat.
 3. Create Team Lead worktree:
    ```bash
    bd worktree create .worktrees/parallel-agents/<epic-id> --branch agent/<epic-id>
