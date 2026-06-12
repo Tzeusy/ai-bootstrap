@@ -11,7 +11,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-04-16"
+  last_reviewed: "2026-06-12"
 ---
 
 # Cruft Cleanup
@@ -44,18 +44,12 @@ If you catch yourself writing a compatibility alias, wrapper, or fallback, stop 
 
 | File | Read when | Content |
 |------|-----------|---------|
-| `references/audit-flow.md` | Every real use of this skill | Proactive and reactive workflow, grep strategy, and review sequence |
-| `references/patterns-to-delete.md` | You need concrete examples of cruft | Common shim/fallback/tombstone patterns to remove |
-| `references/compat-boundary.md` | You suspect compatibility might be legitimate | Hard boundary for when old interfaces may stay temporarily |
+| [`references/audit-flow.md`](./references/audit-flow.md) | Every real use of this skill | Proactive and reactive workflow, grep strategy, and review sequence |
+| [`references/patterns-to-delete.md`](./references/patterns-to-delete.md) | You need concrete examples of cruft | Common shim/fallback/tombstone patterns to remove |
+| [`references/compat-boundary.md`](./references/compat-boundary.md) | You suspect compatibility might be legitimate | Hard boundary for when old interfaces may stay temporarily |
 
 ## Trigger Sanity Check
 
 - Should trigger: "This rename left a wrapper and old re-export behind so callers still work."
+- Should trigger: "Clean up this refactor — I think there are leftover aliases and fallback branches."
 - Should not trigger: "We need a planned deprecation layer for an external API consumed by other repos."
-
-## Resources
-
-### references/
-- `audit-flow.md` — How to review or perform a same-repo migration without leaving compatibility cruft behind.
-- `patterns-to-delete.md` — Concrete anti-patterns and deletion targets during cleanup.
-- `compat-boundary.md` — The narrow cases where temporary backward compatibility is legitimate.

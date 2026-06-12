@@ -90,5 +90,14 @@ Reviewable expectations — cite the one violated, with file:line evidence:
 
 ## Trigger Sanity Check
 
-- Should trigger: "This works but I had to read it three times — tighten it up."
-- Should not trigger: "Run the formatter" or "find the bug in this function."
+Should trigger:
+
+- "This works but I had to read it three times — tighten it up."
+- "Is this abstraction worth keeping, or should I inline it?"
+- "Simplify this module before we merge."
+- "Review the naming and structure in this diff."
+
+Should not trigger:
+
+- "Run the formatter" — pure formatting belongs to the linter/formatter.
+- "Find the bug in this function" — correctness review, not readability.

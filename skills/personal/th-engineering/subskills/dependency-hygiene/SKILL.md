@@ -68,8 +68,9 @@ Reviewable expectations — cite the one violated, with module/import evidence:
    boundary so they stay replaceable; don't wrap stable, idiomatic ones.
 6. **Versions are pinned, upgrades are deliberate** — Lockfiles are
    committed; upgrades are their own reviewed change with the changelog read,
-   not a side effect of unrelated work. New dependencies are recorded where
-   the project documents them (e.g. `DEPENDENCIES.md` in this repo).
+   not a side effect of unrelated work. New dependencies are recorded
+   wherever the host project documents them (for example, the dotfiles repo
+   that ships this skill uses a `DEPENDENCIES.md`).
 7. **Test/dev dependencies stay out of production chains** — Fixtures,
    fakes, and tooling must not be importable from shipped code paths.
 
@@ -94,4 +95,6 @@ Reviewable expectations — cite the one violated, with module/import evidence:
 ## Trigger Sanity Check
 
 - Should trigger: "core imports the HTTP layer and I can't test it alone — untangle this."
+- Should trigger: "should we pull in this package or write the ~40 lines ourselves?"
+- Should trigger: "everything imports `utils` and every change touches it — is that fine?"
 - Should not trigger: "Rename these variables" or "update the lockfile after CI told us to."

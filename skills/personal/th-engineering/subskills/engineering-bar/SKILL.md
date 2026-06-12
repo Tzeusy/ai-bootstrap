@@ -24,11 +24,15 @@ reviewable expectation: a reviewer can reject a change for violating it.
 ## Use This Skill When
 
 - Implementing a non-trivial change and deciding what "done" requires
-- Reviewing a change holistically ("is this good enough to merge?")
+- Reviewing a change holistically before merge
 - Resolving a conflict between subdomain findings (e.g. readability vs.
   observability) — the biases set the tiebreak
 - Authoring or updating a project's `about/craft-and-care/` pillar (via
   `/th-projects` project-shape) — reference this bar, restate nothing
+
+Example trigger phrasings: "hold this to the engineering bar", "is this
+change done", "is this good enough to merge", "what does done require here",
+"set the quality bar for this project".
 
 ## Do Not Use This Skill For
 

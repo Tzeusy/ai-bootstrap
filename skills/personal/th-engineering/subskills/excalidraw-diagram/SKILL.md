@@ -1,12 +1,23 @@
 ---
 name: excalidraw-diagram
 description: Use when the user wants a workflow, architecture, protocol, concept, or Mermaid diagram converted into or out of Excalidraw, especially when the result should teach through structure, flow, and concrete evidence.
+metadata:
+  owner: tze
+  authors:
+    - tze
+    - Claude Fable 5
+  status: active
+  last_reviewed: "2026-06-12"
 compatibility: Requires Python 3.11+, uv, and Playwright Chromium setup on first render. The Excalidraw browser bundle is vendored into the skill, so rendering stays local after setup. Refresh that bundle from the repo-level scripts/refresh.sh when needed.
 ---
 
 # Excalidraw Diagram Creator
 
 Generate `.excalidraw` files that argue visually rather than turning prose into labeled boxes.
+
+Sample trigger phrasings: "draw a diagram of this architecture", "visualize this
+workflow in Excalidraw", "convert this Mermaid flowchart to Excalidraw", "turn
+this Excalidraw scene into Mermaid".
 
 ## Setup
 
@@ -163,10 +174,17 @@ Use `references/render-checklist.md` for the full loop.
 
 ## Required References
 
-- `references/theme-catalog.md`: theme selection and authoring
-- `references/themes/catalog.json`: available themes
-- `references/design-patterns.md`: visual pattern library
-- `references/mermaid-interoperability.md`: Mermaid to/from Excalidraw prompting workflow
-- `references/element-templates.md`: Excalidraw element scaffolds
-- `references/json-schema.md`: JSON shape notes
-- `references/render-checklist.md`: render-view-fix loop
+Load each file at the workflow step that calls for it:
+
+- [`references/theme-catalog.md`](references/theme-catalog.md): theme selection and authoring — load before generating any colors
+- [`references/themes/catalog.json`](references/themes/catalog.json): available themes
+- [`references/design-patterns.md`](references/design-patterns.md): visual pattern library — load when planning the visual structure
+- [`references/mermaid-interoperability.md`](references/mermaid-interoperability.md): Mermaid to/from Excalidraw prompting workflow — load when the input or output is Mermaid
+- [`references/element-templates.md`](references/element-templates.md): Excalidraw element scaffolds — load when generating JSON
+- [`references/json-schema.md`](references/json-schema.md): JSON shape notes — load when generating JSON
+- [`references/render-checklist.md`](references/render-checklist.md): render-view-fix loop — load when iterating on the export
+
+## Scripts
+
+- [`scripts/render_excalidraw.py`](scripts/render_excalidraw.py): render a `.excalidraw` file to an image; run after every generation or edit (`--install-browser` on first use)
+- [`scripts/excalidraw_to_mermaid.py`](scripts/excalidraw_to_mermaid.py): deterministic structural Mermaid export from an existing scene; run when the user wants Mermaid derived from Excalidraw

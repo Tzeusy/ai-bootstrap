@@ -78,7 +78,8 @@ Cite the item violated, with doc and code evidence:
    [`references/interface-semantics.md`](./references/interface-semantics.md).
 6. **Docs operate under a maintenance contract** — The docs entry point
    states it: behavior changes update affected docs in the same change
-   (engineering-bar bias 7); stale claims get fixed or marked `STALE` with
+   ([engineering-bar](../engineering-bar/SKILL.md) bias 7); stale claims get
+   fixed or marked `STALE` with
    evidence, never left silently. Living catalogs open with their own
    write-back contract.
 7. **Prose earns its place** — Types, names, and defaults are already

@@ -26,7 +26,7 @@ will actually have, and can a maintainer believe a green run?
 - Reviewing tests that accompany a change — are they meaningful or ornamental?
 - Auditing a suite: coverage gaps, tautological tests, flakiness, mock overuse
 - Writing tests for a bugfix or risky refactor and deciding what to assert
-- Asked "review these tests", "are these tests meaningful", "what's missing"
+- Asked any phrasing in the Trigger Sanity Check below
 
 ## Do Not Use This Skill For
 
@@ -88,5 +88,9 @@ Reviewable expectations — cite the one violated, with file:line evidence:
 
 ## Trigger Sanity Check
 
-- Should trigger: "Tests pass but I don't trust them — what would they actually catch?"
-- Should not trigger: "Write the feature test-first" (TDD process) or "why is CI red" (debugging).
+- Should trigger: "review these tests", "are these tests meaningful",
+  "what's missing from this suite", "tests pass but I don't trust them —
+  what would they actually catch?"
+- Should not trigger: "write the feature test-first" (TDD process,
+  `/test-driven-development`) or "why is CI red" (debugging,
+  `/systematic-debugging`).
