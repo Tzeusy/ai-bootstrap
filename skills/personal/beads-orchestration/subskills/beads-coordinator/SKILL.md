@@ -62,6 +62,14 @@ State these hold for the entire run; the references elaborate, never override.
 | [`references/epic-coordination.md`](references/epic-coordination.md) | the bead is an epic or a worker hits a hard blocker | Epic classification, independent dispatch, Team Lead mode + prompt, blocker handling |
 | [`references/commands.md`](references/commands.md) | a quick command lookup | `bd` quick reference, lease checklist, session-completion checklist |
 
+
+Diagrams (load only when you need a visual of the flow): the full cycle is
+[`assets/coordinator-cycle.svg`](assets/coordinator-cycle.svg) and the
+PR-review priority lane is
+[`assets/pr-review-lane.svg`](assets/pr-review-lane.svg); editable sources are
+[`assets/coordinator-cycle.excalidraw`](assets/coordinator-cycle.excalidraw) and
+[`assets/pr-review-lane.excalidraw`](assets/pr-review-lane.excalidraw).
+
 ## Rig Targeting
 
 `bd create`, `bd list`, and `bd ready` default to the `.beads/` DB discovered

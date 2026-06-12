@@ -66,13 +66,13 @@ become a competing doctrine.
 
 ## Load Only The Reference You Need
 
-- `references/local-state-reconciliation.md`
+- [`references/local-state-reconciliation.md`](references/local-state-reconciliation.md)
   Load for stale `in_progress` claims, dependency unblocking, Dolt/worktree
   health, and stale `review-running` labels.
-- `references/pr-review-reconciliation.md`
+- [`references/pr-review-reconciliation.md`](references/pr-review-reconciliation.md)
   Load for blocked original `pr-review` beads and blocked
   `pr-review-task` review beads.
-- `references/reporting.md`
+- [`references/reporting.md`](references/reporting.md)
   Load for the cleanup report shape, rig-routing notes, command quick reference,
   and final mutation summary.
 

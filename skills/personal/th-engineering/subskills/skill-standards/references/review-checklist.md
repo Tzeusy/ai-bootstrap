@@ -9,7 +9,13 @@ steps only.
 ```bash
 uv run <skill-standards>/scripts/audit_skill.py <target-skill-dir>
 # add --strict to fail on warnings, --stale-days N to tune the review-age check
+# batch/CI: --all <skills-root> [--skip NAME] [--json]
 ```
+
+CI runs the same audit over `skills/personal/` on every push and PR
+(`.github/workflows/skill-audit.yml`); errors block, warnings are advisory.
+Links inside fenced code blocks are treated as illustrative examples and
+ignored — fence your templates.
 
 - Fix every ERROR: invalid/missing frontmatter, spec-limit violations,
   placeholder descriptions, broken links, missing routing-table entries,

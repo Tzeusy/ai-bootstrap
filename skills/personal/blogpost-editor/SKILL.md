@@ -215,6 +215,7 @@ Risk: {needs citation/hedging/context}
 
 Suggested phrasing template:
 
+```text
 Fact-Check Results
 Claim: "..."
 
@@ -225,6 +226,7 @@ Evidence: ...
 Sources: [source title](URL), ...
 
 Action: {keep as-is / add citation / add caveat / revise / remove}
+```
 
 Visual Pacing & Asset Plan
 Wall-of-text: {heading} (~{N} words)

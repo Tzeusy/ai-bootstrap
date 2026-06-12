@@ -78,33 +78,33 @@ If no repository-level `craft-and-care` skill exists, continue with this skill.
 
 Use the bundled helpers in `scripts/` for deterministic read-only operations:
 
-- `scripts/resolve_review_context.py`
+- [`scripts/resolve_review_context.py`](scripts/resolve_review_context.py)
   Resolves the original bead, PR number, repo, branches, and current PR state.
-- `scripts/prepare_pr_branch.py`
+- [`scripts/prepare_pr_branch.py`](scripts/prepare_pr_branch.py)
   Fetches base/head, checks out the PR head branch, rebases onto latest base,
   strips `.beads/` divergence, and reports whether cleanup changed the branch.
-- `scripts/list_review_threads.py`
+- [`scripts/list_review_threads.py`](scripts/list_review_threads.py)
   Lists review threads with full pagination and returns unresolved-thread
   details in JSON.
-- `scripts/evaluate_merge_readiness.py`
+- [`scripts/evaluate_merge_readiness.py`](scripts/evaluate_merge_readiness.py)
   Computes merge gates in one place, failing closed when required checks cannot
   be verified.
-- `scripts/discover_quality_gates.py`
+- [`scripts/discover_quality_gates.py`](scripts/discover_quality_gates.py)
   Discovers likely lint, typecheck, and test commands from common project
   manifests when project docs do not name them explicitly.
-- `scripts/reply_to_review_thread.py`
+- [`scripts/reply_to_review_thread.py`](scripts/reply_to_review_thread.py)
   Adds an idempotent reply to an existing review thread.
-- `scripts/resolve_review_thread.py`
+- [`scripts/resolve_review_thread.py`](scripts/resolve_review_thread.py)
   Resolves a review thread idempotently.
-- `scripts/create_inline_review_comment.py`
+- [`scripts/create_inline_review_comment.py`](scripts/create_inline_review_comment.py)
   Adds an idempotent line-level review comment for a newly discovered issue.
 
 Use the bundled references in `references/` when you need the exact GitHub
 review-thread operations or the failure protocol:
 
-- `references/thread-operations.md`
-- `references/failure-protocol.md`
-- `references/evaluation.md`
+- [`references/thread-operations.md`](references/thread-operations.md)
+- [`references/failure-protocol.md`](references/failure-protocol.md)
+- [`references/evaluation.md`](references/evaluation.md)
 
 ## Workflow
 

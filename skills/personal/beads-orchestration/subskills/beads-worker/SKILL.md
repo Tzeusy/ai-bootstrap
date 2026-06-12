@@ -58,13 +58,13 @@ to the coordinator instead of improvising local fan-out.
 Use the bundled helpers when they fit. They exist to reduce runtime ambiguity,
 not to replace local judgment.
 
-- `scripts/assert_worker_context.py`
+- [`scripts/assert_worker_context.py`](scripts/assert_worker_context.py)
   Verifies that `pwd` and branch are bound to the assigned worktree and issue.
-- `scripts/emit_worker_report.py`
+- [`scripts/emit_worker_report.py`](scripts/emit_worker_report.py)
   Emits the final structured Worker Report and validates status-specific fields.
-- `references/runtime-contract.md`
+- [`references/runtime-contract.md`](references/runtime-contract.md)
   Exact bootstrap rules, guidance discovery order, and push/PR failure routing.
-- `references/worker-report.md`
+- [`references/worker-report.md`](references/worker-report.md)
   Report-generation rules, examples, and JSON entry schemas.
 
 ## Optional Project-Level Craft-And-Care Gate

@@ -14,6 +14,12 @@ tool-adapter YAML validity, and superskill (subskills/) layout.
 
 Usage:
   uv run scripts/audit_skill.py <skill-package-dir> [--strict] [--stale-days N]
+  uv run scripts/audit_skill.py --all <skills-root> [--skip NAME ...] [--json]
+
+--all discovers every package under the root (a dir with SKILL.md, excluding
+subskills/ trees, fixtures, and hidden dirs) and audits each; --skip excludes
+packages by directory name. --json emits a machine-readable report for CI.
+Links inside fenced code blocks are treated as illustrative and ignored.
 
 Exit codes: 0 = no errors (warnings allowed unless --strict), 1 = errors found,
 2 = bad invocation. Judgment items (trigger quality, scope, grounding) are NOT
@@ -24,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import re
 import sys
 from pathlib import Path
@@ -122,8 +129,19 @@ def check_staleness(fm: dict, rep: Report, label: str, stale_days: int) -> None:
         rep.warn(f"{label}: last_reviewed is {age} days old (> {stale_days})")
 
 
+FENCE_RE = re.compile(r"^(```|~~~)[^\n]*\n.*?^\1\s*$", re.MULTILINE | re.DOTALL)
+CODE_SPAN_RE = re.compile(r"`[^`\n]+`")
+
+
 def collect_local_links(md_file: Path) -> list[str]:
-    return LOCAL_LINK_RE.findall(md_file.read_text(encoding="utf-8"))
+    """Extract local markdown link targets, ignoring code.
+
+    Links inside fenced blocks or inline code spans are illustrative
+    (templates, examples for target projects), not package links."""
+    text = md_file.read_text(encoding="utf-8")
+    text = FENCE_RE.sub("", text)
+    text = CODE_SPAN_RE.sub("", text)
+    return LOCAL_LINK_RE.findall(text)
 
 
 def check_links(pkg: Path, rep: Report, label: str) -> tuple[set[Path], set[Path]]:
@@ -252,28 +270,88 @@ def audit_superskill(pkg: Path, rep: Report, stale_days: int) -> None:
             rep.error(f"{pkg.name}: router SKILL.md has no routing-table link to subskills/{sub.name}/SKILL.md")
 
 
+# Dirs whose nested SKILL.md files are fixtures or internals, not packages.
+NON_PACKAGE_PARTS = {"subskills", "references", "scripts", "assets", "tests", "fixtures", "node_modules"}
+
+
+def discover_packages(root: Path, skips: set[str]) -> list[Path]:
+    pkgs = []
+    for skill_md in sorted(root.rglob("SKILL.md")):
+        rel_parts = skill_md.parent.relative_to(root).parts
+        if any(p.startswith(".") or p in NON_PACKAGE_PARTS for p in rel_parts):
+            continue
+        if any(p in skips for p in rel_parts):
+            continue
+        pkgs.append(skill_md.parent)
+    return pkgs
+
+
+def audit_one(pkg: Path, stale_days: int) -> Report:
+    rep = Report()
+    audit_package(pkg, rep, stale_days)
+    audit_superskill(pkg, rep, stale_days)
+    return rep
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("package", type=Path, help="path to the skill package directory")
+    parser.add_argument("package", type=Path, nargs="?", help="path to one skill package directory")
+    parser.add_argument("--all", type=Path, metavar="ROOT", help="discover and audit every package under ROOT")
+    parser.add_argument("--skip", action="append", default=[], metavar="NAME", help="directory name to exclude from --all (repeatable)")
+    parser.add_argument("--json", action="store_true", help="emit a machine-readable JSON report")
     parser.add_argument("--strict", action="store_true", help="treat warnings as errors")
     parser.add_argument("--stale-days", type=int, default=180, help="warn when last_reviewed is older (default 180)")
     args = parser.parse_args()
 
-    pkg = args.package.resolve()
-    if not pkg.is_dir():
-        print(f"error: {pkg} is not a directory", file=sys.stderr)
+    if bool(args.package) == bool(args.all):
+        print("error: pass exactly one of <package> or --all ROOT", file=sys.stderr)
         return 2
 
-    rep = Report()
-    audit_package(pkg, rep, args.stale_days)
-    audit_superskill(pkg, rep, args.stale_days)
+    if args.all:
+        root = args.all.resolve()
+        if not root.is_dir():
+            print(f"error: {root} is not a directory", file=sys.stderr)
+            return 2
+        pkgs = discover_packages(root, set(args.skip))
+        if not pkgs:
+            print(f"error: no skill packages found under {root}", file=sys.stderr)
+            return 2
+    else:
+        pkgs = [args.package.resolve()]
+        if not pkgs[0].is_dir():
+            print(f"error: {pkgs[0]} is not a directory", file=sys.stderr)
+            return 2
 
-    for msg in rep.errors:
-        print(f"ERROR  {msg}")
-    for msg in rep.warnings:
-        print(f"WARN   {msg}")
-    failed = bool(rep.errors) or (args.strict and bool(rep.warnings))
-    print(f"\n{pkg.name}: {len(rep.errors)} error(s), {len(rep.warnings)} warning(s) — {'FAIL' if failed else 'PASS'}")
+    results = [(pkg, audit_one(pkg, args.stale_days)) for pkg in pkgs]
+    failed = any(rep.errors or (args.strict and rep.warnings) for _, rep in results)
+
+    if args.json:
+        print(json.dumps({
+            "strict": args.strict,
+            "status": "FAIL" if failed else "PASS",
+            "packages": [
+                {
+                    "package": str(pkg),
+                    "name": pkg.name,
+                    "errors": rep.errors,
+                    "warnings": rep.warnings,
+                    "status": "FAIL" if rep.errors or (args.strict and rep.warnings) else "PASS",
+                }
+                for pkg, rep in results
+            ],
+        }, indent=2))
+        return 1 if failed else 0
+
+    for pkg, rep in results:
+        for msg in rep.errors:
+            print(f"ERROR  {msg}")
+        for msg in rep.warnings:
+            print(f"WARN   {msg}")
+        pkg_failed = bool(rep.errors) or (args.strict and bool(rep.warnings))
+        print(f"{pkg.name}: {len(rep.errors)} error(s), {len(rep.warnings)} warning(s) — {'FAIL' if pkg_failed else 'PASS'}")
+    if len(results) > 1:
+        n_fail = sum(1 for _, rep in results if rep.errors or (args.strict and rep.warnings))
+        print(f"\n{len(results)} package(s): {len(results) - n_fail} pass, {n_fail} fail")
     return 1 if failed else 0
 
 

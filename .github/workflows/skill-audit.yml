@@ -1,0 +1,24 @@
+name: Skill audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skills/personal/**"
+      - ".github/workflows/skill-audit.yml"
+  pull_request:
+    paths:
+      - "skills/personal/**"
+      - ".github/workflows/skill-audit.yml"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Audit personal skill packages
+        # Errors gate the merge; warnings are advisory (no --strict yet).
+        run: >
+          uv run skills/personal/th-engineering/subskills/skill-standards/scripts/audit_skill.py
+          --all skills/personal

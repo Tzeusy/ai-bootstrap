@@ -43,10 +43,10 @@ Every bead must be a self-contained handoff for a future independent session. Su
 
 | File | Read when | Content |
 |------|-----------|---------|
-| `references/workflow.md` | Every real use of this skill | Research-first workflow, decomposition rules, creation sequence, and verification flow |
-| `references/fields-and-examples.md` | Crafting issue text or choosing fields | Field schema, type/priority guidance, and example beads |
-| `references/reconciliation-beads.md` | Writing or checking an epic | Required reconciliation-bead contract, generation rules, and template |
-| `references/quality-checklist.md` | Before finalizing or after creating beads | Final checklist, persistence checks, and anti-patterns |
+| [`references/workflow.md`](references/workflow.md) | Every real use of this skill | Research-first workflow, decomposition rules, creation sequence, and verification flow |
+| [`references/fields-and-examples.md`](references/fields-and-examples.md) | Crafting issue text or choosing fields | Field schema, type/priority guidance, and example beads |
+| [`references/reconciliation-beads.md`](references/reconciliation-beads.md) | Writing or checking an epic | Required reconciliation-bead contract, generation rules, and template |
+| [`references/quality-checklist.md`](references/quality-checklist.md) | Before finalizing or after creating beads | Final checklist, persistence checks, and anti-patterns |
 
 ## Trigger Sanity Check
 
