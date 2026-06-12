@@ -3,7 +3,7 @@
 	url = https://github.com/obra/superpowers
 	branch = main
 [submodule "skills/Skill_Seekers"]
-	path = skills/Skill_Seekers
+	path = skills/archive/Skill_Seekers
 	url = https://github.com/yusufkaraaslan/Skill_Seekers
 	branch = main
 [submodule "skills/anthropic-skills"]
@@ -17,6 +17,6 @@
 	path = .claude/plugins/marketplaces/claude-plugins-official
 	url = https://github.com/anthropics/claude-plugins-official.git
 [submodule "skills/mattpocock-skills"]
-	path = skills/mattpocock-skills
+	path = skills/archive/mattpocock-skills
 	url = https://github.com/mattpocock/skills
 	branch = main
