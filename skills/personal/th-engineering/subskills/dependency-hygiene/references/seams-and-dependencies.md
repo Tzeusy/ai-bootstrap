@@ -52,9 +52,3 @@ deep modules are the payoff of good dependency hygiene.
 - **"We might need to swap databases someday."** A hypothetical second
   implementation does not justify a seam today; seams are added when the
   second adapter arrives.
-
-## Provenance
-
-Categories, seam rules, and the deletion test are adapted from
-`skills/mattpocock-skills/skills/engineering/improve-codebase-architecture/`
-(LANGUAGE.md, DEEPENING.md) and `tdd/mocking.md` in the same package.

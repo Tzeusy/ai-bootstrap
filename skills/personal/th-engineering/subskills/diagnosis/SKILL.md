@@ -112,9 +112,3 @@ Cite the item violated, with the run/log evidence:
   analysis actually verified?"
 - Should not trigger: "walk me through debugging basics"
   (`/systematic-debugging`) or "review this test suite" (test-rigor).
-
-## Provenance
-
-The loop ladder, rate-raising protocol, log tagging, and correct-seam rule
-are adapted from `skills/mattpocock-skills/skills/engineering/diagnose/`
-(which also ships a reusable HITL loop script template).
