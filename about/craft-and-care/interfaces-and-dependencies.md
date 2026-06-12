@@ -11,9 +11,10 @@ and adapter-specific config surfaces rather than network APIs.
   intentional-fork provenance.
 - `.claude/`, `.codex/`, `.gemini/`, and `opencode/` are adapter surfaces, not
   the default home for shared logic.
-- Repo-scoped pillar skills live in `about/skills/` and are navigation
-  entrypoints into canonical docs, not independent sources of truth. They are
-  never mirrored into `.claude/skills`, `.codex/skills`, or `.gemini/skills`,
+- Repository-shape navigation lives in the project instruction files
+  (`CLAUDE.md`, `AGENTS.md`) and the pillar READMEs, which are entrypoints
+  into canonical docs, not independent sources of truth. No repo-specific
+  skills go into `.claude/skills`, `.codex/skills`, or `.gemini/skills`,
   because those surfaces are the user's global catalogs on installed machines.
 
 ## Interface Hygiene

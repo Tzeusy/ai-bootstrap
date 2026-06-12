@@ -145,37 +145,37 @@ Scope: v1-mandatory
 - **THEN** those expectations live under `about/craft-and-care/` instead of
   being left only in doctrine, RFC prose, or reviewer folklore
 
-### Requirement: Repo-Scoped Pillar Skills
+### Requirement: In-Repo Shape Navigation
 
-The repository MUST author all five pillar navigation skills under
-`about/skills/`, beside the docs they index, and MUST keep them out of the
-tool skill surfaces (`.claude/skills`, `.codex/skills`, `.gemini/skills`):
-on installed machines those surfaces double as the user's global skill
-catalogs, and repo-specific navigation must not leak into unrelated sessions.
-Project instruction files MUST route in-repo sessions to them instead.
+The repository MUST route sessions started inside it to the canonical shape
+docs through its project instruction files, with `about/README.md` and the
+pillar READMEs as the navigation layer, and MUST NOT expose
+repository-specific navigation skills on the tool skill surfaces
+(`.claude/skills`, `.codex/skills`, `.gemini/skills`), because those surfaces
+double as the user's global skill catalogs on installed machines.
 
 Source: RFC 0001 §Distribution Model, §Documentation Contract;
 about/craft-and-care/interfaces-and-dependencies.md
 Scope: v1-mandatory
 
-#### Scenario: Five pillar sources
-
-- **WHEN** `about/skills/` is inspected
-- **THEN** it contains `heart-and-soul`, `legends-and-lore`, `spec-and-spine`,
-  `lay-and-land`, and `craft-and-care`, each routing to `about/` or `openspec/`
-  content rather than acting as a second authored documentation layer
-
-#### Scenario: No global mirroring
-
-- **WHEN** the skill mirror populates `.claude/skills`, `.codex/skills`, or
-  `.gemini/skills`
-- **THEN** the pillar skills are not among the mirrored entries
-
 #### Scenario: In-repo discovery
 
 - **WHEN** an agent session starts inside this repository
-- **THEN** the project instruction files (`CLAUDE.md`, `AGENTS.md`) route it to
-  `about/skills/` for pillar navigation
+- **THEN** the project instruction files (`CLAUDE.md`, `AGENTS.md`) route it
+  to `about/README.md`, the pillar READMEs, and `openspec/`
+
+#### Scenario: No global skill leakage
+
+- **WHEN** the skill mirror populates `.claude/skills`, `.codex/skills`, or
+  `.gemini/skills`
+- **THEN** no repository-shape navigation skills are among the mirrored
+  entries
+
+#### Scenario: Navigation routes to canonical docs
+
+- **WHEN** an in-repo navigation route or pillar README is followed
+- **THEN** it lands on `about/` or `openspec/` content rather than a second
+  authored documentation layer
 
 ### Requirement: Traceable Navigation
 

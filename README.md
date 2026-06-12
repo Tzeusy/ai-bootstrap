@@ -81,7 +81,7 @@ This is the preferred model for sustained throughput. The coordinator coordinate
 Related personal workflow skills include:
 
 - `th-projects` — superskill routing to `project-shape` (doctrine/spec/topology setup), `project-feature-request` (feature request → spec delta), `project-review` (repo audits + spec reconciliation), and `project-direction` (spec-driven prioritization)
-- `craft-and-care` for the repository's execution-quality bar once the local pillar skill is installed
+- `about/craft-and-care/` for this repository's own execution-quality bar (in-repo sessions are routed there by `CLAUDE.md`/`AGENTS.md`)
 
 ## Quick Start
 

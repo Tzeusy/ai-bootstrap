@@ -3,7 +3,7 @@
 ## Approach
 
 Bootstrap the five-pillar shape with repository-level documents plus
-project-local pillar-skill routing:
+instruction-file routing for in-repo sessions:
 
 - doctrine for identity, boundaries, and contribution rules;
 - engineering standards for verification, review, interface hygiene, and

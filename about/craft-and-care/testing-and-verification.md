@@ -26,7 +26,7 @@ traceability, and reproducibility rather than compiling an application binary.
 
 - Shape language should agree across `about/README.md`, `about/`, RFC 0001, and
   the repository-shape spec.
-- Project-local pillar skills should stay thin and should point to real files in
-  `about/` or `openspec/`.
+- In-repo shape-navigation routes (`CLAUDE.md`, `AGENTS.md`, pillar READMEs)
+  should stay thin and point to real files in `about/` or `openspec/`.
 - Mirror surfaces should never become the only place a rule or workflow is
   documented.

@@ -14,8 +14,8 @@ no normative spec describing what must remain true about its structure.
 - Adds a repository-specific `craft-and-care` pillar for execution-quality
   expectations.
 - Adds an initial OpenSpec change with testable requirements for future audits.
-- Installs project-local pillar skills that route tool-local agents back into
-  canonical docs.
+- Routes in-repo agent sessions back into the canonical docs via the project
+  instruction files (`CLAUDE.md`, `AGENTS.md`).
 
 ## Non-Goals
 

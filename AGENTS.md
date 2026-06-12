@@ -97,11 +97,11 @@ bd close <id>         # Complete work
 
 ## Project Shape Navigation
 
-The five-pillar shape docs live under `about/` and `openspec/`. Their
-repo-scoped navigation skills are authored in `about/skills/<pillar>/SKILL.md`
-(`heart-and-soul`, `legends-and-lore`, `spec-and-spine`, `lay-and-land`,
-`craft-and-care`). They are deliberately NOT mirrored into the tool skill
-catalogs — those surfaces double as the user's global catalogs on installed
-machines. Before structural, placement, or quality-bar decisions here, read
-the relevant `about/skills/*/SKILL.md` index and follow its routing.
-`craft-and-care` is mandatory for non-trivial changes.
+The five-pillar shape docs live under `about/` and `openspec/`;
+`about/README.md` is the reading-order index and each pillar's `README.md`
+routes within that pillar. They are deliberately not exposed as catalog
+skills — the tool skill surfaces double as the user's global catalogs on
+installed machines. Before structural, placement, or quality-bar decisions
+here, start from `about/README.md` (or the relevant pillar README) and follow
+its routing. Reading `about/craft-and-care/` is mandatory for non-trivial
+changes.

@@ -9,7 +9,8 @@ truth, naming, provenance, and local-state boundaries.
 - Update README, doctrine, RFC, spec, and standards material in the same change
   when their meaning moved.
 - Call out anything that could not be fully verified.
-- Keep project-local skill routes aligned with the canonical docs they index.
+- Keep in-repo shape-navigation routes (`CLAUDE.md`, `AGENTS.md`) aligned with
+  the canonical docs they index.
 
 ## Reviewer Blocking Findings
 

@@ -46,8 +46,9 @@ A non-trivial change is not done until:
 
 - Edit canonical shared content before touching tool-local mirrors or
   entrypoints.
-- Keep project-local pillar skills as routing layers into canonical docs, not
-  as a second authored documentation system.
+- Keep in-repo shape navigation (`CLAUDE.md`/`AGENTS.md` routes and the pillar
+  READMEs) pointing at canonical docs, never growing into a second authored
+  documentation system.
 - Keep flattened mirrored skill names understandable from the source tree; do
   not hide provenance behind install-time names alone.
 - Treat checked-in baseline config as portable defaults only. Machine-private
