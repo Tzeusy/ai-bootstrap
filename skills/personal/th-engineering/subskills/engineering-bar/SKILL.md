@@ -73,7 +73,9 @@ biases apply:
 7. **Prefer same-change documentation and contract updates** — When behavior,
    assumptions, interfaces, or standards change, update the relevant docs,
    specs, RFCs, or standards in the same change. "We'll update the docs later"
-   is a violation, not a plan.
+   is a violation, not a plan. ([documentation](../documentation/SKILL.md)
+   operationalizes this, including the code-citation discipline that makes
+   doc claims re-verifiable.)
 8. **Prefer verification depth over throughput** — Verification is deliberate
    and risk-scaled. Re-check important changes before merge rather than
    assuming the first pass was sufficient. Evidence (command output, test

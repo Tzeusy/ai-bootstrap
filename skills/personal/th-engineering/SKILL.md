@@ -4,13 +4,14 @@ description: >
   Use for engineering-quality work on any change or codebase — holding an implementation or
   review to the engineering quality bar, judging code readability and maintainability,
   assessing test-suite rigor, auditing module boundaries and dependency chains, hunting
-  compatibility cruft after refactors/renames/migrations, creating or reviewing skills
-  against the skill quality bar, or producing Excalidraw diagrams. Route to exactly one
-  subskill per subdomain; fan out subagents when a task spans several. Triggers: "hold this
-  to the engineering bar", "is this change done", "is this code readable", "review these
-  tests", "are these tests meaningful", "untangle these dependencies", "clean up this
-  refactor", "finish this migration", "review this skill", "audit our skills",
-  "draw a diagram", "visualize this architecture".
+  compatibility cruft after refactors/renames/migrations, creating or auditing codebase
+  documentation (READMEs, docs trees, doc sites, code-cited facts), creating or reviewing
+  skills against the skill quality bar, or producing Excalidraw diagrams. Route to exactly
+  one subskill per subdomain; fan out subagents when a task spans several. Triggers: "hold
+  this to the engineering bar", "is this change done", "is this code readable", "review
+  these tests", "are these tests meaningful", "untangle these dependencies", "clean up
+  this refactor", "finish this migration", "document this service", "audit the docs",
+  "review this skill", "audit our skills", "draw a diagram", "visualize this architecture".
 metadata:
   owner: tze
   authors:
@@ -23,7 +24,7 @@ compatibility: skill-standards auditing and excalidraw rendering require uv and 
 
 # TH Engineering
 
-Superskill router for the engineering quality bar. Seven subskills live under
+Superskill router for the engineering quality bar. Eight subskills live under
 `subskills/`; each is a complete standard skill package (own `SKILL.md`,
 `references/`, optional `scripts/`). Subskills are **not** installed in the
 global skill catalog — discover them lazily from this package and load **at
@@ -51,6 +52,7 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 | Judge or improve readability and maintainability: naming, function shape, abstraction altitude, comment discipline, simplicity over cleverness. | [subskills/code-readability/SKILL.md](subskills/code-readability/SKILL.md) | "is this readable", "simplify this code", "review naming and structure" |
 | Judge or improve test quality: behavior-focused assertions, edge and failure-path coverage, regression tests for bugfixes, tautological/flaky test elimination. | [subskills/test-rigor/SKILL.md](subskills/test-rigor/SKILL.md) | "review these tests", "are these tests meaningful", "what coverage is missing" |
 | Audit module boundaries and dependency chains: dependency direction, layering, cycles, public surface, third-party admission and upgrades. | [subskills/dependency-hygiene/SKILL.md](subskills/dependency-hygiene/SKILL.md) | "untangle these dependencies", "is this layering right", "should we add this library" |
+| Create, review, or audit codebase documentation: concise project synthesis, architecture/data-flow/error-handling diagrams, code-cited facts under a maintenance contract, human-readable doc sites (OpenAPI, MkDocs, Sphinx). | [subskills/documentation/SKILL.md](subskills/documentation/SKILL.md) | "document this service", "audit docs for stale claims", "is this README adequate", "make the API docs readable" |
 | Finish same-repo refactors/renames/migrations: delete lingering aliases, re-exports, wrappers, fallback branches, deprecated flags. | [subskills/cruft-cleanup/SKILL.md](subskills/cruft-cleanup/SKILL.md) | "clean up this refactor", "old path still works", "finish this migration" |
 | Create, update, review, or audit a skill or superskill against the skill quality bar (triggers, grounding, metadata, routing, context efficiency, scripts, validation). | [subskills/skill-standards/SKILL.md](subskills/skill-standards/SKILL.md) | "review this skill", "is this SKILL.md well designed", "should this be a superskill" |
 | Convert a workflow, architecture, protocol, concept, or Mermaid graph into (or out of) an Excalidraw diagram that argues visually. | [subskills/excalidraw-diagram/SKILL.md](subskills/excalidraw-diagram/SKILL.md) | "draw a diagram", "visualize this flow", "convert this Mermaid" |
@@ -66,6 +68,11 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   architecture → `/th-projects`. When th-projects' project-shape authors a
   `craft-and-care` pillar, it consults engineering-bar for the default biases
   rather than restating them.
+- **Docs craft vs. knowledge architecture**: README/docs/diagram/doc-site
+  quality for any repo → documentation. Establishing or auditing the
+  five-pillar knowledge architecture itself → `/th-projects` (project-shape).
+  documentation consumes excalidraw-diagram for its diagrams — that pairing
+  is expected, not a routing violation.
 - **Tooling subdomains stand alone**: skill-standards and excalidraw-diagram
   are self-contained crafts; route to them on their triggers without loading
   the code-quality subskills.
