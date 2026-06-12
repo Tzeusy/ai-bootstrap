@@ -33,15 +33,15 @@ Read `../project-shape/SKILL.md` first, then run the shape scan:
 bash ../project-shape/scripts/shape-scan.sh <repo_root>
 ```
 
-Use the result to classify each pillar using `project-shape`'s own maturity vocabulary: `absent`, `nascent`, `structured`, or `mature`.
+Use the result to classify each pillar using `project-shape`'s per-pillar scale: `absent`, `nascent`, `structured`, or `mature`. The scan's overall Assessment line uses a separate five-level repo rubric (`Unshaped`/`Nascent`/`Structured`/`Shaped`/`Mature` — see [`../project-shape/references/maturity-rubric.md`](../project-shape/references/maturity-rubric.md)); report both, and do not conflate pillar ratings with the repo assessment.
 
 Review behavior:
-- If doctrine, design, specs, or topology are `structured` or `mature`, treat them as the primary normative baseline for their domains.
+- If doctrine, design, specs, topology, or engineering standards (craft-and-care) are `structured` or `mature`, treat them as the primary normative baseline for their domains.
 - If only some pillars exist, use those pillars normatively and fall back elsewhere.
 - If all pillars are `absent` or effectively unusable, fall back to README/docs/code and lower confidence on alignment judgments.
 
 If the scan finds relevant pillars:
-- Read the actual doctrine/design/spec/topology files before reviewing code.
+- Read the actual doctrine/design/spec/topology/craft-and-care files before reviewing code.
 - Extract the project's explicit non-negotiables, scope boundaries, architectural claims, and normative requirements.
 - Note contradictions between pillars. Do not silently resolve them.
 
@@ -53,7 +53,7 @@ If the scan reports weak or missing shape:
 Output of Phase 0: a short baseline packet containing:
 - Per-pillar maturity and missing pillars
 - Source-of-truth order used for this review
-- Explicit doctrine/spec requirements that the code must satisfy
+- Explicit doctrine/spec requirements that the code must satisfy, and craft-and-care execution standards the work is expected to meet
 - Any unresolved contradictions across doctrine, lore, spec, README, or code
 
 ### Phase 1: Automated Repository Scan

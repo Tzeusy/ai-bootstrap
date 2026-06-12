@@ -244,6 +244,7 @@ Scored assessments (1-5 with confidence) for categories 9-12 with evidence.
 - Code review config: CODEOWNERS, required reviewers, branch protection
 - Feature flag system
 - Migration patterns and rollback capability
+- `about/craft-and-care/` (engineering-standards pillar): does it exist, and do its stated standards — testing discipline, review expectations, observability, verification, documentation — match observed practice? Divergence between stated standards and reality is a normative violation, not a style note; its absence is a shape gap to record
 
 ### Search patterns (using LLM tools)
 ```
@@ -265,6 +266,9 @@ Grep: pattern="feature.flag|featureFlag|FEATURE_|feature_toggle|LaunchDarkly|unl
 
 # Health checks
 Grep: pattern="health|readiness|liveness|/healthz|/ready|/alive" glob="*.{ts,py,go,java,yml,yaml}"
+
+# Engineering-standards pillar
+Glob: "about/craft-and-care/**/*.md"
 ```
 
 ### Key questions

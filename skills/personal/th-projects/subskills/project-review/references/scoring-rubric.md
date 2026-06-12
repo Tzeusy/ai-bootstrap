@@ -199,3 +199,5 @@ Mark as N/A with a one-line justification. Do NOT force a 1-5 score on inapplica
 | 5 | Refactoring is routine; comprehensive tests; feature flags; incremental rollout |
 
 **Evidence to cite**: Type system usage, test coverage, code review config, feature flag system, migration patterns.
+
+**Craft-and-care override**: when `about/craft-and-care/` exists and is authored, score this category (and inform categories 7 and 13-14) against the project's own stated standards rather than generic expectations — practice contradicting the project's stated bar caps the score at 2 and is a normative violation; meeting a deliberately lean stated bar is not penalized.

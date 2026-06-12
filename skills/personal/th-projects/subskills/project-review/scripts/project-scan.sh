@@ -242,7 +242,7 @@ echo ""
 
 # --- Git signals ---
 echo "=== GIT SIGNALS ==="
-if [ -d ".git" ]; then
+if git rev-parse --git-dir >/dev/null 2>&1; then
   echo "  Commits: $(git rev-list --count HEAD 2>/dev/null || echo 'unknown')"
   echo "  Contributors: $(git shortlog -sn --no-merges HEAD 2>/dev/null | wc -l | tr -d ' ')"
   first_commit=$(git log --reverse --format='%ai' 2>/dev/null | sed -n '1p')
@@ -254,7 +254,7 @@ if [ -d ".git" ]; then
   echo "  Latest tag: $latest_tag"
   echo "  Branches: $(git branch -a 2>/dev/null | wc -l | tr -d ' ')"
   # Shallow clone detection
-  if [ -f ".git/shallow" ]; then
+  if [ -f "$(git rev-parse --git-dir 2>/dev/null)/shallow" ]; then
     echo "  WARNING: Shallow clone detected — commit counts may be inaccurate"
   fi
   if [ -f ".gitmodules" ]; then
@@ -264,7 +264,7 @@ if [ -d ".git" ]; then
   # Churn hotspots (top 10 most-changed files in last 500 commits)
   echo "  --- Churn hotspots (top 10, last 500 commits) ---"
   git log --oneline -500 --name-only --pretty=format: 2>/dev/null \
-    | sort | uniq -c | sort -rn | sed -n '1,10p' | sed 's/^/    /'
+    | grep -v '^$' | sort | uniq -c | sort -rn | sed -n '1,10p' | sed 's/^/    /'
 fi
 echo ""
 
