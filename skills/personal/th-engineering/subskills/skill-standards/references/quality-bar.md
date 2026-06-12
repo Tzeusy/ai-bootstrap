@@ -110,6 +110,10 @@ Every package should be either a standard `skill` or a `superskill`.
 - Link every important support file from `SKILL.md` with explicit selection
   guidance: say what question the file answers and when to load it. A bare
   link list is not a routing layer.
+- Only real markdown links count as routing. Links inside fenced code blocks
+  or inline code spans are illustrative examples (templates, target-project
+  skeletons) and are ignored by the audit — fence your templates, and never
+  rely on a fence-quoted path to make a support file discoverable.
 - Avoid deep reference chains. Important support files should usually be
   linked directly from `SKILL.md`, not discovered through multiple hops.
 - Prefer several narrow supporting files over one monolithic support document

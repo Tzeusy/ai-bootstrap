@@ -225,6 +225,13 @@ def check_adapters(pkg: Path, rep: Report, label: str) -> None:
             continue
         if not isinstance(data, dict):
             rep.error(f"{label}: {adapter.relative_to(pkg)} is not a YAML mapping")
+            continue
+        interface = data.get("interface")
+        if not isinstance(interface, dict) or not interface.get("display_name"):
+            rep.warn(
+                f"{label}: {adapter.relative_to(pkg)} has no interface.display_name — "
+                "hollow adapter, fill it in or delete it"
+            )
 
 
 def check_layout(pkg: Path, rep: Report, label: str) -> None:
@@ -255,7 +262,12 @@ def audit_superskill(pkg: Path, rep: Report, stale_days: int) -> None:
     subskills = pkg / "subskills"
     if not subskills.is_dir():
         return
-    router_text = (pkg / "SKILL.md").read_text(encoding="utf-8") if (pkg / "SKILL.md").exists() else ""
+    # Real markdown links only — a fence-quoted path is illustrative, not routing.
+    router_md = pkg / "SKILL.md"
+    router_links: set[Path] = set()
+    if router_md.exists():
+        for target in collect_local_links(router_md):
+            router_links.add((router_md.parent / target).resolve())
     names: dict[str, str] = {}
     for sub in sorted(p for p in subskills.iterdir() if p.is_dir()):
         label = f"{pkg.name}/subskills/{sub.name}"
@@ -266,7 +278,7 @@ def audit_superskill(pkg: Path, rep: Report, stale_days: int) -> None:
             rep.error(f"{label}: subskill name {name!r} duplicates {names[name]}")
         elif name:
             names[name] = label
-        if f"subskills/{sub.name}/SKILL.md" not in router_text:
+        if (sub / "SKILL.md").resolve() not in router_links:
             rep.error(f"{pkg.name}: router SKILL.md has no routing-table link to subskills/{sub.name}/SKILL.md")
 
 

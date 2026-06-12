@@ -17,6 +17,10 @@ CI runs the same audit over `skills/personal/` on every push and PR
 Links inside fenced code blocks are treated as illustrative examples and
 ignored — fence your templates.
 
+Ratchet intent: existing warnings are being burned down per package
+(dotfiles-hyd); once `skills/personal/` is warning-free, CI flips to
+`--strict`. Do not add new warnings to a clean package.
+
 - Fix every ERROR: invalid/missing frontmatter, spec-limit violations,
   placeholder descriptions, broken links, missing routing-table entries,
   invalid adapter YAML, and Python scripts without PEP 723 inline metadata.

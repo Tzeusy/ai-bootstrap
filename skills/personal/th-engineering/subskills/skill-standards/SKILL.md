@@ -54,6 +54,10 @@ designed", "audit our skills for quality", "should this be a superskill",
    uv run <this-package>/scripts/audit_skill.py <target-skill-dir>
    ```
 
+   Resolve `<this-package>` from the path of the `SKILL.md` you loaded —
+   this subskill lives under the `th-engineering` package's `subskills/`,
+   not in a global skills directory.
+
    Fix every ERROR it reports. Triage WARNs deliberately — fix or justify.
    In particular, any Python helper script flagged for missing PEP 723
    inline metadata must be brought into compliance as part of the change,
