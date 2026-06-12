@@ -54,3 +54,8 @@ __pycache__/
 # === Private / machine-specific ===
 skills/homelab-opentelemetry/
 skills/mattpocock-skills/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

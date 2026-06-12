@@ -1,39 +1,40 @@
 {
+  "autoCompactEnabled": true,
+  "effortLevel": "high",
   "env": {
-    "ENABLE_TOOL_SEARCH": "1",
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "ENABLE_TOOL_SEARCH": "1"
   },
   "hooks": {
     "PreCompact": [
       {
-        "matcher": "",
         "hooks": [
           {
-            "type": "command",
-            "command": "bd prime"
+            "command": "bd prime",
+            "type": "command"
           }
-        ]
+        ],
+        "matcher": ""
       }
     ],
     "SessionStart": [
       {
-        "matcher": "",
         "hooks": [
           {
-            "type": "command",
-            "command": "bd prime"
+            "command": "bd prime",
+            "type": "command"
           }
-        ]
+        ],
+        "matcher": ""
       }
     ]
   },
-  "statusLine": {
-    "type": "command",
-    "command": "bash ~/.claude/statusline.sh"
-  },
-  "effortLevel": "high",
+  "model": "fable",
+  "remoteControlAtStartup": true,
   "skipDangerousModePermissionPrompt": true,
-  "autoCompactEnabled": true,
-  "teammateMode": "tmux",
-  "remoteControlAtStartup": true
+  "statusLine": {
+    "command": "bash ~/.claude/statusline.sh",
+    "type": "command"
+  },
+  "teammateMode": "tmux"
 }
