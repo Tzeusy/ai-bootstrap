@@ -59,3 +59,13 @@ rg -n "^name:|^description:" subskills/*/SKILL.md
 - Worktrees live at `.worktrees/parallel-agents/<id>` on branch `agent/<id>`.
 - `.beads/` is Dolt-backed and gitignored — never commit it to code branches.
 - bd 1.0.4 has no `--rig` flag: target another project with `bd -C <path> …`.
+
+## When `bd` itself misbehaves
+
+On any unexpected `bd` error (connection failures, unknown flags, refused
+mutations, weird exit states), load
+[`references/known-errors.md`](references/known-errors.md) **before**
+debugging from scratch — it catalogs known errors, deprecations, and
+workarounds. If you hit a rough edge that is not listed, append an entry
+after resolving it: that file is this skill's persistent memory, and an
+unrecorded fix gets re-debugged by the next session.
