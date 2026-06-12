@@ -51,20 +51,43 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
+## Beads Database Topology
+
+This repo has its **own** beads DB (prefix `aib-`) because bd discovery stops
+at the git-repo boundary — sessions here cannot see the parent
+`~/.dotfiles/.beads` (prefix `dotfiles-`). Use the `aib` DB for skill/agent
+work; address the parent's beads explicitly with `bd -C ~/.dotfiles <cmd>`.
+ID-prefix auto-routing across these embedded DBs does NOT work. Known bd
+errors and workarounds are cataloged in
+`skills/personal/beads-orchestration/references/known-errors.md` — append new
+rough edges there after resolving them.
+
 ## Build & Test
 
-_Add your build and test commands here_
+There is no repo-wide build. Skill packages with tests carry them in
+`<skill>/tests/`; run them with:
 
 ```bash
-# Example:
-# npm install
-# npm test
+python3 -m pytest skills/personal/beads-orchestration/subskills/*/tests/ --import-mode=importlib -q
 ```
+
+Symlinks into tool homes (`~/.claude/skills` etc.) are managed by the parent
+repo's `bootstrap.sh`, which prunes `subskills/` so superskills install as one
+catalog entry.
 
 ## Architecture Overview
 
-_Add a brief overview of your project architecture_
+Skills-first (see README.md). Canonical skills live in `skills/`;
+`skills/personal/` is the user-maintained layer, everything else is
+upstream-derived (submodules or vendored). Superskills (`beads-orchestration`,
+`th-projects`, `th-engineering`) are router `SKILL.md` + `subskills/` packages;
+only the router enters the global catalog. `agents/` is legacy/reference.
 
 ## Conventions & Patterns
 
-_Add your project-specific conventions here_
+- Follow `skills/personal/th-engineering/subskills/skill-standards/` when
+  creating or updating skills (trigger quality, routing, context efficiency).
+- Keep `SKILL.md` a thin router; detailed guidance goes in `references/`,
+  helpers in `scripts/` (PEP 723 headers for Python).
+- Update doctrine worth remembering in the parent repo's `AGENTS.md`
+  "Notes to self" at session end.

@@ -78,8 +78,9 @@ PR-review priority lane is
 `bd create`, `bd list`, and `bd ready` default to the `.beads/` DB discovered
 from `$PWD`. To target a different project (running from the mayor or town root),
 use the global `-C <path>` flag to point `bd` at the rig's workspace, e.g.
-`bd -C /path/to/rig list --status=open`. Commands that take an existing bead ID
-(`bd update`, `bd close`, `bd show`, `bd dep`) auto-route via the ID prefix.
+`bd -C /path/to/rig list --status=open`. Do not rely on bead-ID prefixes
+auto-routing to the right DB — that fails across embedded-mode workspaces
+(see `../../references/known-errors.md`); pass `-C` explicitly.
 
 ## Dispatch Quickstart
 

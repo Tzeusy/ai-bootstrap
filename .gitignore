@@ -59,3 +59,6 @@ skills/mattpocock-skills/
 .dolt/
 *.db
 .beads-credential-key
+
+# Beads issue tracker (Dolt-backed local DB; sync via Dolt, not git)
+.beads/

@@ -82,6 +82,24 @@ assuming breakage, then record the rename here AND fix the subskill docs.
 
 ## Environment
 
+### `no beads database found` inside a nested git repository
+- **Symptom**: every `bd` command fails with `Error: no beads database found`
+  (and `bd where` reports no active workspace) even though a parent directory
+  has a healthy `.beads/`.
+- **Cause**: bd's database discovery walks up from `$PWD` but stops at the
+  enclosing git repository boundary. A nested repo (e.g. a submodule or a
+  repo-within-a-repo) without its own `.beads/` cannot see the parent's DB.
+  Session hooks keyed on `.beads/` detection also do not fire there.
+- **Fix**: either give the nested repo its own DB (`bd init --prefix <p>` —
+  done for `ai-bootstrap` on 2026-06-12, prefix `aib`), or prefix commands
+  with the global directory flag: `bd -C /path/to/parent <command>`.
+- **This workspace**: `~/.dotfiles` uses prefix `dotfiles` (shell/dotfiles
+  work); `~/.dotfiles/ai-bootstrap` uses prefix `aib` (skill/agent work).
+  **ID-prefix auto-routing does NOT work across these embedded DBs**
+  (verified: `bd show dotfiles-ac7` from ai-bootstrap fails) — always use
+  `bd -C <repo>` when addressing the other repo's beads.
+- Observed: 2026-06-12, bd 1.0.4.
+
 ### Stale duplicate `bd` binary on PATH
 - **Symptom**: `bd version` warns about multiple binaries; behavior differs
   between shells/worktrees.
