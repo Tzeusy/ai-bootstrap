@@ -8,15 +8,16 @@ Use this template when dispatching investigation subagents for project direction
 
 | Agent | Role | Depends on | Output |
 |-------|------|-----------|--------|
-| A | Project spirit & requirements | Scan output | Direction model: spirit, requirements, reality check |
-| B | Spec adherence & workflow completeness | Scan output + spec inventory from A | Spec drift report, workflow assessment |
-| C | Implementation fitness | Scan output | Test confidence, observability, delivery readiness, architectural fitness |
-| D | Alignment review & gap analysis | A + B + C findings | Alignment matrix, classification, gaps, push-back list |
+| A | Doctrine/spec intent validation | Phase 1 baseline + scan output + specs | Intent model, mandate checks, requirement fidelity |
+| B | Spec adherence & workflow completeness | Scan output + spec inventory | Spec drift report, workflow assessment |
+| C | Implementation fitness | Scan output + code | Test confidence, observability, delivery readiness, architectural fitness |
+| D | Alignment review & gap analysis | A + B + C findings (+ review-packet constraints) | Alignment matrix, classification, gaps, push-back list, spec deltas |
 
 **Dispatch strategy**:
 - Launch A, B, C in parallel (B can start with scan output; it doesn't strictly need A's full output to begin reading specs)
 - Launch D after A, B, C complete (it synthesizes their findings)
-- Phase 4 (work plan) is done by the orchestrator using all agent outputs
+- The Handoff Output (direction report + beads handoff) is assembled by the orchestrator using all agent outputs; it is not a numbered phase
+- **Receiver protocol**: when a fresh `../project-review/` handoff packet exists, Agent C's dispatch must explicitly list the dimensions to SKIP (the ones the review already scored — typically test confidence, observability, delivery readiness) and narrow C to architectural fitness for the proposed direction
 
 ---
 
@@ -33,9 +34,9 @@ Type: {type} | Maturity: {maturity} | Users: {users}
 
 ## Your task
 {Paste the relevant section from the appropriate reference file:
-  - Agent A: direction-model.md Phase 1 + Phase 2 sections 2.1-2.2
-  - Agent B: direction-model.md Phase 2 sections 2.1-2.3
-  - Agent C: direction-model.md Phase 2 sections 2.3-2.6
+  - Agent A: direction-model.md Section 1 (project spirit, requirements, reality check) + Section 2.1 (spec-intent fidelity); plus the Phase 1 doctrine baseline
+  - Agent B: direction-model.md Sections 2.1-2.2 (spec adherence, workflow completeness)
+  - Agent C: direction-model.md Sections 2.3-2.6 (test confidence, observability, delivery readiness, architectural fitness)
   - Agent D: alignment-review.md (full file)}
 
 ## Investigation rules
@@ -62,12 +63,14 @@ Include a "Key Findings" section at the top with your 3-5 most important observa
 
 ## Agent-specific notes
 
-### Agent A (Project Spirit & Requirements)
+### Agent A (Doctrine/Spec Intent Validation)
+- Start from the Phase 1 doctrine baseline; validate that spec intent is faithful to doctrine (heart-and-soul, legends-and-lore) and run mandate checks
 - Read README and all spec documents before anything else
 - Package manifests (package.json description, pyproject.toml metadata) often contain the most honest project description
 - If the project has both a README and specs, note any contradictions
 - Check git commit messages for intent signals (what were recent efforts focused on?)
 - Look for non-goals and rejected proposals — they reveal direction as much as goals do
+- Produce a requirement-fidelity assessment (Section 2.1 read as intent, not as B's drift inventory)
 
 ### Agent B (Spec Adherence & Workflow Completeness)
 - Build a complete spec section inventory first, then check each against code

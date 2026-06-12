@@ -1,6 +1,6 @@
 # Work Plan Template
 
-How to decompose aligned work into sequenced, modular chunks with reconciliation (Phase 4), and the complete output format.
+The template for the **Handoff Output** — the direction report the orchestrator assembles after Phase 3 (it is not a numbered phase; there is no Phase 4). It covers how to decompose aligned work into sequenced, modular chunks and the complete output format. The beads graph itself is generated in Phase 3 via `/beads-orchestration`; this template presents and hands it off.
 
 ---
 
@@ -68,7 +68,9 @@ When in doubt, serialize. The cost of coordination failures (merge conflicts, re
 
 ### Reconciliation steps
 
-After each completed chunk, add a reconciliation task:
+Reconciliation is proportional to risk (see SKILL.md "Reconciliation Protocol"): a chunk that **modifies normative artifacts** (doctrine/lore edits, an OpenSpec changeset) gets a **change-tier** reconciliation — at least 4 dedicated passes (`R1`-`R4`), fresh subagent each, continuing while acceptance criteria are unmet, up to the 6-pass convergence ceiling. A chunk that only **consumes** approved artifacts gets a **verify-tier** reconciliation — one dedicated pass. Mechanical validations (cycle checks, spec-link coverage) run directly and do not count as passes. Report which tier each chunk used and the pass count.
+
+After each completed chunk, add a reconciliation task (the checklist below is the verify-tier baseline; escalate to change-tier if the chunk edited normative artifacts):
 
 ```markdown
 ### Reconciliation: {chunk title}

@@ -4,6 +4,8 @@ Execution guide for the **epic report bead** — a child bead created by `/proje
 
 This file is referenced in the report bead's description. The executor (human, `/beads-worker`, or agent) follows this guide.
 
+`<skill_dir>` below resolves to the directory containing this subskill's `SKILL.md` — i.e. `.../th-projects/subskills/project-direction`.
+
 ---
 
 ## Bead Template
@@ -26,7 +28,7 @@ Description: |
   Bootstrap with:
     bash <skill_dir>/scripts/epic-report-scaffold.sh {epic-id}
 
-  Then fill sections, generate diagrams via /excalidraw-diagram,
+  Then fill sections, generate diagrams via /th-engineering (excalidraw-diagram),
   create follow-up beads, and commit.
 
 Acceptance criteria:
@@ -77,7 +79,7 @@ See the section guide below for each section's content.
 
 ### Step 4: Generate diagrams
 
-Use `/excalidraw-diagram` to create architecture/workflow diagrams. Render to PNG and embed in the report markdown.
+Use `/th-engineering` (excalidraw-diagram) to create architecture/workflow diagrams. Render to SVG (the package standard — `--format svg` via the excalidraw-diagram render pipeline) and embed in the report markdown.
 
 **Color conventions**:
 - New/added components: `#a7f3d0` fill (green)
@@ -95,7 +97,7 @@ Use `/excalidraw-diagram` to create architecture/workflow diagrams. Render to PN
 | Multi-module, >15 files | 2 diagrams: component overview + detail of most complex area |
 | Architectural change | 2 diagrams: before/after |
 
-Store diagram sources at `docs/reports/diagrams/<epic-id>-*.excalidraw` with rendered PNGs alongside.
+Store diagram sources at `docs/reports/diagrams/<epic-id>-*.excalidraw` with rendered SVGs alongside.
 
 ### Step 5: Create follow-up beads
 
@@ -206,4 +208,4 @@ Before embedding:
 - [ ] Color coding matches convention
 - [ ] Diagram has a title
 - [ ] No overlapping elements
-- [ ] Rendered PNG is crisp at normal zoom
+- [ ] Rendered SVG is crisp at normal zoom

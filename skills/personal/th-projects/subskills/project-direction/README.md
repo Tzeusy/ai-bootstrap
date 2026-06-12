@@ -25,12 +25,14 @@ This skill is for questions like:
 
 The workflow is intentionally serialized at the phase level:
 
-1. Preflight: infer project type, users, maturity, spec location, and analysis focus.
-2. Phase 1: run `/project-shape` reconciliation so doctrine, lore, and spec intent are coherent before planning.
-3. Phase 2: assess project spirit, spec adherence, workflows, architecture, tests, observability, and delivery readiness.
-4. Phase 3: evaluate tractability and alignment, then materialize a sequenced beads graph.
-5. Reconciliation: every phase must survive at least four dedicated review passes (`R1`-`R4+`).
-6. Handoff: emit the direction report and explicit beads handoff to `beads-coordinator`.
+1. Preflight: infer project type, users, maturity, spec location, and analysis focus, then check for upstream inputs (see Receiver Protocol below).
+2. Phase 1: doctrine alignment — establish that proposed work is judged against the project's actual doctrine and lore (a `/project-shape` baseline).
+3. Phase 2: specification scan, parallel investigation (Agents A-D), and synthesis into an OpenSpec changeset covering spec adherence, workflows, architecture, tests, observability, and delivery readiness.
+4. Phase 3: materialize a sequenced, acyclic beads graph from the approved changeset.
+5. Reconciliation is proportional to risk: a phase that *modifies* normative artifacts gets change-tier review (at least four dedicated passes, `R1`-`R4`, up to a 6-pass convergence ceiling); a phase that only *consumes* them gets a single verify-tier pass. Mechanical validations run directly and do not count as passes.
+6. Handoff Output: emit the direction report and explicit beads handoff to `beads-coordinator` (this is not a numbered phase).
+
+When an upstream input is present, the work is pre-filled: a fresh `/project-review` handoff packet supplies the Phase 0 baseline (Phase 1 becomes a check and Agent C skips the dimensions the review already scored), and a signed-off `/project-feature-request` spec delta means Phase 1/2 are narrowed to integrating that delta rather than re-deriving it.
 
 ## Preflight
 
@@ -108,9 +110,9 @@ Rules for the resulting plan:
 
 When the plan is large enough to justify epics, `project-direction` should hand off to `/beads-writer` to create the actual graph. Non-trivial epics must include a report bead as described in `references/epic-report.md`.
 
-## Mandatory Reconciliation Passes
+## Reconciliation: Proportional To Risk
 
-The reconciliation loop is not optional. For each phase, run at least four passes (`R1`-`R4`) and continue if acceptance criteria are still not met.
+The reconciliation loop is not optional, but its depth is proportional to risk. A phase that **modifies** normative artifacts (doctrine/lore edits, an OpenSpec changeset) gets **change-tier** review: at least four dedicated passes (`R1`-`R4`), a fresh subagent each, fixes applied between passes, continuing while acceptance criteria are unmet — up to a 6-pass convergence ceiling, after which unresolved findings are surfaced to the user. A phase that only **consumes** approved artifacts (doctrine checks, drift analysis, graph generation) gets **verify-tier** review: a single dedicated pass, escalating to change-tier only if it finds the consumed artifacts themselves need changes. Mechanical validations (cycle checks, spec-link coverage) run directly and do not count as passes.
 
 Each pass should:
 
@@ -165,7 +167,7 @@ Helper scripts:
 - `scripts/spec-scan.sh <repo_root>`: discover specs, docs, AI context, issue tracking, tests, CI, and git signals.
 - `scripts/epic-report-scaffold.sh <epic-id> [repo_root]`: scaffold the markdown report for a report bead executor.
 
-## Report Bead And `/excalidraw-diagram` Integration
+## Report Bead And `/th-engineering` (excalidraw-diagram) Integration
 
 When Phase 3 creates a non-trivial epic, the report bead is the bridge from planning into human-readable review output.
 
@@ -179,7 +181,7 @@ bash scripts/epic-report-scaffold.sh <epic-id> [repo_root]
 ```
 
 3. The scaffold creates `docs/reports/<epic-id>-<slug>.md` and the related diagrams directory.
-4. The executor then uses `/excalidraw-diagram` to create rendered architecture or workflow diagrams and embeds them into the report.
+4. The executor then uses `/th-engineering` (excalidraw-diagram) to create rendered architecture or workflow diagrams and embeds them into the report.
 5. Remaining TODOs discovered during report writing become new follow-up beads.
 
 That is why this README includes SVGs generated from local `.excalidraw` sources in `references/diagrams/`: the skill is expected to produce rendered visual artifacts as part of the reporting path, not just prose.
@@ -194,6 +196,6 @@ The embedded SVGs in this README were rendered locally from:
 Using:
 
 ```bash
-python3 ../excalidraw-diagram/scripts/render_excalidraw.py references/diagrams/project-direction-workflow.excalidraw --format svg
-python3 ../excalidraw-diagram/scripts/render_excalidraw.py references/diagrams/project-direction-artifacts.excalidraw --format svg
+python3 ../../../th-engineering/subskills/th-engineering (excalidraw-diagram)/scripts/render_excalidraw.py references/diagrams/project-direction-workflow.excalidraw --format svg
+python3 ../../../th-engineering/subskills/th-engineering (excalidraw-diagram)/scripts/render_excalidraw.py references/diagrams/project-direction-artifacts.excalidraw --format svg
 ```

@@ -13,6 +13,8 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+  status: active
+  last_reviewed: "2026-06-12"
 ---
 
 # Project Feature Request

@@ -10,6 +10,29 @@
 
 set -euo pipefail
 
+# Escape characters that would trigger expansion inside an unquoted heredoc.
+# Backslash must be escaped first, then backtick and dollar, so that strings
+# sourced from bd/jq/git (which we do not control) are rendered as literal text
+# rather than executed as command substitutions or variable expansions.
+heredoc_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"   # backslash -> \\
+  s="${s//\`/\\\`}"   # backtick  -> \`
+  s="${s//\$/\\\$}"   # dollar    -> \$
+  printf '%s' "$s"
+}
+
+# Like heredoc_escape but leaves backslashes untouched. Used for the children
+# table, whose markdown pipe-escapes (\|) are produced by jq and would be
+# corrupted if backslashes were doubled. Still neutralizes the command/var
+# expansion vectors (backtick, dollar) that the unquoted heredoc would honor.
+heredoc_escape_keep_backslash() {
+  local s="$1"
+  s="${s//\`/\\\`}"   # backtick -> \`
+  s="${s//\$/\\\$}"   # dollar   -> \$
+  printf '%s' "$s"
+}
+
 if [ -z "${1:-}" ]; then
   echo "Usage: epic-report-scaffold.sh <epic-id> [repo_root]"
   echo "  epic-id: The beads epic ID (e.g., beads-abc123)"
@@ -64,23 +87,40 @@ echo "  Report: $report_file"
 # --- Gather git data ---
 date_str=$(date +%Y-%m-%d)
 
-# Find commits referencing this epic or its children
+# Find commits referencing this epic or its children.
+# Pass each id as its own --grep flag; git ORs multiple --grep patterns,
+# so this catches both epic and child commits without regex-escaping issues.
 child_ids=$(echo "$children_json" | jq -r '.[].id' 2>/dev/null || true)
-all_ids="$EPIC_ID"
+grep_args=(--grep="$EPIC_ID")
 for cid in $child_ids; do
-  all_ids="$all_ids\|$cid"
+  grep_args+=(--grep="$cid")
 done
 
-commit_log=$(git log --oneline --all --grep="$EPIC_ID" 2>/dev/null | head -20 || echo "(no commits found referencing $EPIC_ID)")
+commit_log=$(git log --oneline --all "${grep_args[@]}" 2>/dev/null | head -20 || echo "(no commits found referencing $EPIC_ID)")
 
-# Files changed (approximate — from commits mentioning the epic)
-files_changed=$(git log --all --grep="$EPIC_ID" --name-only --pretty=format: 2>/dev/null | sort -u | grep -v '^$' | head -30 || echo "(could not determine)")
+# Files changed (approximate — from commits mentioning the epic or its children)
+files_changed=$(git log --all "${grep_args[@]}" --name-only --pretty=format: 2>/dev/null | sort -u | grep -v '^$' | head -30 || echo "(could not determine)")
 
 # --- Generate children table ---
 children_table=""
 if [ "$total_children" -gt 0 ]; then
-  children_table=$(echo "$children_json" | jq -r '.[] | "| \(.id) | \(.title) | \(.status) | \(.priority // "—") | \(.type // "task") |"')
+  # jq escapes markdown pipes in titles (| -> \|) so a title cannot add table
+  # columns. Note: heredoc_escape is NOT applied to children_table (it would
+  # double the backslash of \|); instead the targeted escape below neutralizes
+  # backtick/dollar without disturbing the jq-produced \| sequence.
+  children_table=$(echo "$children_json" | jq -r '.[] | "| \(.id) | \(.title | gsub("\\|"; "\\|")) | \(.status) | \(.priority // "—") | \(.type // "task") |"')
 fi
+
+# --- Sanitize untrusted strings before heredoc interpolation ---
+# These come from bd/jq (epic/children metadata) or git (commit subjects /
+# file paths) and must not be able to execute via the unquoted heredoc.
+epic_title=$(heredoc_escape "$epic_title")
+epic_desc=$(heredoc_escape "$epic_desc")
+epic_status=$(heredoc_escape "$epic_status")
+epic_priority=$(heredoc_escape "$epic_priority")
+children_table=$(heredoc_escape_keep_backslash "$children_table")
+commit_log=$(heredoc_escape "$commit_log")
+files_changed=$(heredoc_escape "$files_changed")
 
 # --- Write scaffold ---
 cat > "$report_file" << SCAFFOLD
@@ -114,10 +154,10 @@ $epic_desc
   - Removed: #fecaca (red)
   - External: #ddd6fe (purple)
 
-  Generate .excalidraw file using /excalidraw-diagram skill, then render to PNG.
+  Generate .excalidraw file using /th-engineering (excalidraw-diagram) skill, then render to PNG.
 -->
 
-<!-- ![Architecture overview](diagrams/${EPIC_ID}-architecture.png) -->
+<!-- ![Architecture overview](diagrams/${EPIC_ID}-architecture.svg) -->
 
 ---
 
@@ -228,7 +268,7 @@ $files_changed
 
 | Diagram | Source | Rendered |
 |---------|--------|----------|
-| <!-- Architecture --> | \`diagrams/${EPIC_ID}-architecture.excalidraw\` | \`diagrams/${EPIC_ID}-architecture.png\` |
+| <!-- Architecture --> | \`diagrams/${EPIC_ID}-architecture.excalidraw\` | \`diagrams/${EPIC_ID}-architecture.svg\` |
 SCAFFOLD
 
 echo ""

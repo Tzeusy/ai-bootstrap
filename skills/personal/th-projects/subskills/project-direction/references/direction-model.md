@@ -1,10 +1,15 @@
 # Direction Model
 
-How to build the project's direction model (Phases 1-2). This is the foundation — all alignment review, gap analysis, and work planning depend on it.
+The analysis dimensions Phase 2 agents apply when building the project's direction model. This is the foundation — all alignment review, gap analysis, and work planning depend on it. These are document sections, not workflow phases: the SKILL.md workflow has three phases, and everything here happens inside Phase 2 (Specification Scan + Fitness/Gap Synthesis).
+
+Agents A, B, and C each apply a disjoint slice of these dimensions (see the Phase 2 table in SKILL.md and `subagent-template.md`):
+- **Agent A** — doctrine/spec intent validation: Section 1 (project spirit, requirement classification, reality check) plus Section 2.1 (spec-intent fidelity).
+- **Agent B** — spec adherence & workflows: Sections 2.1-2.2 (spec drift inventory, workflow completeness).
+- **Agent C** — implementation fitness: Sections 2.3-2.6 (test confidence, observability, delivery readiness, architectural fitness).
 
 ---
 
-## Phase 1: Project Spirit & Requirements
+## Section 1: Project Spirit & Requirements
 
 ### 1.1 Determine project spirit
 
@@ -57,7 +62,7 @@ If the project is overreaching, say so directly with evidence.
 
 ---
 
-## Phase 2: Current State Assessment
+## Section 2: Current State Assessment
 
 Evaluate each dimension. For each, assign:
 - **Strong**: Reliable, well-implemented, supports future work

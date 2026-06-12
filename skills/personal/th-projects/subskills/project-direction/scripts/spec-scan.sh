@@ -95,7 +95,7 @@ echo ""
 echo "=== ISSUE TRACKING ==="
 # Beads
 if [ -d ".beads" ]; then
-  open_count=$(set +o pipefail; find .beads -name '*.json' -exec grep -l '"status":"open"\|"status":"in_progress"' {} \; 2>/dev/null | wc -l | tr -d ' ')
+  open_count=$(set +o pipefail; find .beads -name '*.json' -exec grep -El '"status":"(open|in_progress)"' {} \; 2>/dev/null | wc -l | tr -d ' ')
   total_count=$(set +o pipefail; find .beads -name '*.json' -type f 2>/dev/null | wc -l | tr -d ' ')
   echo "  .beads/ ($total_count issues, ~$open_count open/in_progress)"
 fi
@@ -106,9 +106,9 @@ if [ -d ".github" ]; then
   done
 fi
 # Linear/Jira references in docs
-linear_refs=$(set +o pipefail; grep -rl 'linear\.app\|LIN-\|LINEAR-' . --include='*.md' 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ')
+linear_refs=$(set +o pipefail; grep -Erl 'linear\.app|LIN-|LINEAR-' . --include='*.md' 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ')
 [ "${linear_refs:-0}" -gt 0 ] 2>/dev/null && echo "  Linear references found in $linear_refs files"
-jira_refs=$(set +o pipefail; grep -rl 'jira\.\|JIRA-\|atlassian' . --include='*.md' 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ')
+jira_refs=$(set +o pipefail; grep -Erl 'jira\.|JIRA-|atlassian' . --include='*.md' 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ')
 [ "${jira_refs:-0}" -gt 0 ] 2>/dev/null && echo "  Jira references found in $jira_refs files"
 echo ""
 
@@ -169,8 +169,10 @@ echo ""
 
 # --- Test structure (brief) ---
 echo "=== TEST STRUCTURE (brief) ==="
-test_count=$(find . -type f \( -name '*test*' -o -name '*spec*' -o -name '*_test.*' \) \
-  "${EXCLUDES[@]}" 2>/dev/null | wc -l | tr -d ' ')
+test_count=$(find . \
+  -type d \( -path './openspec' -o -path './spec' -o -path './specs' -o -path './docs' \) -prune \
+  -o -type f \( -name '*test*' -o -name '*_test.*' -o -name '*_spec.*' -o -name '*.spec.*' \) \
+  "${EXCLUDES[@]}" -print 2>/dev/null | wc -l | tr -d ' ')
 echo "  Total test files: $test_count"
 for d in tests test __tests__ spec e2e; do
   while IFS= read -r dir; do

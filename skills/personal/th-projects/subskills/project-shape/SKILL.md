@@ -15,13 +15,15 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+  status: active
+  last_reviewed: "2026-06-12"
 ---
 
 # Project Shape
 
 A project's **shape** is the knowledge architecture that makes it comprehensible to both humans and LLMs. Shape is not code — it's the structured understanding that tells you *what* a project is, *why* it exists, *how* it works, *where* it lives, *what* must be built, and *who you are expected to be when you change it*.
 
-**Visualization directive**: Prefer `/excalidraw-diagram` plus SVG rendering when the environment supports it and the diagram materially improves comprehension. If that skill or renderer is unavailable, fall back to Mermaid or concise prose. Do not block shape work on diagram tooling.
+**Visualization directive**: Prefer `/th-engineering` (excalidraw-diagram) plus SVG rendering when the environment supports it and the diagram materially improves comprehension. If that skill or renderer is unavailable, fall back to Mermaid or concise prose. Do not block shape work on diagram tooling.
 
 ## The Five-Pillar Model
 
@@ -40,7 +42,7 @@ Four pillars live under `about/` — the project's self-knowledge with poetic na
 The pillars form a **traceability chain**:
 
 <!-- [DIAGRAM: traceability-chain]
-Style: conceptual, simple. Use /excalidraw-diagram.
+Style: conceptual, simple. Use /th-engineering (excalidraw-diagram).
 Layout: horizontal assembly line (left-to-right) with a cross-cutting band beneath.
 Elements:
   - Top row: 5 nodes in a chain — "Doctrine principle" → "RFC design decision" → "Spec requirement" → "Code" → "Test"
@@ -90,7 +92,7 @@ Bootstrapping is a **consultative process**, not a template-filling exercise. Th
 
 ### Fallback Modes
 
-- **Full mode** — Highest-capability model, independent review subagents, diagrams rendered via `/excalidraw-diagram`
+- **Full mode** — Highest-capability model, independent review subagents, diagrams rendered via `/th-engineering` (excalidraw-diagram)
 - **Lite mode** — Single agent plus deliberate self-critique and user review when subagents are unavailable
 - **No-diagram mode** — Use Mermaid or prose when diagram tooling is unavailable
 
@@ -106,14 +108,14 @@ The skill still applies in constrained environments. Degrade the presentation, n
 
 4. **Revise and present** — Incorporate review findings, present to user for validation. If the user says "not quite right," return to the interview — don't patch.
 
-5. **Scaffold and install** — Run `shape-init.sh` for directory structure, populate with reviewed documents, install local skills. When generating or customizing local skill packages such as `/heart-and-soul`, `/legends-and-lore`, `/spec-and-spine`, or `/lay-and-land`, use `/skill-standards` as the quality bar before relying on them.
+5. **Scaffold and install** — Run `shape-init.sh` for directory structure, populate with reviewed documents, install local skills. When generating or customizing local skill packages such as `/heart-and-soul`, `/legends-and-lore`, `/spec-and-spine`, or `/lay-and-land`, use `/th-engineering` (skill-standards) as the quality bar before relying on them.
 
 ### Pillar Order
 
 Work top-down — each pillar grounds the next:
 
 <!-- [DIAGRAM: pillar-order]
-Style: conceptual, simple. Use /excalidraw-diagram.
+Style: conceptual, simple. Use /th-engineering (excalidraw-diagram).
 Layout: horizontal chain of 5 nodes with a parallel bypass arrow.
 Elements:
   - 5 pillars as distinct shapes, left-to-right:
@@ -130,7 +132,7 @@ Argument: Order matters — each pillar grounds the next. Craft-and-care follows
 
 Topology (lay-and-land) can be started in parallel with design contracts once the architecture interview track is complete. `craft-and-care` should be drafted immediately after doctrine is coherent and before implementation planning begins; it is mandatory for all non-trivial implementation work.
 
-Read `references/bootstrapping.md` for phase-by-phase details, including the local-skill authoring and `/skill-standards` review loop.
+Read `references/bootstrapping.md` for phase-by-phase details, including the local-skill authoring and `/th-engineering` (skill-standards) review loop.
 
 ## Workflow 2: Translate Ideas into Requirements
 
@@ -141,7 +143,7 @@ gate, topology placement, design sketch, and WHEN/THEN spec scenarios — use
 implements:
 
 <!-- [DIAGRAM: idea-funnel]
-Style: conceptual, simple. Use /excalidraw-diagram.
+Style: conceptual, simple. Use /th-engineering (excalidraw-diagram).
 Layout: vertical funnel/timeline — wide at top, narrowing toward bottom.
 Elements:
   - Top: large cloud shape labeled "Idea / Insight" (abstract, fuzzy)
@@ -195,14 +197,14 @@ Synthesize the project pillars into a visual, layman-friendly `about/README.md` 
 ### Requirements
 
 - At least two pillars must exist (heart-and-soul + one other)
-- Prefer `/excalidraw-diagram` for visualizations; fall back to Mermaid or prose when unavailable
+- Prefer `/th-engineering` (excalidraw-diagram) for visualizations; fall back to Mermaid or prose when unavailable
 - Use independent review subagents when available; otherwise do an explicit accessibility/adversarial self-check and ask the user to validate
 
 ### The Process
 
 1. **Extract** — Read each pillar, pull out only what a layman needs to understand
 2. **Design diagrams** — Plan 3-5 Excalidraw diagrams that visually argue the project's story (vision, architecture, scope, pillar model, domain-specific)
-3. **Generate** — Build each diagram via `/excalidraw-diagram`, render to SVG, validate through render-view-fix loop
+3. **Generate** — Build each diagram via `/th-engineering` (excalidraw-diagram), render to SVG, validate through render-view-fix loop
 4. **Write** — Structured markdown: thesis → what it's not → how it works → what v1 delivers → principles → navigating the docs
 5. **Review** — Spawn accessibility + adversarial review subagents targeting layman comprehension
 6. **Commit** — Place at `about/README.md`, store diagram sources in `about/assets/`

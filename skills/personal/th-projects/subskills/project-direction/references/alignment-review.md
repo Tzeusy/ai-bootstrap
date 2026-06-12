@@ -1,6 +1,6 @@
 # Alignment & Tractability Review
 
-How to evaluate proposed work against project direction (Phase 3). This phase determines what should be done, what should be deferred, and what should be rejected.
+How to evaluate proposed work against project direction. This is the synthesis dimension Agent D applies inside SKILL.md Phase 2, after Agents A/B/C produce evidence; it is also the core of the **feature-evaluation** focus mode. It determines what should be done, what should be deferred, and what should be rejected. Its output (alignment matrix, classification, push-back list, gaps, spec deltas) feeds the Phase 2 changeset and Phase 3 sequencing.
 
 ---
 
