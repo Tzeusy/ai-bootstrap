@@ -66,6 +66,9 @@ Reviewable expectations — cite the one violated, with module/import evidence:
    owned code, check maintenance health, and prefer the standard library.
    Wrap volatile or heavy dependencies behind an owned interface at the
    boundary so they stay replaceable; don't wrap stable, idiomatic ones.
+   For seam placement by dependency category, the deletion test, and the
+   test strategy per category, read
+   [`references/seams-and-dependencies.md`](./references/seams-and-dependencies.md).
 6. **Versions are pinned, upgrades are deliberate** — Lockfiles are
    committed; upgrades are their own reviewed change with the changelog read,
    not a side effect of unrelated work. New dependencies are recorded
@@ -85,7 +88,9 @@ Reviewable expectations — cite the one violated, with module/import evidence:
    most often must depend on what changes least.
 3. Walk the edges: flag wrong-direction imports (1), cycles (2), deep
    imports (3), and god-module fan-in (4). For each, propose the concrete
-   inversion or extraction, smallest first.
+   inversion or extraction, smallest first. Judge suspect wrappers and
+   layers with the deletion test
+   ([`references/seams-and-dependencies.md`](./references/seams-and-dependencies.md)).
 4. For each third-party package in scope, apply the rent test (5) and check
    pinning/recording (6) and test/prod separation (7).
 5. Apply small in-scope fixes (move a helper, narrow an export, pin a

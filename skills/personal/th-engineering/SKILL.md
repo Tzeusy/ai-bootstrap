@@ -3,15 +3,15 @@ name: th-engineering
 description: >
   Use for engineering-quality work on any change or codebase — holding an implementation or
   review to the engineering quality bar, judging code readability and maintainability,
-  assessing test-suite rigor, auditing module boundaries and dependency chains, hunting
-  compatibility cruft after refactors/renames/migrations, creating or auditing codebase
-  documentation (READMEs, docs trees, doc sites, code-cited facts), creating or reviewing
-  skills against the skill quality bar, or producing Excalidraw diagrams. Route to exactly
-  one subskill per subdomain; fan out subagents when a task spans several. Triggers: "hold
-  this to the engineering bar", "is this change done", "is this code readable", "review
-  these tests", "are these tests meaningful", "untangle these dependencies", "clean up
-  this refactor", "finish this migration", "document this service", "audit the docs",
-  "review this skill", "audit our skills", "draw a diagram", "visualize this architecture".
+  assessing test-suite rigor, auditing module boundaries and dependency chains, diagnosing
+  hard bugs and flaky failures to a verified root cause, hunting compatibility cruft after
+  refactors/renames/migrations, creating or auditing codebase documentation (READMEs, docs
+  trees, doc sites, code-cited facts), creating or reviewing skills against the skill
+  quality bar, or producing Excalidraw diagrams. Route to exactly one subskill per
+  subdomain; fan out subagents when a task spans several. Triggers: "hold this to the
+  engineering bar", "is this code readable", "review these tests", "untangle these
+  dependencies", "diagnose this", "this test is flaky", "clean up this refactor",
+  "document this service", "audit the docs", "review this skill", "draw a diagram".
 metadata:
   owner: tze
   authors:
@@ -24,7 +24,7 @@ compatibility: skill-standards auditing and excalidraw rendering require uv and 
 
 # TH Engineering
 
-Superskill router for the engineering quality bar. Eight subskills live under
+Superskill router for the engineering quality bar. Nine subskills live under
 `subskills/`, each a complete skill package. They are **not** in the global
 catalog — discover them lazily, load **at most one** subskill body per
 subdomain, and prefer one subagent per subskill when a task spans several
@@ -51,6 +51,7 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 | Test quality: behavior-focused assertions, edge/failure coverage, regression tests, tautology and flake elimination. | [subskills/test-rigor/SKILL.md](subskills/test-rigor/SKILL.md) | "review these tests", "what coverage is missing" |
 | Module boundaries and dependency chains: direction, layering, cycles, public surface, third-party policy. | [subskills/dependency-hygiene/SKILL.md](subskills/dependency-hygiene/SKILL.md) | "untangle these dependencies", "should we add this library" |
 | Codebase documentation: synthesis, diagrams, contract-level code-cited facts, interface semantics cards, human-readable doc sites. | [subskills/documentation/SKILL.md](subskills/documentation/SKILL.md) | "document this service", "audit docs for stale claims" |
+| Evidence bar for diagnosing hard bugs, flaky failures, and perf regressions: feedback loop, ranked hypotheses, tagged instrumentation, regression test at the correct seam. | [subskills/diagnosis/SKILL.md](subskills/diagnosis/SKILL.md) | "diagnose this", "fails one run in twenty", "find the regression" |
 | Finish same-repo refactors/renames/migrations: delete lingering aliases, wrappers, fallbacks, dead flags. | [subskills/cruft-cleanup/SKILL.md](subskills/cruft-cleanup/SKILL.md) | "clean up this refactor", "old path still works" |
 | Skill/superskill quality bar: triggers, grounding, metadata, routing, context efficiency, validation. | [subskills/skill-standards/SKILL.md](subskills/skill-standards/SKILL.md) | "review this skill", "should this be a superskill" |
 | Excalidraw diagrams into/out of workflows, architectures, protocols, Mermaid. | [subskills/excalidraw-diagram/SKILL.md](subskills/excalidraw-diagram/SKILL.md) | "draw a diagram", "convert this Mermaid" |

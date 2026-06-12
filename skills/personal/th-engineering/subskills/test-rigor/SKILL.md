@@ -31,7 +31,8 @@ will actually have, and can a maintainer believe a green run?
 ## Do Not Use This Skill For
 
 - The red-green-refactor process itself — `/test-driven-development`
-- Diagnosing a failing test's root cause — `/systematic-debugging`
+- Diagnosing a failing test's root cause — [diagnosis](../diagnosis/SKILL.md)
+  (evidence bar) or `/systematic-debugging` (process)
 - Production-code clarity — [code-readability](../code-readability/SKILL.md)
 
 ## Core Rule
@@ -60,7 +61,11 @@ Reviewable expectations — cite the one violated, with file:line evidence:
    independently derived.
 5. **Mock only at boundaries you don't own** — Network, clock, filesystem,
    third-party services. Mocking your own internals welds tests to the
-   implementation (violating 1) and lets integration bugs through.
+   implementation (violating 1) and lets integration bugs through. Design
+   the boundary for mockability: each external operation gets its own named,
+   SDK-style function rather than one generic fetcher — specific functions
+   mock cleanly; generic ones push conditional logic into the mocks
+   (see [seams-and-dependencies](../dependency-hygiene/references/seams-and-dependencies.md)).
 6. **Deterministic or quarantined** — A test that fails intermittently is
    worse than no test: it trains people to ignore red. Fix the
    nondeterminism (time, ordering, shared state) or delete the test; never
