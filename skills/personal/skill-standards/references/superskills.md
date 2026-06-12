@@ -12,6 +12,11 @@ A superskill is one of the two valid skill package shapes:
 - `superskill`: a router package with one top-level `SKILL.md` plus
   `subskills/`, where each subskill is itself a standard skill package.
 
+`subskills/` is a **local extension** to the agentskills.io spec, not part of
+it. Portable consumers ignore the directory; this repo's `bootstrap.sh`
+prunes `subskills/` during install so subskill metadata never reaches the
+global catalog. That prune is part of the contract, not an accident.
+
 The superskill's public job is routing. It owns one broad trigger in the global
 skill catalog, then directs the agent to internal subskills only when the task
 needs them.
@@ -54,7 +59,7 @@ Prefer this layout:
 ```text
 superskill/
   SKILL.md
-  agents/openai.yaml
+  agents/openai.yaml        # optional tool adapter
   subskills/
     workflow-a/
       SKILL.md
@@ -72,21 +77,8 @@ superskill/
 
 Use `subskills/` for internal workflows that have their own trigger, workflow,
 and support files. Use `references/` for documents the router or subskills read
-as supporting context.
-
-Each `subskills/<name>/` directory should follow the standard skill shape:
-
-```text
-subskills/workflow-a/
-  SKILL.md
-  agents/openai.yaml
-  references/
-  scripts/
-  assets/
-```
-
-Only include `agents/openai.yaml`, `references/`, `scripts/`, or `assets/` when
-the subskill needs them.
+as supporting context. Only include adapter files, `references/`, `scripts/`,
+or `assets/` in a subskill when it needs them.
 
 ## Router Requirements
 
@@ -95,14 +87,18 @@ The top-level router `SKILL.md` should:
 - Use trigger-oriented frontmatter for the broad capability, not a list of every
   internal workflow.
 - State that internal subskills are discovered lazily from `subskills/`.
-- Give a cheap lookup method, such as:
+- Give a cheap, location-independent lookup method. Resolve the package root
+  from the `SKILL.md` path the agent actually loaded — do not assume the
+  current working directory is the package:
 
 ```bash
-find subskills -maxdepth 2 -name SKILL.md -print
-rg -n "^name:|^description:" subskills
+PKG="$(dirname "<absolute-path-to-this-SKILL.md>")"
+find "$PKG/subskills" -maxdepth 2 -name SKILL.md
+rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 ```
 
-- Define the selection criteria for each subskill in one concise routing table.
+- Define the selection criteria for each subskill in one concise routing
+  table, with a direct link to each `subskills/<name>/SKILL.md`.
 - Load at most one or two subskills for an ordinary task.
 - Say what to do when no subskill fits: continue with router-level guidance,
   ask for clarification, or create a new subskill if the user requested skill
@@ -122,17 +118,23 @@ Each internal subskill should:
 
 ## Validation
 
-Before shipping a superskill:
+Before shipping a superskill, run the package audit — it validates the router
+and every subskill (frontmatter, spec limits, link integrity, PEP 723 on
+scripts, and routing-table coverage of each subskill):
 
-- Verify the top-level skill with the normal skill validator.
-- Verify every `subskills/*/SKILL.md` for valid frontmatter and link integrity,
-  even if the platform does not load nested skills automatically.
+```bash
+uv run <skill-standards>/scripts/audit_skill.py <superskill-dir>
+```
+
+Then verify by hand:
+
 - Test one broad user request that should trigger the router and select a
   subskill.
 - Test one request that should stay inside the router or be declined because no
   subskill fits.
 - Confirm install or mirror scripts do not flatten `subskills/` into the global
-  skill directory unless that is an explicit product decision.
+  skill directory unless that is an explicit product decision (in this repo,
+  `bootstrap.sh` prunes `subskills/` — keep it that way).
 
 ## Anti-Patterns
 

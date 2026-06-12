@@ -1,3 +1,9 @@
+# /// script
+# requires-python = ">=3.9"
+# dependencies = [
+#   "playwright>=1.40",
+# ]
+# ///
 """Render Excalidraw JSON to PNG or SVG using Playwright + headless Chromium.
 
 Usage:

@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.9"
+# dependencies = []
+# ///
 """
 Synchronize canonical ai-bootstrap/skills and ai-bootstrap/agents into tool-specific folders.
 """

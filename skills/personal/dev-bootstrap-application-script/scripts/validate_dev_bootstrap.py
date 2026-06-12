@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.9"
+# dependencies = []
+# ///
 """Validate tmux-oriented dev bootstrap scripts generated from this skill."""
 
 from __future__ import annotations

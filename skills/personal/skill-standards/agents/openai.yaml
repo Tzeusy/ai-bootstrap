@@ -1,4 +1,4 @@
 interface:
   display_name: "Skill Standards"
-  short_description: "Review bar for skill and superskill packaging"
-  default_prompt: "Use $skill-standards to review or update a skill or superskill for trigger quality, project-shape grounding, explicit ownership, router design, progressive discovery, and aligned metadata."
+  short_description: "Quality bar and mechanical audit for skill and superskill packaging"
+  default_prompt: "Use $skill-standards to create, update, review, or audit a skill or superskill: run scripts/audit_skill.py for mechanical conformance (frontmatter, links, PEP 723 scripts, superskill layout), then judge trigger quality, project grounding, routing, and context efficiency."
