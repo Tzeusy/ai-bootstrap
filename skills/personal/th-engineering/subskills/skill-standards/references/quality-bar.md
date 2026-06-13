@@ -130,6 +130,10 @@ Every package should be either a standard `skill` or a `superskill`.
 - Do not write a skill as a narrative of one session.
 - Do not preserve stale workaround text after the underlying problem or tooling
   has changed.
+- Sacrifice grammar for concision. Keep every line sharp and focused on its
+  core message; drop articles, connectives, and flowery phrasing when they add
+  words without meaning. Terseness must not cost clarity — cut the decoration,
+  never the point.
 
 ## 8. Script Repeated Or Complex Workflows
 
