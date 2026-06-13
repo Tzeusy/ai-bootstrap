@@ -16,9 +16,9 @@ Classify each dependency before deciding seam placement and test strategy:
 
 ## Seam Discipline
 
-- **One adapter is a hypothetical seam; two adapters make a real one.** Do
-  not build the port/adapter machinery for a second implementation that does
-  not exist — note where the seam *would* go and move on.
+- **One adapter is a hypothetical seam; two adapters make a real one.** Don't
+  build port/adapter machinery for a second implementation that doesn't
+  exist — note where the seam *would* go and move on.
 - **The interface is the test surface.** If testing a module forces you past
   its interface into internals, the module boundary is wrong — fix the shape
   rather than reaching deeper with mocks.
@@ -34,8 +34,8 @@ deleting it:
 
 - If the complexity it held simply **vanishes**, it was a pass-through —
   delete it for real ([cruft-cleanup](../../cruft-cleanup/SKILL.md)).
-- If the complexity **reappears in every caller**, the module is doing real
-  work — keep it, and consider deepening it (move more of the repeated
+- If the complexity **reappears in every caller**, the module does real
+  work — keep it, consider deepening it (move more repeated
   caller burden behind the same interface).
 
 A module is *deep* when its interface is small relative to the work it hides;
@@ -50,5 +50,5 @@ deep modules are the payoff of good dependency hygiene.
   dependencies adds a pass-through layer that fails the deletion test. Wrap
   what is volatile, heavy, or likely to be substituted (SKILL.md bar 5).
 - **"We might need to swap databases someday."** A hypothetical second
-  implementation does not justify a seam today; seams are added when the
+  implementation doesn't justify a seam today; add seams when the
   second adapter arrives.

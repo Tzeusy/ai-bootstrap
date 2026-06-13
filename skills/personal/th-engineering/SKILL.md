@@ -25,15 +25,15 @@ compatibility: skill-standards auditing and excalidraw rendering require uv and 
 # TH Engineering
 
 Superskill router for the engineering quality bar. Nine subskills live under
-`subskills/`, each a complete skill package. They are **not** in the global
-catalog — discover them lazily, load **at most one** subskill body per
-subdomain, and prefer one subagent per subskill when a task spans several
+`subskills/`, each a complete skill package. **Not** in the global
+catalog — discover lazily, load **at most one** subskill body per
+subdomain, prefer one subagent per subskill when a task spans several
 (see "Subagent dispatch").
 
 `/th-projects` governs the project (doctrine, specs, topology, audits);
 `/th-tooling` governs this machine's harness (installed skills, dotfiles,
 snapshot state); this superskill governs the change: the bar code must clear
-while being written, reviewed, or cleaned up.
+while written, reviewed, or cleaned up.
 
 ## Discover subskills
 
@@ -66,13 +66,13 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   `/th-projects` (whose craft-and-care pillar adopts engineering-bar by
   reference).
 - **Docs craft vs. knowledge architecture**: README/docs/doc-site quality →
-  documentation (it consumes excalidraw-diagram for its diagrams — an
+  documentation (consumes excalidraw-diagram for its diagrams — an
   expected pairing); five-pillar shape work → `/th-projects`.
-- **Skill content vs. harness state**: skill quality, authoring, and review →
-  skill-standards; whether installed skills are used, linked, and fresh on
+- **Skill content vs. harness state**: skill quality, authoring, review →
+  skill-standards; whether installed skills are used, linked, fresh on
   this machine → `/th-tooling` (audit-skill-hygiene, refresh-snapshots).
 - **Fallback**: quality-adjacent but no row fits → answer from router-level
-  context or ask; do not load a subskill to browse.
+  context or ask; don't load a subskill to browse.
 
 ## Subagent dispatch
 
@@ -80,20 +80,20 @@ Subskills are independent subdomains; multi-subdomain work parallelizes:
 
 - **Quality sweep across subdomains**: one subagent per relevant subskill.
   Each prompt carries (1) the absolute path to its
-  `subskills/<name>/SKILL.md` with the instruction to read and apply it,
-  (2) the exact scope (diff, files, directories), (3) the output contract:
-  findings with file:line evidence and a proposed fix. The parent
+  `subskills/<name>/SKILL.md` with instruction to read and apply it,
+  (2) exact scope (diff, files, directories), (3) the output contract:
+  findings with file:line evidence and a proposed fix. Parent
   synthesizes and dedupes; conflicts resolve via engineering-bar's biases.
 - **Iteration-heavy single subdomains** (excalidraw render loop, skill
   audit-and-fix): delegate the whole loop, review the returned artifact.
-- **One narrow question**: load the single subskill and answer directly.
+- **One narrow question**: load the single subskill, answer directly.
 
 ## Shared invariants (all subskills)
 
 - Quality claims are reviewable expectations, not taste: every finding cites
   file:line (or skill-path) evidence and the expectation it violates.
 - engineering-bar's default biases are the baseline all subskills assume; a
-  project's `about/craft-and-care/` overrides them where it exists.
+  project's `about/craft-and-care/` overrides them where present.
 - Fix-it-now beats file-it-away: small in-scope findings get fixed, not
   ticketed.
 - Subskills reference each other by relative path (`../engineering-bar/…`);

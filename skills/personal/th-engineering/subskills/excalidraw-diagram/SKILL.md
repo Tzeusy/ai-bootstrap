@@ -13,7 +13,7 @@ compatibility: Requires Python 3.11+, uv, and Playwright Chromium setup on first
 
 # Excalidraw Diagram Creator
 
-Generate `.excalidraw` files that argue visually rather than turning prose into labeled boxes.
+Generate `.excalidraw` files that argue visually instead of turning prose into labeled boxes.
 
 Sample trigger phrasings: "draw a diagram of this architecture", "visualize this
 workflow in Excalidraw", "convert this Mermaid flowchart to Excalidraw", "turn
@@ -21,13 +21,13 @@ this Excalidraw scene into Mermaid".
 
 ## Setup
 
-If the renderer has not been initialized in this environment, run:
+If the renderer is not initialized in this environment, run:
 
 ```bash
 uv run scripts/render_excalidraw.py --install-browser
 ```
 
-The Excalidraw browser bundle is vendored locally, and the renderer serves it from a local HTTP endpoint during export so Chromium can load the packaged module correctly. Refresh it from the repo root with `scripts/refresh.sh` when you want the latest upstream JS state from npm.
+The Excalidraw browser bundle is vendored locally; the renderer serves it from a local HTTP endpoint during export so Chromium loads the packaged module correctly. Refresh it from the repo root with `scripts/refresh.sh` for the latest upstream JS state from npm.
 
 ## Theme Selection
 
@@ -45,10 +45,10 @@ Theme implies mode. Do not use a separate dark-mode switch.
 
 - Diagrams should show relationships, causality, and flow that would be weaker in prose.
 - Shape should match meaning. If removing the text destroys the idea, redesign the structure.
-- Technical diagrams should teach with concrete evidence: real event names, payloads, API calls, or UI states.
+- Technical diagrams teach with concrete evidence: real event names, payloads, API calls, or UI states.
 - Default to free-floating text. Use containers only when they carry meaning or need bindings.
-- Mermaid interoperability is semantic, not literal. Preserve the graph meaning, but do not blindly mimic Mermaid's layout when Excalidraw can teach it better.
-- When the user wants a quick structural Mermaid derivation from an existing `.excalidraw` scene, you can use `uv run scripts/excalidraw_to_mermaid.py path/to/file.excalidraw` as a starting point and then refine the result if needed.
+- Mermaid interoperability is semantic, not literal. Preserve graph meaning; don't blindly mimic Mermaid's layout when Excalidraw teaches it better.
+- For a quick structural Mermaid derivation from an existing `.excalidraw` scene, use `uv run scripts/excalidraw_to_mermaid.py path/to/file.excalidraw` as a starting point, then refine.
 
 ## Decide The Depth
 
@@ -73,7 +73,7 @@ For technical diagrams, research the real spec first and include evidence artifa
 - Identify the key transformation, decision points, and outputs.
 - For technical topics, look up the real data shape, event names, methods, or API surface.
 - Decide what the viewer must see, not just what they must read.
-- If the input or output is Mermaid, read `references/mermaid-interoperability.md` and choose the Mermaid form that best matches the diagram semantics.
+- If input or output is Mermaid, read `references/mermaid-interoperability.md` and choose the Mermaid form that best matches the diagram semantics.
 
 ### 2. Pick A Theme And A Visual Plan
 
@@ -90,7 +90,7 @@ For comprehensive diagrams, include:
 - Section boundaries
 - Detail inside each section
 
-This keeps the diagram readable from far away and useful up close.
+This keeps the diagram readable from afar and useful up close.
 
 ### 4. Build Large Diagrams Section By Section
 
@@ -102,7 +102,7 @@ For larger diagrams:
 4. Keep section spacing balanced.
 5. Update cross-section bindings when arrows connect across sections.
 
-Do not try to generate a large technical diagram in one pass.
+Do not generate a large technical diagram in one pass.
 
 ### 5. Generate The JSON
 
@@ -129,9 +129,9 @@ Rules:
 - Use `fontFamily: 3`.
 - Prefer `roughness: 0` and `opacity: 100`.
 - Every real relationship gets an arrow or structural line.
-- If using a container, keep bound text under about 70-75% of the container width and under about 60-65% of the container height.
-- For boxed labels, aim for at least 24px horizontal padding and 14px vertical padding.
-- If a boxed label is too tight, shorten the wording first, then add a better line break, then widen the container. Reduce font size only as a last resort.
+- In a container, keep bound text under about 70-75% of container width and 60-65% of container height.
+- For boxed labels, aim for at least 24px horizontal and 14px vertical padding.
+- If a boxed label is too tight, shorten the wording first, then add a line break, then widen the container. Reduce font size only as a last resort.
 - Pull element shapes and field structure from `references/element-templates.md` and `references/json-schema.md`.
 
 ### 6. Render And Iterate
@@ -159,7 +159,7 @@ Then inspect the exported image and fix:
 - bad arrow routing
 - unreadable evidence artifacts
 
-The renderer emits layout warnings before export when bound text is likely too tight inside a container. Treat those warnings as fix-me items, not ignorable noise.
+The renderer emits layout warnings before export when bound text is likely too tight inside a container. Treat warnings as fix-me items, not ignorable noise.
 
 Use `references/render-checklist.md` for the full loop.
 
@@ -187,4 +187,4 @@ Load each file at the workflow step that calls for it:
 ## Scripts
 
 - [`scripts/render_excalidraw.py`](scripts/render_excalidraw.py): render a `.excalidraw` file to an image; run after every generation or edit (`--install-browser` on first use)
-- [`scripts/excalidraw_to_mermaid.py`](scripts/excalidraw_to_mermaid.py): deterministic structural Mermaid export from an existing scene; run when the user wants Mermaid derived from Excalidraw
+- [`scripts/excalidraw_to_mermaid.py`](scripts/excalidraw_to_mermaid.py): deterministic structural Mermaid export from an existing scene; run when deriving Mermaid from Excalidraw

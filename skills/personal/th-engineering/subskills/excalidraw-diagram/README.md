@@ -4,9 +4,9 @@ A coding-agent skill for generating Excalidraw diagrams that teach through struc
 
 ## Provenance
 
-This directory is a vendored, improved fork of [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill).
+A vendored, improved fork of [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill).
 
-Verified local improvements in this vendored copy:
+Verified local improvements in this copy:
 
 - Self-contained renderer script with PEP 723 inline metadata
 - Theme catalog support with a default theme and theme-bound light/dark mode
@@ -18,18 +18,18 @@ Verified local improvements in this vendored copy:
 ## What Makes This Different
 
 - Diagrams argue visually instead of repeating prose as boxes and arrows.
-- Technical diagrams are expected to use concrete evidence artifacts.
-- The renderer can export and immediately support visual QA loops.
+- Technical diagrams use concrete evidence artifacts.
+- The renderer exports and immediately supports visual QA loops.
 - Colors come from a theme catalog, not hardcoded instructions.
-- The prompt layer can translate Mermaid into Excalidraw or derive Mermaid from an Excalidraw scene when the user asks.
+- The prompt layer translates Mermaid into Excalidraw, or derives Mermaid from an Excalidraw scene, on request.
 
 ## Installation
 
 In this repository, this vendored directory is the source of truth.
 
-For use elsewhere, copy this directory into your agent's skills directory under the name `excalidraw-diagram`.
+To use elsewhere, copy this directory into your agent's skills directory as `excalidraw-diagram`.
 
-If you want the original standalone project instead, use the upstream repository: <https://github.com/coleam00/excalidraw-diagram-skill>.
+For the original standalone project, use the upstream repository: <https://github.com/coleam00/excalidraw-diagram-skill>.
 
 ## Setup
 
@@ -39,7 +39,7 @@ Install the Playwright browser binary for the self-contained renderer:
 uv run scripts/render_excalidraw.py --install-browser
 ```
 
-The Excalidraw browser bundle is vendored into this skill. Rendering stays local: the renderer serves the packaged bundle from a loopback HTTP endpoint so Chromium can load the module without reaching out to `esm.sh` or any other external CDN.
+The Excalidraw browser bundle is vendored into this skill. Rendering stays local: the renderer serves the packaged bundle from a loopback HTTP endpoint so Chromium loads the module without reaching `esm.sh` or any external CDN.
 
 To refresh that bundle to the latest upstream JS state from npm, run from the repo root:
 
@@ -55,14 +55,14 @@ uv run scripts/render_excalidraw.py path/to/file.excalidraw
 
 ## Themes
 
-This skill uses a theme catalog. If the user does not request a theme, use the default dark theme from `references/themes/catalog.json`.
+This skill uses a theme catalog. If the user requests no theme, use the default dark theme from `references/themes/catalog.json`.
 
 To inspect or extend the catalog, read:
 
 - `references/theme-catalog.md`
 - `references/themes/catalog.json`
 
-Available built-in themes include:
+Available built-in themes:
 
 - `default`
 - `vscode-dark`
@@ -91,7 +91,7 @@ Ask your coding agent to create a diagram, for example:
 
 The skill handles planning, JSON generation, rendering, and iteration.
 
-It also supports Mermaid interoperability via prompting, for example:
+It also supports Mermaid interoperability via prompting:
 
 > "Convert this Mermaid flowchart into an Excalidraw diagram that is better for teaching"
 

@@ -1,34 +1,34 @@
 # Superskills
 
-Use this reference when a skill package needs broader scope than one workflow
-but should still stay cheap to discover and load.
+Use when a skill package needs broader scope than one workflow but should
+still stay cheap to discover and load.
 
 ## Definition
 
 A superskill is one of the two valid skill package shapes:
 
-- `skill`: a standard agentskills.io-style skill package with one top-level
+- `skill`: a standard agentskills.io-style package with one top-level
   `SKILL.md` and optional `references/`, `scripts/`, and `assets/`.
 - `superskill`: a router package with one top-level `SKILL.md` plus
   `subskills/`, where each subskill is itself a standard skill package.
 
 `subskills/` is a **local extension** to the agentskills.io spec, not part of
-it. Portable consumers ignore the directory; this repo's `bootstrap.sh`
-prunes `subskills/` during install so subskill metadata never reaches the
-global catalog. That prune is part of the contract, not an accident.
+it. Portable consumers ignore the directory; this repo's `bootstrap.sh` prunes
+`subskills/` during install so subskill metadata never reaches the global
+catalog. That prune is part of the contract, not an accident.
 
-The superskill's public job is routing. It owns one broad trigger in the global
-skill catalog, then directs the agent to internal subskills only when the task
-needs them.
+The superskill's public job is routing. It owns one broad trigger in the
+global skill catalog, then directs the agent to internal subskills only when
+the task needs them.
 
-The context contract is:
+The context contract:
 
 - The top-level `SKILL.md` frontmatter is the only superskill metadata that
   belongs in the global skill catalog.
 - Internal subskills are package-local resources, not separately installed
   top-level skills.
 - The router body may tell the agent how to inspect subskill frontmatter, but
-  subskill bodies are read only after the router selects a relevant subskill.
+  subskill bodies load only after the router selects a relevant subskill.
 
 ## When To Use
 
@@ -75,10 +75,10 @@ superskill/
     optional-router-helper.py
 ```
 
-Use `subskills/` for internal workflows that have their own trigger, workflow,
-and support files. Use `references/` for documents the router or subskills read
-as supporting context. Only include adapter files, `references/`, `scripts/`,
-or `assets/` in a subskill when it needs them.
+Use `subskills/` for internal workflows with their own trigger, workflow, and
+support files. Use `references/` for documents the router or subskills read as
+supporting context. Include adapter files, `references/`, `scripts/`, or
+`assets/` in a subskill only when it needs them.
 
 ## Router Requirements
 
@@ -118,13 +118,13 @@ Each internal subskill should:
 - Keep its description trigger-oriented even though it is not globally loaded.
 - Link its own support files directly.
 - Avoid restating router policy unless the subskill needs a local hard stop.
-- Be usable after reading only the router plus that subskill.
+- Be usable from the router plus that subskill alone.
 
 ## Validation
 
 Before shipping a superskill, run the package audit — it validates the router
 and every subskill (frontmatter, spec limits, link integrity, PEP 723 on
-scripts, and routing-table coverage of each subskill):
+scripts, routing-table coverage of each subskill):
 
 ```bash
 uv run <skill-standards>/scripts/audit_skill.py <superskill-dir>

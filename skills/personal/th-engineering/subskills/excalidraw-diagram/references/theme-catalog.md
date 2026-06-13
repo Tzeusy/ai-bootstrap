@@ -4,7 +4,7 @@ Themes live in `references/themes/catalog.json` and individual JSON theme files 
 
 ## How to Use
 
-1. Pick a theme name from the catalog. If the user does not request one, use `default`.
+1. Pick a theme name from the catalog. If the user requests none, use `default`.
 2. Read the matching theme file before generating diagram colors.
 3. Set `appState.excalidrawDiagramTheme` to the selected theme name in the `.excalidraw` file.
 4. Set `appState.viewBackgroundColor` to the theme's `background`.
@@ -25,7 +25,7 @@ Mode is implicit in the theme. Do not add a separate dark-mode switch.
 
 ## Default Theme
 
-If no theme is specified, use the default theme from the catalog. The current default is a dark VS Code-inspired palette.
+If no theme is specified, use the catalog default: a dark VS Code-inspired palette.
 
 ## Available Themes
 
@@ -44,4 +44,4 @@ If no theme is specified, use the default theme from the catalog. The current de
 
 ## Authoring Rule
 
-Do not invent colors inside the skill. All color choices must come from the selected theme file.
+Do not invent colors. All color choices must come from the selected theme file.

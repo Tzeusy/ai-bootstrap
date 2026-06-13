@@ -1,6 +1,6 @@
 # Mermaid Interoperability
 
-Use this reference when the user wants Mermaid converted into Excalidraw, Excalidraw converted into Mermaid, or a workflow that can be represented in either form.
+Use when the user wants Mermaid converted to Excalidraw, Excalidraw converted to Mermaid, or a workflow representable in either form.
 
 ## Core Rule
 
@@ -8,7 +8,7 @@ Convert semantics, not pixels.
 
 - Mermaid is a compact graph description language.
 - Excalidraw is a freeform visual explanation medium.
-- A good conversion preserves nodes, edges, ordering, hierarchy, and decisions even when the layout changes.
+- A good conversion preserves nodes, edges, ordering, hierarchy, and decisions even when layout changes.
 
 ## Mermaid To Excalidraw
 
@@ -31,9 +31,9 @@ Convert semantics, not pixels.
    - fan-out or convergence for branching graphs
    - section boundaries for Mermaid subgraphs
 4. Preserve important labels verbatim unless the user asks for editorial cleanup.
-5. When Mermaid is too sparse to teach well, add concrete evidence artifacts if the surrounding task is technical.
+5. When Mermaid is too sparse to teach well, add concrete evidence artifacts if the task is technical.
 
-Do not force the Excalidraw output into a Mermaid-style left-to-right box grid unless that is actually the clearest explanation.
+Do not force the Excalidraw output into a Mermaid-style left-to-right box grid unless that is the clearest explanation.
 
 ## Excalidraw To Mermaid
 
@@ -46,15 +46,15 @@ Do not force the Excalidraw output into a Mermaid-style left-to-right box grid u
 2. Pick the Mermaid syntax that loses the least meaning.
 3. Convert shapes and arrows into Mermaid nodes and edges.
 4. Flatten purely visual styling and decorative annotations unless Mermaid has a meaningful equivalent.
-5. If the Excalidraw contains evidence artifacts or rich annotations that Mermaid cannot express, keep the core graph in Mermaid and note the lossy parts briefly.
+5. If the Excalidraw holds evidence artifacts or rich annotations Mermaid cannot express, keep the core graph in Mermaid and note the lossy parts briefly.
 
 ## Mapping Heuristics
 
 - Excalidraw ellipse start/end nodes usually map to Mermaid rounded nodes or labeled states.
 - Decision diamonds usually map to Mermaid decision branches with labeled edges.
 - Section boundaries often map to Mermaid `subgraph`.
-- Timeline diagrams usually map best to `sequenceDiagram`.
-- Trees and dependency graphs usually map best to `flowchart` or `graph`.
+- Timeline diagrams map best to `sequenceDiagram`.
+- Trees and dependency graphs map best to `flowchart` or `graph`.
 
 ## Output Expectations
 
@@ -62,13 +62,13 @@ Do not force the Excalidraw output into a Mermaid-style left-to-right box grid u
 
 - Output a proper `.excalidraw` JSON document.
 - Keep the selected theme metadata in `appState`.
-- Preserve the Mermaid semantics even if the layout becomes more expressive than the source.
+- Preserve Mermaid semantics even if the layout becomes more expressive than the source.
 
 ### When Producing Mermaid From Excalidraw
 
 - Output valid Mermaid code in a fenced `mermaid` block unless the user requests another format.
 - Prefer readable node IDs and stable labels.
-- Mention any major information that was visually present but not representable in Mermaid.
+- Mention any major information visually present but not representable in Mermaid.
 
 ## Round-Trip Guidance
 
@@ -78,4 +78,4 @@ If the user wants both versions:
 2. Convert once carefully.
 3. Avoid repeated lossy round-trips.
 
-Mermaid is best for compact, editable graph syntax. Excalidraw is best for explanation, emphasis, and spatial teaching.
+Mermaid is best for compact, editable graph syntax; Excalidraw for explanation, emphasis, and spatial teaching.

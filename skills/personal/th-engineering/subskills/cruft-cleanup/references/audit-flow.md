@@ -1,6 +1,6 @@
 # Cruft Cleanup Audit Flow
 
-Use this reference when applying the skill to a real refactor, rename, or migration.
+Use when applying this skill to a real refactor, rename, or migration.
 
 ## Quick Audit Flow
 
@@ -28,15 +28,15 @@ Use this reference when applying the skill to a real refactor, rename, or migrat
 
 ### Proactive
 
-When you are writing the refactor:
+When writing the refactor:
 
 - Update every same-repo consumer in the same change.
 - Treat the urge to add a compatibility shim as a signal to grep and update callers instead.
-- If updating all callers makes the change too large, split the work by component boundary, not into "migrate now, clean up later."
+- If updating all callers makes the change too large, split by component boundary, not into "migrate now, clean up later."
 
 ### Reactive
 
-When you are reviewing an existing change:
+When reviewing an existing change:
 
 1. Read the diff for every renamed, moved, or restructured interface.
 2. Grep for every remaining reference to the pre-refactor interface.

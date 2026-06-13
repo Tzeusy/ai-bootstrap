@@ -1,6 +1,6 @@
 # Element Templates
 
-Copy-paste JSON scaffolds for Excalidraw elements. Pull actual colors from the selected theme file, not from hardcoded examples.
+Copy-paste JSON scaffolds for Excalidraw elements. Pull colors from the selected theme file, not from hardcoded examples.
 
 ## Theme Reminder
 

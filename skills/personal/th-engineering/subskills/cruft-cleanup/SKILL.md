@@ -16,9 +16,9 @@ metadata:
 
 # Cruft Cleanup
 
-LLMs tend to preserve old interfaces "just in case." In same-repo refactors, that usually leaves dead wrappers, aliases, and fallback paths instead of a finished migration.
+LLMs preserve old interfaces "just in case." In same-repo refactors, that leaves dead wrappers, aliases, and fallback paths instead of a finished migration.
 
-When refactoring, migrating, or renaming code, leave **only the new code path** unless backward compatibility is explicitly required.
+When refactoring, migrating, or renaming, leave **only the new code path** unless backward compatibility is explicitly required.
 
 ## When to Use
 
@@ -36,9 +36,9 @@ When refactoring, migrating, or renaming code, leave **only the new code path** 
 
 ## Core Rule
 
-**If you changed it, finish the job.** Every callsite, import, reference, and test must use the new interface. The old one is deleted — not deprecated, not re-exported, not aliased.
+**If you changed it, finish the job.** Every callsite, import, reference, and test uses the new interface. Delete the old one — not deprecate, not re-export, not alias.
 
-If you catch yourself writing a compatibility alias, wrapper, or fallback, stop and update the callers instead.
+Catch yourself writing a compatibility alias, wrapper, or fallback? Stop and update the callers instead.
 
 ## Read Order
 

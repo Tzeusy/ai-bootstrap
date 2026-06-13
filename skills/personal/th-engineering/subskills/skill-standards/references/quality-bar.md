@@ -1,9 +1,9 @@
 # Quality Bar
 
-Use this reference for the judgment-level review criteria. Run
-[`scripts/audit_skill.py`](../scripts/audit_skill.py) first for the
-mechanical checks (frontmatter, limits, links, PEP 723, layout); this
-document covers what the script cannot decide.
+Judgment-level review criteria. Run
+[`scripts/audit_skill.py`](../scripts/audit_skill.py) first for mechanical
+checks (frontmatter, limits, links, PEP 723, layout); this document covers
+what the script cannot decide.
 
 ## 1. Follow The Agent Skills Spec
 
@@ -11,16 +11,16 @@ Every skill follows the open `agentskills.io` package model
 (https://agentskills.io/specification):
 
 - `SKILL.md` begins with valid YAML frontmatter; `name` and `description`
-  are required.
-- Spec limits: `name` ≤ 64 chars, lowercase letters, digits, and hyphens;
+  required.
+- Spec limits: `name` ≤ 64 chars, lowercase letters, digits, hyphens;
   `description` ≤ 1024 chars. Optional standard fields: `license`,
   `compatibility`, client-specific `metadata`.
-- The `description` is trigger-oriented. It explains when to use the skill,
-  not the full workflow. Every installed skill's description is loaded into
-  the catalog of every session — each character has a recurring context
-  cost, so spend it on activation signals, not process summary.
-- The body stays lean and acts as guidance or routing, not a giant duplicate
-  of all related documentation.
+- The `description` is trigger-oriented: when to use the skill, not the full
+  workflow. Every installed skill's description loads into every session's
+  catalog — each character has a recurring context cost, so spend it on
+  activation signals, not process summary.
+- The body stays lean — guidance or routing, not a giant duplicate of all
+  related documentation.
 - Write valid, portable YAML. Do not rely on client-specific parser quirks.
 - Tool-specific adapter files (such as `agents/openai.yaml` for Codex) are
   not part of the open spec. They are optional; when present, keep them in
@@ -28,17 +28,17 @@ Every skill follows the open `agentskills.io` package model
 
 ## 2. Ground Project-Specific Skills In Project Shape
 
-If the skill is specific to one repository or product, it must align with that
-project's documented source of truth.
+A skill specific to one repository or product must align with that project's
+documented source of truth.
 
 - Read the relevant project-shape pillars first when they exist (route via
   `/th-projects`): `about/heart-and-soul/`, `about/legends-and-lore/`,
   `openspec/`, `about/lay-and-land/`, and `about/craft-and-care/`.
 - Treat the skill as a navigation and execution layer over those docs, not a
   competing doctrine.
-- If the skill and the project docs disagree, fix the inconsistency. Do not let
+- If the skill and project docs disagree, fix the inconsistency. Do not let
   the skill become a third truth source.
-- Project-local terminology, boundaries, and quality expectations should match
+- Project-local terminology, boundaries, and quality expectations must match
   the project's own shape docs exactly.
 
 ## 3. Require Clear Metadata And Authorship
@@ -56,74 +56,72 @@ Every skill should make ownership obvious.
 
 ## 4. Sharp Scope And Trigger Quality
 
-- One skill should solve one coherent class of problems.
-- The title and description should help the agent find the skill from real
-  symptoms, user phrasing, and task context. Write 3–5 sample user phrasings
-  that should trigger the skill and check the description against them; keep
-  the samples in `SKILL.md` so future reviews can re-verify.
+- One skill solves one coherent class of problems.
+- Title and description should help the agent find the skill from real
+  symptoms, user phrasing, and task context. Write 3–5 sample phrasings that
+  should trigger the skill and check the description against them; keep the
+  samples in `SKILL.md` so future reviews can re-verify.
 - Include clear "use when" boundaries and, where helpful, brief "do not use
   when" guidance.
 - Check the description against sibling skills in the catalog: if two
   installed skills would both plausibly match the same phrasing, sharpen one
-  or both descriptions to disambiguate.
+  or both to disambiguate.
 - Avoid vague umbrella skills unless they are intentionally routing skills.
 
 ## 5. Skills Have Two Valid Shapes
 
-Every package should be either a standard `skill` or a `superskill`.
+Every package is either a standard `skill` or a `superskill`.
 
 - A `skill` follows the agentskills.io package model: one top-level
-  `SKILL.md`, optional `references/`, `scripts/`, and `assets/`, and no
-  internal `subskills/` tree.
+  `SKILL.md`, optional `references/`, `scripts/`, and `assets/`, no internal
+  `subskills/` tree.
 - A `superskill` is a router package: one top-level `SKILL.md` plus
   `subskills/`, where each subskill follows the standard skill shape.
 - **`subskills/` is a local extension, not part of the agentskills.io spec.**
-  Portable consumers will ignore it; this repo's `bootstrap.sh` deliberately
-  prunes `subskills/` when installing so subskill metadata never enters the
-  global catalog. Treat that prune as part of the contract.
+  Portable consumers ignore it; this repo's `bootstrap.sh` deliberately prunes
+  `subskills/` when installing so subskill metadata never enters the global
+  catalog. Treat that prune as part of the contract.
 - A superskill is a top-level router whose frontmatter is the only metadata
   that should load into the global skill catalog. Internal subskills live
-  under `subskills/<workflow>/SKILL.md` and are discovered lazily.
-- The router should provide concise selection rules and a cheap way to inspect
-  subskill frontmatter. It should not duplicate every subskill body.
-- Subskills must remain independently coherent after selection: valid
+  under `subskills/<workflow>/SKILL.md`, discovered lazily.
+- The router provides concise selection rules and a cheap way to inspect
+  subskill frontmatter. It does not duplicate every subskill body.
+- Subskills must stay independently coherent after selection: valid
   frontmatter, trigger-oriented descriptions, direct links to support files,
-  and no hidden dependency on unrelated sibling content.
+  no hidden dependency on unrelated sibling content.
 - Use [`superskills.md`](./superskills.md) when deciding whether a broad skill
-  should become a superskill or be split into independent top-level skills.
+  should become a superskill or split into independent top-level skills.
 
 ## 6. Progressive Disclosure And Context Discipline
 
-- Emphasize progressive discovery, not just brevity. `SKILL.md` should help the
-  agent decide what to load next rather than trying to carry the whole skill in
-  one file.
+- Emphasize progressive discovery, not just brevity. `SKILL.md` should help
+  the agent decide what to load next rather than carry the whole skill in one
+  file.
 - Budgets: keep `SKILL.md` under ~150 lines for an ordinary skill; treat 500
-  lines as a hard ceiling that forces fan-out. A reference file should cover
-  one task slice so a typical task loads `SKILL.md` plus one or two support
-  files, not the whole package.
+  lines as a hard ceiling that forces fan-out. A reference file covers one
+  task slice so a typical task loads `SKILL.md` plus one or two support files,
+  not the whole package.
 - Fan heavy or domain-specific reference material into `references/`,
-  deterministic helpers into `scripts/`, and output-only resources into
-  `assets/`.
+  deterministic helpers into `scripts/`, output-only resources into `assets/`.
 - `tests/` (self-tests and fixtures) and `evals/` (trigger/eval datasets) are
-  allowed and encouraged for skills with executable helpers; they are never
-  loaded as agent context and are exempt from linking requirements.
+  allowed and encouraged for skills with executable helpers; they never load
+  as agent context and are exempt from linking requirements.
 - Link every important support file from `SKILL.md` with explicit selection
-  guidance: say what question the file answers and when to load it. A bare
-  link list is not a routing layer.
+  guidance: what question the file answers and when to load it. A bare link
+  list is not a routing layer.
 - Only real markdown links count as routing. Links inside fenced code blocks
   or inline code spans are illustrative examples (templates, target-project
   skeletons) and are ignored by the audit — fence your templates, and never
   rely on a fence-quoted path to make a support file discoverable.
-- Avoid deep reference chains. Important support files should usually be
-  linked directly from `SKILL.md`, not discovered through multiple hops.
-- Prefer several narrow supporting files over one monolithic support document
-  when the subject naturally splits by task, framework, domain, or workflow
-  step.
+- Avoid deep reference chains. Important support files should usually link
+  directly from `SKILL.md`, not surface through multiple hops.
+- Prefer several narrow support files over one monolithic document when the
+  subject naturally splits by task, framework, domain, or workflow step.
 
 ## 7. Evidence Over Generic Prose
 
-- Skills should capture proven workflows, recurring failure modes, or durable
-  repo knowledge.
+- Skills capture proven workflows, recurring failure modes, or durable repo
+  knowledge.
 - Prefer concrete heuristics, checklists, and commands over abstract advice.
   Never point at "the validator" or "the usual process" without naming the
   command or file.
@@ -141,13 +139,13 @@ The decision rule is context economics: any procedure an agent would
 otherwise re-derive in its context window each session belongs in a script.
 A script invocation costs a few dozen tokens and is deterministic;
 re-deriving the same workflow from prose costs thousands of tokens and
-drifts. When a workflow is complex, fragile, repeated, or expensive to
-reconstruct, encapsulate it.
+drifts. Encapsulate any workflow that is complex, fragile, repeated, or
+expensive to reconstruct.
 
 - Well-documented scripts let future agents reuse a known-good workflow
-  instead of reinventing it from scratch.
-- Python is a strong default for these helpers unless another language is
-  clearly a better fit for the environment.
+  instead of reinventing it.
+- Python is a strong default for these helpers unless another language fits
+  the environment better.
 - **Every Python helper script MUST carry PEP 723 inline script metadata** so
   it runs environment-agnostically via `uv run`, declaring its own Python
   requirement and dependencies:
@@ -173,10 +171,10 @@ reconstruct, encapsulate it.
   scripts, not importable modules.
 - If reproducibility matters, use `uv lock --script` and commit the adjacent
   lockfile when the repository wants locked script environments.
-- Scripts should include a short purpose statement, clear usage examples, and
-  stable flags so agents can invoke them correctly without rereading large
-  docs. Link each script from `SKILL.md` (or the relevant reference) with a
-  one-line statement of when to run it.
+- Scripts include a short purpose statement, clear usage examples, and stable
+  flags so agents invoke them correctly without rereading large docs. Link
+  each script from `SKILL.md` (or the relevant reference) with a one-line
+  statement of when to run it.
 
 ## 9. Safe And Explicit Operational Boundaries
 
@@ -188,26 +186,26 @@ reconstruct, encapsulate it.
 
 ## 10. Stateful Reference Docs Carry A Maintenance Contract
 
-Some reference docs are living state rather than static guidance: catalogs of
-known errors or quirks, inventories of projects or environments,
-compatibility matrices, theme or template registries. These rot silently
-unless the agents that consume them also write back to them.
+Some reference docs are living state, not static guidance: catalogs of known
+errors or quirks, inventories of projects or environments, compatibility
+matrices, theme or template registries. These rot silently unless the agents
+that consume them also write back.
 
 - Every stateful reference doc must open with an explicit **maintenance
   contract**: a short section telling the consuming agent when and how to
-  update the doc as part of normal use. The exemplar is
+  update the doc during normal use. The exemplar is
   `beads-orchestration/references/known-errors.md` ("Maintenance contract
   (read this first)").
-- The contract should cover at least: append a new entry when a new class of
-  item is discovered during use (new error, new project, new quirk); update
-  an entry when its facts change; remove an entry when it is disproved or
-  fixed upstream — note the disproving evidence or version first, drop the
-  entry one revision later.
+- The contract covers at least: append an entry when a new class of item
+  surfaces during use (new error, new project, new quirk); update an entry
+  when its facts change; remove an entry when disproved or fixed upstream —
+  note the disproving evidence or version first, drop the entry one revision
+  later.
 - Entries follow a stable format and carry the evidence needed to trust or
   retire them later: date observed, tool version, symptom verbatim.
-- Writing back happens in the same change that surfaced the new fact, not as
-  follow-up work. A skill whose workflow can surface catalog-worthy facts
-  should say so in its workflow steps, not rely on agent goodwill.
+- Write back in the same change that surfaced the new fact, not as follow-up
+  work. A skill whose workflow can surface catalog-worthy facts should say so
+  in its workflow steps, not rely on agent goodwill.
 - When reviewing a skill, treat a stateful reference doc with no maintenance
   contract as a finding: add the contract, or convert the doc to static
-  guidance if it does not actually need to live.
+  guidance if it need not live.

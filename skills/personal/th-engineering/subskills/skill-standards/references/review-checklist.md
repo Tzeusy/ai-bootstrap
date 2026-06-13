@@ -1,8 +1,7 @@
 # Review Checklist
 
-Use this reference for the procedure when updating or approving a skill
-package. Criteria live in [`quality-bar.md`](./quality-bar.md); this file is
-steps only.
+Procedure for updating or approving a skill package. Criteria live in
+[`quality-bar.md`](./quality-bar.md); this file is steps only.
 
 ## Step 1: Mechanical Audit
 
@@ -14,16 +13,16 @@ uv run <skill-standards>/scripts/audit_skill.py <target-skill-dir>
 
 CI runs the same audit over `skills/personal/` in `--strict` mode on every
 push and PR (`.github/workflows/skill-audit.yml`) — errors AND warnings
-block. The tree is warning-free; a change that introduces either does not
-merge. Links inside fenced code blocks are treated as illustrative examples
-and ignored — fence your templates.
+block. The tree is warning-free; a change introducing either does not merge.
+Links inside fenced code blocks are treated as illustrative examples and
+ignored — fence your templates.
 
 - Fix every ERROR: invalid/missing frontmatter, spec-limit violations,
   placeholder descriptions, broken links, missing routing-table entries,
   invalid adapter YAML, and Python scripts without PEP 723 inline metadata.
 - PEP 723 errors in the target skill are in scope for the current change:
   add the `# /// script` block to each flagged script now (quality-bar
-  section 8 has the required header), do not defer.
+  section 8 has the required header); do not defer.
 - Triage every WARN: fix it or state why it stays.
 
 ## Step 2: Judgment Review
@@ -57,17 +56,17 @@ When changing an existing skill:
 3. Remove stale guidance instead of only appending new text.
 4. Keep examples, scripts, and adapter metadata synchronized with the revised
    skill.
-5. For superskills, keep the router table and every internal subskill aligned.
+5. For superskills, keep the router table and every subskill aligned.
 
 ## Step 4: Verification Before Calling It Done
 
 - Re-run `audit_skill.py` on the final package; it must PASS.
-- Check the description against the skill's sample trigger phrasings; if
-  scope is subtle, also check one phrasing that should NOT trigger it.
+- Check the description against the skill's sample trigger phrasings; if scope
+  is subtle, also check one phrasing that should NOT trigger it.
 - For superskills, walk the routing table against one matching-subskill case
   and one no-fit or router-only case.
-- If the skill contains executable helpers, run each documented invocation
-  (at minimum `--help`) and confirm it works via `uv run`.
+- If the skill has executable helpers, run each documented invocation (at
+  minimum `--help`) and confirm it works via `uv run`.
 
 ## Anti-Patterns
 

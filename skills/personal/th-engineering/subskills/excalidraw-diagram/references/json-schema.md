@@ -11,7 +11,7 @@
 
 ## Skill-Specific App State
 
-Set these fields when generating diagrams for this skill:
+Set these fields when generating diagrams:
 
 ```json
 {
@@ -34,7 +34,7 @@ Set these fields when generating diagrams for this skill:
 
 ## Reminders
 
-- `text` and `originalText` should contain only human-readable content.
+- `text` and `originalText` contain only human-readable content.
 - Use `fontFamily: 3`.
-- Keep `opacity: 100` unless a user explicitly wants a different effect.
+- Keep `opacity: 100` unless the user explicitly wants a different effect.
 - Use `roundness: { "type": 3 }` for rounded rectangles.

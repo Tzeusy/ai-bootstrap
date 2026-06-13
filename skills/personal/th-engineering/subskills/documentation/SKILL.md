@@ -18,10 +18,10 @@ metadata:
 # Documentation
 
 Documentation keeps a codebase accessible to reviewers and future
-maintainers — in a spec-driven workflow it is load-bearing. Its failure mode
-is not absence but rot: confident prose that no longer matches the code.
-Hold docs to two standards at once: **accessible** (a newcomer orients in
-minutes) and **maintainable** (every claim re-verifiable against the code).
+maintainers — load-bearing in a spec-driven workflow. Its failure mode
+is not absence but rot: confident prose no longer matching the code.
+Hold docs to two standards at once: **accessible** (newcomer orients in
+minutes) and **maintainable** (every claim re-verifiable against code).
 
 ## Use This Skill When
 
@@ -47,7 +47,7 @@ minutes) and **maintainable** (every claim re-verifiable against the code).
 about the code: couple it to the location it derives from, and state it at
 an altitude where only a behavior change — never a behavior-preserving
 refactor — can falsify it. A doc that cannot be re-verified is already
-rotting; a doc that narrates internals re-rots on every refactor.
+rotting; a doc narrating internals re-rots on every refactor.
 
 ## The Bar
 
@@ -64,12 +64,12 @@ Cite the item violated, with doc and code evidence:
    source plus rendered SVG beside the embedding doc; fall back to Mermaid.
    Real component and event names — never generic boxes.
 3. **Facts carry citations to interface sites** — Each claim links the code
-   that makes it true (`path/to/file.py:Symbol`), anchored at definition and
+   making it true (`path/to/file.py:Symbol`), anchored at definition and
    interface sites — module, endpoint handler, schema — never internal call
    chains. Prefer symbol anchors over line numbers. Uncited claims and
    stale citations are findings.
-4. **Claims survive behavior-preserving refactors** — If a refactor that
-   preserves behavior would falsify a claim, it documents internals: raise
+4. **Claims survive behavior-preserving refactors** — If a behavior-preserving
+   refactor would falsify a claim, it documents internals: raise
    it to what callers observe, or delete it.
 5. **Public interfaces carry a semantics card** — Endpoints, exported
    functions, jobs, and CLI commands document side effects, state,
@@ -79,11 +79,10 @@ Cite the item violated, with doc and code evidence:
 6. **Docs operate under a maintenance contract** — The docs entry point
    states it: behavior changes update affected docs in the same change
    ([engineering-bar](../engineering-bar/SKILL.md) bias 7); stale claims get
-   fixed or marked `STALE` with
-   evidence, never left silently. Living catalogs open with their own
-   write-back contract.
-7. **Prose earns its place** — Types, names, and defaults are already
-   documentation; prose states only what they cannot: semantics,
+   fixed or marked `STALE` with evidence, never left silently. Living
+   catalogs open with their own write-back contract.
+7. **Prose earns its place** — Types, names, and defaults already
+   document; prose states only what they cannot: semantics,
    invariants, units, the why. Every doc has a nameable reader and a
    question it answers — can't name both, delete or merge it.
 8. **Formal doc tooling serves human readers** — OpenAPI/MkDocs/Sphinx

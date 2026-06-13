@@ -15,17 +15,17 @@ Use different visual structures for different ideas. Avoid uniform card grids.
 
 ## Shape Guidance
 
-- Use free-floating text for titles, labels, and annotations unless a container carries meaning.
-- Use ellipses for entry points, outputs, or soft external boundaries.
-- Use rectangles for concrete processes.
-- Use diamonds for decisions.
-- Use lines for timelines, trees, and structural dividers.
+- Free-floating text for titles, labels, and annotations unless a container carries meaning.
+- Ellipses for entry points, outputs, or soft external boundaries.
+- Rectangles for concrete processes.
+- Diamonds for decisions.
+- Lines for timelines, trees, and structural dividers.
 
 ## Layout Guidance
 
 - Give hero concepts the most space.
 - Keep the eye moving in one clear direction.
-- Route arrows around objects instead of through them.
+- Route arrows around objects, not through them.
 - Prefer readable clusters over dense symmetry.
 
 ## Technical Diagram Guidance

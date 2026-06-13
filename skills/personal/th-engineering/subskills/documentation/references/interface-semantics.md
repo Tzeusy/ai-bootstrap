@@ -8,7 +8,7 @@ labeled lines placed **adjacent to the interface** (docstring, OpenAPI
 Cards are contract-level by construction: every line states something a
 caller can observe, so a behavior-preserving refactor cannot invalidate one.
 When behavior changes, the card changes in the same commit (engineering-bar
-bias 7). A wrong card is worse than no card.
+bias 7). A wrong card is worse than none.
 
 ## Fields
 
@@ -26,7 +26,7 @@ Rules:
   doc — probably needs simplification.
 - `Side effects` and `Idempotency` are mandatory for anything that mutates
   state or crosses a process boundary. `none (pure)` is a valuable answer —
-  it is a promise, not filler.
+  a promise, not filler.
 - Omit a field only when genuinely inapplicable. When a caller might
   reasonably wonder, an explicit `none` beats omission.
 - No internals: name what is observable (tables, events, error codes,
@@ -36,7 +36,7 @@ Rules:
 
 Write a card when the interface is any of: exported from its module/package,
 exposed over a process boundary (endpoint, queue consumer, CLI, job), mutates
-state, or is retried by infrastructure. Skip private helpers and trivially
+state, or retried by infrastructure. Skip private helpers and trivially
 pure functions — a card there is noise (bar 7).
 
 ## Placements

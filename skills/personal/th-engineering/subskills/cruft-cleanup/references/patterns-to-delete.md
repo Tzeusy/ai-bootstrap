@@ -1,6 +1,6 @@
 # Patterns To Delete
 
-These are the common forms of migration cruft this skill is meant to eliminate.
+Common forms of migration cruft this skill eliminates.
 
 ## Ghost Re-exports And Type Aliases
 
@@ -21,7 +21,7 @@ export { UserProfile as UserRecord };
 from new_module import *
 ```
 
-Delete the alias or re-export and update all callers to use the new name directly.
+Delete the alias or re-export; update all callers to the new name directly.
 
 ## Dead Compatibility Branches
 
@@ -47,7 +47,7 @@ function getUser(id: string) {
 }
 ```
 
-Delete the wrapper and update callers to use the new interface.
+Delete the wrapper; update callers to the new interface.
 
 ## Tombstone Artifacts
 
@@ -83,4 +83,4 @@ engine:
   legacy_fallback: false
 ```
 
-If a setting has only one valid value after the migration, it is no longer configuration. Inline the constant and delete the option.
+A setting with only one valid value after migration is no longer configuration. Inline the constant; delete the option.
