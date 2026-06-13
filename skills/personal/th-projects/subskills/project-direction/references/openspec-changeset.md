@@ -1,13 +1,12 @@
 # OpenSpec Changeset Synthesis (Tool-Agnostic)
 
-How to turn Phase 2 findings into an OpenSpec changeset using the `openspec`
-CLI directly. This procedure works from any agent environment. In Codex, the
-`/opsx:ff` prompt automates the same loop — treat it as an accelerator, not a
-dependency; the acceptance criteria are identical either way.
+Turn Phase 2 findings into an OpenSpec changeset via the `openspec` CLI
+directly. Works from any agent environment. In Codex, `/opsx:ff` automates the
+same loop — an accelerator, not a dependency; acceptance criteria are identical.
 
-Prerequisite: `openspec` on PATH (`which openspec`). If the CLI is missing,
-stop and report it — do not hand-write changeset files into
-`openspec/changes/`; the scaffold and schema come from the tool.
+Prerequisite: `openspec` on PATH (`which openspec`). CLI missing → stop and
+report it; do not hand-write changeset files into `openspec/changes/` — the
+scaffold and schema come from the tool.
 
 ## The Loop
 
@@ -33,13 +32,13 @@ stop and report it — do not hand-write changeset files into
    ```bash
    openspec instructions <artifact-id> --change "<name>" --json
    ```
-   The JSON gives you `template` (the structure), `instruction`
-   (schema-specific guidance), `outputPath` (where to write), `dependencies`
-   (completed artifacts to read first), plus `context` and `rules` — apply
-   those two as constraints; do not copy them into the output file.
+   JSON gives `template` (structure), `instruction` (schema-specific
+   guidance), `outputPath` (where to write), `dependencies` (completed
+   artifacts to read first), plus `context` and `rules` — apply those two as
+   constraints; do not copy them into the output file.
 
-   Write the artifact, grounding every requirement in Phase 2 evidence
-   (agent findings, file references, drift inventory). Re-run
+   Write the artifact, grounding every requirement in Phase 2 evidence (agent
+   findings, file references, drift inventory). Re-run
    `openspec status --change "<name>" --json` after each artifact; continue
    until everything in `applyRequires` is `done`.
 
@@ -57,3 +56,15 @@ stop and report it — do not hand-write changeset files into
   (heading hierarchy, WHEN/THEN bullets, naming, `[TARGET-STATE]` tags for
   aspirational requirements).
 - A changeset proposes; it does not sequence. Sequencing happens in Phase 3.
+- **Ground every new invariant against the code it retroactively binds.** When
+  a requirement is universal or negative ("no X anywhere", "the only path is
+  Z", "every Y must") or constrains shared data semantics (a store's scope,
+  a column default, a cardinality rule), enumerate the PRE-EXISTING paths and
+  defaults it now outlaws or depends on. Each must be resolved one of two ways:
+  the spec states the rule explicitly (e.g. which `scope` values count, how a
+  single-cardinality conflict resolves), or the changeset carries a task to
+  sweep the existing violators into compliance. A new invariant satisfied only
+  by the new code it ships with — while legacy paths keep violating it — is an
+  incomplete changeset, not a complete one. (Observed: a "no merge without
+  review" invariant shipped while two pre-existing merge endpoints bypassed it,
+  and two reads of one store diverged because the spec never fixed the scope.)

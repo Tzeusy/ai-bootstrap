@@ -1,34 +1,34 @@
 # Consultative Bootstrapping Protocol
 
-How to extract project shape from a human's head through structured dialogue. This is not a template-filling exercise — it's Socratic extraction followed by adversarial refinement.
+Extract project shape from a human's head through structured dialogue. Not template-filling — Socratic extraction followed by adversarial refinement.
 
 ## Core Principle
 
-The human knows what they want to build but often can't articulate it precisely. Your job is to:
+The human knows what they want to build but often can't articulate it precisely. Your job:
 1. Ask questions that surface implicit assumptions
 2. Challenge vague or contradictory answers
-3. Synthesize what they *mean* (not just what they *said*)
+3. Synthesize what they *mean*, not just what they *said*
 4. Write docs they recognize as their own thinking, made sharper
 
 ## Model and Thinking Configuration
 
-Generating project shape documents demands the highest reasoning quality available. These are constitutional documents — errors cascade into every downstream decision.
+Shape docs are constitutional — errors cascade into every downstream decision. Demand the highest reasoning quality available.
 
-- **Use the most capable model available** (e.g., Opus with extended thinking)
-- **Enable maximum thinking/reasoning budget** for synthesis steps
+- **Most capable model available** (e.g., Opus with extended thinking)
+- **Maximum thinking budget** for synthesis steps
 - **Never rush generation** — a flawed vision.md costs more than a delayed one
-- **Prefer depth over speed** — one excellent document beats three mediocre ones
+- **Depth over speed** — one excellent document beats three mediocre ones
 
 ### Mid-Tier Model Guidance
 
 If only a mid-tier model is available:
 
-- Narrow the scope of each turn — one interview track or one document section at a time
-- Make contradictions explicit in the prompt instead of expecting the model to infer them
-- Use shorter synthesis/review loops with more user validation checkpoints
-- Prefer conservative wording over polished but speculative prose
+- Narrow each turn — one interview track or doc section at a time
+- Make contradictions explicit in the prompt; don't expect the model to infer them
+- Shorter synthesis/review loops with more user validation checkpoints
+- Conservative wording over polished but speculative prose
 
-The package still applies. The trade-off is throughput and polish, not correctness standards.
+The package still applies. Trade-off is throughput and polish, not correctness.
 
 ## Phase 1: Discovery Interview
 
@@ -42,11 +42,11 @@ or
 
 > **"If this project succeeds perfectly, what changes for the people who use it?"**
 
-These questions surface motivation and values, not features.
+These surface motivation and values, not features.
 
 ### Core Interview Tracks
 
-Run these tracks sequentially. Each track should be 3-5 exchanges deep before moving on.
+Run sequentially, each 3-5 exchanges deep before moving on.
 
 #### Track 1: Identity (feeds → vision.md)
 
@@ -143,21 +143,13 @@ Only pursue this track if the project is past the idea stage:
 
 ## Phase 2: Synthesis
 
-After the interview, synthesize — don't transcribe. The human said many things; your job is to find the coherent thread.
+After the interview, synthesize — don't transcribe. The human said many things; find the coherent thread.
 
 ### Subagent Dispatch Guidance
 
-If the environment supports subagents and the scope is substantive, fan out synthesis by pillar:
+When subagents are available and scope is substantive, fan out synthesis by pillar: one each for `heart-and-soul`, `craft-and-care`, `legends-and-lore`, `lay-and-land`, and `spec-and-spine` (once prerequisite pillars are stable). Keeps each draft grounded in the right evidence slice rather than blurring doctrine, contracts, requirements, topology, and standards in one swollen window.
 
-- one subagent for `heart-and-soul`
-- one for `craft-and-care`
-- one for `legends-and-lore`
-- one for `lay-and-land`
-- one for `spec-and-spine` once the prerequisite pillars are stable enough
-
-This keeps each pillar's draft grounded in the right slice of evidence rather than letting one swollen context window blur doctrine, contracts, requirements, topology, and engineering standards together.
-
-Use the lead agent to own the interview, route the evidence to the right pillar worker, and reconcile contradictions across pillars. Use the pillar subagents to investigate, draft, and refine within their narrower remit.
+Lead agent owns the interview, routes evidence to the right pillar worker, reconciles cross-pillar contradictions. Pillar subagents investigate, draft, and refine within their narrower remit.
 
 ### Synthesis Steps
 

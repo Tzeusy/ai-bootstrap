@@ -1,8 +1,8 @@
 # Report Template
 
-Use this structure for the final project review report. Adapt depth to project size. A small CLI should not get the same verbosity as a large SaaS codebase.
+Structure for the final project review report. Adapt depth to project size — a small CLI shouldn't get the same verbosity as a large SaaS codebase.
 
-For **quick health check** scope, output only: Normative Baseline, Executive Summary, Scorecard, Top 5 Risks, Verdict, Planning Handoff.
+**Quick health check** scope → output only: Normative Baseline, Executive Summary, Scorecard, Top 5 Risks, Verdict, Planning Handoff.
 
 ---
 

@@ -1,11 +1,11 @@
 # Direction Model
 
-The analysis dimensions Phase 2 agents apply when building the project's direction model. This is the foundation — all alignment review, gap analysis, and work planning depend on it. These are document sections, not workflow phases: the SKILL.md workflow has three phases, and everything here happens inside Phase 2 (Specification Scan + Fitness/Gap Synthesis).
+Analysis dimensions Phase 2 agents apply when building the project's direction model — the foundation all alignment review, gap analysis, and work planning depend on. These are document sections, not workflow phases: everything here happens inside SKILL.md Phase 2 (Specification Scan + Fitness/Gap Synthesis).
 
-Agents A, B, and C each apply a disjoint slice of these dimensions (see the Phase 2 table in SKILL.md and `subagent-template.md`):
-- **Agent A** — doctrine/spec intent validation: Section 1 (project spirit, requirement classification, reality check) plus Section 2.1 (spec-intent fidelity).
-- **Agent B** — spec adherence & workflows: Sections 2.1-2.2 (spec drift inventory, workflow completeness).
-- **Agent C** — implementation fitness: Sections 2.3-2.6 (test confidence, observability, delivery readiness, architectural fitness).
+Agents A/B/C each apply a disjoint slice (see Phase 2 table in SKILL.md + `subagent-template.md`):
+- **Agent A** — doctrine/spec intent: Section 1 (spirit, requirement classification, reality check) + Section 2.1 (spec-intent fidelity).
+- **Agent B** — spec adherence & workflows: Sections 2.1-2.2.
+- **Agent C** — implementation fitness: Sections 2.3-2.6.
 
 ---
 
@@ -13,7 +13,7 @@ Agents A, B, and C each apply a disjoint slice of these dimensions (see the Phas
 
 ### 1.1 Determine project spirit
 
-Answer these questions with evidence:
+Answer with evidence:
 
 | Question | Where to look |
 |----------|--------------|
@@ -23,7 +23,7 @@ Answer these questions with evidence:
 | What is it trying to be? | Architecture choices, abstractions, scope of features |
 | What is it explicitly NOT trying to be? | Non-goals sections, limitations docs, rejected RFCs |
 
-If the project spirit is unclear from docs, infer it from what was actually built. Note the inference.
+Spirit unclear from docs → infer from what was actually built. Note the inference.
 
 ### 1.2 Classify requirements
 
@@ -36,16 +36,16 @@ If the project spirit is unclear from docs, infer it from what was actually buil
 
 ### 1.3 Separate explicit from implicit goals
 
-**Explicit goals**: Stated in README, specs, docs, package metadata, roadmap.
+**Explicit goals**: stated in README, specs, docs, package metadata, roadmap.
 
-**Implicit goals**: Not documented but suggested by:
-- Architecture patterns (e.g., plugin system implies extensibility is a goal)
-- Abstraction choices (e.g., provider interface implies multi-backend support)
-- Test coverage patterns (e.g., heavy integration tests imply reliability priority)
-- CI/CD sophistication (e.g., canary deploys imply production-grade ambitions)
-- Dependency choices (e.g., using a specific framework implies its ecosystem's patterns)
+**Implicit goals**: undocumented but suggested by:
+- Architecture patterns (plugin system → extensibility is a goal)
+- Abstraction choices (provider interface → multi-backend support)
+- Test coverage patterns (heavy integration tests → reliability priority)
+- CI/CD sophistication (canary deploys → production-grade ambitions)
+- Dependency choices (a specific framework → its ecosystem's patterns)
 
-**Important**: Implicit goals are inferences. Label them as such. They may be accidental complexity rather than intentional design.
+**Important**: implicit goals are inferences — label them. May be accidental complexity, not intentional design.
 
 ### 1.4 Reality check
 
@@ -58,7 +58,7 @@ Assess tractability honestly:
 | **Maturity** | Is the project trying to be production-grade before it has basic correctness? | Security hardening with no tests, observability with broken core flows |
 | **State of art** | Are any proposed features beyond what's currently feasible? | Custom ML models for niche tasks, real-time at impossible scale |
 
-If the project is overreaching, say so directly with evidence.
+Project overreaching → say so directly with evidence.
 
 ---
 
@@ -72,9 +72,9 @@ Evaluate each dimension. For each, assign:
 
 ### 2.1 Specification adherence
 
-If the project has specs (openspec/, spec/, design docs):
+If specs exist (openspec/, spec/, design docs):
 
-**Step 1**: Inventory all spec documents and their sections.
+**Step 1**: Inventory all spec documents and sections.
 ```
 # Glob tool (Claude Code/Codex): openspec/**/*.md, spec/**/*.md, docs/design/**/*.md
 # or shell-side: find openspec spec docs/design -name '*.md' 2>/dev/null
@@ -90,14 +90,14 @@ If the project has specs (openspec/, spec/, design docs):
 | **Missing** | Spec requires it, code doesn't address it |
 | **Exceeds spec** | Code does more than spec requires (may indicate spec drift) |
 
-**Step 3**: Note which direction the drift goes:
-- Is the code ahead of the spec? (Spec needs updating)
-- Is the spec ahead of the code? (Implementation needed)
-- Are they diverging? (Realignment needed)
+**Step 3**: Note drift direction:
+- Code ahead of spec → spec needs updating
+- Spec ahead of code → implementation needed
+- Diverging → realignment needed
 
 ### 2.2 Core workflow completeness
 
-Identify the 3-5 most important user journeys. For each:
+Identify the 3-5 most important user journeys. Per journey:
 
 | Aspect | Check |
 |--------|-------|
@@ -143,16 +143,16 @@ Appropriate for maturity level:
 
 ### 2.6 Architectural fitness
 
-The critical question: **Does the current architecture support the intended direction?**
+Critical question: **Does the current architecture support the intended direction?**
 
 Look for:
-- Features that require architectural changes to implement
-- Abstractions that fight the intended use patterns
+- Features requiring architectural changes to implement
+- Abstractions that fight intended use patterns
 - Coupling that makes intended changes expensive
 - Missing extension points for planned features
-- Technical debt that compounds with each new feature
+- Tech debt that compounds with each new feature
 
-If the architecture doesn't support the direction, this is a blocker that must appear early in the work plan.
+Architecture doesn't support the direction → blocker; must appear early in the work plan.
 
 ---
 

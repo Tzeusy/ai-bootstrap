@@ -6,19 +6,19 @@ Step-by-step guide for establishing the five-pillar knowledge architecture from 
 
 - A project with a clear purpose (even if only in the founder's head)
 - Willingness to write before coding
-- Ability to partition substantive pillar work across distinct subagents when the environment supports it
+- Ability to partition substantive pillar work across subagents when supported
 
 ## Dispatch Principle
 
-For substantive generation or curation of pillar documentation, prefer one subagent per pillar or per coherent pillar-document cluster. The goal is not ceremony. The goal is narrower context windows:
+For substantive pillar generation/curation, prefer one subagent per pillar or per coherent doc cluster. Not ceremony — narrower context windows:
 
-- doctrine work should not be diluted by RFC implementation detail
-- RFC drafting should not inherit unnecessary topology or overview-writing context
-- spec curation should stay close to requirements and scenarios
-- topology curation should stay spatial and boundary-focused
-- craft-and-care drafting should stay focused on execution standards rather than product behavior
+- doctrine not diluted by RFC implementation detail
+- RFC drafting not inheriting topology or overview-writing context
+- spec curation close to requirements and scenarios
+- topology curation spatial and boundary-focused
+- craft-and-care focused on execution standards, not product behavior
 
-Keep work local only when the task is too small to justify dispatch or when the next step is tightly blocked on the result.
+Keep work local only when too small to justify dispatch, or when the next step is tightly blocked on the result.
 
 ## Phase 1: Doctrine (about/heart-and-soul/)
 
@@ -54,15 +54,13 @@ An index file with one-line descriptions and a recommended reading order. Not do
 
 ### Dispatch note
 
-If the environment supports subagents, doctrine drafting and doctrine revision should be handled by a dedicated pillar-specific subagent rather than a general-purpose document worker carrying other pillar context.
+When subagents are available, handle doctrine drafting/revision in a dedicated doctrine subagent, not a general worker carrying other pillar context.
 
 ## Phase 2: Engineering Standards (about/craft-and-care/)
 
 **Goal**: Make the project's engineering character and execution-quality bar explicit before implementation planning begins.
 
-This pillar is mandatory for all non-trivial implementation work. Keep it stack-neutral: define
-what evidence, hygiene, review quality, operability, maintainability, and engineering posture are
-expected, not which libraries or tools to use.
+Mandatory for all non-trivial implementation work. Keep stack-neutral: define expected evidence, hygiene, review quality, operability, maintainability, and engineering posture — not which libraries or tools to use.
 
 ### Step 1: Write engineering-bar.md
 
@@ -94,12 +92,11 @@ Only when the project's risk profile warrants them. Common additions:
 
 ### Step 4: Keep it standards-level
 
-`craft-and-care` should define enduring engineering principles and reviewable expectations.
-Detailed runbooks, CI recipes, and tool-specific instructions belong elsewhere and may be linked.
+`craft-and-care` defines enduring engineering principles and reviewable expectations. Detailed runbooks, CI recipes, tool-specific instructions belong elsewhere (may be linked).
 
 ### Dispatch note
 
-`craft-and-care` benefits from its own subagent because it is especially prone to overlap drift. Keep the context focused on execution quality, not feature behavior, architecture contracts, or topology.
+`craft-and-care` benefits from its own subagent — especially prone to overlap drift. Keep context on execution quality, not feature behavior, architecture contracts, or topology.
 
 ## Phase 3: Design Contracts (about/legends-and-lore/)
 
@@ -123,7 +120,7 @@ Even solo projects benefit from review rounds — your future self (or an LLM ag
 
 ### Dispatch note
 
-Use a dedicated subagent for RFC investigation and refinement so technical contract work stays isolated from doctrine prose, topology maps, and standards curation.
+Use a dedicated subagent for RFC investigation/refinement so contract work stays isolated from doctrine prose, topology maps, and standards curation.
 
 ### Step 3: Cross-reference doctrine
 
@@ -158,7 +155,7 @@ Use the spec requirements to create implementation tasks or work items. Each v1-
 
 ### Dispatch note
 
-When curating specs, prefer a spec-focused subagent so requirement edits stay grounded in scenarios and traceability rather than drifting into architectural or doctrinal restatement.
+Prefer a spec-focused subagent so requirement edits stay grounded in scenarios and traceability, not drifting into architectural or doctrinal restatement.
 
 ## Phase 5: Topology (about/lay-and-land/)
 
@@ -190,7 +187,7 @@ Annotate the topology with which RFCs govern which boundaries, and which doctrin
 
 ### Dispatch note
 
-Topology work should be handled by a dedicated subagent whenever the mapping work is non-trivial. Spatial reasoning degrades when mixed with broad generation context from doctrine, specs, and overview prose.
+Hand non-trivial topology mapping to a dedicated subagent. Spatial reasoning degrades when mixed with broad generation context from doctrine, specs, and overview prose.
 
 ## Phase 6: Local Skills
 
@@ -208,7 +205,7 @@ mkdir -p .claude/skills/{heart-and-soul,legends-and-lore,spec-and-spine,lay-and-
 
 **Preferred:** Run `shape-init.sh --skills-only` which generates correctly-formatted skills automatically.
 
-**If writing manually:** Every SKILL.md **MUST** start with YAML frontmatter (`---` delimiters with `name` and `description` fields). Without frontmatter, skill loaders silently reject the file. Manual pillar skills **MUST** follow current `agentskills.io` expectations and `/skill-creator` best practices: keep the description about when to use the skill, keep the body concise, and structure the skill as an index/router instead of copying whole docs into it. Use the templates from `references/local-skill-templates.md`, customize the index tables with your actual files and domains, and fan deeper guidance into `references/`, `scripts/`, and other supporting files that `SKILL.md` links with explicit "read when..." cues. Before you call a generated skill package done, run `/th-engineering` (skill-standards) against it as the review bar for trigger quality, grounding, metadata, and progressive discovery.
+**If writing manually:** Every SKILL.md **MUST** start with YAML frontmatter (`---` delimiters, `name` + `description`). Without it, loaders silently reject the file. Manual pillar skills **MUST** follow `agentskills.io` + `/skill-creator` best practices: trigger-oriented description, concise body, index/router structure (don't copy whole docs in). Use the templates in `references/local-skill-templates.md`, customize index tables with your actual files/domains, fan deeper guidance into `references/`/`scripts/` linked from `SKILL.md` with explicit "read when..." cues. Before calling a generated package done, run `/th-engineering` (skill-standards) as the review bar for trigger quality, grounding, metadata, progressive discovery.
 
 ### Step 3: Validate format
 
@@ -227,11 +224,11 @@ Interpret the scan using `references/maturity-rubric.md`. A fully scaffolded pro
 
 ### Step 4.5: Review customized skills
 
-Run `/th-engineering` (skill-standards) on each generated pillar skill after you replace placeholders or add support files. This is especially important for `heart-and-soul`-style doctrine skills, which are easy to bloat or turn into document dumps instead of navigation layers.
+Run `/th-engineering` (skill-standards) on each generated pillar skill after replacing placeholders or adding support files. Especially important for `heart-and-soul`-style doctrine skills — easy to bloat into document dumps instead of navigation layers.
 
 ### Step 5: Test navigation
 
-Start a new LLM session and try tasks that should trigger each skill. Verify the agent finds the right files.
+Start a new LLM session, try tasks that should trigger each skill, verify the agent finds the right files.
 
 ## Timeline Guidance
 

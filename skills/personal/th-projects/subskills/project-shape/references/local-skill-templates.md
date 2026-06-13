@@ -1,16 +1,14 @@
 # Local Skill Templates
 
-Install these as `.claude/skills/<name>/SKILL.md` (and equivalents for `.codex/`, `.gemini/`, etc.) in the target project. Each skill is an **index** — it tells agents which file to read for a given task, not what the file says.
+Install as `.claude/skills/<name>/SKILL.md` (and `.codex/`, `.gemini/` equivalents) in the target project. Each skill is an **index** — which file to read for a task, not what the file says.
 
-**CRITICAL FORMAT REQUIREMENT:** Every SKILL.md file **MUST** begin with YAML frontmatter delimited by `---`. Without frontmatter, skill loaders silently reject the file. Supported fields: `name` and `description`. Do not omit the opening or closing `---` delimiters. Do not start the file with a markdown heading.
+**CRITICAL FORMAT:** Every SKILL.md **MUST** begin with YAML frontmatter delimited by `---` (fields: `name`, `description`). Without it, loaders silently reject the file. Don't omit either `---` delimiter; don't start with a markdown heading.
 
-**Authoring mandate:** These local skills **MUST** follow current `agentskills.io` conventions and `/skill-creator` best practices, and they should be reviewed against `/th-engineering` (skill-standards) before shipping. In practice that means: valid minimal frontmatter, a trigger-oriented `description`, a concise SKILL body that routes rather than repeats source material, explicit navigation cues that help the agent select only the files needed for the current task, and package-level alignment between `SKILL.md` and any directly referenced support files.
+**Authoring mandate:** Follow `agentskills.io` conventions + `/skill-creator` best practices; review against `/th-engineering` (skill-standards) before shipping. Means: valid minimal frontmatter, trigger-oriented `description`, concise routing body (don't repeat source material), explicit navigation cues so the agent loads only files needed for the current task, package-level alignment between `SKILL.md` and referenced support files.
 
-**Progressive discovery mandate:** Design every pillar skill for targeted retrieval. Keep `SKILL.md` as the discovery/index layer, and fan heavier or narrower content out into supporting files such as `references/*.md` and `scripts/*`. Supporting files should not be hidden sidecars: link them directly from `SKILL.md` with "read when..." guidance so the agent can progressively discover and load only the relevant slice.
+**Progressive discovery mandate:** Design every pillar skill for targeted retrieval. `SKILL.md` = discovery/index layer; fan heavier/narrower content into `references/*.md`, `scripts/*`. Link support files directly from `SKILL.md` with "read when..." guidance — no hidden sidecars.
 
-Customize the tables and rules for your project's specific domains.
-
-After customizing any generated pillar skill, run `/th-engineering` (skill-standards) as the final rubric pass for trigger quality, grounding, metadata hygiene, and progressive discovery.
+Customize tables and rules for your project's domains. After customizing any generated skill, run `/th-engineering` (skill-standards) as the final rubric pass for trigger quality, grounding, metadata hygiene, progressive discovery.
 
 ## Template: heart-and-soul
 

@@ -1,6 +1,6 @@
 # Subagent Dispatch Template
 
-Use this template when dispatching investigation subagents for project direction analysis.
+Use when dispatching investigation subagents for project direction analysis.
 
 ---
 
@@ -14,10 +14,10 @@ Use this template when dispatching investigation subagents for project direction
 | D | Alignment review & gap analysis | A + B + C findings (+ review-packet constraints) | Alignment matrix, classification, gaps, push-back list, spec deltas |
 
 **Dispatch strategy**:
-- Launch A, B, C in parallel (B can start with scan output; it doesn't strictly need A's full output to begin reading specs)
-- Launch D after A, B, C complete (it synthesizes their findings)
-- The Handoff Output (direction report + beads handoff) is assembled by the orchestrator using all agent outputs; it is not a numbered phase
-- **Receiver protocol**: when a fresh `../../project-review/` handoff packet exists, Agent C's dispatch must explicitly list the dimensions to SKIP (the ones the review already scored — typically test confidence, observability, delivery readiness) and narrow C to architectural fitness for the proposed direction
+- Launch A, B, C in parallel (B starts with scan output; doesn't need A's full output to read specs).
+- Launch D after A, B, C complete (it synthesizes their findings).
+- Handoff Output (direction report + beads handoff) is assembled by the orchestrator from all agent outputs; not a numbered phase.
+- **Receiver protocol**: fresh `../../project-review/` packet exists → Agent C's dispatch must explicitly list the dimensions to SKIP (review-scored: typically test confidence, observability, delivery readiness) and narrow C to architectural fitness for the proposed direction.
 
 ---
 
@@ -64,31 +64,31 @@ Include a "Key Findings" section at the top with your 3-5 most important observa
 ## Agent-specific notes
 
 ### Agent A (Doctrine/Spec Intent Validation)
-- Start from the Phase 1 doctrine baseline; validate that spec intent is faithful to doctrine (heart-and-soul, legends-and-lore) and run mandate checks
-- Read README and all spec documents before anything else
-- Package manifests (package.json description, pyproject.toml metadata) often contain the most honest project description
-- If the project has both a README and specs, note any contradictions
-- Check git commit messages for intent signals (what were recent efforts focused on?)
-- Look for non-goals and rejected proposals — they reveal direction as much as goals do
-- Produce a requirement-fidelity assessment (Section 2.1 read as intent, not as B's drift inventory)
+- Start from the Phase 1 doctrine baseline; validate spec intent is faithful to doctrine (heart-and-soul, legends-and-lore); run mandate checks.
+- Read README + all spec docs before anything else.
+- Package manifests (package.json description, pyproject.toml metadata) often hold the most honest project description.
+- README and specs both present → note any contradictions.
+- Check git commit messages for intent signals (what recent efforts focused on).
+- Look for non-goals and rejected proposals — they reveal direction as much as goals.
+- Produce a requirement-fidelity assessment (Section 2.1 read as intent, not B's drift inventory).
 
 ### Agent B (Spec Adherence & Workflow Completeness)
-- Build a complete spec section inventory first, then check each against code
-- For each spec section, determine: implemented / partially implemented / contradicted / missing / exceeds spec
-- For workflow completeness, trace the 3-5 most important user journeys end-to-end
-- Note "demo-quality" paths vs "production-quality" paths
-- Pay attention to error handling in workflows — a happy path that works but fails ungracefully is "partially implemented"
+- Build a complete spec section inventory first, then check each against code.
+- Per spec section: implemented / partially implemented / contradicted / missing / exceeds spec.
+- Workflow completeness: trace the 3-5 most important user journeys end-to-end.
+- Note demo-quality vs production-quality paths.
+- Watch error handling — a happy path that fails ungracefully is "partially implemented".
 
 ### Agent C (Implementation Fitness)
-- Focus on whether the codebase can support the stated direction, not just current quality
-- Architectural fitness is the most important assessment — it determines whether future work is feasible
-- Look for coupling hotspots that would make spec'd features expensive
-- Check if the test suite tests the right things (behavior vs implementation details)
-- Note missing extension points for features described in specs but not yet implemented
+- Focus on whether the codebase can support the stated direction, not just current quality.
+- Architectural fitness is the most important assessment — it determines whether future work is feasible.
+- Look for coupling hotspots that would make spec'd features expensive.
+- Check if the test suite tests the right things (behavior vs implementation details).
+- Note missing extension points for spec'd-but-unimplemented features.
 
 ### Agent D (Alignment Review & Gap Analysis)
-- You synthesize findings from A, B, and C — read their outputs before starting evaluation
-- Apply the 8-dimension evaluation framework to every proposed/discovered work item
-- Be conservative with "aligned next steps" — only items with clear spec backing AND architectural support
-- The push-back list is as important as the recommendations — be direct about what shouldn't be done
-- For gaps, distinguish between "needs spec" and "needs implementation" — the remediation is different
+- Synthesize A, B, C — read their outputs before evaluating.
+- Apply the 8-dimension framework to every proposed/discovered work item.
+- Be conservative with "aligned next steps" — only items with clear spec backing AND architectural support.
+- Push-back list is as important as the recommendations — be direct about what shouldn't be done.
+- For gaps, distinguish "needs spec" from "needs implementation" — remediation differs.

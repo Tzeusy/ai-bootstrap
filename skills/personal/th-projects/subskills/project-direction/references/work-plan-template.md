@@ -1,6 +1,6 @@
 # Work Plan Template
 
-The template for the **Handoff Output** — the direction report the orchestrator assembles after Phase 3 (it is not a numbered phase; there is no Phase 4). It covers how to decompose aligned work into sequenced, modular chunks and the complete output format. The beads graph itself is generated in Phase 3 via `/beads-orchestration`; this template presents and hands it off.
+Template for the **Handoff Output** — the direction report the orchestrator assembles after Phase 3 (not a numbered phase; there is no Phase 4). Covers how to decompose aligned work into sequenced modular chunks + the complete output format. The beads graph is generated in Phase 3 via `/beads-orchestration`; this template presents and hands it off.
 
 ---
 
@@ -8,27 +8,27 @@ The template for the **Handoff Output** — the direction report the orchestrato
 
 ### Linking to spec
 
-Every work item must have one of:
-- **Spec reference**: Specific section in a specification document that defines the expected behavior
-- **Spec-first flag**: "Specification work is required before implementation" — in which case the first chunk IS writing/updating the spec
+Every work item has one of:
+- **Spec reference**: specific section defining expected behavior.
+- **Spec-first flag**: "spec work required before implementation" — first chunk IS writing/updating the spec.
 
-If a feature has no spec coverage, the work plan starts with writing the spec. Implementation chunks come after spec signoff.
+No spec coverage → work plan starts with writing the spec; implementation chunks come after spec signoff.
 
 ### Signoff gates
 
-Default: **user signoff is required before implementation begins**.
+Default: **user signoff required before implementation begins**.
 
-Signoff is NOT required for:
-- Pure refactors that don't change behavior (but still need reconciliation)
+Signoff NOT required for:
+- Pure refactors that don't change behavior (still need reconciliation)
 - Bug fixes where spec already defines correct behavior
 - Spec writing itself (but spec content needs signoff before implementation)
 
 ### Decomposing into chunks
 
-Target: **3-10 hours per chunk**. Each chunk should be:
-- Independently completable (can be committed and tested on its own)
-- Clear objective (someone reading just the chunk description knows what to do)
-- Verifiable (has acceptance criteria that can be checked)
+Target: **3-10 hours per chunk**. Each chunk:
+- Independently completable (committed and tested on its own)
+- Clear objective (reading just the chunk description tells you what to do)
+- Verifiable (checkable acceptance criteria)
 
 #### Chunk template
 
@@ -52,25 +52,25 @@ Target: **3-10 hours per chunk**. Each chunk should be:
 
 ### Parallelization guidance
 
-Be conservative. Parallelization is safe when:
-- Chunks touch different files/modules with no shared interfaces
+Be conservative. Safe when:
+- Chunks touch different files/modules, no shared interfaces
 - No shared test fixtures or config changes
 - No database migrations in either chunk
 - No architectural decisions that could change the other chunk's approach
 
-Parallelization is unsafe when:
+Unsafe when:
 - Chunks modify the same module or shared interfaces
 - One chunk introduces types/patterns the other depends on
 - Either chunk involves schema changes
 - Chunks touch the same config files (CI, build, env)
 
-When in doubt, serialize. The cost of coordination failures (merge conflicts, repeated test runs, architecture churn) exceeds the benefit of parallelism.
+When in doubt, serialize. Coordination-failure cost (merge conflicts, repeated test runs, architecture churn) exceeds the parallelism benefit.
 
 ### Reconciliation steps
 
-Reconciliation is proportional to risk (see SKILL.md "Reconciliation Protocol"): a chunk that **modifies normative artifacts** (doctrine/lore edits, an OpenSpec changeset) gets a **change-tier** reconciliation — at least 4 dedicated passes (`R1`-`R4`), fresh subagent each, continuing while acceptance criteria are unmet, up to the 6-pass convergence ceiling. A chunk that only **consumes** approved artifacts gets a **verify-tier** reconciliation — one dedicated pass. Mechanical validations (cycle checks, spec-link coverage) run directly and do not count as passes. Report which tier each chunk used and the pass count.
+Proportional to risk (see SKILL.md "Reconciliation Protocol"): a chunk that **modifies normative artifacts** (doctrine/lore edits, an OpenSpec changeset) gets **change-tier** — ≥4 dedicated passes (`R1`-`R4`), fresh subagent each, continuing while acceptance criteria unmet, up to the 6-pass ceiling. A chunk that only **consumes** approved artifacts gets **verify-tier** — one pass. Mechanical validations (cycle checks, spec-link coverage) run directly, don't count as passes. Report the tier and pass count per chunk.
 
-After each completed chunk, add a reconciliation task (the checklist below is the verify-tier baseline; escalate to change-tier if the chunk edited normative artifacts):
+After each completed chunk, add a reconciliation task (checklist below = verify-tier baseline; escalate to change-tier if the chunk edited normative artifacts):
 
 ```markdown
 ### Reconciliation: {chunk title}
@@ -83,9 +83,9 @@ Check:
 - [ ] Spec is still accurate (update if implementation revealed spec gaps)
 ```
 
-Reconciliation applies regardless of who/what did the work — person, subagent, or automated pipeline.
+Reconciliation applies regardless of who/what did the work — person, subagent, or pipeline.
 
-For multi-chunk work blocks, also add a **block-level reconciliation** after the final chunk:
+For multi-chunk work blocks, add a **block-level reconciliation** after the final chunk:
 
 ```markdown
 ### Block Reconciliation: {block title}

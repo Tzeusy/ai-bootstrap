@@ -1,24 +1,16 @@
 # Scoring Rubric
 
-Scoring scale: 1-5 per category. Confidence: High / Medium / Low.
-
-Calibrate to project type and stated maturity. A prototype scoring 3 on testing is fine; a production service scoring 3 is a risk. See `project-type-adaptations.md` for per-type calibration.
+Scale: 1-5 per category. Confidence: High / Medium / Low. Calibrate to project type + stated maturity — a prototype scoring 3 on testing is fine, a production service scoring 3 is a risk. See `project-type-adaptations.md` for per-type calibration.
 
 ## N/A Handling
 
-Score a category **N/A** when it genuinely doesn't apply to this project type:
-- Observability (6) for a pure library with no runtime
-- Security (10) for a local-only CLI that reads/writes files with no network
-- Release/ops (14) for a prototype or spike
-- Data/API design (12) for a project with no API or data layer
+Score **N/A** (with one-line justification) when a category genuinely doesn't apply — e.g. Observability (6) for a pure library with no runtime · Security (10) for a local-only no-network CLI · Release/ops (14) for a prototype/spike · Data/API (12) for a project with no API or data layer. Do NOT force a 1-5 on inapplicable categories — it distorts the average.
 
-Mark as N/A with a one-line justification. Do NOT force a 1-5 score on inapplicable categories — it distorts the average.
+## Confidence
 
-## Confidence Guidelines
-
-- **High**: 5+ pieces of evidence examined, patterns are clear and consistent
-- **Medium**: 2-4 pieces of evidence, or evidence is mixed/ambiguous
-- **Low**: 0-1 pieces of evidence, or significant areas could not be examined
+- **High**: 5+ pieces of evidence; patterns clear and consistent
+- **Medium**: 2-4 pieces, or evidence mixed/ambiguous
+- **Low**: 0-1 pieces, or significant areas unexamined
 
 ## 1. Goal Alignment and Product Coherence
 

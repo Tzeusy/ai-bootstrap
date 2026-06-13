@@ -1,12 +1,12 @@
 # Alignment & Tractability Review
 
-How to evaluate proposed work against project direction. This is the synthesis dimension Agent D applies inside SKILL.md Phase 2, after Agents A/B/C produce evidence; it is also the core of the **feature-evaluation** focus mode. It determines what should be done, what should be deferred, and what should be rejected. Its output (alignment matrix, classification, push-back list, gaps, spec deltas) feeds the Phase 2 changeset and Phase 3 sequencing.
+How to evaluate proposed work against project direction. The synthesis dimension Agent D applies in SKILL.md Phase 2 after Agents A/B/C produce evidence; also the core of the **feature-evaluation** focus mode. Determines what to do, defer, reject. Output (alignment matrix, classification, push-back list, gaps, spec deltas) feeds the Phase 2 changeset + Phase 3 sequencing.
 
 ---
 
 ## Evaluation Framework
 
-For every proposed feature, improvement, refactor, or roadmap item, evaluate across 8 dimensions:
+Evaluate every proposed feature/improvement/refactor/roadmap item across 8 dimensions:
 
 ### 1. Alignment with project spirit
 
@@ -82,32 +82,32 @@ Will this work need to be redone?
 
 ## Classification Buckets
 
-After evaluation, classify each item:
+Classify each item after evaluation:
 
 ### Aligned next steps
-Items that score well across alignment, value, leverage, and tractability. These go into the work plan.
+Score well across alignment, value, leverage, tractability. Go into the work plan.
 
 ### Misaligned ideas
-Items that don't serve the project's core purpose. Be specific about *why* — is it the wrong audience, wrong scope, or wrong project?
+Don't serve the project's core purpose. Be specific *why* — wrong audience, scope, or project?
 
 ### Premature work
-Items that are aligned but not yet tractable. Common reasons:
-- Spec isn't written yet
+Aligned but not yet tractable. Common reasons:
+- Spec not written
 - Architecture doesn't support it
-- Dependencies aren't met
-- Fundamentals aren't solid enough (e.g., observability before core workflows work)
+- Dependencies not met
+- Fundamentals not solid enough (e.g., observability before core workflows work)
 
 ### Deferred work
-Items that are aligned and tractable but lower priority. Include criteria for when they should be revisited.
+Aligned and tractable but lower priority. Include criteria for when to revisit.
 
 ### Rejected work
-Items that should not be done. Reasons:
-- Fundamentally misaligned with project direction
+Should not be done. Reasons:
+- Fundamentally misaligned with direction
 - Infeasible with current state of art
 - Contradicts hard requirements
-- Would introduce unsustainable complexity
+- Introduces unsustainable complexity
 
-For rejected items, be blunt and explain why. This is a feature, not a bug.
+Be blunt and explain why. This is a feature, not a bug.
 
 ---
 
@@ -127,18 +127,18 @@ Explicitly flag work that is:
 
 ## Gap Analysis
 
-After alignment review, catalog remaining gaps:
+Catalog remaining gaps after alignment review:
 
 ### Blockers
-Gaps that prevent the project from fulfilling its stated purpose.
+Prevent the project from fulfilling its stated purpose.
 
 ### Important enhancements
-Gaps that significantly improve the project's value but aren't blocking.
+Significantly improve value but aren't blocking.
 
 ### Strategic gaps
-Gaps that matter for long-term viability but aren't urgent.
+Matter for long-term viability but aren't urgent.
 
-For each gap:
+Per gap:
 
 | Field | Content |
 |-------|---------|

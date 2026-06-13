@@ -1,207 +1,153 @@
 ---
 name: project-review
-description: Use when auditing a repository's overall health, tech debt, maintainability, architecture quality, processing a third-party repo-wide audit, or reconciling OpenSpec specs against the implementation (bidirectional gap analysis and remediation). Use for repository-level assessment requests such as "review this project", "audit the codebase", "assess project health", or "reconcile spec vs implementation", not for single-PR review.
+description: Use when auditing a repository's overall health, tech debt, maintainability, or architecture quality; processing a third-party repo-wide audit; or reconciling OpenSpec specs against the implementation (bidirectional gap analysis and remediation). For repository-level assessment such as "review this project", "audit the codebase", "assess project health", or "reconcile spec vs implementation" — not single-PR review.
 metadata:
   owner: tze
   authors:
     - tze
     - Claude Fable 5
   status: active
-  last_reviewed: "2026-06-12"
+  last_reviewed: "2026-06-13"
 ---
 
 # Project Review
 
-Perform a blunt, evidence-based audit of a repository across 15 categories. Start by establishing the project's normative baseline through `/project-shape`. End by handing confirmed findings to `/project-direction` for scheduling. Treat README as a claim to validate, not as the primary source of truth when shape artifacts exist.
+Blunt, evidence-based audit of a repo across 15 categories. Establish the normative baseline via `/project-shape` first; hand confirmed findings to `/project-direction` for scheduling. README is a claim to validate, not primary truth when shape artifacts exist.
 
-Normative source order:
-1. `about/heart-and-soul/` and `about/legends-and-lore/`
-2. `openspec/`
-3. `about/lay-and-land/`
-4. README / docs / issue tracker
-5. Repository inference from code and history
+**Sample triggers:** "review this project" · "audit the codebase" · "assess project health" · "process this third-party review" · "reconcile spec vs implementation".
 
-Every major claim must cite specific files or sections. Label assertions as [Observed], [Inferred], or [Unknown]. Every criticism must include a concrete remedy.
+**Not for:** single-PR/diff review (use `/th-engineering`), or deciding what to build next (use `/project-direction`).
+
+Normative source order: 1. `about/heart-and-soul/` + `about/legends-and-lore/` → 2. `openspec/` → 3. `about/lay-and-land/` → 4. README/docs/issues → 5. inference from code+history.
+
+Every major claim cites specific files/sections. Label assertions [Observed] / [Inferred] / [Unknown]. Every criticism carries a concrete remedy.
 
 ## Workflow
 
-### Phase 0: Establish the Normative Baseline with `/project-shape`
+### Phase 0 — Normative baseline via `/project-shape`
 
-Read `../project-shape/SKILL.md` first, then run the shape scan:
+Read `../project-shape/SKILL.md`, then:
 
 ```bash
 bash ../project-shape/scripts/shape-scan.sh <repo_root>
 ```
 
-Use the result to classify each pillar using `project-shape`'s per-pillar scale: `absent`, `nascent`, `structured`, or `mature`. The scan's overall Assessment line uses a separate five-level repo rubric (`Unshaped`/`Nascent`/`Structured`/`Shaped`/`Mature` — see [`../project-shape/references/maturity-rubric.md`](../project-shape/references/maturity-rubric.md)); report both, and do not conflate pillar ratings with the repo assessment.
+Classify each pillar on project-shape's per-pillar scale: `absent` / `nascent` / `structured` / `mature`. The scan's Assessment line uses a separate five-level repo rubric (`Unshaped`/`Nascent`/`Structured`/`Shaped`/`Mature` — see [`../project-shape/references/maturity-rubric.md`](../project-shape/references/maturity-rubric.md)); report both, never conflate pillar ratings with repo assessment.
 
-Review behavior:
-- If doctrine, design, specs, topology, or engineering standards (craft-and-care) are `structured` or `mature`, treat them as the primary normative baseline for their domains.
-- If only some pillars exist, use those pillars normatively and fall back elsewhere.
-- If all pillars are `absent` or effectively unusable, fall back to README/docs/code and lower confidence on alignment judgments.
+Baseline rules:
+- Pillars `structured`/`mature` → primary normative baseline for their domains. Read the actual doctrine/design/spec/topology/craft-and-care files before reviewing code; extract non-negotiables, scope boundaries, architectural claims, normative requirements; note contradictions between pillars without silently resolving them.
+- Some pillars present → use those normatively, fall back elsewhere.
+- All `absent`/unusable, or shape weak/missing → fall back to README/docs/code as provisional truth, lower confidence on alignment + product-coherence + roadmap judgments, and flag the absence of normative artifacts as a project risk.
 
-If the scan finds relevant pillars:
-- Read the actual doctrine/design/spec/topology/craft-and-care files before reviewing code.
-- Extract the project's explicit non-negotiables, scope boundaries, architectural claims, and normative requirements.
-- Note contradictions between pillars. Do not silently resolve them.
+**Phase 0 output — baseline packet:** per-pillar maturity + missing pillars · source-of-truth order used · explicit doctrine/spec requirements code must satisfy + craft-and-care execution standards · unresolved contradictions across doctrine/lore/spec/README/code.
 
-If the scan reports weak or missing shape:
-- Record the missing pillars in the report.
-- Downgrade confidence on product-coherence and roadmap judgments.
-- Use README/docs/code as provisional truth, but call out the absence of normative artifacts as a project risk.
-
-Output of Phase 0: a short baseline packet containing:
-- Per-pillar maturity and missing pillars
-- Source-of-truth order used for this review
-- Explicit doctrine/spec requirements that the code must satisfy, and craft-and-care execution standards the work is expected to meet
-- Any unresolved contradictions across doctrine, lore, spec, README, or code
-
-### Phase 1: Automated Repository Scan
-
-Run the review scan:
+### Phase 1 — Automated repo scan
 
 ```bash
 bash scripts/project-scan.sh <repo_root>
 ```
 
-Before proceeding, read `references/project-type-adaptations.md` to calibrate scoring by project type and maturity.
+Then read [`references/project-type-adaptations.md`](references/project-type-adaptations.md) to calibrate scoring by project type and maturity.
 
-Calibration rule: `project-shape` sets the project's normative requirements; `project-type-adaptations.md` adjusts emphasis and expectations. If generic project-type advice conflicts with doctrine, lore, or spec, the shaped project artifacts win.
+Calibration rule: `project-shape` sets normative requirements; `project-type-adaptations.md` adjusts emphasis. On conflict, shaped project artifacts win.
 
-#### Edge cases
+Edge cases:
 
 | Situation | Handling |
 |-----------|----------|
-| <50 source files | Skip full subagent fan-out; single-agent review is acceptable |
-| >50k LOC | Focus on entry points, churn hotspots, public API surface, and normative requirements |
-| Monorepo with 10+ packages | Sample 3-5 representative packages plus shared/core code |
-| No README or docs | Infer goals from git history, tests, manifests, and code comments |
-| Shallow git clone | Note in report; commit counts and churn data are unreliable |
-| Generated code (protobuf, ORM output, bundles) | Exclude from quality scoring; note presence |
-| Shape absent or weak | Treat missing pillars as a maintainability and planning risk, not just a documentation gap |
+| <50 source files | Skip subagent fan-out; single-agent review OK |
+| >50k LOC | Focus entry points, churn hotspots, public API, normative requirements |
+| Monorepo, 10+ packages | Sample 3-5 representative packages + shared/core |
+| No README/docs | Infer goals from git history, tests, manifests, comments |
+| Shallow clone | Note in report; commit/churn data unreliable |
+| Generated code (protobuf, ORM, bundles) | Exclude from quality scoring; note presence |
+| Shape absent/weak | Treat missing pillars as maintainability + planning risk, not just doc gap |
 
-### Phase 2: Parallel Investigation
+### Phase 2 — Parallel investigation
 
-Read `references/investigation-guides.md` for per-domain checklists. Read `references/subagent-template.md` for the dispatch format.
+Read [`references/investigation-guides.md`](references/investigation-guides.md) (per-domain checklists) and [`references/subagent-template.md`](references/subagent-template.md) (dispatch format).
 
-Dispatch subagents per this plan:
+Dispatch plan:
 
 | Agent | Domain | Scores | Key focus |
 |-------|--------|--------|-----------|
-| A | Project mapping & baseline reconciliation | — | Repo map, goals, doc contradictions, shape-vs-code contradictions |
+| A | Mapping & baseline reconciliation | — | Repo map, goals, doc + shape-vs-code contradictions |
 | B | Code quality & architecture | 1-4 | Modularity, clarity, correctness, normative violations |
 | C | Reliability & tooling | 5-8 | Errors, observability, testing, hygiene |
 | D | Security, perf & data | 9-12 | Dependencies, auth, performance, API/data design |
 | E | Docs, ops & maintainability | 13-15 | Documentation, release, change safety, missing shape artifacts |
 | F | Gaps, scale & planning constraints | — | Feature gaps, 10x/100x, risk register, sequencing constraints |
 
-Dispatch strategy:
+Strategy:
 - Launch A-F in parallel for a full review.
-- Pass both the Phase 0 baseline packet and the Phase 1 scan output to every subagent.
-- The canonical change-level quality expectations live in `/th-engineering`'s
-  subskills — B: code-readability + dependency-hygiene; C: test-rigor (+
-  diagnosis for flake/root-cause evidence); E: documentation. When craft-and-care
-  is absent or silent on a domain, agents cite those bars rather than inventing
-  criteria; `references/investigation-guides.md` stays the evidence-gathering
-  checklist, not a second bar.
-- Agent F can work independently, but during synthesis its roadmap draft remains advisory only. It does not create beads or own scheduling.
+- Pass the Phase 0 baseline packet + Phase 1 scan output to every subagent.
+- Change-level quality bars live in `/th-engineering` subskills — B: code-readability + dependency-hygiene; C: test-rigor (+ diagnosis for flake/root-cause evidence); E: documentation. When craft-and-care is absent/silent on a domain, agents cite those bars rather than inventing criteria; `investigation-guides.md` stays the evidence checklist, not a second bar.
+- Agent F's roadmap draft is advisory only — no beads, no scheduling.
 
-Each subagent receives:
-- Phase 0 baseline packet
-- Shape-scan output
-- Project-scan output
-- Project context (type, users, maturity, scope)
-- Its domain section from `references/investigation-guides.md`
-- Relevant rubric sections from `references/scoring-rubric.md`
-- Relevant project-type calibration from `references/project-type-adaptations.md`
+Each subagent receives: Phase 0 baseline packet · shape-scan output · project-scan output · project context (type/users/maturity/scope) · its domain section from `investigation-guides.md` · relevant rubric sections from [`references/scoring-rubric.md`](references/scoring-rubric.md) · relevant calibration from `project-type-adaptations.md`.
 
-### Phase 3: Synthesis
+### Phase 3 — Synthesis
 
-Collect all subagent reports. Read `references/report-template.md` for the output structure.
+Collect subagent reports. Read [`references/report-template.md`](references/report-template.md) for output structure.
 
-1. Merge scores conservatively. When subagents disagree on a category, take the lower score and record the disagreement.
-2. Mark genuinely inapplicable categories as `N/A`; exclude them from the average.
-3. Classify findings into four buckets:
-   - Normative violations: doctrine/lore/spec/topology contradicted by implementation
-   - Generic health risks: code quality, reliability, tooling, security, performance, DX
-   - Shape gaps: missing or stale pillars that weaken review confidence or decision quality
-   - Deprioritized items: theoretically good ideas that do not fit the project's actual context
-4. Build the risk register by severity x likelihood.
-5. Generate an advisory roadmap: quick wins, medium improvements, strategic investments. This roadmap is for synthesis only and must not create execution artifacts.
-6. Assign the verdict:
+1. Merge scores conservatively — on disagreement take the lower score, record the disagreement.
+2. Mark genuinely inapplicable categories `N/A`; exclude from average.
+3. Bucket findings: **Normative violations** (doctrine/lore/spec/topology contradicted by code) · **Generic health risks** (quality/reliability/tooling/security/perf/DX) · **Shape gaps** (missing/stale pillars weakening confidence) · **Deprioritized** (good ideas that don't fit context).
+4. Build risk register by severity × likelihood.
+5. Generate advisory roadmap (quick wins / medium / strategic) — synthesis only, creates no execution artifacts.
+6. Assign verdict:
 
 | Verdict | Criteria |
 |---------|----------|
-| **Healthy** | No category below 3; no critical risks; average >= 3.5 |
-| **Healthy but fragile** | No category below 2; <= 1 critical risk; average >= 3.0; but missing safety nets |
-| **Functional but accumulating debt** | 1-3 categories below 3; average 2.5-3.5; growing risk register |
-| **At risk** | 3+ categories below 3 OR any category at 1 OR 2+ critical risks; average < 3.0 |
-| **Severely at risk** | 5+ categories below 3 OR multiple categories at 1 OR critical security/data risks; average < 2.0 |
+| **Healthy** | No category <3; no critical risks; avg ≥3.5 |
+| **Healthy but fragile** | No category <2; ≤1 critical risk; avg ≥3.0; but missing safety nets |
+| **Functional but accumulating debt** | 1-3 categories <3; avg 2.5-3.5; growing risk register |
+| **At risk** | 3+ categories <3 OR any at 1 OR 2+ critical risks; avg <3.0 |
+| **Severely at risk** | 5+ categories <3 OR multiple at 1 OR critical security/data risks; avg <2.0 |
 
-7. Prepare the `/project-direction` handoff packet:
-   - Confirmed findings only
-   - Phase 0 baseline packet
-   - Required doctrine/lore/spec updates before implementation planning
-   - Recommended sequencing constraints and dependency hints
-   - Deprioritized items with reasons
-   - Evidence index
+7. Prepare `/project-direction` handoff packet: confirmed findings only · Phase 0 baseline packet · required doctrine/lore/spec updates before planning · sequencing constraints + dependency hints · deprioritized items with reasons · evidence index.
 
-### Phase 4: Deliver
+### Phase 4 — Deliver
 
-Output the report per `references/report-template.md`.
+Output the report per `report-template.md`. Make the boundary explicit: `project-review` audits and classifies; `project-direction` decides sequencing, specs, and beads.
 
-The report must make the boundary explicit:
-- `project-review` audits and classifies
-- `project-direction` decides sequencing, specs, and beads
+## Adapting to scope
 
-## Adapting to Scope
+- **Full review** (default): all 6 subagents, all 15 categories, complete report + handoff packet.
+- **Focused review** (user names categories): dispatch only relevant subagents. Still include normative baseline, scorecard for scoped categories, risk register, handoff packet.
+- **Quick health check** (fast answer): shape scan + project scan + Agent A, then a brief orchestrator sweep of obvious high-risk areas (tests, CI, auth/secrets, docs). Output: exec summary, provisional scorecard, top 5 risks, explicit low-confidence markers. Don't pass this off as a full review.
+- **Third-party deep-dive** ("process this review/audit"): fact-check external findings, filter through actual context, convert confirmed findings into a handoff packet, route planning to `/project-direction`. Read [`references/third-party-review.md`](references/third-party-review.md) for the five-step protocol.
+- **Spec reconciliation** ("reconcile spec vs implementation", "what's implemented but undocumented", "what's specified but missing"): exhaustive bidirectional spec↔code mapping with remediation — undocumented features get specs, unimplemented requirements get beads, strategic gaps escalate to `/project-direction`. Read [`references/spec-reconciliation.md`](references/spec-reconciliation.md). Samples nothing; the one mode permitted to create remediation artifacts, since each traces 1:1 to a confirmed spec gap.
 
-**Full review** (default): All 6 subagents, all 15 categories, complete report plus planning handoff packet.
+## Anti-patterns
 
-**Focused review** (user specifies categories): Dispatch only relevant subagents. Still include the normative baseline, scorecard for scoped categories, risk register, and planning handoff packet.
-
-**Quick health check** (fast answer): Run shape scan + project scan + Agent A, then do a brief orchestrator sweep of obvious high-risk areas (tests, CI, auth/secrets, docs). Output: executive summary, provisional scorecard, top 5 risks, explicit low-confidence markers where evidence is thin. Do not pretend this is equivalent to a full review.
-
-**Third-party deep-dive review synthesis** ("process this review/audit"): Fact-check external findings, filter them through the project's actual context, convert confirmed findings into a planning handoff packet, and route execution planning to `/project-direction`. Read [`references/third-party-review.md`](references/third-party-review.md) for the five-step extraction protocol.
-
-**Spec reconciliation** ("reconcile spec vs implementation", "what's implemented but undocumented", "what's specified but missing"): Exhaustive bidirectional spec↔code mapping with remediation — undocumented features get specs, unimplemented requirements get beads, strategic gaps escalate to `/project-direction`. Read `references/spec-reconciliation.md` for the full protocol. Unlike the health audit this mode samples nothing, and it is the one mode permitted to create remediation artifacts, because each artifact traces 1:1 to a confirmed spec gap.
-
-## Anti-Patterns
-
-- Skipping `/project-shape` and treating README as sufficient when doctrine/spec artifacts exist
-- Accepting severity assessments from an external review at face value
+- Skipping `/project-shape`, treating README as sufficient when doctrine/spec artifacts exist
+- Accepting external-review severities at face value
 - Treating all recommendations as equally important
 - Enterprise-framing a personal project
-- Creating beads or other execution artifacts directly from `project-review` (the scoped exception: spec-reconciliation remediation per `references/spec-reconciliation.md`)
+- Creating beads/execution artifacts from `project-review` (scoped exception: spec-reconciliation remediation)
 - Preserving the review as canon instead of extracting durable doctrine/spec/planning updates
 
 ## References
 
-| File | Read when | Content |
+| File | Read when | Answers |
 |------|-----------|---------|
 | [`../project-shape/SKILL.md`](../project-shape/SKILL.md) | Phase 0 | Five-pillar model, shape assessment workflow, normative source hierarchy |
-| [`../project-direction/SKILL.md`](../project-direction/SKILL.md) | Phase 3-4 | Planning contract, sequencing expectations, and handoff target |
+| [`../project-direction/SKILL.md`](../project-direction/SKILL.md) | Phase 3-4 | Planning contract, sequencing expectations, handoff target |
 | [`references/scoring-rubric.md`](references/scoring-rubric.md) | Phase 2 | 1-5 criteria per category with evidence guidance |
 | [`references/investigation-guides.md`](references/investigation-guides.md) | Phase 2 | Per-domain checklists, search patterns, deliverables |
 | [`references/subagent-template.md`](references/subagent-template.md) | Phase 2 | Dispatch template and required prompt fields |
 | [`references/report-template.md`](references/report-template.md) | Phase 3-4 | Output structure, scorecard, handoff packet layout |
 | [`references/project-type-adaptations.md`](references/project-type-adaptations.md) | Phase 1-3 | Category weighting by project type, maturity expectations, hybrid handling |
-| [`references/spec-reconciliation.md`](references/spec-reconciliation.md) | Spec reconciliation mode | Bidirectional spec↔code inventory, coverage table, gap analysis, remediation protocol |
-| [`references/third-party-review.md`](references/third-party-review.md) | Processing an external review/audit | Five-step protocol: fact-check, context-filter, ROI tiers, planning-input prep, episodic-artifact handling |
-| [`../../references/spec-format.md`](../../references/spec-format.md) | Writing or extending specs during reconciliation | OpenSpec file format: heading hierarchy, WHEN/THEN rules, naming conventions (shared package-level contract) |
+| [`references/spec-reconciliation.md`](references/spec-reconciliation.md) | Spec reconciliation mode | Bidirectional spec↔code inventory, coverage table, gap analysis, remediation |
+| [`references/third-party-review.md`](references/third-party-review.md) | Processing an external review/audit | Fact-check, context-filter, ROI tiers, planning-input prep, episodic-artifact handling |
+| [`../../references/spec-format.md`](../../references/spec-format.md) | Writing/extending specs during reconciliation | OpenSpec file format: heading hierarchy, WHEN/THEN rules, naming (shared contract) |
 
 ## Scripts
 
-- [`../project-shape/scripts/shape-scan.sh`](../project-shape/scripts/shape-scan.sh) `<repo_root>` — Establishes the normative baseline and shape maturity. Run first.
-- [`scripts/project-scan.sh`](scripts/project-scan.sh) `<repo_root>` — Structural repository scan covering languages, deps, tests, CI, infra, governance, git signals, and size.
+- [`../project-shape/scripts/shape-scan.sh`](../project-shape/scripts/shape-scan.sh) `<repo_root>` — establishes normative baseline + shape maturity. Run first (Phase 0).
+- [`scripts/project-scan.sh`](scripts/project-scan.sh) `<repo_root>` — structural scan: languages, deps, tests, CI, infra, governance, git signals, size (Phase 1).
 
-## After Review: Schedule with `/project-direction`
+## After review: schedule with `/project-direction`
 
-Once findings are confirmed, invoke `/project-direction`.
-
-Handoff contract:
-- Feed it the Phase 0 baseline packet, not just the scorecard
-- Separate normative violations from generic health risks
-- Identify which findings require doctrine/lore/spec updates before any implementation planning
-- Include sequencing constraints, dependency hints, and explicit deprioritized items
-- Keep execution ownership separate: `project-review` audits, `/project-direction` plans
+Once findings are confirmed, invoke `/project-direction` with the Phase 3 handoff packet (Phase 0 baseline packet, not just the scorecard). Ownership stays separate: `project-review` audits, `/project-direction` plans.

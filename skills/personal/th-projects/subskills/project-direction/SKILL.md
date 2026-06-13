@@ -1,62 +1,65 @@
 ---
 name: project-direction
-description: Analyze a software project's true direction, validate alignment between specs/docs and implementation, and produce a prioritized, spec-driven work plan with beads. Ensures every non-trivial epic includes a report-generation bead for human review. Use when deciding what to work on next, evaluating feature proposals, checking spec-to-code drift, sequencing roadmap items, or pushing back on misaligned requirements. Triggers on "what should we work on next", "prioritize features", "does the code match the spec", "is this roadmap aligned", "what's highest leverage", "should we build this", "is this tractable", "break this down into chunks".
+description: Analyze a software project's true direction, validate alignment between specs/docs and implementation, and produce a prioritized, spec-driven work plan with beads (every non-trivial epic gets a report bead for human review). Use when deciding what to work on next, evaluating feature proposals, checking spec-to-code drift, sequencing roadmap items, or pushing back on misaligned requirements. Triggers on "what should we work on next", "prioritize features", "does the code match the spec", "is this roadmap aligned", "what's highest leverage", "should we build this", "is this tractable", "break this down into chunks".
 metadata:
   owner: tze
   authors:
     - tze
     - Claude Fable 5
   status: active
-  last_reviewed: "2026-06-12"
+  last_reviewed: "2026-06-13"
 ---
 
 # Project Direction
 
-Determine what a project should work on next. Ground decisions in specifications, repository evidence, and implementation reality. Optimize for spec alignment, tractability, leverage, and low-churn execution — not feature count.
+Decide what a project works on next. Ground every decision in specs, repo evidence, and implementation reality. Optimize for spec alignment, tractability, leverage, low-churn execution — not feature count.
 
-Do not use when: you want to take ONE concrete new feature from idea to spec (use `../project-feature-request/SKILL.md`); you want to score repo health or confirm findings (use `../project-review/SKILL.md`, which hands its packet here); or you only need backlog mechanics with no direction analysis (use `/beads-orchestration` (beads-writer)).
+Do not use when:
+- One concrete new feature, idea → spec → `../project-feature-request/SKILL.md`.
+- Score repo health / confirm findings → `../project-review/SKILL.md` (hands its packet here).
+- Backlog mechanics only, no direction analysis → `/beads-orchestration` (beads-writer).
 
 ## Core Rules
 
-1. **Specifications are source of truth** — every work item must link to a spec section. If a feature lacks spec coverage, recommend spec work first.
-2. **No coding before signoff** — spec must be written/updated and approved before implementation begins.
-3. **Evidence over assumption** — cite files, functions, spec sections. Label claims: [Observed], [Inferred], [Unknown].
-4. **Push back when needed** — flag misaligned, premature, unrealistic, or infeasible work directly.
-5. **Minimize churn** — favor removing dead paths over backward-compatibility shims (`/th-engineering` cruft-cleanup is the bar); serialize work that would conflict.
-6. **Rigor where truth changes** — deep reconciliation guards *changes to normative artifacts*; consuming them takes one verification pass, not four.
+1. **Specs are source of truth** — every work item links to a spec section. No spec coverage → recommend spec work first.
+2. **No coding before signoff** — spec written/updated and approved before implementation.
+3. **Evidence over assumption** — cite files, functions, spec sections. Label claims [Observed] / [Inferred] / [Unknown].
+4. **Push back** — flag misaligned, premature, unrealistic, infeasible work directly.
+5. **Minimize churn** — remove dead paths over back-compat shims (`/th-engineering` cruft-cleanup is the bar); serialize conflicting work.
+6. **Rigor where truth changes** — deep reconciliation guards *changes to normative artifacts*; consuming them is one verification pass, not four.
 
 ## Workflow
 
 ### Preflight: Gather Context
 
-Ask the user (or infer from the repo):
+Ask user or infer from repo:
 
 | Parameter | Values | Default |
 |-----------|--------|---------|
 | Project type | library, SDK, backend, SaaS, frontend, CLI, mobile, monorepo, ML/data, internal tool, IaC | Infer |
 | Primary user | developers, end users, internal team, enterprises | Infer |
 | Maturity | prototype, beta, production, mission-critical | Infer |
-| Spec location | openspec/, spec/, docs/design/, or "none" | Infer from scan |
-| Focus | Full direction analysis, feature evaluation, spec-drift check, work decomposition | Full |
-| Inputs on hand | project-review handoff packet, project-feature-request spec delta, or cold start | Cold start |
+| Spec location | openspec/, spec/, docs/design/, or none | Infer from scan |
+| Focus | full direction, feature evaluation, spec-drift check, work decomposition | Full |
+| Inputs on hand | project-review packet, feature-request spec delta, cold start | Cold start |
 
-Then check for upstream inputs — they change how much of each phase runs (see Receiver Protocol below).
+Then check for upstream inputs — they change how much of each phase runs (Receiver Protocol below).
 
-### Receiver Protocol: Consume Upstream Packets, Don't Re-Derive Them
+### Receiver Protocol: Consume Upstream Packets, Don't Re-Derive
 
-**From `../project-review/` (handoff packet).** A packet is *fresh* when the repo HEAD matches the reviewed commit, or the user accepts the staleness. For a fresh packet:
-- Adopt its Phase 0 baseline packet (pillar maturity, source-of-truth order, extracted normative requirements, contradictions) — Phase 1 becomes a doctrine *check*, not a re-derivation.
-- Treat its confirmed findings as Phase 2 evidence. Agent C skips the dimensions the review already scored (test confidence, observability, delivery readiness) and narrows to architectural fitness *for the proposed direction*.
-- Feed its sequencing constraints, dependency hints, and deprioritized items directly to Agent D and Phase 3.
-- Findings the packet labels as requiring doctrine/spec updates enter Phase 1/2 as work items, not as questions to re-investigate.
+**From `../project-review/` (handoff packet).** Fresh = repo HEAD matches reviewed commit, or user accepts staleness. Fresh packet:
+- Adopt its Phase 0 baseline (pillar maturity, source-of-truth order, normative requirements, contradictions) → Phase 1 = doctrine *check*, not re-derivation.
+- Confirmed findings = Phase 2 evidence. Agent C skips review-scored dimensions (test confidence, observability, delivery readiness) → narrows to architectural fitness *for the proposed direction*.
+- Feed sequencing constraints, dependency hints, deprioritized items to Agent D + Phase 3.
+- Findings flagged as needing doctrine/spec updates → Phase 1/2 work items, not re-investigation.
 
-**From `../project-feature-request/` (signed-off spec delta).** The funnel already did doctrine, topology, design, and spec work for that request. Do not re-run it. Phase 1 is skipped unless the delta itself changed doctrine; Phase 2 narrows to integrating the delta into the changeset; Phase 3 sequences it against existing work.
+**From `../project-feature-request/` (signed-off spec delta).** Funnel already did doctrine, topology, design, spec work — do not re-run. Phase 1 skipped unless delta changed doctrine; Phase 2 narrows to integrating delta into changeset; Phase 3 sequences it against existing work.
 
-**Cold start.** No packet, no delta: run the phases as written below.
+**Cold start.** No packet, no delta → run phases as written.
 
 ### Reconciliation Protocol: Proportional to Risk
 
-Reconciliation passes are subagent-driven deep-dive reviews of generated artifacts. Use the unbiased reviewer persona for every pass (customize only phase context and artifact list):
+Reconciliation passes = subagent-driven deep-dive reviews of generated artifacts. Unbiased-reviewer persona every pass (customize only phase context + artifact list):
 
 ```text
 You are a lead software architect at a world-class software organization.
@@ -69,125 +72,116 @@ Recommend the minimum precise changes required to reach acceptance.
 
 Two tiers, chosen per phase by what the phase did:
 
-| Tier | When it applies | Protocol |
-|------|-----------------|----------|
-| **Change-tier** | The phase *modified normative artifacts*: doctrine/lore edits, OpenSpec changeset creation or modification | At least 4 dedicated passes (`R1`-`R4`), fresh subagent each, fixes applied between passes; continue while acceptance criteria are unmet |
-| **Verify-tier** | The phase only *consumed* normative artifacts: doctrine checks, drift analysis, graph generation from an approved changeset | One dedicated verification pass; escalate to change-tier only if it finds the consumed artifacts themselves need modification |
+| Tier | When | Protocol |
+|------|------|----------|
+| **Change-tier** | Phase *modified normative artifacts*: doctrine/lore edits, OpenSpec changeset create/modify | ≥4 dedicated passes (`R1`-`R4`), fresh subagent each, fixes applied between passes; continue while acceptance criteria unmet |
+| **Verify-tier** | Phase only *consumed* normative artifacts: doctrine checks, drift analysis, graph from approved changeset | One verification pass; escalate to change-tier only if it finds the consumed artifacts need modification |
 
-Mechanical validations (dependency cycle checks, spec-link coverage, mandate coverage) are scripts-and-checklists work — run them directly; they do not count as passes and do not require subagents.
+Mechanical validations (cycle checks, spec-link coverage, mandate coverage) = scripts-and-checklists — run directly; not passes, no subagents.
 
-**Convergence ceiling**: if any artifact set still fails acceptance criteria after 6 passes, stop. Summarize the unresolved findings with evidence, present the disagreement to the user, and do not proceed to the next phase on an unconverged artifact.
+**Convergence ceiling**: artifact set still failing after 6 passes → stop, summarize unresolved findings with evidence, present disagreement to user, do not proceed on an unconverged artifact.
 
-**Commit discipline**: commit normative changes when their phase converges (so later phases build on a fixed base). Read-only runs — where no normative artifact changed — make no commits and need no push gates. Pushing follows the repository's own convention, at the end of the run.
+**Commit discipline**: commit normative changes when their phase converges (later phases build on a fixed base). Read-only runs (no normative artifact changed) make no commits, need no push gates. Push per repo convention, at end of run.
 
 ### Phase 1: Doctrine Alignment (project-shape Baseline)
 
-Establish that proposed work is judged against the project's actual doctrine.
+Judge proposed work against the project's actual doctrine.
 
-Execution:
-1. Obtain the shape baseline: adopt a fresh review packet's baseline, or run `../project-shape/scripts/shape-scan.sh` and read `about/heart-and-soul/` + `about/legends-and-lore/`.
-2. Map each proposed feature/initiative to that baseline; flag doctrine conflicts.
-3. If doctrine/lore documents themselves need editing (contradictions, gaps that block judgment) — make the edits and run **change-tier** reconciliation on them.
-4. If the docs are sound and merely consumed — run **verify-tier** (one pass over the feature-to-doctrine mapping).
+1. Obtain shape baseline: adopt a fresh review packet's baseline, or run `../project-shape/scripts/shape-scan.sh` and read `about/heart-and-soul/` + `about/legends-and-lore/`.
+2. Map each proposed feature/initiative to baseline; flag doctrine conflicts.
+3. Doctrine/lore docs need editing (contradictions, blocking gaps) → edit and run **change-tier** on them.
+4. Docs sound, merely consumed → **verify-tier** (one pass over feature-to-doctrine mapping).
 
-Acceptance criteria:
-- Every proposed feature is explicitly aligned, rejected, or escalated against doctrine, with citations.
-- Any doctrine/lore edits are reconciled (change-tier) and committed before Phase 2 builds on them.
+Acceptance: every proposed feature explicitly aligned/rejected/escalated against doctrine, with citations; any doctrine/lore edits reconciled (change-tier) and committed before Phase 2.
 
 ### Phase 2: Specification Scan + Fitness/Gap Synthesis
 
-Steps:
-1. Run the spec-focused scan:
-   ```bash
-   bash <skill_dir>/scripts/spec-scan.sh <repo_root>
-   ```
-2. Run parallel investigation (A, B, C), then synthesis (D) — roles and dispatch format in `references/subagent-template.md`:
+1. Run spec scan: `bash <skill_dir>/scripts/spec-scan.sh <repo_root>`
+2. Parallel investigation (A, B, C) then synthesis (D) — roles + dispatch in `references/subagent-template.md`:
 
 | Agent | Role | Input | Output |
 |-------|------|-------|--------|
 | A | Doctrine/spec intent validation | Phase 1 baseline + scan + specs | Intent model, mandate checks, requirement fidelity |
 | B | Spec adherence & workflows | Scan + specs | Spec drift inventory, workflow completeness |
-| C | Implementation fitness | Scan + code (minus dimensions covered by a fresh review packet) | Test confidence, observability, delivery readiness, architectural fitness |
-| D | Alignment & gap synthesis | A + B + C (+ review packet constraints) | Alignment matrix, gaps, push-back list, spec deltas |
+| C | Implementation fitness | Scan + code (minus dimensions a fresh packet covered) | Test confidence, observability, delivery readiness, architectural fitness |
+| D | Alignment & gap synthesis | A + B + C (+ packet constraints) | Alignment matrix, gaps, push-back list, spec deltas |
 
-3. Synthesize findings into an OpenSpec changeset per `references/openspec-changeset.md` (tool-agnostic `openspec` CLI loop; `/opsx:ff` is a Codex accelerator for the same procedure).
-4. Run **change-tier** reconciliation on the changeset (it is a normative artifact). If the run produced no changeset — pure analysis, no spec changes — run **verify-tier** on the analysis instead.
+3. Synthesize into an OpenSpec changeset per `references/openspec-changeset.md` (tool-agnostic `openspec` CLI loop; `/opsx:ff` = Codex accelerator for the same procedure).
+4. **Change-tier** reconciliation on the changeset (normative artifact). No changeset produced (pure analysis) → **verify-tier** on the analysis.
 
-Acceptance criteria:
-- Spec intent, implemented spine, and gap analysis are coherent and actionable.
-- Any changeset is complete, internally consistent, traceable to doctrine + implementation evidence, reconciled, and committed before Phase 3 sequences it.
+Acceptance: spec intent, implemented spine, gap analysis coherent and actionable; any changeset complete, internally consistent, traceable to doctrine + implementation evidence, reconciled, and committed before Phase 3.
 
 ### Phase 3: Beads Generation (Planning Graph Only)
 
-Call `/beads-orchestration` (beads-writer) to create a full, acyclic dependency graph of work from the approved changeset.
+Call `/beads-orchestration` (beads-writer) to build a full acyclic dependency graph from the approved changeset.
 
-Execution:
-1. Generate epics/tasks with explicit dependencies and no cycles.
-2. Ensure each bead traces back to doctrine/lore/spec mandates and acceptance criteria.
+1. Generate epics/tasks, explicit dependencies, no cycles.
+2. Each bead traces to doctrine/lore/spec mandates + acceptance criteria.
 3. Include required reconciliation/report structural beads per beads-writer conventions (report beads use `scripts/epic-report-scaffold.sh`; see `references/epic-report.md`).
-4. Run mechanical graph validations (cycle check, mandate coverage, spec-link coverage), then **verify-tier** reconciliation (the graph consumes the approved changeset; it does not modify it).
+4. Run mechanical graph validations (cycle check, mandate coverage, spec-link coverage), then **verify-tier** (graph consumes the approved changeset, does not modify it).
 
-Acceptance criteria:
-- Graph is acyclic, prioritized, execution-ready, and every bead is spec-traceable.
-- Delivery/execution is NOT handled here — that is owned by `/beads-orchestration` (beads-coordinator).
+Acceptance: graph acyclic, prioritized, execution-ready, every bead spec-traceable. Delivery/execution NOT handled here — owned by `/beads-orchestration` (beads-coordinator).
 
 ### Handoff Output (No Delivery Ownership)
 
-Output the direction report per `references/work-plan-template.md`, including:
-- What is the project's real direction?
-- What should it work on next?
-- What should it stop pretending it can do?
-- Which beads graph was generated and why it is coherent with doctrine/lore/spec.
+Output the direction report per `references/work-plan-template.md`:
+- Project's real direction?
+- What to work on next?
+- What to stop pretending it can do?
+- Which beads graph was generated and why it's coherent with doctrine/lore/spec.
 
-Do not execute or deliver the beads plan here; hand off explicitly to the beads coordinator.
+Do not execute/deliver the beads plan here — hand off explicitly to the beads coordinator.
 
 ## Adapting to Focus
 
-Focus modes change which phases do real work and which tier applies — the phase *questions* are always answered, even if the answer is one line backed by a citation.
+Focus modes change which phases do real work and which tier applies — the phase *questions* are always answered, even if one line backed by a citation.
 
-**Full direction analysis** (default): All phases as written. Change-tier wherever normative artifacts change.
-
-**Feature evaluation** ("should we build X?"): For a *new, single* request, route to `../project-feature-request/SKILL.md` — its funnel is the right tool, and its output comes back here as a spec delta. Run this mode only for portfolio questions (X against competing priorities): Phase 1 verify-tier doctrine check on X, Phase 2 narrowed to the 8-dimension evaluation from `references/alignment-review.md`, Phase 3 only if X is approved for scheduling. No commits unless specs changed.
-
-**Spec-drift check** ("does code match spec?"): Phase 1 verify-tier (doctrine is consumed, not edited). Phase 2 emphasizes B + C + D; produce a corrective changeset (change-tier) only for confirmed drift the user wants fixed — otherwise deliver the drift inventory as a read-only report. Phase 3 only when a changeset was produced.
-
-**Work decomposition** ("break this down"): Assumes an approved spec (from feature-request or a prior run). Phase 1 skipped unless the spec lacks any doctrine link. Phase 2 is one verify-tier pass confirming the spec is implementable as written. Phase 3 is the primary artifact, with its mechanical validations + verify-tier pass.
+- **Full direction analysis** (default): all phases as written; change-tier wherever normative artifacts change.
+- **Feature evaluation** ("should we build X?"): a *new, single* request routes to `../project-feature-request/SKILL.md` (its funnel returns a spec delta here). Run this mode only for portfolio questions (X vs competing priorities): Phase 1 verify-tier doctrine check on X, Phase 2 narrowed to the 8-dimension evaluation in `references/alignment-review.md`, Phase 3 only if X is approved. No commits unless specs changed.
+- **Spec-drift check** ("does code match spec?"): Phase 1 verify-tier (doctrine consumed). Phase 2 emphasizes B + C + D; produce a corrective changeset (change-tier) only for confirmed drift the user wants fixed — else deliver the drift inventory read-only. Phase 3 only when a changeset was produced.
+- **Work decomposition** ("break this down"): assumes an approved spec. Phase 1 skipped unless the spec lacks a doctrine link. Phase 2 = one verify-tier pass confirming implementability. Phase 3 is the primary artifact (mechanical validations + verify-tier pass).
 
 ## Edge Cases
 
 | Situation | Handling |
 |-----------|----------|
-| No specs exist | Phase 2 creates the initial changeset via `references/openspec-changeset.md`; doctrine check in Phase 1 still runs. |
-| `openspec` CLI unavailable | Stop changeset synthesis and report it; deliver analysis + drift inventory, and recommend installing the CLI. Do not hand-write changeset scaffolds. |
-| Specs exist but are outdated | Agent B catalogs drift; Phase 2 must produce a corrective changeset before Phase 3. |
-| No clear project direction | State this directly. Recommend a direction-setting workshop or `../project-shape/` bootstrap before any feature work. |
+| No specs exist | Phase 2 creates the initial changeset via `references/openspec-changeset.md`; Phase 1 doctrine check still runs. |
+| `openspec` CLI unavailable | Stop changeset synthesis, report it; deliver analysis + drift inventory, recommend installing the CLI. Do NOT hand-write changeset scaffolds. |
+| Specs outdated | Agent B catalogs drift; Phase 2 must produce a corrective changeset before Phase 3. |
+| No clear direction | State it directly. Recommend a direction-setting workshop or `../project-shape/` bootstrap before feature work. |
 | Conflicting specs | Flag each contradiction with evidence from both sides. Do not resolve — escalate to user. |
 | Reconciliation won't converge | Convergence ceiling (6 passes): stop, present unresolved findings, await user judgment. |
-| Massive spec surface (>50 sections) | Agent B samples: fully audit core features, spot-check secondary features. |
+| Massive spec surface (>50 sections) | Agent B samples: fully audit core features, spot-check secondary. |
+
+## Sample Triggers
+
+- "What should we work on next in this repo?"
+- "Does the code actually match the spec?"
+- "Should we build X, or is it a distraction?"
+- "Break this approved spec into sequenced chunks."
+- "Is our roadmap aligned with what the project really is?"
 
 ## References
 
 | File | Read when | Content |
 |------|-----------|---------|
-| [`references/direction-model.md`](references/direction-model.md) | Phase 2 (agents A, B, C) | Project spirit, requirement classification, current-state assessment |
-| [`references/alignment-review.md`](references/alignment-review.md) | Phase 2 (agent D); feature evaluation | 8-dimension evaluation framework, classification buckets, push-back checklist, gap analysis |
-| [`references/openspec-changeset.md`](references/openspec-changeset.md) | Phase 2 step 3 | Tool-agnostic OpenSpec changeset synthesis via the `openspec` CLI |
-| [`references/work-plan-template.md`](references/work-plan-template.md) | Handoff output | Output format, sequencing presentation, reconciliation reporting |
-| [`references/subagent-template.md`](references/subagent-template.md) | Phases 1-3 (reconciliation and dispatch) | Agent roles, dispatch template, depth limits, per-agent notes |
-| [`references/epic-report.md`](references/epic-report.md) | Phase 3 (beads structure) | Report bead structure, diagram integration, spec compliance matrix |
+| [`references/direction-model.md`](references/direction-model.md) | Phase 2 (agents A, B, C) | Analysis dimensions: project spirit, requirement classification, current-state assessment |
+| [`references/alignment-review.md`](references/alignment-review.md) | Phase 2 (agent D); feature evaluation | 8-dimension evaluation, classification buckets, push-back checklist, gap analysis |
+| [`references/openspec-changeset.md`](references/openspec-changeset.md) | Phase 2 step 3 | How to synthesize an OpenSpec changeset via the `openspec` CLI |
+| [`references/work-plan-template.md`](references/work-plan-template.md) | Handoff output | Output format, chunk/sequencing presentation, reconciliation reporting |
+| [`references/subagent-template.md`](references/subagent-template.md) | Phases 1-3 (reconciliation + dispatch) | Agent roles, dispatch template, depth limits, per-agent notes |
+| [`references/epic-report.md`](references/epic-report.md) | Phase 3 (report bead structure) | Report bead template/execution, diagram integration, spec compliance matrix |
 
 ## Scripts
 
-- [`scripts/spec-scan.sh`](scripts/spec-scan.sh) `<repo_root>` — Discovers specs, design docs, roadmap, agent context, issue tracking, git activity by area. Required in Phase 2.
-- [`scripts/epic-report-scaffold.sh`](scripts/epic-report-scaffold.sh) `<epic-id> [repo_root]` — Used by report bead executors created in Phase 3. Bootstraps report markdown from beads epic data, creates `docs/reports/` with metadata pre-filled.
+- [`scripts/spec-scan.sh`](scripts/spec-scan.sh) `<repo_root>` — discovers specs, design docs, roadmap, agent context, issue tracking, git activity by area. Run in Phase 2.
+- [`scripts/epic-report-scaffold.sh`](scripts/epic-report-scaffold.sh) `<epic-id> [repo_root]` — used by Phase 3 report-bead executors; bootstraps report markdown from beads epic data, creates `docs/reports/` with metadata pre-filled.
 
 ## Diagrams
 
-Workflow visuals for this skill (each `.svg` has an editable `.excalidraw`
-source alongside; regenerate with `/th-engineering` (excalidraw-diagram),
-`--format svg`):
+Workflow visuals (each `.svg` has an editable `.excalidraw` source alongside; regenerate with `/th-engineering` (excalidraw-diagram), `--format svg`):
 
 | Diagram | Shows |
 |---------|-------|
-| [`references/diagrams/project-direction-workflow.svg`](references/diagrams/project-direction-workflow.svg) ([source](references/diagrams/project-direction-workflow.excalidraw)) | Phase-by-phase direction workflow, preflight through handoff |
+| [`references/diagrams/project-direction-workflow.svg`](references/diagrams/project-direction-workflow.svg) ([source](references/diagrams/project-direction-workflow.excalidraw)) | Phase-by-phase workflow, preflight through handoff |
 | [`references/diagrams/project-direction-artifacts.svg`](references/diagrams/project-direction-artifacts.svg) ([source](references/diagrams/project-direction-artifacts.excalidraw)) | Analysis-agent and report-bead artifact flow |

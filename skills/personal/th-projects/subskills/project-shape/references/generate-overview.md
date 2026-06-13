@@ -1,25 +1,25 @@
 # Generate Project Overview
 
-Synthesize the project pillars into a visual, layman-friendly markdown document that serves as `about/README.md`. This is the public face of the project's shape — it should make someone who knows nothing about the project understand what it is, why it exists, how it works, and where everything lives.
+Synthesize the pillars into a visual, layman-friendly `about/README.md` — the public face of the project's shape. Makes someone who knows nothing understand what it is, why it exists, how it works, where everything lives.
 
 ## Output
 
-A single markdown file at `about/README.md` containing:
-- Embedded SVG or PNG diagrams (preferably rendered from Excalidraw, with Mermaid or prose fallbacks allowed)
-- Prose written for a non-technical reader
-- Links into the pillars for readers who want depth
+A single markdown file at `about/README.md`:
+- Embedded SVG/PNG diagrams (prefer Excalidraw; Mermaid/prose fallbacks allowed)
+- Prose for a non-technical reader
+- Links into pillars for depth
 
 ## Prerequisites
 
-- At least two pillars must exist (heart-and-soul + one other)
-- Prefer `/th-engineering` (excalidraw-diagram) plus a working renderer for visualization
-- If Excalidraw tooling is unavailable, use Mermaid or skip diagrams that do not materially improve understanding
+- ≥2 pillars exist (heart-and-soul + one other)
+- Prefer `/th-engineering` (excalidraw-diagram) + a working renderer
+- If Excalidraw unavailable, use Mermaid or skip diagrams that don't materially help
 
 ## Process
 
 ### Phase 1: Extract the Narrative
 
-Read each pillar and extract the layman-relevant essence. Not every technical detail belongs in the overview — only what helps someone *understand* the project.
+Read each pillar, extract the layman-relevant essence. Only what helps someone *understand* the project, not every technical detail.
 
 | Pillar | Extract... | Skip... |
 |--------|-----------|---------|
@@ -202,18 +202,18 @@ After reading the overview:
 
 ## Writing Guidelines
 
-- **No jargon without explanation** — If you must use a technical term, define it inline
-- **Concrete over abstract** — "processes 10,000 events per second" not "high throughput"
-- **Active voice** — "The runtime composites the scene" not "The scene is composited by the runtime"
-- **Short paragraphs** — 2-4 sentences max. The document should be scannable.
-- **Diagrams do the heavy lifting** — Prose explains the diagram, not the other way around
-- **Link, don't duplicate** — Point readers into the pillars for depth rather than reproducing content
-- **The "explain it to a friend" test** — Read each section aloud. If it sounds like documentation, rewrite it.
+- **No jargon without explanation** — define technical terms inline
+- **Concrete over abstract** — "processes 10,000 events per second", not "high throughput"
+- **Active voice** — "The runtime composites the scene", not "The scene is composited by the runtime"
+- **Short paragraphs** — 2-4 sentences max; keep it scannable
+- **Diagrams do the heavy lifting** — prose explains the diagram, not vice versa
+- **Link, don't duplicate** — point into pillars for depth
+- **"Explain it to a friend" test** — read each section aloud; if it sounds like documentation, rewrite
 
 ## Anti-Patterns
 
-- **Internal README** — Writing for the team instead of for someone who just found the project. The overview is external-facing.
-- **Feature list** — Listing what the project does without explaining why or how. Features belong in specs.
-- **Diagram dump** — Including diagrams without prose that walks through them. Every diagram needs a narrative companion.
-- **Copy-paste from doctrine** — Doctrine is written for implementors. The overview must be rewritten for laypeople.
-- **Stale overview** — The overview must be updated when pillars change. Include it in the maintenance protocol.
+- **Internal README** — writing for the team, not for someone who just found the project. The overview is external-facing.
+- **Feature list** — what it does without why or how. Features belong in specs.
+- **Diagram dump** — diagrams without walk-through prose. Every diagram needs a narrative companion.
+- **Copy-paste from doctrine** — doctrine is for implementors; rewrite for laypeople.
+- **Stale overview** — update when pillars change. Include in the maintenance protocol.

@@ -1,16 +1,16 @@
 # Epic Report Bead
 
-Execution guide for the **epic report bead** — a child bead created by `/project-direction` during work plan materialization. This bead generates a human-readable report of what was built, for a human to review.
+Execution guide for the **epic report bead** — a child bead `/project-direction` creates during work-plan materialization to generate a human-readable report of what was built, for human review.
 
-This file is referenced in the report bead's description. The executor (human, `/beads-worker`, or agent) follows this guide.
+Referenced in the report bead's description. The executor (human, `/beads-worker`, or agent) follows this guide.
 
-`<skill_dir>` below resolves to the directory containing this subskill's `SKILL.md` — i.e. `.../th-projects/subskills/project-direction`.
+`<skill_dir>` = the directory containing this subskill's `SKILL.md`, i.e. `.../th-projects/subskills/project-direction`.
 
 ---
 
 ## Bead Template
 
-When `/project-direction` calls `/beads-writer` to create the epic, include a report bead with this structure:
+When `/project-direction` calls `/beads-writer` to create the epic, include a report bead:
 
 ```
 Title: "Generate epic report for: {epic title}"
@@ -45,10 +45,10 @@ Acceptance criteria:
 
 Include a report bead for epics that are:
 - Non-trivial (>=3 children or >100 lines expected)
-- Touching multiple modules or introducing architectural changes
-- Delivering a user-facing milestone
+- Multi-module or architectural
+- A user-facing milestone
 
-Skip for: single-bead fixes, config changes, doc-only epics.
+Skip: single-bead fixes, config changes, doc-only epics.
 
 ---
 
@@ -71,15 +71,15 @@ git log --oneline --all --grep="<epic-id>"
 bash <skill_dir>/scripts/epic-report-scaffold.sh <epic-id>
 ```
 
-This creates `docs/reports/<epic-id>-<slug>.md` with metadata pre-filled from beads (children table, commit history, files changed). The scaffold contains TODO markers for each section.
+Creates `docs/reports/<epic-id>-<slug>.md` with metadata pre-filled from beads (children table, commit history, files changed) and TODO markers per section.
 
 ### Step 3: Fill report sections
 
-See the section guide below for each section's content.
+See the section guide below.
 
 ### Step 4: Generate diagrams
 
-Use `/th-engineering` (excalidraw-diagram) to create architecture/workflow diagrams. Render to SVG (the package standard — `--format svg` via the excalidraw-diagram render pipeline) and embed in the report markdown.
+Use `/th-engineering` (excalidraw-diagram) for architecture/workflow diagrams. Render to SVG (package standard — `--format svg` via the excalidraw-diagram render pipeline) and embed in the report markdown.
 
 **Color conventions**:
 - New/added components: `#a7f3d0` fill (green)
@@ -101,7 +101,7 @@ Store diagram sources at `docs/reports/diagrams/<epic-id>-*.excalidraw` with ren
 
 ### Step 5: Create follow-up beads
 
-For each TODO or gap identified during report writing:
+For each TODO or gap found while writing the report:
 
 ```bash
 NEW_ID=$(bd create --title="..." --type=task --priority=2 --parent=<epic-id> --json | jq -r '.id')
@@ -122,16 +122,14 @@ git add docs/reports/ && git commit -m "docs: epic report for <epic-id>"
 
 ### 1. Summary
 
-2-3 paragraphs covering:
+2-3 paragraphs:
 - What was built and why (link to project spirit)
-- Key design decisions made during implementation
+- Key design decisions during implementation
 - Current state: what works, what's provisional, what's deferred
 
 ### 2. Architecture
 
-1-2 excalidraw diagrams showing what was built or changed.
-
-Diagram types to consider:
+1-2 excalidraw diagrams of what was built or changed. Types to consider:
 
 | Diagram | When to use |
 |---------|------------|

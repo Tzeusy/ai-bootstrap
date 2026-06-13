@@ -16,18 +16,26 @@ metadata:
     - tze
     - Claude Fable 5
   status: active
-  last_reviewed: "2026-06-12"
+  last_reviewed: "2026-06-13"
 ---
 
 # Project Shape
 
-A project's **shape** is the knowledge architecture that makes it comprehensible to both humans and LLMs. Shape is not code — it's the structured understanding that tells you *what* a project is, *why* it exists, *how* it works, *where* it lives, *what* must be built, and *who you are expected to be when you change it*.
+A project's **shape** = the knowledge architecture making it comprehensible to humans and LLMs. Not code — structured understanding of *what* a project is, *why* it exists, *how* it works, *where* it lives, *what* must be built, *who* you must be when you change it.
 
-**Visualization directive**: Prefer `/th-engineering` (excalidraw-diagram) plus SVG rendering when the environment supports it and the diagram materially improves comprehension. If that skill or renderer is unavailable, fall back to Mermaid or concise prose. Do not block shape work on diagram tooling.
+**Visualization**: prefer `/th-engineering` (excalidraw-diagram) + SVG render when supported and the diagram materially aids comprehension. Else fall back to Mermaid or prose. Never block shape work on diagram tooling.
+
+## Sample triggers
+
+- "Help me set up the docs structure for this project"
+- "What's this project about / where should this idea be documented?"
+- "Audit our documentation health — are the pillars coherent?"
+- "Turn this idea into requirements"
+- "Map this system's topology"
 
 ## The Five-Pillar Model
 
-Every well-shaped project has five distinct knowledge layers, each answering a different question:
+Five distinct knowledge layers, each answering a different question:
 
 | Pillar | Folder | Local Skill | Question | Content |
 |--------|--------|-------------|----------|---------|
@@ -35,11 +43,11 @@ Every well-shaped project has five distinct knowledge layers, each answering a d
 | **Design Contracts** | `about/legends-and-lore/` | `legends-and-lore` | **HOW** will it work? | RFCs, design docs, wire contracts, state machines, reviews, trade-offs |
 | **Capability Specs** | `openspec/` | `spec-and-spine` | **WHAT** exactly must be built? | Normative requirements, WHEN/THEN scenarios, testable acceptance criteria |
 | **Topology** | `about/lay-and-land/` | `lay-and-land` | **WHERE** does everything live and connect? | Component diagrams, dependency boundaries, data flow, deployment topology, integration maps |
-| **Engineering Standards** | `about/craft-and-care/` | `craft-and-care` | **WHO ARE WE WHEN WE BUILD?** | Engineering character in practice: implementation quality bar, testing discipline, review expectations, observability, dependency hygiene, documentation, maintainability |
+| **Engineering Standards** | `about/craft-and-care/` | `craft-and-care` | **WHO ARE WE WHEN WE BUILD?** | Implementation quality bar, testing discipline, review expectations, observability, dependency hygiene, documentation, maintainability |
 
-Four pillars live under `about/` — the project's self-knowledge with poetic names. `openspec/` stays at root because it's a product with its own structure and conventions.
+Four pillars live under `about/` (project self-knowledge, poetic names). `openspec/` stays at root — a product with its own structure/conventions.
 
-The pillars form a **traceability chain**:
+Pillars form a **traceability chain** — Doctrine principle → RFC decision → Spec requirement → Code → Test. Topology cross-cuts all: *where* doctrine is embodied, contracts apply, specs are implemented, work lands. `craft-and-care` is the engineering-character cross-cut: who an engineer must be when changing this repo — explicit, careful, reviewable, observable, maintainable.
 
 <!-- [DIAGRAM: traceability-chain]
 Style: conceptual, simple. Use /th-engineering (excalidraw-diagram).
@@ -53,66 +61,52 @@ Elements:
 Argument: Every implementation decision traces back through this chain. Topology is not a phase — it cross-cuts all others.
 -->
 
-Every implementation decision should trace back through this chain. The topology layer cross-cuts all others — it shows *where* the doctrine is embodied, *where* the design contracts apply, *where* the specs are implemented, and *where* work lands in the system. The `craft-and-care` layer is the engineering-character cross-cut — it defines who an engineer is expected to be, in practice, when making changes here: explicit, careful, reviewable, observable, and maintainable.
+## Quick Start: Assess Shape
 
-## Quick Start: Assess a Project's Shape
-
-Run the scan script to discover existing shape artifacts:
+Run the scanner for a health report (which pillars exist, maturity, gaps):
 
 ```bash
 bash <skill-path>/scripts/shape-scan.sh [project-root]
 ```
 
-This produces a health report showing which pillars exist, their maturity, and gaps.
+For scanner thresholds and conservative scoring rules, read [`references/maturity-rubric.md`](references/maturity-rubric.md) — load when interpreting a scan score or asked what counts as structured/shaped/mature.
 
-For the scanner's intended thresholds and conservative scoring rules, read `references/maturity-rubric.md`.
+If scanning is unavailable, check manually for each pillar:
 
-### Manual Assessment
+1. **Doctrine?** — `about/heart-and-soul/`, `heart-and-soul/`, `vision.md`, `MANIFESTO.md`, `PHILOSOPHY.md`, or doctrine-like `README.md`
+2. **Design contracts?** — `about/legends-and-lore/`, `docs/rfcs/`, `docs/adrs/`, numbered design docs, review rounds
+3. **Specs?** — `openspec/`, `specs/`, `requirements/`, WHEN/THEN files, formal requirement IDs
+4. **Topology?** — `about/lay-and-land/`, `maps/`, `architecture/`, component diagrams, deployment docs, `ARCHITECTURE.md`
+5. **Engineering standards?** — `about/craft-and-care/`, `engineering-bar.md`, `testing-and-verification.md`, review/verification/observability standards, or quality doctrine scattered in contributor docs
 
-If scanning isn't available, check for these signals:
+Rate each: **absent** → **nascent** (scattered) → **structured** (dedicated folder, some coverage) → **mature** (comprehensive, traceable, maintained).
 
-1. **Doctrine exists?** — Look for: `about/heart-and-soul/`, `heart-and-soul/`, `vision.md`, `MANIFESTO.md`, `PHILOSOPHY.md`, or doctrine-like content in `README.md`
-2. **Design contracts exist?** — Look for: `about/legends-and-lore/`, `docs/rfcs/`, `docs/adrs/`, numbered design docs, review rounds
-3. **Specs exist?** — Look for: `openspec/`, `specs/`, `requirements/`, files with WHEN/THEN scenarios, formal requirement IDs
-4. **Topology exists?** — Look for: `about/lay-and-land/`, `maps/`, `architecture/`, component diagrams, deployment docs, `ARCHITECTURE.md`
-5. **Engineering standards exist?** — Look for: `about/craft-and-care/`, `engineering-bar.md`, `testing-and-verification.md`, review standards, verification expectations, observability/operability guidance, or implementation-quality doctrine currently scattered through contributor docs
+## Workflow 1: Bootstrap Shape (new project)
 
-Rate each pillar: **absent** → **nascent** (scattered, informal) → **structured** (dedicated folder, some coverage) → **mature** (comprehensive, traceable, maintained)
+Bootstrapping is **consultative**, not template-filling. Extract shape from the human's head via structured dialogue, synthesis, adversarial review.
 
-## Workflow 1: Bootstrap Shape for a New Project
+**Quality gates:**
+- Most capable model, max thinking budget when available.
+- Prefer one subagent per pillar for substantive generation/curation — keep each draft in a tighter context window when work partitions cleanly.
+- Never self-review — independent review subagents when the environment supports them.
+- Challenge the user — accept vague answers only to push deeper, never to ship.
 
-Bootstrapping is a **consultative process**, not a template-filling exercise. The LLM must extract shape from the human's head through structured dialogue, synthesis, and adversarial review.
+**Fallback modes** (degrade presentation, not rigor):
+- Full — highest model, independent review subagents, diagrams via `/th-engineering`.
+- Lite — single agent + deliberate self-critique + user review when subagents unavailable.
+- No-diagram — Mermaid or prose when diagram tooling unavailable.
 
-### Quality Requirements
+**Process:**
 
-- **Use the most capable model available** with maximum thinking/reasoning budget when available
-- **Prefer distinct subagents per pillar for substantive document generation or curation** — keep doctrine, contracts, specs, topology, and engineering standards in tighter, task-specific context windows whenever the work can be partitioned cleanly
-- **Never self-review** — use independent subagents for review when the environment supports them (see below)
-- **Challenge the user** — accept vague answers only to push deeper, never to ship
+1. **Interview** — Socratic extraction across five tracks (identity, boundaries, principles, architecture, contracts). Read [`references/consultative-bootstrapping.md`](references/consultative-bootstrapping.md) for question banks + challenge patterns.
+2. **Synthesize** — distill answers into drafts. Use the human's own language. Make trade-offs explicit. Flag contradictions. Prefer one subagent per pillar.
+3. **Independent review** — fresh subagents (no generation context) review each doc. Read [`references/review-protocol.md`](references/review-protocol.md) for the three review-agent specs (Coherence, Adversarial, Cross-Pillar).
+4. **Revise + present** — incorporate findings, present for validation. If "not quite right" → return to interview, don't patch.
+5. **Scaffold + install** — run `shape-init.sh` for structure, populate with reviewed docs, install local skills. Vet generated pillar skills with `/th-engineering` (skill-standards) before relying on them.
 
-### Fallback Modes
+**Pillar order** (top-down, each grounds the next): heart-and-soul → craft-and-care → legends-and-lore → openspec → lay-and-land. Draft `craft-and-care` right after doctrine is coherent, before implementation planning — mandatory for all non-trivial work. Topology can start in parallel with design contracts once the architecture interview track is done.
 
-- **Full mode** — Highest-capability model, independent review subagents, diagrams rendered via `/th-engineering` (excalidraw-diagram)
-- **Lite mode** — Single agent plus deliberate self-critique and user review when subagents are unavailable
-- **No-diagram mode** — Use Mermaid or prose when diagram tooling is unavailable
-
-The skill still applies in constrained environments. Degrade the presentation, not the rigor.
-
-### The Process
-
-1. **Consultative interview** — Structured Socratic extraction across five tracks (identity, boundaries, principles, architecture, contracts). Read `references/consultative-bootstrapping.md` for the full protocol with question banks and challenge patterns.
-
-2. **Synthesize** — Distill interview answers into draft documents. Use the human's own language. Make implicit trade-offs explicit. Flag contradictions. For substantive shape work, prefer one subagent per pillar or per major pillar document cluster so each draft is generated and refined in a tighter context window.
-
-3. **Independent review** — Spawn fresh subagents (no generation context) to review each document. Read `references/review-protocol.md` for the three review agent specs (Coherence, Adversarial, Cross-Pillar).
-
-4. **Revise and present** — Incorporate review findings, present to user for validation. If the user says "not quite right," return to the interview — don't patch.
-
-5. **Scaffold and install** — Run `shape-init.sh` for directory structure, populate with reviewed documents, install local skills. When generating or customizing local skill packages such as `/heart-and-soul`, `/legends-and-lore`, `/spec-and-spine`, or `/lay-and-land`, use `/th-engineering` (skill-standards) as the quality bar before relying on them.
-
-### Pillar Order
-
-Work top-down — each pillar grounds the next:
+Read [`references/bootstrapping.md`](references/bootstrapping.md) for the phase-by-phase guide, including the local-skill authoring and skill-standards review loop.
 
 <!-- [DIAGRAM: pillar-order]
 Style: conceptual, simple. Use /th-engineering (excalidraw-diagram).
@@ -130,17 +124,16 @@ Elements:
 Argument: Order matters — each pillar grounds the next. Craft-and-care follows doctrine directly; topology can start early.
 -->
 
-Topology (lay-and-land) can be started in parallel with design contracts once the architecture interview track is complete. `craft-and-care` should be drafted immediately after doctrine is coherent and before implementation planning begins; it is mandatory for all non-trivial implementation work.
-
-Read `references/bootstrapping.md` for phase-by-phase details, including the local-skill authoring and `/th-engineering` (skill-standards) review loop.
-
 ## Workflow 2: Translate Ideas into Requirements
 
-The shape model provides a natural funnel for turning ideas into code. To run
-this funnel end-to-end for one concrete feature request — through doctrine
-gate, topology placement, design sketch, and WHEN/THEN spec scenarios — use
-`../project-feature-request/SKILL.md`; this section describes the model it
-implements:
+The shape model funnels ideas into code. Idea → doctrine gate → topology placement → design sketch → WHEN/THEN spec scenarios → tasks. Ideas enter fuzzy, exit precise; each pillar sharpens them; bad ideas die early on doctrine misalignment.
+
+To run this funnel end-to-end for one concrete feature request, use [`../project-feature-request/SKILL.md`](../project-feature-request/SKILL.md). This section is the model it implements.
+
+**When ideas don't fit:**
+- Contradicts doctrine → reject, or evolve doctrine (with full team alignment).
+- No technical path → park; write exploratory RFC when a path emerges.
+- Sound but not specifiable → too vague; break down further.
 
 <!-- [DIAGRAM: idea-funnel]
 Style: conceptual, simple. Use /th-engineering (excalidraw-diagram).
@@ -156,68 +149,41 @@ Elements:
 Argument: Ideas enter fuzzy and exit precise. Each pillar sharpens them. Bad ideas are killed early by doctrine.
 -->
 
-At each stage, ideas get sharper and more concrete. Bad ideas die early (doctrine misalignment). Good ideas gain precision (spec scenarios).
-
-### When Ideas Don't Fit
-
-- **Idea contradicts doctrine** → Either reject the idea or evolve the doctrine (with full team alignment)
-- **Idea has no technical path** → Park it; write an exploratory RFC when a path emerges
-- **Idea is technically sound but not specifiable** → It's too vague. Break it down further.
-
 ## Workflow 3: Audit and Maintain Shape Health
 
-For an existing project, assess coherence across pillars and keep docs current.
+For an existing project, assess cross-pillar coherence and keep docs current.
 
-### Assessment Dimensions
+**Assessment dimensions:**
+1. **Coverage** — specs trace to RFC sections? RFCs align with doctrine?
+2. **Freshness** — specs current with code? RFCs updated after implementation reveals design flaws?
+3. **Gaps** — code with no spec? Specs with no doctrine? Design docs that never became specs?
+4. **Orphans** — doctrine principles no RFC references; RFC sections no spec covers.
+5. **Execution drift** — testing/observability/review/compatibility/documentation/dependency/maintenance standards out of sync with how the project is actually changed?
 
-1. **Coverage** — Do all spec requirements trace to RFC sections? Do all RFCs align with doctrine?
-2. **Freshness** — Are specs current with the code? Are RFCs updated after implementation reveals design flaws?
-3. **Gaps** — Is there code with no spec coverage? Specs with no doctrine backing? Design docs that never became specs?
-4. **Orphans** — Doctrine principles that no RFC references. RFC sections that no spec covers.
-5. **Execution drift** — Have testing, observability, review, compatibility, documentation, dependency, or maintenance standards fallen out of sync with how the project is actually changed?
+**Maintenance protocol** when code diverges from docs:
+1. **Detect** — compare implementation against spec requirements, RFC contracts, doctrine.
+2. **Update** — generate updated sections, preferring one subagent per affected pillar.
+3. **Review the delta** — independent review agents on changed sections only.
+4. **Cross-check** — cross-pillar review if changes affect multiple pillars.
+5. **Present** — show diff + review summary before committing.
 
-### Maintenance Protocol
-
-When code changes diverge from documentation:
-
-1. **Detect** — Compare implementation against spec requirements, RFC contracts, and doctrine
-2. **Update** — Generate updated sections for affected documents, preferring distinct subagents per affected pillar so each curation pass stays narrow and pillar-specific
-3. **Review the delta** — Spawn independent review agents on changed sections (not the full doc)
-4. **Cross-check** — Run cross-pillar review if changes affect multiple pillars
-5. **Present to user** — Show diff with review summary before committing
-
-### Related Skills
-
-Use `../project-direction/SKILL.md` for a full direction analysis including priority-weighted work plans. Use `../project-review/SKILL.md` (spec-reconciliation mode) for detailed spec-code divergence detection. Use `../project-feature-request/SKILL.md` to take a single new idea through the funnel.
+**Related:** [`../project-direction/SKILL.md`](../project-direction/SKILL.md) for full direction analysis with priority-weighted plans; [`../project-review/SKILL.md`](../project-review/SKILL.md) (spec-reconciliation mode) for detailed spec-code divergence; [`../project-feature-request/SKILL.md`](../project-feature-request/SKILL.md) for a single idea through the funnel.
 
 ## Workflow 4: Generate Project Overview
 
-Synthesize the project pillars into a visual, layman-friendly `about/README.md` with embedded Excalidraw SVG diagrams. This is the public face of the project's shape — it makes someone who knows nothing understand what the project is, why it exists, and how it works.
+Synthesize pillars into a visual, layman-friendly `about/README.md` with embedded Excalidraw SVG diagrams — the public face of the project's shape.
 
-### Requirements
+**Requirements:** ≥2 pillars exist (heart-and-soul + one other); prefer `/th-engineering` (excalidraw-diagram), fall back to Mermaid/prose; independent review subagents when available, else explicit accessibility/adversarial self-check + user validation.
 
-- At least two pillars must exist (heart-and-soul + one other)
-- Prefer `/th-engineering` (excalidraw-diagram) for visualizations; fall back to Mermaid or prose when unavailable
-- Use independent review subagents when available; otherwise do an explicit accessibility/adversarial self-check and ask the user to validate
+**Process:** extract layman-relevant essence per pillar → design 3-5 diagrams arguing the project's story → generate via excalidraw-diagram + render SVG (render-view-fix loop) → write structured markdown (thesis → what it's not → how it works → v1 delivers → principles → navigating docs) → review (accessibility + adversarial subagents) → commit to `about/README.md`, sources in `about/assets/`.
 
-### The Process
-
-1. **Extract** — Read each pillar, pull out only what a layman needs to understand
-2. **Design diagrams** — Plan 3-5 Excalidraw diagrams that visually argue the project's story (vision, architecture, scope, pillar model, domain-specific)
-3. **Generate** — Build each diagram via `/th-engineering` (excalidraw-diagram), render to SVG, validate through render-view-fix loop
-4. **Write** — Structured markdown: thesis → what it's not → how it works → what v1 delivers → principles → navigating the docs
-5. **Review** — Spawn accessibility + adversarial review subagents targeting layman comprehension
-6. **Commit** — Place at `about/README.md`, store diagram sources in `about/assets/`
-
-Read `references/generate-overview.md` for the full guide: diagram specs, document skeleton, review agent prompts, and writing guidelines.
+Read [`references/generate-overview.md`](references/generate-overview.md) for diagram specs, document skeleton, review-agent prompts, and writing guidelines.
 
 ## Reference Index
 
 ### Diagrams
 
-Rendered visuals for the shape model (each `.svg` has an editable
-`.excalidraw` source alongside; regenerate via the `<!-- [DIAGRAM: ...] -->`
-specs with /th-engineering's excalidraw-diagram):
+Rendered visuals for the shape model (each `.svg` has an editable `.excalidraw` source; regenerate via the `<!-- [DIAGRAM: ...] -->` specs with /th-engineering's excalidraw-diagram):
 
 | Diagram | Shows |
 |---------|-------|
@@ -236,7 +202,7 @@ specs with /th-engineering's excalidraw-diagram):
 | Design Contracts | [`references/pillar-legends-and-lore.md`](references/pillar-legends-and-lore.md) | Structuring RFCs, running reviews, capturing trade-offs |
 | Capability Specs | [`references/pillar-spec-and-spine.md`](references/pillar-spec-and-spine.md) | Writing requirements, WHEN/THEN scenarios, spec lifecycle |
 | Topology | [`references/pillar-lay-and-land.md`](references/pillar-lay-and-land.md) | Mapping components, boundaries, data flow, deployment |
-| Engineering Standards | [`references/pillar-craft-and-care.md`](references/pillar-craft-and-care.md) | Defining the implementation quality bar, review standards, verification discipline, observability, and maintainability expectations |
+| Engineering Standards | [`references/pillar-craft-and-care.md`](references/pillar-craft-and-care.md) | Defining the implementation quality bar, review standards, verification, observability, maintainability |
 
 ### Process Guides
 
@@ -256,34 +222,34 @@ specs with /th-engineering's excalidraw-diagram):
 |--------|-------------|
 | [`scripts/shape-scan.sh`](scripts/shape-scan.sh) `[project-root]` | Assessing an existing project's shape — reports which pillars exist, their maturity, and gaps |
 | [`scripts/shape-init.sh`](scripts/shape-init.sh) `[project-root] [--skills-only] [--tools=...]` | Scaffolding pillar directories and generating correctly-formatted local skills |
-| [`scripts/self-test.sh`](scripts/self-test.sh) | Verifying the scanner/scaffolder against known fixtures after changing `SKILL.md`, `shape-scan.sh`, or `shape-init.sh` |
+| [`scripts/self-test.sh`](scripts/self-test.sh) | Verifying the scanner/scaffolder against fixtures after changing `SKILL.md`, `shape-scan.sh`, or `shape-init.sh` |
 | [`scripts/eval-fallbacks.sh`](scripts/eval-fallbacks.sh) | Confirming constrained-environment fallback behavior is still documented after changing fallback guidance |
 
 ## Local Skill Installation
 
-Each pillar gets a local navigation skill in `.claude/skills/` (and equivalents for other tools) — an **index with selection guidance**, not a copy of the pillar's content. It tells the agent *which file to read* for a task, not *what the file says*. The preferred path generates correctly-formatted skills automatically:
+Each pillar gets a local navigation skill in `.claude/skills/` (and equivalents) — an **index with selection guidance**, not a copy of pillar content. It says *which file to read* for a task, not *what the file says*. Preferred path generates correctly-formatted skills:
 
 ```bash
 bash <skill-path>/scripts/shape-init.sh [project-root] --skills-only --tools=claude,codex
 ```
 
-All five pillars should have one: `heart-and-soul`, `legends-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`. For the manual path — per-pillar templates, the mandatory `name`/`description`-only frontmatter (the scanner rejects extra keys), and the required progressive-discovery structure — read [`references/local-skill-templates.md`](references/local-skill-templates.md). After writing, validate with `scripts/shape-scan.sh` + `scripts/self-test.sh` + `scripts/eval-fallbacks.sh` (see the Scripts table) and fix every reported issue before committing.
+All five pillars need one: `heart-and-soul`, `legends-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`. For the manual path — per-pillar templates, the mandatory `name`/`description`-only frontmatter (scanner rejects extra keys), required progressive-discovery structure — read [`references/local-skill-templates.md`](references/local-skill-templates.md). After writing, validate with `scripts/shape-scan.sh` + `scripts/self-test.sh` + `scripts/eval-fallbacks.sh` and fix every reported issue before committing.
 
 ## Maintenance Expectations
 
-- Keep package metadata, scripts, and references consistent. If the model says "five pillars," adapters and companion files must say the same.
-- Treat `shape-scan.sh` as an auditor, not a brochure. Prefer conservative assessments over flattering ones.
-- Re-run `scripts/self-test.sh` whenever changing `SKILL.md`, `shape-scan.sh`, or `shape-init.sh`.
-- Re-run `scripts/eval-fallbacks.sh` whenever changing fallback-mode guidance or references.
-- Keep `tests/fixtures/` aligned with real scanner behavior. Fixtures are part of the package contract, not throwaway test data.
+- Keep metadata, scripts, and references consistent. If the model says "five pillars," adapters and companion files must too.
+- Treat `shape-scan.sh` as an auditor, not a brochure — prefer conservative assessments.
+- Re-run `scripts/self-test.sh` after changing `SKILL.md`, `shape-scan.sh`, or `shape-init.sh`.
+- Re-run `scripts/eval-fallbacks.sh` after changing fallback-mode guidance or references.
+- Keep `tests/fixtures/` aligned with real scanner behavior — they are package contract, not throwaway data.
 
 ## Anti-Patterns
 
-- **README-as-doctrine** — A README describes the project to users. Doctrine defines what the project *believes*. Don't conflate them.
-- **Monolith docs** — One giant ARCHITECTURE.md mixing vision, design, and specs. Split into pillars.
-- **Specs without doctrine** — Requirements with no philosophical grounding get challenged endlessly. Doctrine ends debates.
-- **Doctrine without specs** — Beautiful principles that never become testable requirements. Specs make doctrine actionable.
-- **Stale middle** — Doctrine and code are current, but RFCs are from six months ago. Design contracts must evolve.
-- **Pillar without skill** — The knowledge exists but agents can't find it. Install local skills.
-- **Self-reviewed docs** — The LLM that wrote the doc reviews it in the same context. Use independent subagents.
-- **Template-filling** — Handing templates to the user instead of extracting shape through dialogue. Produces bureaucratic docs, not doctrine.
+- **README-as-doctrine** — README describes the project to users; doctrine defines what it *believes*. Don't conflate.
+- **Monolith docs** — one giant ARCHITECTURE.md mixing vision/design/specs. Split into pillars.
+- **Specs without doctrine** — requirements with no grounding get challenged endlessly. Doctrine ends debates.
+- **Doctrine without specs** — principles that never become testable requirements. Specs make doctrine actionable.
+- **Stale middle** — doctrine and code current, RFCs six months old. Design contracts must evolve.
+- **Pillar without skill** — knowledge exists but agents can't find it. Install local skills.
+- **Self-reviewed docs** — the LLM that wrote the doc reviews it in the same context. Use independent subagents.
+- **Template-filling** — handing templates to the user instead of extracting shape through dialogue. Produces bureaucracy, not doctrine.

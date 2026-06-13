@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The capability specs layer answers **WHAT**: what exactly must be built, with testable requirements that trace to design contracts and doctrine. Specs bridge design to implementation — they're the acceptance criteria for every feature.
+The capability specs layer answers **WHAT**: exactly what must be built, with testable requirements tracing to design contracts and doctrine. Specs bridge design to implementation — acceptance criteria for every feature.
 
 ## Recommended Structure
 

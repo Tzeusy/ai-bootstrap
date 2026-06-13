@@ -16,32 +16,29 @@ metadata:
     - tze
     - Claude Fable 5
   status: active
-  last_reviewed: "2026-06-12"
+  last_reviewed: "2026-06-13"
 compatibility: Subskill scripts require bash, git, grep, find. project-direction additionally assumes the bd (beads) CLI and an OpenSpec-capable environment for changeset synthesis.
 ---
 
 # TH Projects
 
-Superskill router for spec-driven project governance. Four subskills live under
-`subskills/`; each is a complete standard skill package (own `SKILL.md`,
-`references/`, `scripts/`). Subskills are **not** installed in the global skill
-catalog — discover them lazily from this package and load **at most one**
-subskill body per task. A subskill may itself tell you to consult a sibling
-(e.g. project-review runs project-shape's scanner); follow those links from the
-subskill, not from here.
+Superskill router for spec-driven project governance. Four subskills under
+`subskills/`; each a complete standard package (own `SKILL.md`, `references/`,
+`scripts/`). Subskills **not** in global catalog — discover lazily here, load
+**at most one** subskill body per task. A subskill may route you to a sibling
+(e.g. project-review runs project-shape's scanner); follow that link from the
+subskill, not here.
 
-The four subskills cover one lifecycle:
+Four subskills, one lifecycle:
 
-1. **Shape** establishes the normative baseline — what the project believes,
-   how it is designed, what exactly must be built, where everything lives, and
-   the engineering bar for changing it.
-2. **Feature request** runs one concrete proposal through the idea funnel
-   against that baseline, producing a signed-off spec delta.
-3. **Review** audits the implementation against the baseline and generic
-   health criteria (including exhaustive spec↔code reconciliation), producing
-   confirmed findings.
-4. **Direction** turns baseline + spec deltas + findings into a prioritized,
-   spec-linked work plan and hands execution to beads tooling.
+1. **Shape** — set normative baseline: what project believes, how designed,
+   what must be built, where things live, engineering bar for changing it.
+2. **Feature request** — run one concrete proposal through idea funnel against
+   baseline → signed-off spec delta.
+3. **Review** — audit implementation vs baseline + generic health criteria
+   (incl. exhaustive spec↔code reconciliation) → confirmed findings.
+4. **Direction** — baseline + spec deltas + findings → prioritized, spec-linked
+   work plan; hand execution to beads.
 
 ## Discover subskills
 
@@ -63,39 +60,36 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 ## Routing rules
 
 - **Baseline before judgment**: review and direction both consume the shape
-  baseline. If the repo has no shape artifacts at all and the user's real ask is
-  "make this project legible", route to project-shape even if they said
-  "review".
-- **Audit vs. plan**: project-review *classifies* (scores, risks, confirmed
-  findings); project-direction *decides* (sequencing, specs, beads). "What's
-  wrong with this repo" → review. "What should we do about it / next" →
-  direction. A full review naturally hands off to direction — that handoff
-  happens inside the subskills.
+  baseline. No shape artifacts at all + real ask is "make this project legible"
+  → project-shape, even if user said "review".
+- **Audit vs. plan**: review *classifies* (scores, risks, confirmed findings);
+  direction *decides* (sequencing, specs, beads). "What's wrong with this repo"
+  → review. "What to do about it / next" → direction. Full review hands off to
+  direction inside the subskills.
 - **Feature vs. direction**: one concrete proposal → feature-request; many
-  competing priorities or "what next" → direction. A feature request that
-  survives its funnel hands its spec delta to direction for sequencing.
-- **Scope guard**: single-PR or diff review is not project-level — use
-  `/code-review`. Change-level engineering-quality judgment (the engineering
-  bar, readability, test rigor, dependency hygiene, cruft cleanup, skill
-  reviews, diagrams) belongs to `/th-engineering`; project-shape's
-  craft-and-care pillar adopts that bar by reference. Backlog mechanics
-  without direction analysis belong to `/beads-orchestration` (beads-writer).
-  Hygiene of this machine's AI-tooling harness (installed skills, dotfiles,
-  snapshot state) belongs to `/th-tooling`.
-- **Fallback**: if the task is project-adjacent but none of the rows fit,
-  answer from router-level context or ask — do not load a subskill to browse.
+  competing priorities or "what next" → direction. A feature request surviving
+  its funnel hands its spec delta to direction for sequencing.
+- **Scope guard**: single-PR/diff review → `/code-review`, not here.
+  Change-level engineering-quality judgment (engineering bar, readability, test
+  rigor, dependency hygiene, cruft cleanup, skill reviews, diagrams) →
+  `/th-engineering` (project-shape's craft-and-care adopts that bar by
+  reference). Backlog mechanics without direction analysis →
+  `/beads-orchestration` (beads-writer). AI-tooling harness hygiene (installed
+  skills, dotfiles, snapshot state) → `/th-tooling`.
+- **Fallback**: project-adjacent but no row fits → answer from router context or
+  ask. Do not load a subskill to browse.
 
 ## Shared invariants (all subskills)
 
-- The five-pillar shape model (`about/heart-and-soul`, `about/legends-and-lore`,
+- Five-pillar shape model (`about/heart-and-soul`, `about/legends-and-lore`,
   `openspec/`, `about/lay-and-land`, `about/craft-and-care`) is the single
   normative vocabulary; subskills must not redefine it.
-- Specifications are the source of truth for work planning; implementation
-  without spec coverage is a finding, not a baseline. The OpenSpec file format
-  these subskills read and write is one shared contract,
-  [`references/spec-format.md`](references/spec-format.md) at this package root,
-  not owned by any single subskill.
-- Every major claim cites evidence and is labeled [Observed], [Inferred], or
+- Specs are source of truth for work planning; implementation without spec
+  coverage is a finding, not a baseline. The OpenSpec file format subskills
+  read/write is one shared contract,
+  [`references/spec-format.md`](references/spec-format.md) at package root, not
+  owned by any single subskill.
+- Every major claim cites evidence, labeled [Observed], [Inferred], or
   [Unknown].
-- Subskills reference each other by relative path (`../project-shape/…`) inside
-  this package; those paths are package-internal and stable.
+- Subskills cross-reference by relative path (`../project-shape/…`) inside this
+  package; those paths are package-internal and stable.

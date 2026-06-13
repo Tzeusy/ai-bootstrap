@@ -2,9 +2,9 @@
 
 ## Purpose
 
-The topology layer answers **WHERE**: where components live, how they connect, what boundaries exist, and how the system is deployed. It's the spatial understanding of the project — the map you'd draw on a whiteboard to orient a new contributor.
+The topology layer answers **WHERE**: where components live, how they connect, what boundaries exist, how the system deploys. The project's spatial understanding — the whiteboard map that orients a new contributor.
 
-Topology cross-cuts the other four pillars. Doctrine says *why* a boundary exists, RFCs say *how* it communicates, specs say *what* it must do, craft-and-care says *who we must be* when we change it — but topology shows *where* it sits in relation to everything else.
+Topology cross-cuts the other four pillars. Doctrine says *why* a boundary exists, RFCs *how* it communicates, specs *what* it must do, craft-and-care *who we must be* when we change it — topology shows *where* it sits relative to everything else.
 
 ## Recommended Structure
 

@@ -1,12 +1,12 @@
 # Project Type Adaptations
 
-Adjust emphasis, expectations, and scoring thresholds based on project type. Use this to calibrate investigation depth per domain.
+Adjust emphasis, expectations, and scoring thresholds by project type. Calibrates investigation depth per domain.
 
-> **Maintenance contract**: this is a living registry of project types. When a
-> review encounters a project type not listed here (a new domain, runtime, or
-> distribution shape), append a section for it with its elevated/lowered
-> category priorities. Update a section when practice shows its calibration is
-> miscalibrated. Remove a type only when it is genuinely extinct.
+> **Maintenance contract**: living registry of project types. Encounter a type
+> not listed (new domain, runtime, or distribution shape) → append a section
+> with its elevated/lowered category priorities, in the same change. Update a
+> section when practice shows its calibration is off. Remove a type only when
+> genuinely extinct.
 
 ---
 

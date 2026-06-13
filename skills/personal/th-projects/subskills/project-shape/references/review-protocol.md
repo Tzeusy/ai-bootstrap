@@ -1,33 +1,28 @@
 # Review Protocol: Subagent-Based Independent Review
 
-Generated shape documents must be reviewed by independent agents to catch context bias — the tendency for the same LLM that wrote a document to overlook its own blind spots.
+Generated shape docs must be reviewed by independent agents to catch context bias — the same LLM that wrote a doc overlooks its own blind spots.
 
 ## Why Independent Review Matters
 
-When an LLM writes vision.md and then reviews it, it is primed by its own generation context. It will:
+An LLM that writes vision.md then reviews it is primed by its own generation context. It will:
 - Overlook gaps it didn't think of during generation
 - Accept its own framings as natural rather than questioning them
-- Miss contradictions between documents because it holds the "intended meaning" in context
+- Miss cross-doc contradictions because it holds the "intended meaning" in context
 
-Independent review breaks this by giving a fresh agent only the document, not the generation context.
+Independent review breaks this — give a fresh agent only the document, not the generation context.
 
-The same principle applies one step earlier in the workflow: substantive document generation and curation should also be partitioned where possible. A dedicated pillar worker with a tighter context window will usually produce cleaner doctrine, contracts, specs, topology docs, and engineering standards than a single monolithic agent carrying all pillars at once.
+Same principle one step earlier: partition substantive generation/curation too. A dedicated pillar worker with a tighter context window produces cleaner doctrine, contracts, specs, topology, and standards than one monolithic agent carrying all pillars.
 
 ## Generation And Curation Partitioning
 
-When the task is large enough to justify dispatch, prefer:
+When the task justifies dispatch, prefer one investigation/refinement subagent per pillar, or per coherent doc cluster within a pillar:
 
-- one investigation/refinement subagent per pillar, or
-- one investigation/refinement subagent per coherent document cluster within a pillar
+- `heart-and-soul/vision.md` + `v1.md` → one doctrine worker
+- `legends-and-lore/rfcs/0001-*.md` + review notes → one contracts worker
+- `lay-and-land/components.md` + `data-flow.md` → one topology worker
+- `craft-and-care/engineering-bar.md` + `testing-and-verification.md` → one standards worker
 
-Examples:
-
-- `heart-and-soul/vision.md` and `v1.md` can share one doctrine-focused worker
-- `legends-and-lore/rfcs/0001-*.md` and its review notes can share one contracts-focused worker
-- `lay-and-land/components.md` and `data-flow.md` can share one topology-focused worker
-- `craft-and-care/engineering-bar.md` and `testing-and-verification.md` can share one standards-focused worker
-
-Do not split work so aggressively that the coordinator spends more time stitching than the workers save. The point is targeted context windows, not maximal fan-out.
+Don't split so aggressively the coordinator spends more time stitching than the workers save. Targeted context windows, not maximal fan-out.
 
 ## Review Architecture
 
@@ -145,48 +140,48 @@ Output: Ranked list of cross-pillar issues, each with affected documents and fix
 
 ### For New Projects (bootstrapping)
 
-1. **Generate** — Use the consultative bootstrapping protocol to produce each document, preferring distinct generation/refinement subagents per pillar when the work is substantial
-2. **Review sequentially** — After each document, run Review Agents 1 and 2 on it
-3. **Revise** — Incorporate findings, re-synthesize if needed
-4. **Cross-review** — After all pillars exist, run Review Agent 3
-5. **Present to user** — Show the reviewed documents with a summary of what changed during review
+1. **Generate** — consultative bootstrapping protocol per document, preferring per-pillar subagents when substantial
+2. **Review sequentially** — after each doc, run Review Agents 1 and 2
+3. **Revise** — incorporate findings, re-synthesize if needed
+4. **Cross-review** — after all pillars exist, run Review Agent 3
+5. **Present** — reviewed docs + summary of what changed during review
 
 ### For Existing Projects (maintenance)
 
-1. **Detect drift** — When code changes diverge from docs, flag for review
-2. **Update** — Generate updated sections, preferring per-pillar curation subagents when multiple pillars are affected
-3. **Review the delta** — Run Review Agents 1 and 2 on just the changed sections
-4. **Cross-check** — Run Review Agent 3 if changes affect cross-pillar coherence
-5. **Present to user** — Show diff with review findings
+1. **Detect drift** — code diverges from docs → flag for review
+2. **Update** — generate updated sections, per-pillar curation subagents when multiple pillars affected
+3. **Review the delta** — Review Agents 1 and 2 on changed sections only
+4. **Cross-check** — Review Agent 3 if changes affect cross-pillar coherence
+5. **Present** — diff + review findings
 
 ### Iteration Rules
 
-- **First round**: Always run both Coherence and Adversarial reviews
-- **Second round**: Only if first round produced REVISE verdicts on major items
-- **Third round**: Stop. If three rounds haven't converged, the issue is upstream (unclear user intent) — return to consultative interview
-- **Cross-pillar**: Run after every pillar is added or substantially changed
+- **First round**: always run both Coherence and Adversarial
+- **Second round**: only if first round produced REVISE verdicts on major items
+- **Third round**: stop. Three non-converging rounds means the issue is upstream (unclear user intent) — return to interview
+- **Cross-pillar**: after every pillar added or substantially changed
 
 ## Model Configuration for Review Agents
 
-- Review agents should use a capable model but don't need extended thinking — they're evaluating, not generating
-- The key requirement is **fresh context** — the review agent must NOT have access to the generation conversation
-- Use `Agent` tool with a clean prompt (no conversation history) to ensure independence
-- Each review agent runs in its own invocation — do not batch reviews in a single agent
+- Capable model, no extended thinking needed — evaluating, not generating
+- Key requirement: **fresh context** — review agent must NOT see the generation conversation
+- Use `Agent` tool with a clean prompt (no history) for independence
+- Each review agent runs in its own invocation — do not batch reviews
 
 ## Fallback When Subagents Are Unavailable
 
-If the environment does not support independent subagents, do **not** skip review. Use this lite review fallback:
+Do **not** skip review. Lite fallback:
 
-1. Run a **coherence pass** yourself using the Review Agent 1 criteria
-2. Run a separate **adversarial pass** yourself using the Review Agent 2 criteria
-3. Summarize the top unresolved risks explicitly
-4. Present the document and those risks to the user for validation before treating it as settled
+1. **Coherence pass** yourself using Review Agent 1 criteria
+2. **Adversarial pass** yourself using Review Agent 2 criteria
+3. Summarize top unresolved risks explicitly
+4. Present doc + risks to user for validation before treating it as settled
 
-This is weaker than true independent review, so say that plainly. The fallback preserves rigor by making the review modes explicit rather than silently collapsing generation and review together.
+Weaker than true independent review — say so plainly. The fallback preserves rigor by making review modes explicit rather than silently collapsing generation and review.
 
 ## Anti-Patterns
 
-- **Self-review** — The generator reviewing its own output in the same context. This catches typos, not blind spots.
-- **Rubber-stamp reviews** — Review agents that say "looks good" without evidence. A useful review always has findings.
-- **Review without mandate** — Running reviews but not incorporating findings. Every REVISE verdict must be addressed or explicitly overruled by the user.
-- **Infinite review loops** — More than 2 rounds means the problem is upstream. Stop reviewing and return to the user.
+- **Self-review** — generator reviewing its own output in-context. Catches typos, not blind spots.
+- **Rubber-stamp** — "looks good" without evidence. A useful review always has findings.
+- **Review without mandate** — running reviews but not incorporating findings. Every REVISE must be addressed or explicitly overruled by the user.
+- **Infinite loops** — >2 rounds means the problem is upstream. Stop and return to the user.

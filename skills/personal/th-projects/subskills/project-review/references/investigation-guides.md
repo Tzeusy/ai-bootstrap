@@ -1,21 +1,21 @@
 # Investigation Guides
 
-Per-domain checklists for subagent investigators. Each section is self-contained — pass only the relevant domain section to the assigned subagent.
+Per-domain checklists for subagent investigators. Each section is self-contained — pass only the relevant domain section to its subagent.
 
-If Phase 0 of `project-review` found usable `project-shape` artifacts, treat them as the normative baseline for every domain. README claims are still evidence, but they do not override doctrine, lore, or spec.
+If Phase 0 found usable `project-shape` artifacts, treat them as the normative baseline for every domain. README claims are evidence but do not override doctrine, lore, or spec.
 
-**Tool usage**: Use Glob for file discovery and Grep for content search. Fall back to Bash only for commands that require piping (e.g., `wc -l`, `sort`).
+**Tool usage**: Glob for file discovery, Grep for content search. Bash only for piping (`wc -l`, `sort`).
 
 ---
 
 ## Domain A: Project Mapping, Normative Baseline & Goal Inference
 
-**Objective**: Build the project map, establish the normative baseline, and infer goals. This grounds all other investigations.
+**Objective**: Build the project map, establish the normative baseline, infer goals. Grounds all other investigations.
 
-### What to examine
-- Project-shape artifacts: `about/heart-and-soul/`, `about/legends-and-lore/`, `about/lay-and-land/`, `openspec/`
-- README.md, docs/, wiki references
-- Package manifests: package.json, pyproject.toml, Cargo.toml, go.mod, Gemfile, pom.xml, build.gradle
+### Examine
+- Shape artifacts: `about/heart-and-soul/`, `about/legends-and-lore/`, `about/lay-and-land/`, `openspec/`
+- README.md, docs/, wiki refs
+- Manifests: package.json, pyproject.toml, Cargo.toml, go.mod, Gemfile, pom.xml, build.gradle
 - Entry points: main.*, index.*, app.*, cmd/, bin/, src/main
 - Directory structure (top 3 levels)
 - .gitmodules, monorepo config (nx.json, lerna.json, turbo.json, pnpm-workspace.yaml)
@@ -24,357 +24,269 @@ If Phase 0 of `project-review` found usable `project-shape` artifacts, treat the
 - DB: migrations/, schema files, ORM config, prisma/, alembic/
 - Changelog, git tags, CONTRIBUTING.md, LICENSE
 
-### Search patterns (using LLM tools)
+### Search patterns
 ```
 Glob: "about/heart-and-soul/**/*", "about/legends-and-lore/**/*", "about/lay-and-land/**/*", "openspec/**/*"
 Glob: "**/main.*", "**/index.*", "**/app.*", "cmd/**/*", "bin/**/*"
 Glob: "**/*.proto", "**/*.graphql", "**/openapi.*", "**/swagger.*"
-Grep: pattern="description" glob="package.json" (extract project description)
-Bash: git log --oneline -20 (recent commit messages for goal inference)
-Bash: git tag --sort=-creatordate | head -10 (version history)
+Grep: pattern="description" glob="package.json"   # project description
+Bash: git log --oneline -20                        # goal inference
+Bash: git tag --sort=-creatordate | head -10       # version history
 ```
 
-### Deliverable
-Structured summary covering:
-1. **Project-shape maturity** and which pillars exist
+### Deliverable — structured summary
+1. **Shape maturity** + which pillars exist
 2. **Normative baseline** (doctrine, design contracts, specs, topology)
-3. **Languages & frameworks** (evidence: file extensions, imports, configs)
+3. **Languages & frameworks** (evidence: extensions, imports, configs)
 4. **Entry points & services** (what runs, what deploys)
 5. **Dependency management** (lock files, version pinning)
-6. **Test structure** (test dirs, frameworks, CI test steps)
+6. **Test structure** (dirs, frameworks, CI test steps)
 7. **CI/CD pipeline** (stages, triggers, deploy targets)
-8. **Infrastructure** (containers, cloud, databases, caches, queues)
+8. **Infrastructure** (containers, cloud, DBs, caches, queues)
 9. **Maturity signals** (versioning, changelog, contribution guide, benchmarks, runbooks)
-10. **Explicit goals** (from doctrine, specs, README, docs, package description)
-11. **Implicit goals** (from architecture choices, what was built but not documented)
+10. **Explicit goals** (doctrine, specs, README, docs, package description)
+11. **Implicit goals** (architecture choices; built but undocumented)
 12. **Goal contradictions** (where doctrine/spec/README and code disagree)
 
 ---
 
 ## Domain B: Code Quality & Architecture (Categories 1-4)
 
-**Objective**: Evaluate goal alignment, architecture, code clarity, and correctness.
+**Objective**: Evaluate goal alignment, architecture, code clarity, correctness.
 
-### What to examine
+### Examine
 - Module/package structure and import graph
 - Core abstractions: interfaces, base classes, type definitions
-- Dependency direction (do high-level modules import low-level ones?)
+- Dependency direction (do high-level modules import low-level?)
 - Code style consistency: naming, indentation, patterns
 - Complexity hotspots: longest files, deepest nesting, most imports
 - Type coverage: untyped code, `any` usage, type ignores
-- Generated code (exclude from quality assessment): protobuf output, ORM migrations, bundled assets
+- Generated code (exclude from scoring): protobuf output, ORM migrations, bundled assets
 
-### Search patterns (using LLM tools)
+### Search patterns
 ```
-# Complexity hotspots — use churn data from scan output, then read top files
+# Complexity hotspots — use scan churn data, then read top files
 Bash: find . -name '*.ts' -o -name '*.py' -o -name '*.go' -o -name '*.rs' -o -name '*.java' | \
   xargs wc -l 2>/dev/null | sort -rn | head -20
 
-# TODO/FIXME/HACK density
-Grep: pattern="TODO|FIXME|HACK|WORKAROUND" glob="*.{ts,py,go,rs,java,rb}"
+Grep: pattern="TODO|FIXME|HACK|WORKAROUND" glob="*.{ts,py,go,rs,java,rb}"   # debt density
 
-# Import analysis (adjust per language)
-Grep: pattern="^import |^from " glob="*.py"       # Python
-Grep: pattern="^import " glob="*.{ts,tsx,js,jsx}"  # TypeScript/JS
-Grep: pattern="^import " glob="*.go"               # Go
+# Imports (per language)
+Grep: pattern="^import |^from " glob="*.py"
+Grep: pattern="^import " glob="*.{ts,tsx,js,jsx}"
+Grep: pattern="^import " glob="*.go"
 
-# Type safety gaps
-Grep: pattern=": any\b|as any" glob="*.{ts,tsx}"   # TypeScript any usage
-Grep: pattern="# type: ignore" glob="*.py"          # Python type ignores
-Grep: pattern="\.unwrap\(\)" glob="*.rs"            # Rust unwrap usage
+# Type-safety gaps
+Grep: pattern=": any\b|as any" glob="*.{ts,tsx}"
+Grep: pattern="# type: ignore" glob="*.py"
+Grep: pattern="\.unwrap\(\)" glob="*.rs"
 ```
 
 ### Key questions
-- Does the module structure reflect the domain or is it purely framework-driven?
-- Are there clear interface boundaries between major components?
-- Can you understand a function's purpose from its name and signature?
-- Are there unsafe patterns (unchecked unwrap, unvalidated casts, race conditions)?
-- What is the ratio of business logic to boilerplate?
-- Are there god files (>500 lines) or god modules (>20 exports)?
+- Module structure reflects domain, or purely framework-driven?
+- Clear interface boundaries between major components?
+- Function purpose clear from name + signature?
+- Unsafe patterns (unchecked unwrap, unvalidated casts, race conditions)?
+- Ratio of business logic to boilerplate?
+- God files (>500 lines) or god modules (>20 exports)?
 
 ### Deliverable
-Scored assessments (1-5 with confidence) for categories 1-4 with:
-- Specific file/function evidence for each claim
-- What is working well
-- What is weak or risky
-- Concrete remediation recommendations
+Scored (1-5 + confidence) for categories 1-4: specific file/function evidence per claim · what works · what's weak/risky · concrete remediation.
 
 ---
 
 ## Domain C: Reliability & Tooling (Categories 5-8)
 
-**Objective**: Evaluate error handling, observability, testing, and engineering hygiene.
+**Objective**: Evaluate error handling, observability, testing, engineering hygiene.
 
-### What to examine
+### Examine
 - Error handling: try/catch, Result types, error middleware, panic/unwrap
-- Logging: framework, structured vs unstructured, log levels, correlation IDs
+- Logging: framework, structured vs unstructured, levels, correlation IDs
 - Metrics: prometheus, StatsD, custom metrics, dashboards
-- Tracing: OpenTelemetry, Datadog, Jaeger instrumentation
+- Tracing: OpenTelemetry, Datadog, Jaeger
 - Test dirs: tests/, __tests__/, spec/, *_test.go, *_test.rs
 - Test config: jest.config, pytest.ini, vitest.config, coverage thresholds
 - Test types: unit, integration, e2e, snapshot, property-based, load
-- CI: test steps, coverage gates, required checks, flaky test indicators
+- CI: test steps, coverage gates, required checks, flaky indicators
 - Linter/formatter: .eslintrc, .prettierrc, ruff.toml, clippy, golangci-lint
 - Pre-commit: .pre-commit-config.yaml, husky, lint-staged
 - Build scripts: Makefile, justfile, package.json scripts
 
-### Search patterns (using LLM tools)
+### Search patterns
 ```
-# Error handling strategy
 Grep: pattern="catch|except |\.catch\(|Error\(|panic\(|unwrap\(\)" glob="*.{ts,py,go,rs}"
 Grep: pattern="throw new|raise |return err|Err\(" glob="*.{ts,py,go,rs}"
-
-# Logging framework usage
 Grep: pattern="logger\.|log\.(info|warn|error|debug)|console\.(log|error|warn)" glob="*.{ts,py,go,js}"
-
-# Flaky test indicators
-Grep: pattern="skip|xfail|flaky|retry|@pytest.mark.skip" glob="*.{ts,py,go,rs}"
-
-# CI test configuration
-Glob: ".github/workflows/*.yml"  # then read for test steps
+Grep: pattern="skip|xfail|flaky|retry|@pytest.mark.skip" glob="*.{ts,py,go,rs}"   # flaky tests
+Glob: ".github/workflows/*.yml"                                                    # then read test steps
 Glob: "**/jest.config.*", "**/vitest.config.*", "**/pytest.ini", "**/conftest.py"
-
-# Coverage configuration
 Grep: pattern="coverage|threshold|--cov|istanbul|nyc|c8" glob="*.{json,yml,yaml,toml,cfg}"
 ```
 
 ### Key questions
-- Is there a consistent error handling strategy or ad-hoc patterns?
-- Can you diagnose a production issue from logs alone?
-- What percentage of critical paths have test coverage?
-- Are tests testing behavior or implementation details?
-- Is the test suite fast enough to run on every commit?
-- Are there flaky tests (skip/retry annotations)?
-- Do CI checks block merges?
+- Consistent error-handling strategy or ad-hoc?
+- Can you diagnose a prod issue from logs alone?
+- % of critical paths with test coverage?
+- Tests check behavior or implementation details?
+- Test suite fast enough to run on every commit?
+- Flaky tests (skip/retry annotations)?
+- CI checks block merges?
 
 ### Deliverable
-Scored assessments (1-5 with confidence) for categories 5-8 with evidence.
+Scored (1-5 + confidence) for categories 5-8 with evidence.
 
 ---
 
 ## Domain D: Security, Performance & Data (Categories 9-12)
 
-**Objective**: Evaluate dependencies, security, performance, and data/API design.
+**Objective**: Evaluate dependencies, security, performance, data/API design.
 
-### What to examine
+### Examine
+- **Dependencies (9)**: lock files + pinning strategy; direct vs transitive count; renovate.json/dependabot.yml; license compliance
+- **Security (10)**: auth middleware, JWT, session mgmt; input validation/sanitizers; secrets (.env, hardcoded, creds in code); CORS/CSP/headers; SQL/NoSQL injection vectors; rate limiting/abuse prevention
+- **Performance (11)**: algorithm complexity in hot paths; caching (Redis, in-memory, HTTP cache headers); DB indexes, query optimization, N+1; connection pooling, timeouts; pagination/query bounding
+- **Data/API (12)**: route definitions + versioning; schemas (OpenAPI, GraphQL, Protobuf); migrations + rollback; serialization consistency; error-response format across endpoints
 
-**Dependencies (Category 9)**:
-- Lock files and version pinning strategy
-- Direct vs transitive dependency count
-- Automated updates: renovate.json, dependabot.yml
-- License compliance signals
-
-**Security (Category 10)**:
-- Auth middleware, JWT handling, session management
-- Input validation: schemas, validators, sanitizers
-- Secrets: .env files, hardcoded strings, credentials in code
-- CORS, CSP, security headers
-- SQL/NoSQL injection vectors
-- Rate limiting, abuse prevention
-
-**Performance (Category 11)**:
-- Algorithm complexity in hot paths
-- Caching layers: Redis, in-memory, HTTP cache headers
-- Database indexes, query optimization, N+1 patterns
-- Connection pooling, timeout configuration
-- Pagination and query bounding
-
-**Data/API Design (Category 12)**:
-- API route definitions, versioning strategy
-- Schema definitions: OpenAPI, GraphQL, Protobuf
-- Migration files and rollback strategy
-- Serialization/deserialization consistency
-- Error response format across endpoints
-
-### Search patterns (using LLM tools)
+### Search patterns
 ```
-# HIGH PRIORITY: Secrets in code (check first)
+# HIGH PRIORITY: secrets in code (check first)
 Grep: pattern="password|secret|api_key|apikey|token|credential|private_key" glob="*.{ts,py,go,env,yml,yaml,json,toml}" -i=true
-Grep: pattern="(sk-|pk-|ghp_|gho_|AKIA)" glob="*.{ts,py,go,json,yml,env}"  # Common secret prefixes
+Grep: pattern="(sk-|pk-|ghp_|gho_|AKIA)" glob="*.{ts,py,go,json,yml,env}"   # secret prefixes
 
-# SQL injection patterns
+# SQL injection
 Grep: pattern="f\".*SELECT|f\".*INSERT|f\".*UPDATE|f\".*DELETE" glob="*.py"
 Grep: pattern="`.*(SELECT|INSERT|UPDATE|DELETE)" glob="*.{ts,js}"
 Grep: pattern='"\+.*SELECT|string\.Format.*SELECT' glob="*.{cs,java}"
 
-# Auth middleware
 Grep: pattern="auth|authenticate|authorize|middleware|guard|protect" glob="*.{ts,py,go,rs,java}"
-
-# API routes
 Grep: pattern="router\.|app\.(get|post|put|delete|patch)|@(app\.route|router)|HandleFunc" glob="*.{ts,py,go,java}"
-
-# N+1 query patterns (ORM usage in loops)
-Grep: pattern="for.*\n.*\.find|for.*\n.*\.query|for.*\n.*\.get" multiline=true glob="*.{ts,py}"
+Grep: pattern="for.*\n.*\.find|for.*\n.*\.query|for.*\n.*\.get" multiline=true glob="*.{ts,py}"   # N+1
 
 # Dependency count
 Bash: cat package.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'deps: {len(d.get(\"dependencies\",{}))}, devDeps: {len(d.get(\"devDependencies\",{}))}')" 2>/dev/null || true
 ```
 
 ### Key questions
-- Are there known CVEs in dependencies? (Check lock file age, automated update config)
-- Is auth consistently enforced across all endpoints? Are there skip lists?
-- Are there SQL injection or XSS vectors?
-- Are queries bounded (pagination, limits, timeouts)?
-- Is the data model normalized appropriately for the use case?
-- Is there a migration strategy that supports rollback?
-- Are API responses consistent in format across endpoints?
+- Known CVEs in deps? (lock file age, automated-update config)
+- Auth consistently enforced across all endpoints? Skip lists?
+- SQL injection or XSS vectors?
+- Queries bounded (pagination, limits, timeouts)?
+- Data model normalized for the use case?
+- Migration strategy supports rollback?
+- API responses consistent in format across endpoints?
 
 ### Deliverable
-Scored assessments (1-5 with confidence) for categories 9-12 with evidence.
+Scored (1-5 + confidence) for categories 9-12 with evidence.
 
 ---
 
 ## Domain E: Documentation, Maintainability & Operations (Categories 13-15)
 
-**Objective**: Evaluate docs, DX, release process, and long-term maintainability.
+**Objective**: Evaluate docs, DX, release process, long-term maintainability.
 
-### What to examine
-- README.md quality and accuracy (mentally walk through setup instructions)
-- API documentation: generated or hand-written
-- Architecture docs, ADRs (Architecture Decision Records)
-- Examples directory
-- CONTRIBUTING.md quality
-- Changelog and release notes
-- CI/CD pipeline: stages, gates, deploy process
-- Dockerfile, docker-compose for local dev
+### Examine
+- README quality + accuracy (mentally walk the setup steps)
+- API docs (generated or hand-written); architecture docs, ADRs; examples/; CONTRIBUTING.md; changelog/release notes
+- CI/CD: stages, gates, deploy process; Dockerfile/docker-compose for local dev
 - Version strategy: semver, calver, tags
-- Health check endpoints, readiness/liveness probes
-- Runbooks, incident response docs
-- Type system strictness: TypeScript strict mode, mypy strict
-- Code review config: CODEOWNERS, required reviewers, branch protection
-- Feature flag system
-- Migration patterns and rollback capability
-- `about/craft-and-care/` (engineering-standards pillar): does it exist, and do its stated standards — testing discipline, review expectations, observability, verification, documentation — match observed practice? Divergence between stated standards and reality is a normative violation, not a style note; its absence is a shape gap to record
+- Health-check endpoints, readiness/liveness probes; runbooks, incident-response docs
+- Type strictness: TS strict mode, mypy strict
+- Code-review config: CODEOWNERS, required reviewers, branch protection; feature-flag system; migration + rollback capability
+- `about/craft-and-care/` (engineering-standards pillar): exists? Do its stated standards — testing discipline, review expectations, observability, verification, documentation — match observed practice? Divergence is a normative violation, not a style note; absence is a shape gap to record.
 
-### Search patterns (using LLM tools)
+### Search patterns
 ```
-# Documentation inventory
-Glob: "**/*.md" (then filter out node_modules, vendor)
+Glob: "**/*.md"                                            # then filter node_modules, vendor
 Glob: "docs/**/*", "examples/**/*", "ADR/**/*", "adr/**/*"
-
-# Type safety strictness
 Grep: pattern="\"strict\": true|strict = true|strict_mode" glob="tsconfig.json"
 Grep: pattern="strict = true|disallow_untyped" glob="mypy.ini"
-Grep: pattern=": any\b" glob="*.{ts,tsx}" output_mode="count"  # TypeScript any count
-
-# Code review governance
+Grep: pattern=": any\b" glob="*.{ts,tsx}" output_mode="count"
 Glob: "**/CODEOWNERS", "**/.github/CODEOWNERS"
 Grep: pattern="required_approving_review_count|branch_protection" glob="*.{yml,yaml}"
-
-# Feature flags
 Grep: pattern="feature.flag|featureFlag|FEATURE_|feature_toggle|LaunchDarkly|unleash" glob="*.{ts,py,go,java}"
-
-# Health checks
 Grep: pattern="health|readiness|liveness|/healthz|/ready|/alive" glob="*.{ts,py,go,java,yml,yaml}"
-
-# Engineering-standards pillar
 Glob: "about/craft-and-care/**/*.md"
 ```
 
 ### Key questions
-- Can a new developer set up and contribute within a day?
-- Is the release process automated and repeatable?
-- What is the bus factor? (Check git contributor distribution, CODEOWNERS breadth)
-- How safe is it to make changes? What guardrails exist (types, tests, CI gates, review)?
-- Are there areas of the codebase nobody wants to touch? (Check churn hotspots from scan)
+- New dev can set up + contribute within a day?
+- Release process automated + repeatable?
+- Bus factor? (git contributor distribution, CODEOWNERS breadth)
+- How safe are changes? What guardrails (types, tests, CI gates, review)?
+- Areas nobody wants to touch? (churn hotspots from scan)
 
 ### Deliverable
-Scored assessments (1-5 with confidence) for categories 13-15 with evidence.
+Scored (1-5 + confidence) for categories 13-15 with evidence.
 
 ---
 
 ## Domain F: Feature Gaps, Scale & Risk Analysis
 
-**Objective**: Identify missing capabilities, scaling limits, and prioritized risks.
+**Objective**: Identify missing capabilities, scaling limits, prioritized risks.
 
-### Investigation process
+### Step 1: Feature gap discovery
 
-**Step 1: Feature gap discovery**
-
-Read `references/project-type-adaptations.md` for standard expectations per project type. For each expected feature:
-- Check the project-shape baseline first. If doctrine/spec/topology already defines the expectation, treat it as normative.
-- Is it present? (search for it)
-- Is it partially implemented?
-- Is it completely absent?
+Read `references/project-type-adaptations.md` for standard expectations per project type. For each expected feature: check the shape baseline first (if doctrine/spec/topology defines it, treat as normative), then determine present / partial / absent.
 
 Categorize gaps:
 
-| Category | What to look for |
-|----------|-----------------|
-| Core features | Features stated in README but missing in code |
+| Category | Look for |
+|----------|----------|
+| Core features | Stated in README but missing in code |
 | Operational | Health checks, graceful shutdown, rate limiting, circuit breakers, retry policies |
 | DX | Dev server, hot reload, debugging config, setup scripts, seed data |
 | Enterprise/readiness | SSO, RBAC, audit logging, multi-tenancy, SBOM, compliance controls |
 
-For each gap, determine:
-- Is it a **blocker** (prevents use in stated context) or **enhancement** (nice-to-have)?
-- **User impact**: Who feels the pain? (end user, operator, contributor)
-- **Evidence**: Was it intended? (TODO comment, open issue, empty stub)
-- **Effort**: S (<1 day), M (1-5 days), L (1-3 weeks), XL (>3 weeks)
+Per gap: **blocker** (prevents use in stated context) vs **enhancement** · **user impact** (end user / operator / contributor) · **evidence** intended? (TODO, open issue, empty stub) · **effort** S (<1d) / M (1-5d) / L (1-3w) / XL (>3w).
 
-**Step 2: Scale analysis**
+### Step 2: Scale analysis
 
-Trace the critical execution path (e.g., request → auth → handler → DB → serialization → response). For each component on the path:
+Trace the critical path (request → auth → handler → DB → serialization → response). Per component:
 
 | Scale | Question |
 |-------|----------|
-| 10x | Does this component have a known scaling limit? (single-threaded, in-memory, no connection pool) |
+| 10x | Known scaling limit? (single-threaded, in-memory, no connection pool) |
 | 100x | What breaks first? (DB connections, memory, CPU, disk I/O, external API rate limits) |
 
-Also assess organizational scaling:
-- Does the test suite run time scale linearly with code size?
-- Can the codebase be split into independently deployable units?
-- Is there config sprawl (many env vars, many config files, inconsistent patterns)?
+Org scaling: test suite run time scales linearly with code size? Codebase splittable into independently deployable units? Config sprawl (many env vars/config files, inconsistent patterns)?
 
-**Step 3: Time-horizon analysis**
+### Step 3: Time-horizon analysis
 
 | Horizon | Assess |
 |---------|--------|
 | 1 year | Dependency maintenance burden, framework/language ecosystem trajectory |
-| 3 years | Tech debt accumulation rate, bus factor impact, documentation drift |
+| 3 years | Tech-debt accumulation rate, bus-factor impact, documentation drift |
 | 5 years | Lock-in risks, calcified areas (too expensive to change), architectural ceilings |
 
-For dependency drift specifically:
+Dependency drift:
 ```
-Bash: git log --oneline -500 --name-only | grep -c 'lock\|package' (how often deps are updated)
-Grep: pattern="renovate|dependabot" glob="*.{json,yml,yaml}" (automated update config)
+Bash: git log --oneline -500 --name-only | grep -c 'lock\|package'   # update frequency
+Grep: pattern="renovate|dependabot" glob="*.{json,yml,yaml}"          # automated updates
 ```
 
-**Step 4: Risk register**
+### Step 4: Risk register
 
-For each risk discovered across steps 1-3:
-
-| Field | Value |
-|-------|-------|
-| **Title** | One-line description |
-| **Severity** | Critical / High / Medium / Low |
-| **Likelihood** | High / Medium / Low |
-| **Impact** | High / Medium / Low |
-| **Confidence** | High / Medium / Low |
-| **Evidence** | Specific files/patterns |
-| **Why it matters** | Business/engineering impact |
-| **Suggested fix** | Concrete remediation |
-| **Effort** | S / M / L / XL |
+Per risk across steps 1-3: **Title** · **Severity** C/H/M/L · **Likelihood** H/M/L · **Impact** H/M/L · **Confidence** H/M/L · **Evidence** (files/patterns) · **Why it matters** · **Suggested fix** · **Effort** S/M/L/XL.
 
 ### Deliverable
 1. Feature gap analysis (blockers vs enhancements table, with effort)
-2. Scale analysis (10x bottleneck, 100x breaking point, org scaling limits)
+2. Scale analysis (10x bottleneck, 100x breaking point, org limits)
 3. Time-horizon risks (1yr, 3yr, 5yr)
-4. Prioritized risk register (top 10-15 risks, ordered by severity × likelihood)
-5. Advisory roadmap draft: 5 quick wins, 5 medium improvements, 3 strategic investments
-6. Planning constraints for `/project-direction`: required spec work, sequencing constraints, and explicit deprioritizations
+4. Prioritized risk register (top 10-15, by severity × likelihood)
+5. Advisory roadmap draft: 5 quick wins, 5 medium, 3 strategic
+6. Planning constraints for `/project-direction`: required spec work, sequencing constraints, explicit deprioritizations
 
 ---
 
 ## Cross-Domain Concerns
 
-These topics span multiple domains. The listed agent has **primary ownership**, but other agents should flag related findings.
+Listed agent has **primary ownership**; others flag related findings.
 
-| Concern | Primary | Also relevant to | What to coordinate |
-|---------|---------|-------------------|-------------------|
-| Observability | C (logging/metrics) | D (perf monitoring), E (ops/runbooks) | Is observability sufficient for incident diagnosis? |
-| Version strategy | E (release process) | D (API versioning), A (maturity signals) | Is there one coherent versioning approach? |
-| Configuration management | E (maintainability) | D (secrets), F (config sprawl) | Are configs consistent, documented, and not sprawling? |
-| Developer onboarding | E (docs/DX) | A (project map), C (test running) | Can someone actually set up and run everything? |
-| Auth & access control | D (security) | E (CODEOWNERS/review) | Is auth enforced consistently across code AND process? |
-| Data integrity | D (data model) | C (error handling), F (scale) | Are there paths where data can become inconsistent? |
+| Concern | Primary | Also relevant to | Coordinate |
+|---------|---------|------------------|------------|
+| Observability | C (logging/metrics) | D (perf monitoring), E (ops/runbooks) | Sufficient for incident diagnosis? |
+| Version strategy | E (release) | D (API versioning), A (maturity signals) | One coherent versioning approach? |
+| Configuration management | E (maintainability) | D (secrets), F (config sprawl) | Configs consistent, documented, not sprawling? |
+| Developer onboarding | E (docs/DX) | A (project map), C (test running) | Can someone actually set up + run everything? |
+| Auth & access control | D (security) | E (CODEOWNERS/review) | Auth enforced across code AND process? |
+| Data integrity | D (data model) | C (error handling), F (scale) | Paths where data can become inconsistent? |

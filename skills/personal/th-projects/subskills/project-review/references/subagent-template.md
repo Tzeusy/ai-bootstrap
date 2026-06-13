@@ -1,6 +1,6 @@
 # Subagent Dispatch Template
 
-Use this template when dispatching investigation subagents. Fill in the placeholders per domain.
+Use when dispatching investigation subagents. Fill placeholders per domain.
 
 ---
 

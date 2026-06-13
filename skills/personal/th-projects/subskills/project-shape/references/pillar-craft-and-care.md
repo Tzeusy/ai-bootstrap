@@ -2,34 +2,19 @@
 
 ## Purpose
 
-The engineering-character layer answers **WHO ARE WE WHEN WE BUILD?** It defines the quality bar
-for implementation, verification, review, observability, compatibility, security hygiene,
-documentation, and maintainability. It is not product doctrine, not subsystem design, not feature
-requirements, and not topology. It is the project's explicit answer to what kind of engineer this
-codebase expects in practice.
+The engineering-character layer answers **WHO ARE WE WHEN WE BUILD?** Defines the quality bar for implementation, verification, review, observability, compatibility, security hygiene, documentation, maintainability. Not product doctrine, subsystem design, feature requirements, or topology — the project's explicit answer to what kind of engineer this codebase expects.
 
-This pillar should express stack-neutral principles and reviewable expectations. It should tell
-humans and agents what evidence, discipline, posture, and care are required, without prescribing
-vendors, frameworks, or tools unless the project has separately standardized those choices
-elsewhere. `heart-and-soul` defines who the project is in purpose; `craft-and-care` defines who we
-must be when we change it.
+Express stack-neutral principles and reviewable expectations: what evidence, discipline, posture, and care are required, without prescribing vendors/frameworks/tools (unless standardized elsewhere). `heart-and-soul` = who the project is in purpose; `craft-and-care` = who we must be when we change it.
 
 ## Default Engineering Biases
 
-The canonical default quality bar — the nine engineering biases, the definition of done, and
-the change-level subskills that operationalize them (readability, test rigor, dependency
-hygiene, cruft cleanup) — lives in `/th-engineering` (engineering-bar subskill). This pillar
-**adopts that bar by reference**; it does not restate it.
+The canonical default quality bar — nine engineering biases, definition of done, and the change-level subskills operationalizing them (readability, test rigor, dependency hygiene, cruft cleanup) — lives in `/th-engineering` (engineering-bar subskill). This pillar **adopts it by reference**; does not restate it.
 
-When authoring a project's `craft-and-care/`:
+When authoring `craft-and-care/`:
 
-1. Point `engineering-bar.md` at `/th-engineering`'s engineering-bar as the default, then record
-   only the project's **deviations**: biases the project overrides (with the reason), and
-   project-specific standards the default bar does not cover.
-2. Do not copy the bias list into the project. A copied bar drifts; a referenced bar stays
-   current. The override mechanism is the project pillar itself — when it conflicts with the
-   default bar, the pillar wins.
-3. Reviewers enforce the merged result: default biases plus project overrides.
+1. Point `engineering-bar.md` at `/th-engineering`'s engineering-bar as the default; record only the project's **deviations** — overridden biases (with reason) and standards the default bar doesn't cover.
+2. Don't copy the bias list in. A copied bar drifts; a referenced bar stays current. The override mechanism is the pillar itself — on conflict, the pillar wins.
+3. Reviewers enforce the merged result: default biases + project overrides.
 
 ## Recommended Structure
 
