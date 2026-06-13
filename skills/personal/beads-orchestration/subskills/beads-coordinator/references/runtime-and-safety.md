@@ -72,7 +72,7 @@ The coordinator has discretion on subagent model choice based on task type.
 
 | Strategy | Models (subject to change) |
 |---|---|
-| `EPIC_COMPLEXITY_MODEL` | Opus 4.8 / Fable 5, gpt-5.3-codex, gemini-3-pro |
+| `EPIC_COMPLEXITY_MODEL` | Opus 4.8, gpt-5.3-codex, gemini-3-pro |
 | `HIGH_COMPLEXITY_MODEL` | Sonnet 4.6, gpt-5.3-codex, gemini-3-pro |
 | `MEDIUM_COMPLEXITY_MODEL` | Sonnet 4.6, gpt-5.3-codex, gemini-3-pro |
 | `LOW_COMPLEXITY_MODEL` | 4.5 Haiku, gpt-5.3-codex-spark, gemini-3-flash-preview |
@@ -100,7 +100,7 @@ Rule: before dispatching a reconciliation bead, resolve its parent epic's
 complexity tier (see `epic-coordination.md` → "Epic Complexity Tiers"). If the
 epic is **medium or higher** (1+ positive classification signal, or it carries
 the `team-coordination` label), you MUST dispatch the reconciliation bead at
-`EPIC_COMPLEXITY_MODEL` — i.e. Opus or Fable on Claude. This is a floor, not a
+`EPIC_COMPLEXITY_MODEL` — i.e. Opus on Claude. This is a floor, not a
 target: never drop below it for a qualifying epic, regardless of the bead's
 `task` type. Only a low/trivial epic (0 signals) may reconcile at
 `MEDIUM_COMPLEXITY_MODEL`.

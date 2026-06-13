@@ -36,8 +36,8 @@ count drives both the dispatch decision and the reconciliation-model floor.
 
 "Medium or higher" therefore means **1+ positive signals**, or any epic that
 carries the `team-coordination` label. For those epics the terminal
-reconciliation bead MUST be dispatched at `EPIC_COMPLEXITY_MODEL` (Opus or
-Fable on Claude); see "Reconciliation Floor" in `runtime-and-safety.md`.
+reconciliation bead MUST be dispatched at `EPIC_COMPLEXITY_MODEL` (Opus on
+Claude); see "Reconciliation Floor" in `runtime-and-safety.md`.
 
 ## Independent Dispatch
 
