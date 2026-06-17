@@ -31,9 +31,6 @@
     "run_shell_command(yarn)",
     "run_shell_command(npx)"
   ],
-  "checkpointing": {
-    "enabled": true
-  },
   "contextFileName": [
     "GEMINI.md",
     "AGENTS.md",
@@ -122,7 +119,6 @@
     "restore_image"
   ],
   "disableAutoUpdate": true,
-  "enablePromptCompletion": false,
   "experimental": {
     "codebaseInvestigatorSettings": {
       "enabled": true,
@@ -132,9 +128,6 @@
     "enableAgents": true,
     "plan": true
   },
-  "hasSeenIdeIntegrationNudge": true,
-  "hideBanner": true,
-  "hideTips": true,
   "hooks": {
     "PreCompress": [
       {
@@ -159,38 +152,7 @@
       }
     ]
   },
-  "ide": {
-    "enabled": true
-  },
   "model": {
     "name": "gemini-3-pro"
-  },
-  "preferredEditor": "vim",
-  "security": {
-    "auth": {
-      "selectedType": "oauth-personal"
-    }
-  },
-  "selectedAuthType": "oauth-personal",
-  "theme": "Default",
-  "vimMode": true,
-  "general": {
-    "previewFeatures": true,
-    "sessionRetention": {
-      "enabled": true
-    }
-  },
-  "ui": {
-    "showStatusInTitle": true,
-    "showModelInfoInChat": true
-  },
-  "telemetry": {
-    "enabled": true,
-    "target": "local",
-    "otlpEndpoint": "http://otel.YOUR_TAILNET_HOST:4317",
-    "otlpProtocol": "http",
-    "useCollector": true,
-    "logPrompts": true,
-    "useCliAuth": false
   }
 }
