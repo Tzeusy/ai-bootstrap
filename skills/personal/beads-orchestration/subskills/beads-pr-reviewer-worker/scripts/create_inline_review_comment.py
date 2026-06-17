@@ -47,6 +47,7 @@ def main():
     parser.add_argument("--line", required=True, type=int)
     parser.add_argument("--body", required=True)
     parser.add_argument("--dedupe-key", required=True)
+    parser.add_argument("--dry-run", action="store_true", help="Check for duplicates without posting the comment.")
     args = parser.parse_args()
 
     try:
@@ -66,6 +67,18 @@ def main():
                 json.dump(output, sys.stdout, indent=2, sort_keys=True)
                 sys.stdout.write("\n")
                 return
+
+        if args.dry_run:
+            output = {
+                "ok": True,
+                "status": "dry-run",
+                "note": "would create inline comment, mutation skipped",
+                "path": args.path,
+                "line": args.line,
+            }
+            json.dump(output, sys.stdout, indent=2, sort_keys=True)
+            sys.stdout.write("\n")
+            return
 
         payload = run_json([
             "gh",

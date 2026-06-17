@@ -39,6 +39,7 @@ def run_json(cmd):
 def main():
     parser = argparse.ArgumentParser(description="Resolve a review thread idempotently.")
     parser.add_argument("--thread-id", required=True)
+    parser.add_argument("--dry-run", action="store_true", help="Check thread status without performing the resolve mutation.")
     args = parser.parse_args()
 
     try:
@@ -54,6 +55,12 @@ def main():
         node = status_payload["data"]["node"]
         if node["isResolved"]:
             output = {"ok": True, "status": "already-resolved", "thread_id": args.thread_id}
+            json.dump(output, sys.stdout, indent=2, sort_keys=True)
+            sys.stdout.write("\n")
+            return
+
+        if args.dry_run:
+            output = {"ok": True, "status": "dry-run", "thread_id": args.thread_id, "note": "would resolve, mutation skipped"}
             json.dump(output, sys.stdout, indent=2, sort_keys=True)
             sys.stdout.write("\n")
             return
