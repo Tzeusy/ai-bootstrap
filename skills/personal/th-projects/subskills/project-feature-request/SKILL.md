@@ -110,9 +110,17 @@ delta, open questions. Then:
   sequencing and decomposition; for a small single-task request, file directly
   via `/beads-orchestration` (beads-writer) with the spec reference.
 - **Doctrine conflict** → record the rejection and its reasoning where the
-  project keeps decisions; do not soften into a backlog item.
+  project keeps decisions; do not soften into a backlog item. Default when
+  no established home:
+  `about/legends-and-lore/decisions/YYYY-MM-DD-rejected-{slug}.md`.
 - **Parked** (sound idea, no technical path yet) → write an exploratory RFC
-  stub in legends-and-lore and stop.
+  stub in legends-and-lore and stop. Default when no established home:
+  `about/legends-and-lore/rfcs/YYYY-MM-DD-parked-{slug}.md`.
+
+Project ADR/RFC conventions take precedence over these defaults; see
+[`references/decision-record-template.md`](references/decision-record-template.md)
+for minimal file structure.
+
 - **Not specifiable** (still too vague) → split into smaller motifs and
   re-enter at Gate 1, or return to the requester with the specific questions
   blocking specification.
