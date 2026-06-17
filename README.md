@@ -40,7 +40,10 @@ The `skills/` tree is intentionally split by ownership:
 Everything else under top-level `skills/` should be treated as upstream-derived material:
 
 - Some directories are checked out as git submodules from open source upstreams.
-- The current submodules are `skills/superpowers`, `skills/Skill_Seekers`, `skills/anthropic-skills`, and `skills/notebooklm-skill`.
+- The current submodules are `skills/superpowers`, `skills/archive/Skill_Seekers`,
+  `skills/archive/anthropic-skills`, `skills/archive/notebooklm-skill`,
+  `skills/archive/mattpocock-skills`, and
+  `.claude/plugins/marketplaces/claude-plugins-official`.
 - Every other non-`personal/` skill directory is a vendored copy of an open source skill or skill bundle.
 
 In practice, that means:
