@@ -94,6 +94,7 @@ def main():
     parser.add_argument("--owner", required=True)
     parser.add_argument("--repo", required=True)
     parser.add_argument("--pr-number", required=True, type=int)
+    parser.add_argument("--dry-run", action="store_true", help="Run evaluation without performing any mutations (evaluation is already read-only; flag provided for uniformity).")
     args = parser.parse_args()
 
     try:

@@ -73,6 +73,7 @@ def main():
     parser.add_argument("--thread-id", required=True)
     parser.add_argument("--body", required=True)
     parser.add_argument("--dedupe-key", required=True)
+    parser.add_argument("--dry-run", action="store_true", help="Check for duplicates without posting the reply.")
     args = parser.parse_args()
 
     try:
@@ -88,6 +89,17 @@ def main():
                 json.dump(output, sys.stdout, indent=2, sort_keys=True)
                 sys.stdout.write("\n")
                 return
+
+        if args.dry_run:
+            output = {
+                "ok": True,
+                "status": "dry-run",
+                "thread_id": args.thread_id,
+                "note": "would post reply, mutation skipped",
+            }
+            json.dump(output, sys.stdout, indent=2, sort_keys=True)
+            sys.stdout.write("\n")
+            return
 
         payload = run_json([
             "gh",
