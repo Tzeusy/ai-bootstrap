@@ -25,7 +25,8 @@ window.__EXCALIDRAW_EXPORT_TO_SVG__ = exportToSvg;
 JS
 
 pushd "$TMP_DIR" >/dev/null
-npm install --silent @excalidraw/excalidraw@latest esbuild@latest
+# Pinned versions (2026-06-17): bump by re-running `npm view <pkg> version` and updating here.
+npm install --silent @excalidraw/excalidraw@0.18.1 esbuild@0.28.1
 PACKAGE_VERSION="$(node -p "require('./node_modules/@excalidraw/excalidraw/package.json').version")"
 npx esbuild entry.mjs \
   --bundle \
