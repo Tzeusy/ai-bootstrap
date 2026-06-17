@@ -140,6 +140,8 @@ Structure for the final project review report. Adapt depth to project size — a
 
 ## 8. Risk Register
 
+_Only [Confirmed] findings from Phase 3.5 appear here. Invalidated claims go to Appendix D (Veracity Ledger)._
+
 | # | Risk | Sev. | Likelih. | Impact | Conf. | Fix | Effort |
 |---|------|------|----------|--------|-------|-----|--------|
 | 1 | {title} | {C/H/M/L} | {H/M/L} | {H/M/L} | {H/M/L} | {remedy} | {S/M/L/XL} |
@@ -198,6 +200,16 @@ Structure for the final project review report. Adapt depth to project size — a
 
 ### C. Evidence Index
 {Consolidated list of all files cited, grouped by category}
+
+### D. Veracity Ledger
+
+_Claims that were challenged in Phase 3.5 and did not survive. Not planning inputs._
+
+| Prior claim | Classification | Invalidating evidence / reason |
+|-------------|----------------|-------------------------------|
+| {exact claim text} | [Incorrect] / [Overstated] / [Unverifiable] | {file, section, search term, or reason evidence could not be obtained} |
+
+{If no claims were invalidated, write: "All Critical/High/P0/P1 claims confirmed. Ledger empty."}
 
 ---
 
