@@ -90,15 +90,42 @@ assuming breakage, then record the rename here AND fix the subskill docs.
   enclosing git repository boundary. A nested repo (e.g. a submodule or a
   repo-within-a-repo) without its own `.beads/` cannot see the parent's DB.
   Session hooks keyed on `.beads/` detection also do not fire there.
-- **Fix**: either give the nested repo its own DB (`bd init --prefix <p>` —
-  done for `ai-bootstrap` on 2026-06-12, prefix `aib`), or prefix commands
-  with the global directory flag: `bd -C /path/to/parent <command>`.
-- **This workspace**: `~/.dotfiles` uses prefix `dotfiles` (shell/dotfiles
-  work); `~/.dotfiles/ai-bootstrap` uses prefix `aib` (skill/agent work).
-  **ID-prefix auto-routing does NOT work across these embedded DBs**
-  (verified: `bd show dotfiles-ac7` from ai-bootstrap fails) — always use
-  `bd -C <repo>` when addressing the other repo's beads.
-- Observed: 2026-06-12, bd 1.0.4.
+- **Fix**: either give the nested repo its own DB (`bd init --prefix <p>`), or
+  prefix commands with the global directory flag: `bd -C /path/to/parent
+  <command>`.
+- **This workspace**: `~/.dotfiles` → DB `dotfiles` (prefix `dotfiles-`,
+  shell/dotfiles work); `~/.dotfiles/ai-bootstrap` → DB `aib` (prefix `aib-`,
+  skill/agent work). Both now live on the **shared external Dolt server**
+  (`127.0.0.1:3307`, `~/gt/.dolt-data`) as per-project databases — migrated
+  from per-repo embedded Dolt on 2026-06-17. Repo→DB selection is still
+  per-`.beads/`, so **ID-prefix auto-routing does NOT work across them**
+  (`bd show dotfiles-ac7` from ai-bootstrap fails) — always use `bd -C <repo>`
+  when addressing the other repo's beads.
+- Observed: 2026-06-12, updated 2026-06-17, bd 1.0.4.
+
+### Migrating a repo from embedded Dolt to the shared external server
+- **Goal**: move an embedded-mode repo's beads onto the shared 3307 server as
+  its own per-project DB (keeps all repos on one server, data still isolated).
+- **Steps**: (1) `bd export` to refresh `.beads/issues.jsonl` AND tar the whole
+  `.beads/` aside as a backup; (2) create the target DB:
+  `mysql -h127.0.0.1 -P3307 -uroot --ssl-mode=DISABLED -e "CREATE DATABASE <db>;"`;
+  (3) re-init in external-server mode importing from JSONL:
+  `BEADS_DOLT_PASSWORD= bd init --server --external --server-host 127.0.0.1
+  --server-port 3307 --server-user root --database <db> --prefix <prefix>
+  --from-jsonl --reinit-local --non-interactive --destroy-token DESTROY-<prefix>
+  --skip-agents --skip-hooks`; (4) verify counts server-side
+  (`SELECT COUNT(*) FROM issues;`) match the export; (5) persist connection to
+  tracked config: `bd dolt set host/port/database <v> --update-config`;
+  (6) delete the orphaned `.beads/embeddeddolt` only after `metadata.json`
+  shows `"dolt_mode": "server"`.
+- **Gotchas**: `--prefix` defaults to the *directory name* on re-init — pass it
+  explicitly or `ai-bootstrap` becomes prefix `ai-bootstrap`, not `aib`.
+  Non-interactive re-init refuses without `--destroy-token DESTROY-<prefix>`
+  (the JSONL is the import source, so this is safe with a backup). Do NOT use
+  `--shared-server` — that points at bd's *own* managed server
+  (`~/.beads/shared-server/`), not the existing `~/gt/.dolt-data` one; use
+  `--server --external`. Root has no password → `BEADS_DOLT_PASSWORD=` (empty).
+- Observed: 2026-06-17, bd 1.0.4.
 
 ### Stale duplicate `bd` binary on PATH
 - **Symptom**: `bd version` warns about multiple binaries; behavior differs
@@ -122,13 +149,43 @@ When a direct `bd update <id> --status <to>` is rejected:
 - Record the exact rejected transition and the route that worked as a new
   entry here.
 
-(No concrete rejected-transition entry yet — add the first one you hit.)
+- **Claiming a blocked bead** (`bd update <id> --claim` on a `pr-review-task`
+  or any `status=blocked` bead): fails with `Error claiming <id>: issue not
+  claimable: status blocked` (exit 0, no mutation). `--claim` only accepts
+  `open`/`in_progress`. WORKAROUND: route through open first —
+  `bd update <id> --status open` then `bd update <id> --claim`. Note a
+  same-call `--claim --add-label X` will silently apply the label but skip the
+  claim; verify `assignee` after. Observed 2026-06-13, bd 1.0.4 (the
+  coordinator review-lane dispatch hits this every cycle).
+- **Force-closing a bead with open logical deps**: `bd close <id>` fails with
+  `cannot close <id>: blocked by open issues [<dep>] (use --force to override)`.
+  When the deliverable is confirmed merged (PR MERGED) but a logical-ordering
+  dep is still open, `bd close <id> --force --reason "..."` is correct.
+  Observed 2026-06-13 (hud-bq0gl.2: PR #765 merged out-of-order ahead of its
+  dep hud-bq0gl.1).
 
 ## Other quirks
 
 ### `bd edit` blocks agents
 `bd edit` opens `$EDITOR` interactively. Never run it from an agent; use
 `bd update <id> --title/--description/--notes/--design` instead.
+
+### `bd create --json` returns a plain object, not an array
+`bd create --json` emits a single object → extract the id with `jq -r '.id'`.
+By contrast `bd show --json` and `bd update --json` emit an ARRAY → use
+`jq -r '.[0].id'`. The defensive `jq -r '.id // .[0].id'` works for both;
+`.[0].id // .id` does NOT (it throws `Cannot index object with number` on the
+create object). Observed 2026-06-13, bd 1.0.4.
+
+### Epic→task linkage: `bd dep add` rejects it; use `--parent`
+- **Symptom**: wiring an epic to its child tasks with
+  `bd dep add <epic> <task>` fails: `Error: epics can only block other epics,
+  not tasks`.
+- **Cause**: epic membership is a parent-child relation, not a `blocks` edge.
+- **Fix**: `bd update <task> --parent <epic>` per child (the epic's `bd show`
+  then renders a CHILDREN tree with completion %). Reserve `bd dep add` (type
+  `blocks`, default) for genuine ordering between tasks.
+- Observed: 2026-06-17, bd 1.0.4.
 
 ### `bd doctor` unsupported in embedded mode
 `bd doctor` is server-mode only; in embedded repos it prints manual

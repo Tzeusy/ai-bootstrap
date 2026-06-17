@@ -62,3 +62,6 @@ skills/mattpocock-skills/
 
 # Beads issue tracker (Dolt-backed local DB; sync via Dolt, not git)
 .beads/
+
+# Transitory scratch artifacts (reviews, notes) — not canonical
+scratch/

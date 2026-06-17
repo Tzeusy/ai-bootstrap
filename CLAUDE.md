@@ -53,12 +53,21 @@ bd close <id>         # Complete work
 
 ## Beads Database Topology
 
-This repo has its **own** beads DB (prefix `aib-`) because bd discovery stops
-at the git-repo boundary — sessions here cannot see the parent
-`~/.dotfiles/.beads` (prefix `dotfiles-`). Use the `aib` DB for skill/agent
-work; address the parent's beads explicitly with `bd -C ~/.dotfiles <cmd>`.
-ID-prefix auto-routing across these embedded DBs does NOT work. Known bd
-errors and workarounds are cataloged in
+Beads now live on a **shared external Dolt sql-server** at `127.0.0.1:3307`,
+run independently of bd as `dolt sql-server --config ~/gt/.dolt-data/config.yaml`
+(data under `~/gt/.dolt-data`). Each repo maps to its own per-project database
+on that server: this repo → DB `aib` (prefix `aib-`), the parent
+`~/.dotfiles` → DB `dotfiles` (prefix `dotfiles-`). Connection details are
+recorded in each repo's `.beads/config.yaml` + `.beads/metadata.json`
+(`dolt_mode: server`, `--external`). Migrated from per-repo embedded Dolt on
+2026-06-17.
+
+`--external` means **bd does not start/stop the server** — if `bd` commands
+hang or error on connection, ensure the dolt sql-server on 3307 is running.
+Repo→DB selection is still per-`.beads/`, so a session here sees only `aib`;
+address the parent's beads explicitly with `bd -C ~/.dotfiles <cmd>`, and
+cross-prefix auto-routing still does NOT work. Known bd errors and workarounds
+are cataloged in
 `skills/personal/beads-orchestration/references/known-errors.md` — append new
 rough edges there after resolving them.
 
