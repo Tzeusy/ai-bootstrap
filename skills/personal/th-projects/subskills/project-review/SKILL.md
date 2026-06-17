@@ -6,8 +6,9 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - Claude Sonnet 4.6
   status: active
-  last_reviewed: "2026-06-13"
+  last_reviewed: "2026-06-17"
 ---
 
 # Project Review
@@ -107,6 +108,23 @@ Collect subagent reports. Read [`references/report-template.md`](references/repo
 
 7. Prepare `/project-direction` handoff packet: confirmed findings only · Phase 0 baseline packet · required doctrine/lore/spec updates before planning · sequencing constraints + dependency hints · deprioritized items with reasons · evidence index.
 
+### Phase 3.5 — Veracity Gate
+
+**Before delivering the report**, challenge every Critical/High/P0/P1 finding and the top roadmap items. Read [`references/review-veracity-gate.md`](references/review-veracity-gate.md) for the full procedure.
+
+For each claim:
+1. Re-open the named file/path directly.
+2. Search for contradictory evidence using exact terms from the claim.
+3. Verify referenced paths exist.
+4. Verify process claims against actual SKILL/docs/scripts/config.
+5. Classify: `[Confirmed]` · `[Overstated]` · `[Incorrect]` · `[Unverifiable]`.
+6. Delete or demote anything not `[Confirmed]`.
+7. Append invalidated claims to the Veracity Ledger (Appendix D in `report-template.md`); exclude them from the risk register and roadmap.
+
+**Special rule:** Formatting, line-length, and script-invocation claims require local-checkout evidence or GitHub-blob evidence. Raw/parser rendering alone is not sufficient — mark such claims `[Unverifiable]` unless you have blob-level proof.
+
+Any P0/P1 recommendation that survives must cite both supporting evidence **and** the contradictory evidence checked.
+
 ### Phase 4 — Deliver
 
 Output the report per `report-template.md`. Make the boundary explicit: `project-review` audits and classifies; `project-direction` decides sequencing, specs, and beads.
@@ -141,6 +159,7 @@ Output the report per `report-template.md`. Make the boundary explicit: `project
 | [`references/project-type-adaptations.md`](references/project-type-adaptations.md) | Phase 1-3 | Category weighting by project type, maturity expectations, hybrid handling |
 | [`references/spec-reconciliation.md`](references/spec-reconciliation.md) | Spec reconciliation mode | Bidirectional spec↔code inventory, coverage table, gap analysis, remediation |
 | [`references/third-party-review.md`](references/third-party-review.md) | Processing an external review/audit | Fact-check, context-filter, ROI tiers, planning-input prep, episodic-artifact handling |
+| [`references/review-veracity-gate.md`](references/review-veracity-gate.md) | Phase 3.5 | Full gate procedure: per-claim verification steps, classification rules, Veracity Ledger format, special evidence rules |
 | [`../../references/spec-format.md`](../../references/spec-format.md) | Writing/extending specs during reconciliation | OpenSpec file format: heading hierarchy, WHEN/THEN rules, naming (shared contract) |
 
 ## Scripts
