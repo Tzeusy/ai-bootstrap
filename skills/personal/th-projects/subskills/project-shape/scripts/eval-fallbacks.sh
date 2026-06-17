@@ -26,8 +26,8 @@ require_pattern() {
   pass_count=$((pass_count + 1))
 }
 
-require_pattern "$SKILL_FILE" 'Lite mode' "main skill documents lite mode"
-require_pattern "$SKILL_FILE" 'No-diagram mode' "main skill documents no-diagram mode"
+require_pattern "$SKILL_FILE" '\bLite\b' "main skill documents lite mode"
+require_pattern "$SKILL_FILE" 'No-diagram' "main skill documents no-diagram mode"
 require_pattern "$REVIEW_PROTOCOL" 'Fallback When Subagents Are Unavailable' "review protocol documents subagent fallback"
 require_pattern "$REVIEW_PROTOCOL" 'coherence pass|adversarial pass|user for validation' "review protocol describes explicit lite review steps"
 require_pattern "$OVERVIEW_GUIDE" 'Mermaid|prose fallback|skip diagrams' "overview guide documents diagram fallback"
