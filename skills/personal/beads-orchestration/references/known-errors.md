@@ -191,3 +191,36 @@ create object). Observed 2026-06-13, bd 1.0.4.
 `bd doctor` is server-mode only; in embedded repos it prints manual
 troubleshooting steps instead. Use `bd dolt status`, `bd version`, and
 `ls .beads/embeddeddolt/` for embedded diagnostics.
+
+### bd WRITE path silently reverts; jsonl auto-import clobbers committed state (post-3307-migration)
+- **Symptom**: `bd update`/`bd close`/`bd update --claim` print `✓ Updated`/
+  `✓ Closed` (exit 0) but the change does NOT persist — a later `bd show`/`bd
+  ready` shows the bead back at its prior state. Every `bd` call logs
+  `auto-importing N bytes from issues.jsonl into empty database`. Under
+  concurrent worker `bd` reads it is worse: even a direct
+  `mysql … UPDATE … ; CALL DOLT_COMMIT()` to the server gets reverted by the
+  next `bd` read.
+- **Diagnosis** (aib repo, 2026-06-17, bd 1.0.4): `bd dolt show`/`bd dolt test`
+  report the 3307 connection OK and `bd show` DOES read server state (write a
+  sentinel via mysql+`DOLT_COMMIT` → `bd show` sees it). But each `bd`
+  invocation auto-imports the working-tree `issues.jsonl` and commits it over
+  server `main`. When that jsonl is stale (auto-export had failed its `git add`
+  on the gitignored `.beads`, and/or the 60s `export.interval` throttle), the
+  import REVERTS recent mutations. So jsonl is the de-facto source of truth and
+  bd's own write→export→reimport cycle loses writes. `bd dolt show` reports
+  `Mode: per-project` (bd wants to run its OWN server from data-dir
+  `.beads/dolt`) while the external shared server already holds 3307 → split
+  brain.
+- **Reliable workaround** (kept a coordinator loop running across 11 closures):
+  treat `issues.jsonl` as the store. Mutate by editing it directly, then `bd
+  stats >/dev/null` once to propagate jsonl→server. READS (`bd ready`/`bd
+  show`) are fine. Avoid `bd create`/`bd dep` (need synthesized records); use
+  inline coordinator PR review instead of separate review beads. Also set `bd
+  config set export.git-add false` and `export.interval 0` so exports stop
+  aborting/throttling.
+- **Real fix (TODO, needs human)**: properly establish external-server mode so
+  bd stops auto-importing jsonl — re-init per the "Migrating … to the shared
+  external server" entry above (`bd init --server --external … --from-jsonl
+  --reinit-local`), then remove the orphaned `.beads/dolt` per-project data-dir
+  once `metadata.json` shows server mode. Until then, bd writes are unsafe.
+- Observed: 2026-06-17, bd 1.0.4.
