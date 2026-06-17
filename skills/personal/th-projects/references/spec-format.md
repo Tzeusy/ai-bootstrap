@@ -1,5 +1,24 @@
 # OpenSpec Spec File Format Reference
 
+## Scope of This File
+
+This file defines the **minimal shared syntax** for individual requirements and
+scenarios: heading hierarchy, WHEN/THEN/AND bullet format, naming conventions,
+density guidelines, and `[TARGET-STATE]` tags.
+
+It covers *what a single spec file looks like inside*, not how changesets are
+structured or how specs evolve. Specifically, it does **not** define:
+
+- **Changeset scaffolding** — use the `openspec` CLI (`openspec new change
+  "<name>"`) to create `openspec/changes/` structure; do not hand-write it.
+  See
+  [`../subskills/project-direction/references/openspec-changeset.md`](../subskills/project-direction/references/openspec-changeset.md)
+  for the full changeset authoring loop.
+- **Spec lifecycle and traceability** — the explore → new → continue → apply →
+  verify → sync → archive lifecycle, scope tags (`v1-mandatory`, `v1-reserved`,
+  `post-v1`), RFC traceability, and divergence resolution patterns live in
+  [`../subskills/project-shape/references/pillar-spec-and-spine.md`](../subskills/project-shape/references/pillar-spec-and-spine.md).
+
 ## File Location
 `openspec/specs/{spec-name}/spec.md`
 
