@@ -24,7 +24,20 @@ def main():
     parser = argparse.ArgumentParser(description="Prepare a PR head branch for reviewer work.")
     parser.add_argument("--base-branch", required=True)
     parser.add_argument("--head-branch", required=True)
+    parser.add_argument("--dry-run", action="store_true", help="Print what would be done without performing any git mutations.")
     args = parser.parse_args()
+
+    if args.dry_run:
+        output = {
+            "ok": True,
+            "status": "dry-run",
+            "base_branch": args.base_branch,
+            "head_branch": args.head_branch,
+            "note": "no git mutations performed",
+        }
+        json.dump(output, sys.stdout, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
+        return
 
     try:
         run(["git", "fetch", "origin", args.base_branch, args.head_branch])
