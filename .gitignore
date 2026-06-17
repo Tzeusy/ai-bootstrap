@@ -42,6 +42,7 @@
 .gemini/state.json
 .gemini/trustedFolders.json
 .gemini/history/
+.gemini/settings.local.json
 
 # === GitHub ===
 .github/skills

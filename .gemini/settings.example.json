@@ -1,0 +1,41 @@
+{
+  "_comment": "Local-only overrides. Copy relevant fields to settings.local.json (gitignored). Do NOT commit settings.local.json.",
+  "checkpointing": {
+    "enabled": true
+  },
+  "enablePromptCompletion": false,
+  "general": {
+    "previewFeatures": true,
+    "sessionRetention": {
+      "enabled": true
+    }
+  },
+  "hasSeenIdeIntegrationNudge": true,
+  "hideBanner": true,
+  "hideTips": true,
+  "ide": {
+    "enabled": true
+  },
+  "preferredEditor": "vim",
+  "security": {
+    "auth": {
+      "selectedType": "oauth-personal"
+    }
+  },
+  "selectedAuthType": "oauth-personal",
+  "telemetry": {
+    "enabled": true,
+    "target": "local",
+    "otlpEndpoint": "http://otel.YOUR_TAILNET_HOST:4317",
+    "otlpProtocol": "http",
+    "useCollector": true,
+    "logPrompts": false,
+    "useCliAuth": false
+  },
+  "theme": "Default",
+  "ui": {
+    "showStatusInTitle": true,
+    "showModelInfoInChat": true
+  },
+  "vimMode": true
+}
