@@ -1,0 +1,123 @@
+---
+name: design-bar
+description: >
+  Use when designing or reviewing anything with a user surface and you need the
+  canonical design quality bar — default UX biases, the UX walkthrough ritual,
+  and the definition of done — or when resolving conflicts between design
+  subdomain findings.
+metadata:
+  owner: tze
+  authors:
+    - tze
+    - Claude Fable 5
+  status: active
+  last_reviewed: "2026-07-03"
+---
+
+# Design Bar
+
+Canonical default quality bar for user-facing work. The goal is **seamless
+UX**: the interface moves as fast as the user's thought and never makes them
+hunt, wait, or re-read. Everything here is a reviewable expectation: a reviewer
+can reject a design or change for violating it. A project's own design system
+overrides individual biases where present; when a bias is not overridden, it
+applies.
+
+## Use This Skill When
+
+- Designing any feature with a user surface — web UI, TUI, CLI, config file,
+  API ergonomics, error message — and deciding what "good" requires
+- Reviewing a design, mockup, or implemented UI holistically before shipping
+- Resolving a conflict between subdomain findings (e.g. density vs.
+  accessibility) — biases set the tiebreak
+
+Example trigger phrasings: "hold this to the design bar", "walk through the
+UX", "is this UX done", "design this feature", "review this flow".
+
+## Do Not Use This Skill For
+
+- Deep work in one subdomain — route to the sibling subskill
+  ([information-design](../information-design/SKILL.md),
+  [visual-language](../visual-language/SKILL.md),
+  [interaction-speed](../interaction-speed/SKILL.md),
+  [discoverability](../discoverability/SKILL.md),
+  [accessibility](../accessibility/SKILL.md))
+- Implementation code quality — `/th-engineering`
+
+## Default Design Biases
+
+Unless a project's design system explicitly overrides them, these apply:
+
+1. **Seamless UX is the goal** — Any point where the user waits on the
+   interface, hunts for a feature, re-reads to understand, or repeats an
+   action to make it stick is a defect, not a nicety.
+2. **Walk the UX of everything** — No user-facing change ships without the
+   walkthrough below. "It's just a config option" is not an exemption; config
+   options have users too.
+3. **Density where logical, never for its own sake — in either direction** —
+   Don't dilute information to look minimal; don't cram to look powerful.
+   Calibrate to the user's mode.
+   ([information-design](../information-design/SKILL.md) operationalizes.)
+4. **Accessible by default** — Keyboard-operable, contrast-safe,
+   screen-reader-sane from the first draft. Retrofitted accessibility is a
+   defect. ([accessibility](../accessibility/SKILL.md) operationalizes.)
+5. **Consistency over novelty** — Color is welcome; each color, pattern, and
+   control carries one meaning everywhere. Novel presentation needs a reason.
+   ([visual-language](../visual-language/SKILL.md) operationalizes.)
+6. **Motion must earn its keep** — Animation only when it communicates state;
+   decorative animation is a defect.
+   ([visual-language](../visual-language/SKILL.md) operationalizes.)
+7. **Discoverable power** — Features are findable in the product itself, and
+   frequent actions grow shortcut paths (command palettes, keybindings).
+   ([discoverability](../discoverability/SKILL.md) operationalizes.)
+8. **Fast beats fancy** — Perceived latency is a design property, not an
+   implementation detail. Preload, cache, render optimistically.
+   ([interaction-speed](../interaction-speed/SKILL.md) operationalizes.)
+
+## The UX Walkthrough
+
+Simulate the user before shipping. Answer each question with evidence from the
+actual flow, not intention:
+
+- **Entry** — How does the user reach this? How many clicks/keystrokes from
+  intent to done? Every step must justify itself.
+- **First glance** — What do they see first? Is it the thing they came for?
+- **Pace** — Where do they wait? Is every wait acknowledged within ~100ms and
+  does the UI stay usable during it? Does the interface keep up with a user
+  who already knows what they want?
+- **Repetition** — Will they click this control more than once? Is a repeat
+  click safe (idempotent), and if they *needed* to repeat it, what feedback
+  failed?
+- **Recovery** — What happens on error or mis-click? Is undo available (and
+  preferred over confirm dialogs)? Does the error say what to do next?
+- **Habit** — After the tenth use, what will annoy them? That annoyance is the
+  shortcut or default to build now.
+
+A "no" or "don't know" on any question is an open finding, not a note.
+
+## Definition of Done
+
+A user-facing change is complete when all of these hold:
+
+- **Walkthrough passed** — every walkthrough question answered from the real
+  flow, findings fixed (bias 2).
+- **No dead waits** — every operation >100ms acknowledges immediately; nothing
+  blocks input without cause (bias 8).
+- **Repeat-safe** — no control double-fires; destructive actions are undoable
+  or explicitly confirmed (bias 1).
+- **Findable** — the feature is reachable from the UI without docs; frequent
+  paths have a keyboard/palette route (bias 7).
+- **Accessible** — keyboard path, visible focus, AA contrast verified
+  (bias 4).
+- **Consistent** — reuses the project's existing colors, spacing, controls,
+  and vocabulary; deviations are deliberate and documented (bias 5).
+
+## Applying the Bar in Review
+
+- Cite the bias or done-criterion a finding violates, with evidence (screen,
+  component, file:line, or walkthrough step).
+- Severity = friction × frequency: a 300ms stall on a hot path outranks a
+  color inconsistency on a settings page.
+- When two biases tension (e.g. density vs. accessibility), prefer the one
+  protecting the user's flow and ability to act; say which you chose and why.
+- Small in-scope violations get fixed, not filed.

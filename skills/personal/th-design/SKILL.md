@@ -1,0 +1,102 @@
+---
+name: th-design
+description: >
+  Use for UI/UX design work on anything with a user surface — web UI, TUI, CLI
+  ergonomics, dashboards, editors, internal tools — holding a design, mockup, or
+  implementation to the owner's design bar: seamless snappy UX, accessible and
+  consistent visuals, calibrated information density, discoverable features with
+  shortcut surfaces (command palettes, launchers), perceived-performance
+  engineering (preloading, optimistic rendering), and motion restraint. Route to
+  exactly one subskill per subdomain; fan out subagents when a task spans
+  several. Triggers: "design this UI", "hold this to the design bar", "walk
+  through the UX", "is this too dense", "too sparse", "review this UX", "make
+  this feel faster", "why does this feel sluggish", "add a command palette",
+  "audit accessibility", "is this animation necessary", "pick colors for this".
+metadata:
+  owner: tze
+  authors:
+    - tze
+    - Claude Fable 5
+  status: active
+  last_reviewed: "2026-07-03"
+---
+
+# TH Design
+
+Superskill router for the owner's design bar. Six subskills live under
+`subskills/`, each a complete skill package. **Not** in the global catalog —
+discover lazily, load **at most one** subskill body per subdomain, prefer one
+subagent per subskill when a task spans several (see "Subagent dispatch").
+
+The thesis: **seamless UX**. The interface moves as fast as the user's thought,
+shows what matters without dilution, and never makes them hunt, wait, or
+re-read. This bar applies to *anything* a human uses — a button, a CLI flag, a
+config file, an error message — not just web frontends.
+
+`/th-engineering` governs how the code is built; this superskill governs how
+the product feels. Generic craft skills (`/impeccable`, `/frontend-design`,
+`/dataviz`) may execute the build or polish; when they conflict with this bar,
+this bar wins.
+
+## Discover subskills
+
+```bash
+PKG="$(dirname "<absolute-path-to-this-SKILL.md>")"
+find "$PKG/subskills" -maxdepth 2 -name SKILL.md
+rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
+```
+
+## Routing table
+
+| Task intent | Subskill | Typical trigger |
+|---|---|---|
+| Holistic design bar: default biases, the UX walkthrough ritual, definition of done for any user-facing change. | [subskills/design-bar/SKILL.md](subskills/design-bar/SKILL.md) | "hold this to the design bar", "walk through the UX", "is this UX done" |
+| Information density, hierarchy, succinct copy, layout organization: what a screen says and in what order. | [subskills/information-design/SKILL.md](subskills/information-design/SKILL.md) | "is this too dense/sparse", "organize this screen", "tighten this copy" |
+| Color semantics, visual consistency, typography/spacing scales, motion restraint. | [subskills/visual-language/SKILL.md](subskills/visual-language/SKILL.md) | "pick colors", "is this consistent", "is this animation necessary" |
+| Perceived performance: latency budgets, preloading, caching, optimistic rendering, idempotent controls. | [subskills/interaction-speed/SKILL.md](subskills/interaction-speed/SKILL.md) | "make this feel faster", "feels sluggish", "users double-click this" |
+| Feature discoverability and shortcut surfaces: command palettes, keyboard paths, contextual controls, empty states that teach. | [subskills/discoverability/SKILL.md](subskills/discoverability/SKILL.md) | "add a command palette", "nobody finds this feature", "keyboard-first" |
+| Accessibility: keyboard operability, focus, contrast, semantics, reduced motion. | [subskills/accessibility/SKILL.md](subskills/accessibility/SKILL.md) | "audit accessibility", "contrast check", "screen reader support" |
+
+## Routing rules
+
+- **Bar vs. subdomain**: holistic "is this good/designed right" → design-bar;
+  an ask naming one subdomain → that subskill directly.
+- **Feel vs. build**: how the product should behave and look → here. Code
+  quality of the implementation → `/th-engineering`. Chart/data-graphic
+  specifics → `/dataviz`, under this bar's biases.
+- **Doctrine vs. execution**: `/impeccable` and `/frontend-design` are
+  execution craft; load them to produce or polish, load this package to decide
+  what "good" means. On conflict, design-bar's biases win.
+- **Speed symptoms vs. perf bugs**: "feels slow" as a UX property →
+  interaction-speed; an actual regression to diagnose → `/th-engineering`
+  diagnosis.
+- **Fallback**: design-adjacent but no row fits → answer from router-level
+  context or ask; don't load a subskill to browse.
+
+## Subagent dispatch
+
+Subskills are independent subdomains; multi-subdomain work parallelizes:
+
+- **Design review sweep**: one subagent per relevant subskill. Each prompt
+  carries (1) the absolute path to its `subskills/<name>/SKILL.md` with
+  instruction to read and apply it, (2) exact scope (screens, components,
+  files, flows), (3) the output contract: findings with evidence
+  (screen/component/file:line) and a proposed fix. Parent synthesizes and
+  dedupes; conflicts resolve via design-bar's biases.
+- **Iteration-heavy single subdomains** (palette tuning, palette-component
+  build, density pass on one dashboard): delegate the whole loop, review the
+  returned artifact.
+- **One narrow question**: load the single subskill, answer directly.
+
+## Shared invariants (all subskills)
+
+- Design claims are reviewable expectations, not taste: every finding cites
+  evidence (screen, component, file:line, or interaction step) and the
+  expectation it violates.
+- design-bar's default biases are the baseline all subskills assume; a
+  project's own design system or style guide overrides them where present —
+  but absence of a design system never lowers the bar.
+- Fix-it-now beats file-it-away: small in-scope findings get fixed, not
+  ticketed.
+- Subskills reference each other by relative path (`../design-bar/…`); those
+  paths are package-internal and stable.
