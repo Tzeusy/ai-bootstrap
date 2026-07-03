@@ -285,11 +285,12 @@ class EvaluateMergeReadinessTests(unittest.TestCase):
 class ResolveReviewContextTests(unittest.TestCase):
     def _make_bins(self, bin_dir: FakeBinDir, *,
                    description: str = "Original implementation bead: aib-abc\nhttps://github.com/owner/repo/pull/99",
-                   bd_list: list | None = None) -> None:
+                   bd_list: list | None = None,
+                   review_dependencies: list | None = None) -> None:
         review_json = json.dumps([{
             "id": "aib-xyz",
             "description": description,
-            "dependencies": [],
+            "dependencies": review_dependencies or [],
         }])
         bd_list_json = json.dumps(bd_list or [])
         pr_json = json.dumps({
@@ -390,6 +391,44 @@ sys.exit(1)
         self.assertNotEqual(result.returncode, 0)
         payload = json.loads(result.stderr)
         self.assertIn("missing", payload["error_code"])
+
+    def test_resolves_from_review_bead_dependency(self) -> None:
+        # Coordinator-style linkage: no description marker; the review bead's
+        # own dependency points AT the original implementation bead.
+        with FakeBinDir() as fbd:
+            self._make_bins(
+                fbd,
+                description="Review PR (no marker)\nhttps://github.com/owner/repo/pull/99",
+                review_dependencies=[{"depends_on_id": "aib-abc", "type": "blocks"}],
+            )
+            result = run_script("resolve_review_context.py",
+                                ["--issue-id", "aib-xyz"],
+                                env=fbd.env())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["original_id"], "aib-abc")
+        self.assertEqual(payload["pr_number"], 99)
+
+    def test_review_dep_excludes_parent_and_prefers_gh_pr(self) -> None:
+        # Parent-child (epic) edges are excluded; among the rest the target
+        # carrying a gh-pr external_ref (aib-abc) wins over a gate bead
+        # (aib-gate, no gh-pr) so the gate does not masquerade as the original.
+        with FakeBinDir() as fbd:
+            self._make_bins(
+                fbd,
+                description="Review PR (no marker)\nhttps://github.com/owner/repo/pull/99",
+                review_dependencies=[
+                    {"depends_on_id": "aib-epic", "type": "parent-child"},
+                    {"depends_on_id": "aib-gate", "type": "blocks"},
+                    {"depends_on_id": "aib-abc", "type": "blocks"},
+                ],
+            )
+            result = run_script("resolve_review_context.py",
+                                ["--issue-id", "aib-xyz"],
+                                env=fbd.env())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["original_id"], "aib-abc")
 
 
 # ---------------------------------------------------------------------------
