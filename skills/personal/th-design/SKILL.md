@@ -40,26 +40,15 @@ the product feels. Generic craft skills (`/impeccable`, `/frontend-design`,
 `/dataviz`) may execute the build or polish; when they conflict with this bar,
 this bar wins.
 
-## Discover subskills
-
-```bash
-PKG="$(dirname "<absolute-path-to-this-SKILL.md>")"
-find "$PKG/subskills" -maxdepth 2 -name SKILL.md
-rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
-```
-
-Resolve `PKG` from the base directory your skill loader reported when it
-loaded this file; never assume the current working directory is the package.
-
 ## Routing table
 
 | Task intent | Subskill | Typical trigger |
 |---|---|---|
 | Holistic design bar: default biases, the UX walkthrough ritual, definition of done for any user-facing change. | [subskills/design-bar/SKILL.md](subskills/design-bar/SKILL.md) | "hold this to the design bar", "walk through the UX", "is this UX done" |
-| Information density, hierarchy, succinct copy, layout organization: what a screen says and in what order. | [subskills/information-design/SKILL.md](subskills/information-design/SKILL.md) | "is this too dense/sparse", "organize this screen", "tighten this copy" |
+| Information density, hierarchy, succinct copy, layout organization, forms and validation timing: what a surface says and in what order. | [subskills/information-design/SKILL.md](subskills/information-design/SKILL.md) | "is this too dense/sparse", "organize this screen", "tighten this copy" |
 | Color semantics, visual consistency, typography/spacing scales, motion restraint. | [subskills/visual-language/SKILL.md](subskills/visual-language/SKILL.md) | "pick colors", "is this consistent", "is this animation necessary" |
-| Perceived performance: latency budgets, preloading, caching, optimistic rendering, idempotent controls. | [subskills/interaction-speed/SKILL.md](subskills/interaction-speed/SKILL.md) | "make this feel faster", "feels sluggish", "users double-click this" |
-| Feature discoverability and shortcut surfaces: command palettes, keyboard paths, contextual controls, empty states that teach. | [subskills/discoverability/SKILL.md](subskills/discoverability/SKILL.md) | "add a command palette", "nobody finds this feature", "keyboard-first" |
+| Perceived performance: latency budgets, preloading, caching, optimistic rendering, idempotent controls, interruption and toast policy. | [subskills/interaction-speed/SKILL.md](subskills/interaction-speed/SKILL.md) | "make this feel faster", "feels sluggish", "users double-click this" |
+| Feature discoverability and shortcut surfaces: command palettes, keyboard paths, CLI help/completions, contextual controls, empty states that teach. | [subskills/discoverability/SKILL.md](subskills/discoverability/SKILL.md) | "add a command palette", "nobody finds this feature", "keyboard-first" |
 | Accessibility: keyboard operability, focus, contrast, semantics, reduced motion. | [subskills/accessibility/SKILL.md](subskills/accessibility/SKILL.md) | "audit accessibility", "contrast check", "screen reader support" |
 
 ## Routing rules
@@ -79,6 +68,21 @@ loaded this file; never assume the current working directory is the package.
   unknown.
 - **Fallback**: design-adjacent but no row fits → answer from router-level
   context or ask; don't load a subskill to browse.
+
+## Discover subskills
+
+The routing table above is the primary index — route from it directly. Run
+this only when the table seems stale or you need to verify subskill
+frontmatter:
+
+```bash
+PKG="$(dirname "<absolute-path-to-this-SKILL.md>")"
+find "$PKG/subskills" -maxdepth 2 -name SKILL.md
+rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
+```
+
+Resolve `PKG` from the base directory your skill loader reported when it
+loaded this file; never assume the current working directory is the package.
 
 ## Subagent dispatch
 
