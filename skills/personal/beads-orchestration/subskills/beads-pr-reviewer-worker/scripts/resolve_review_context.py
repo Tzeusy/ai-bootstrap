@@ -70,6 +70,43 @@ def main():
             fail("ambiguous-original-id", "multiple original bead ids found in review-bead description", candidates=extracted_ids)
 
         original_id = extracted_ids[0] if extracted_ids else ""
+
+        # Fallback A (forward direction): coordinator-style linkage where the
+        # REVIEW bead's own dependencies point AT the original implementation
+        # bead (review --depends-on/blocks--> original) and the description
+        # carries no marker. Follow those edges. Parent-child edges (epic
+        # membership) are excluded; when several edges remain, prefer the target
+        # that carries a gh-pr external_ref (the bead under review) so gate /
+        # blocker dependencies do not masquerade as the original.
+        if not original_id:
+            review_deps = review.get("dependencies") or []
+            dep_targets = sorted({
+                dep.get("depends_on_id")
+                for dep in review_deps
+                if dep.get("depends_on_id")
+                and dep.get("depends_on_id") != args.issue_id
+                and dep.get("type") != "parent-child"
+            })
+            if dep_targets:
+                pr_bearing = []
+                for target in dep_targets:
+                    try:
+                        target_bead = first_record(run_json(["bd", "show", target, "--json"]))
+                    except RuntimeError:
+                        continue
+                    if re.fullmatch(r"gh-pr:[0-9]+", target_bead.get("external_ref") or ""):
+                        pr_bearing.append(target)
+                chosen = sorted(set(pr_bearing)) or dep_targets
+                if len(chosen) > 1:
+                    fail(
+                        "ambiguous-original-id",
+                        "multiple candidate original beads reachable via review-bead dependencies",
+                        candidates=chosen,
+                    )
+                original_id = chosen[0]
+
+        # Fallback B (reverse direction): another pr-review bead declares a
+        # dependency pointing back AT this review bead.
         fallback_matches = []
         if not original_id:
             candidates = run_json(["bd", "list", "--label", "pr-review", "--json", "--limit", "0"])
