@@ -71,8 +71,10 @@ Unless a project's design system explicitly overrides them, these apply:
    frequent actions grow shortcut paths (command palettes, keybindings).
    ([discoverability](../discoverability/SKILL.md) operationalizes.)
 8. **Fast beats fancy** — Perceived latency is a design property, not an
-   implementation detail. Preload, cache, render optimistically.
-   ([interaction-speed](../interaction-speed/SKILL.md) operationalizes.)
+   implementation detail. Preload, cache, and render optimistically where
+   effects are reversible.
+   ([interaction-speed](../interaction-speed/SKILL.md) operationalizes,
+   including where optimism is forbidden.)
 
 ## The UX Walkthrough
 
@@ -88,8 +90,13 @@ actual flow, not intention:
 - **Repetition** — Will they click this control more than once? Is a repeat
   click safe (idempotent), and if they *needed* to repeat it, what feedback
   failed?
-- **Recovery** — What happens on error or mis-click? Is undo available (and
-  preferred over confirm dialogs)? Does the error say what to do next?
+- **Defaults** — What must the user specify that the product could have
+  known, remembered, or inferred from context? Every pre-fillable field is
+  pre-filled; every repeated choice is remembered.
+- **Recovery** — What happens on error or mis-click? Prefer undo over
+  confirm dialogs where the action is actually reversible; require explicit
+  confirmation where it is not — never replace a confirm with an undo that
+  can't undo. Does the error say what to do next?
 - **Habit** — After the tenth use, what will annoy them? That annoyance is the
   shortcut or default to build now.
 
@@ -105,8 +112,9 @@ A user-facing change is complete when all of these hold:
   blocks input without cause (bias 8).
 - **Repeat-safe** — no control double-fires; destructive actions are undoable
   or explicitly confirmed (bias 1).
-- **Findable** — the feature is reachable from the UI without docs; frequent
-  paths have a keyboard/palette route (bias 7).
+- **Findable** — the feature is reachable from the product surface (UI,
+  `--help`, completion) without external docs; frequent paths have a
+  keyboard/palette route (bias 7).
 - **Accessible** — keyboard path, visible focus, AA contrast verified
   (bias 4).
 - **Consistent** — reuses the project's existing colors, spacing, controls,
@@ -115,7 +123,9 @@ A user-facing change is complete when all of these hold:
 ## Applying the Bar in Review
 
 - Cite the bias or done-criterion a finding violates, with evidence (screen,
-  component, file:line, or walkthrough step).
+  component, file:line, spec section, or walkthrough step). Specs and
+  mockups are reviewable exactly like built UI: apply the same expectations
+  to the described behavior.
 - Severity = friction × frequency: a 300ms stall on a hot path outranks a
   color inconsistency on a settings page.
 - When two biases tension (e.g. density vs. accessibility), prefer the one

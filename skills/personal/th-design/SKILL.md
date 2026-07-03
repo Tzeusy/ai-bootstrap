@@ -2,16 +2,18 @@
 name: th-design
 description: >
   Use for UI/UX design work on anything with a user surface — web UI, TUI, CLI
-  ergonomics, dashboards, editors, internal tools — holding a design, mockup, or
-  implementation to the owner's design bar: seamless snappy UX, accessible and
-  consistent visuals, calibrated information density, discoverable features with
-  shortcut surfaces (command palettes, launchers), perceived-performance
-  engineering (preloading, optimistic rendering), and motion restraint. Route to
-  exactly one subskill per subdomain; fan out subagents when a task spans
-  several. Triggers: "design this UI", "hold this to the design bar", "walk
-  through the UX", "is this too dense", "too sparse", "review this UX", "make
-  this feel faster", "why does this feel sluggish", "add a command palette",
-  "audit accessibility", "is this animation necessary", "pick colors for this".
+  ergonomics, dashboards, editors, internal tools — holding a design, spec,
+  mockup, or implementation to the owner's design bar: seamless snappy UX,
+  accessible and consistent visuals, calibrated information density,
+  discoverable features with shortcut surfaces (command palettes, launchers),
+  perceived-performance engineering (preloading, optimistic rendering), and
+  motion restraint. This skill decides what "good" means and drives design
+  review; generic build/polish skills (impeccable, frontend-design) and chart
+  construction (dataviz) execute under this bar. Triggers: "design this UI",
+  "hold this to the design bar", "walk through the UX", "is this too dense",
+  "too sparse", "review this UX", "make this feel faster", "why does this feel
+  sluggish", "add a command palette", "audit accessibility", "is this
+  animation necessary", "pick colors for this UI".
 metadata:
   owner: tze
   authors:
@@ -25,8 +27,8 @@ metadata:
 
 Superskill router for the owner's design bar. Six subskills live under
 `subskills/`, each a complete skill package. **Not** in the global catalog —
-discover lazily, load **at most one** subskill body per subdomain, prefer one
-subagent per subskill when a task spans several (see "Subagent dispatch").
+discover lazily, load **at most one** subskill body per subdomain, and fan
+out subagents only when scope warrants (see "Subagent dispatch").
 
 The thesis: **seamless UX**. The interface moves as fast as the user's thought,
 shows what matters without dilution, and never makes them hunt, wait, or
@@ -46,6 +48,9 @@ find "$PKG/subskills" -maxdepth 2 -name SKILL.md
 rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 ```
 
+Resolve `PKG` from the base directory your skill loader reported when it
+loaded this file; never assume the current working directory is the package.
+
 ## Routing table
 
 | Task intent | Subskill | Typical trigger |
@@ -62,41 +67,46 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 - **Bar vs. subdomain**: holistic "is this good/designed right" → design-bar;
   an ask naming one subdomain → that subskill directly.
 - **Feel vs. build**: how the product should behave and look → here. Code
-  quality of the implementation → `/th-engineering`. Chart/data-graphic
-  specifics → `/dataviz`, under this bar's biases.
+  quality of the implementation → `/th-engineering`. Chart palette and mark
+  *construction* → `/dataviz`, under this bar's biases; a chart hue that
+  contradicts the app's color semantics is a visual-language finding.
 - **Doctrine vs. execution**: `/impeccable` and `/frontend-design` are
   execution craft; load them to produce or polish, load this package to decide
   what "good" means. On conflict, design-bar's biases win.
-- **Speed symptoms vs. perf bugs**: "feels slow" as a UX property →
-  interaction-speed; an actual regression to diagnose → `/th-engineering`
-  diagnosis.
+- **Speed symptoms vs. perf bugs**: "feels slow/janky" → interaction-speed
+  first; it sets the behavioral bar. Escalate to `/th-engineering` diagnosis
+  only once a previously met bar has demonstrably regressed and the cause is
+  unknown.
 - **Fallback**: design-adjacent but no row fits → answer from router-level
   context or ask; don't load a subskill to browse.
 
 ## Subagent dispatch
 
-Subskills are independent subdomains; multi-subdomain work parallelizes:
+Subskills are independent subdomains; multi-subdomain work parallelizes —
+but scale dispatch to scope:
 
-- **Design review sweep**: one subagent per relevant subskill. Each prompt
+- **Small scope, several subdomains** (one screen, one flow, one CLI): run
+  design-bar's walkthrough inline and consult subdomain expectations
+  directly; no fan-out.
+- **Design review sweep** (multi-screen/multi-flow scope AND ≥3 subdomains):
+  one subagent per relevant subskill. Each prompt
   carries (1) the absolute path to its `subskills/<name>/SKILL.md` with
   instruction to read and apply it, (2) exact scope (screens, components,
   files, flows), (3) the output contract: findings with evidence
   (screen/component/file:line) and a proposed fix. Parent synthesizes and
   dedupes; conflicts resolve via design-bar's biases.
-- **Iteration-heavy single subdomains** (palette tuning, palette-component
-  build, density pass on one dashboard): delegate the whole loop, review the
-  returned artifact.
+- **Iteration-heavy single subdomains** (color-palette tuning,
+  command-palette build, density pass on one dashboard): delegate the whole
+  loop, review the returned artifact.
 - **One narrow question**: load the single subskill, answer directly.
 
 ## Shared invariants (all subskills)
 
-- Design claims are reviewable expectations, not taste: every finding cites
-  evidence (screen, component, file:line, or interaction step) and the
-  expectation it violates.
-- design-bar's default biases are the baseline all subskills assume; a
-  project's own design system or style guide overrides them where present —
-  but absence of a design system never lowers the bar.
-- Fix-it-now beats file-it-away: small in-scope findings get fixed, not
-  ticketed.
+- [subskills/design-bar/SKILL.md](subskills/design-bar/SKILL.md) owns the
+  baseline every subskill assumes — the default biases, evidence-cited
+  findings, severity rule, and fix-it-now policy. A project's own design
+  system overrides individual biases where present; absence of one never
+  lowers the bar.
+- Expectations apply to specs and mockups as much as built UI.
 - Subskills reference each other by relative path (`../design-bar/…`); those
   paths are package-internal and stable.

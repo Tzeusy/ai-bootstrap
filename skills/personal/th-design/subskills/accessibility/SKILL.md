@@ -17,7 +17,7 @@ metadata:
 # Accessibility
 
 Accessible by default: designed in from the first draft, verified before
-ship. The bar is WCAG 2.1 AA as a floor, applied with judgment — a retrofitted
+ship. The bar is WCAG 2.2 AA as a floor, applied with judgment — a retrofitted
 accessibility pass is itself a finding against the process.
 
 ## Use This Skill When
@@ -79,12 +79,15 @@ compliant".
 
 ### Ergonomic floor
 
-- Hit targets ≥ ~40px on touch surfaces; generous click areas everywhere
-  (whole row, not just the 12px icon).
+- Hit targets ≥ 44×44 CSS px (Apple HIG) / 48dp (Material) on touch; WCAG
+  2.2 AA (2.5.8) sets the hard minimum at 24×24. Generous click areas
+  everywhere (whole row, not just the 12px icon).
 - `prefers-reduced-motion` (or platform equivalent) honored: animations
-  reduce to instant state changes.
-- Zoom to 200% without loss of content or function; no horizontal scroll for
-  body text.
+  reduce to instant state changes. This skill owns the rule;
+  [visual-language](../visual-language/SKILL.md) defers here.
+- Text resizes to 200% without loss of content or function (1.4.4); content
+  reflows without horizontal scrolling down to a 320px viewport / 400% zoom
+  (1.4.10).
 
 ## Review Method
 
@@ -97,6 +100,9 @@ compliant".
    cite file:line.
 4. Screen-reader pass on the primary flow (or static-analysis equivalent when
    a reader isn't available): names, roles, announcements present.
+
+No built UI yet? Apply the same expectations to the spec's described
+behavior; evidence cites the spec section or screen region.
 
 Severity follows blast radius: an unlabeled primary action outranks a
 low-contrast footnote. Fix in scope now, per

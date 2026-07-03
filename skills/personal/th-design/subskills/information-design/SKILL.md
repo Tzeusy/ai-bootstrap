@@ -3,8 +3,9 @@ name: information-design
 description: >
   Use when deciding what a screen, page, dashboard, table, or output says and in
   what order — calibrating information density, establishing visual hierarchy,
-  tightening copy and labels, or organizing layout — including judging whether a
-  surface is too dense or too sparse.
+  tightening copy and labels, organizing layout, or laying out forms and their
+  validation timing — including judging whether a surface is too dense or too
+  sparse.
 metadata:
   owner: tze
   authors:
@@ -33,7 +34,9 @@ Example trigger phrasings: "is this too dense", "this feels cluttered",
 ## Do Not Use This Skill For
 
 - Color, spacing scales, or motion — [visual-language](../visual-language/SKILL.md)
-- Whether users can *find* a feature — [discoverability](../discoverability/SKILL.md)
+- Whether users can *find* a feature, or whether an empty state routes them
+  to the action that fills it — [discoverability](../discoverability/SKILL.md)
+  (this skill owns the empty state's *copy*)
 - Chart and data-graphic construction — `/dataviz` (this bar still governs
   density and hierarchy choices there)
 
@@ -70,11 +73,27 @@ Example trigger phrasings: "is this too dense", "this feels cluttered",
   no restating what the UI already shows.
 - Microcopy states the action, not the category: "Save draft", not "Submit";
   "Delete 3 files", not "Confirm".
+- One name per concept: the same entity or action carries the same word
+  everywhere — UI, palette entries, errors, docs. Synonym drift ("remove" /
+  "delete" / "discard" for one operation) is a defect.
 - Error text says what happened and what to do next, in that order.
 - Numbers formatted for scanning: aligned decimals, thousands separators,
   units on the column header not every cell.
 
-### Form
+### Forms and validation
+
+- Validate on blur or submit, never per keystroke: don't red-flag a field the
+  user is still typing in. Live-as-you-type feedback is for positive
+  confirmation (name available, password strong enough), not for
+  errors-in-progress.
+- Errors sit inline at the offending field; any summary links to them.
+- Failure never destroys input: the form re-renders with every entered value
+  intact ([interaction-speed](../interaction-speed/SKILL.md) owns state
+  preservation).
+- Ask only what can't be defaulted, remembered, or inferred (design-bar's
+  Defaults question); every optional field justifies its presence.
+
+### Presentation
 
 - Tables for comparison across items; lists for scanning one attribute; prose
   for narrative only. Never prose where a table fits.
@@ -91,6 +110,9 @@ Example trigger phrasings: "is this too dense", "this feels cluttered",
 3. Read every string aloud; cut words until meaning would break.
 4. For each hidden-by-default detail, ask: how often is it checked? Daily →
    surface it.
+
+No built UI yet? Apply the same expectations to the spec's described
+behavior; evidence cites the spec section or screen region.
 
 Findings cite the element and the expectation violated; severity follows the
 design-bar rule (friction × frequency —
