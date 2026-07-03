@@ -110,7 +110,11 @@ but scale dispatch to scope:
   baseline every subskill assumes — the default biases, evidence-cited
   findings, severity rule, and fix-it-now policy. A project's own design
   system overrides individual biases where present; absence of one never
-  lowers the bar.
+  lowers the bar. Design-bar also owns the locate step: find the project's
+  design system (design-language specs, doctrine docs, token files) before
+  reviewing, and cite it over generic biases. Some projects keep the design
+  language as a normative spec (e.g. `openspec/specs/*design-language*/`) —
+  changes to the language then go through the spec workflow, not ad-hoc edits.
 - Expectations apply to specs and mockups as much as built UI.
 - Subskills reference each other by relative path (`../design-bar/…`); those
   paths are package-internal and stable.

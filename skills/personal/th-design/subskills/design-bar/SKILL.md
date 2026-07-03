@@ -44,6 +44,28 @@ UX", "is this UX done", "design this feature", "review this flow".
   [accessibility](../accessibility/SKILL.md))
 - Implementation code quality — `/th-engineering`
 
+## Locate the Project Design System First
+
+Before applying the default biases, spend one search pass finding the project's
+own design system — it overrides individual biases wherever it speaks, and a
+review that cites a generic bias where the project has a settled rule is a
+wrong finding. Look for, in rough order of authority:
+
+- **Design-language specs** — e.g. `openspec/specs/*design-language*/`,
+  `specs/**/design*`, or a requirements doc naming tokens, type scale,
+  motion vocabulary, and copy rules. Spec-form design systems are binding:
+  cite their requirement headings in findings, and route proposed changes to
+  the language through the project's spec workflow, not ad-hoc edits.
+- **Doctrine/principles docs** — `docs/design*`, `about/**/design*`, a
+  DESIGN.md: the WHY layer (settled decisions like theme commitment or
+  accessibility floor) that shapes how the concrete rules are interpreted.
+- **Token/theme files** — `tokens.css`, `index.css`, `theme.ts`, Tailwind
+  config: the de facto palette and scale when nothing more explicit exists.
+
+When these disagree with each other, prefer spec over doctrine over de facto
+implementation, and flag the disagreement itself as a finding. When nothing is
+found, say so and apply the default biases in full.
+
 ## Default Design Biases
 
 Unless a project's design system explicitly overrides them, these apply:
