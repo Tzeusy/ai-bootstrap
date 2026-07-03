@@ -45,9 +45,11 @@ what's discoverable".
 
 ### Findability
 
-- Every feature is reachable from the UI without reading docs. If
-  documentation is the only path to a feature, the feature is hidden — a
-  defect in the product, not the docs.
+- Every feature is reachable from the product surface without reading
+  external docs. If a wiki or manual is the only path to a feature, the
+  feature is hidden — a defect in the product, not the docs. For CLIs, the
+  product surface *is* `--help`, man pages, and shell completion: a flag
+  those expose is discoverable; one documented only in a README is not.
 - Contextual surfacing: the control lives where the need arises (row actions
   on the row, filter where the list is), not in a distant settings page or
   junk-drawer menu.
@@ -63,12 +65,17 @@ what's discoverable".
   first-class feature, not a power-user garnish. Any app with more than a
   screenful of actions or destinations should have one; for internal tools
   and dev-facing products it is the default expectation.
-- Palette contract: opens on a global chord (Ctrl/Cmd+K convention), fuzzy
-  matches verbs *and* nouns (actions, navigation, entities), shows recents
-  first, executes without further mouse input, and displays each entry's
-  keybinding inline — the palette is where shortcuts are learned.
+- Palette contract: opens on Ctrl/Cmd+K by convention — captured only while
+  focus is inside the app, never globally shadowing browser or system
+  chords — with a visible affordance (a ⌘K hint in the chrome) so the chord
+  isn't the only way in. Fuzzy-matches verbs *and* nouns (actions,
+  navigation, entities), shows recents first, executes without further mouse
+  input, and displays each entry's keybinding inline — the palette is where
+  shortcuts are learned.
 - Everything in menus is in the palette; the palette may contain more than
   the menus.
+- CLI analog: shell completion and did-you-mean suggestions are the palette.
+  A CLI that ships without completions fails this expectation.
 
 ### Keyboard paths
 
@@ -101,3 +108,6 @@ what's discoverable".
 3. For a new control: name the moment of need, place the control in that
    moment's screen region, then add its palette/keyboard route in the same
    change — not as follow-up.
+
+No built UI yet? Apply the same expectations to the spec's described
+surfaces; evidence cites the spec section or screen region.

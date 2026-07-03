@@ -38,7 +38,9 @@ this animation necessary", "this UI looks messy", "set up design tokens".
 - Contrast ratios and non-color signaling as compliance concerns —
   [accessibility](../accessibility/SKILL.md) (this skill still forbids
   inaccessible choices)
-- Chart-specific palettes — `/dataviz`, under these semantics
+- Chart/series palette *construction* — `/dataviz`, under these semantics;
+  a chart hue that contradicts the app's color meanings is this skill's
+  finding
 
 ## Reviewable Expectations
 
@@ -53,8 +55,9 @@ this animation necessary", "this UI looks messy", "set up design tokens".
 - Color is welcome and encouraged where it encodes information (status,
   category, severity) — but never as the *only* channel; pair with icon,
   label, or position ([accessibility](../accessibility/SKILL.md)).
-- Neutrals do the layout work; saturated color is spent on meaning and
-  attention, so it stays scarce enough to keep working.
+- Neutrals carry structure and layout; saturated hues appear only on
+  interactive affordances and status/severity/category marks. A saturated
+  hue on a decorative or non-semantic background is a finding.
 - Use tokens/variables, not literals, so light/dark themes stay one mapping
   away.
 
@@ -78,8 +81,9 @@ this animation necessary", "this UI looks messy", "set up design tokens".
 - Budget: transitions ~100–200ms, ease-out; never longer on a path the user
   hits repeatedly. An animation the user waits *through* twice a minute is a
   latency bug ([interaction-speed](../interaction-speed/SKILL.md)).
-- Motion never blocks input, and honors `prefers-reduced-motion` (or the
-  platform equivalent) by reducing to instant state changes.
+- Motion never blocks input. Reduced-motion compliance is owned by
+  [accessibility](../accessibility/SKILL.md); design every animation so its
+  instant-state fallback loses no information.
 - When in doubt, no animation. The absence of an animation is never a defect;
   an unjustified one always is.
 
@@ -91,6 +95,9 @@ this animation necessary", "this UI looks messy", "set up design tokens".
    with two hues.
 3. For each animation: state what it communicates; no answer → remove.
 4. Diff same-concept components across screens; flag divergence.
+
+No built UI yet? Apply the same expectations to the spec's described
+styling; evidence cites the spec section or screen region.
 
 Findings cite the element and expectation violated; conflicts with density or
 accessibility resolve via [design-bar](../design-bar/SKILL.md) biases.
