@@ -224,6 +224,16 @@ troubleshooting steps instead. Use `bd dolt status`, `bd version`, and
   --reinit-local`), then remove the orphaned `.beads/dolt` per-project data-dir
   once `metadata.json` shows server mode. Until then, bd writes are unsafe.
 - Observed: 2026-06-17, bd 1.0.4.
+- **Recurrence + trap (2026-07-06)**: the failure is INTERMITTENT, which makes
+  it look fixed. A session saw `bd create`/`--claim`/`bd close` persist across
+  several consecutive reads, concluded the write path was healed — then a later
+  batch of `bd close` calls half-reverted (2 of 4 closures survived, the rest
+  came back `in_progress`/`open` after the next `auto-importing … into empty
+  database` cycle). Writes persist only while they win the race against the
+  next stale-jsonl re-import. Do NOT trust a small number of persisting writes
+  as evidence of a fix; verify `bd dolt show` no longer reports
+  `Mode: per-project` before trusting bd writes. Until the real fix lands, use
+  the jsonl-edit workaround above for anything you can't afford to lose.
 
 ### `bd worktree remove` may rewrite `.gitignore` comments
 - **Symptom**: after removing a worktree through `bd worktree remove`,
