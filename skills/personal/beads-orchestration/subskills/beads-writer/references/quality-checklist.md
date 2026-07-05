@@ -17,6 +17,13 @@ Use this reference before finalizing or after creating beads.
 - [ ] The bead has one testable outcome
 - [ ] Epics include one final reconciliation bead that depends on all siblings
 - [ ] Reconciliation beads carry generation tags and never exceed `gen-3`
+- [ ] Every universal/negative spec invariant ("no X anywhere", "every Y must",
+      "the only path is Z") is owned by a bead that sweeps PRE-EXISTING code
+      into compliance (enumerate current violating paths; fix/route/retire
+      them) — not only by beads making the new code comply
+- [ ] Acceptance criteria pin test depth where it matters: behavior-executing
+      (DB/integration/render) vs source-scan; a guardrail bead's criteria
+      quote the spec's mandated scan surface verbatim, not a paraphrase
 
 ## Persistence Checks
 
@@ -50,3 +57,4 @@ bd doctor --fix --yes
 | Tiny subbeads that just restate file names | Expand them until they function as standalone prompts |
 | Epic without reconciliation | Add a final terminal reconciliation bead |
 | Reconciliation beyond `gen-3` | Stop at `gen-3` and document remaining gaps explicitly |
+| Universal invariant concretized only as new-code compliance | Add a sweep bead: enumerate and fix the pre-existing paths the invariant outlaws (observed: "no merge without review" shipped while two legacy merge endpoints kept bypassing it) |
