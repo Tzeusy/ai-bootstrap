@@ -16,7 +16,7 @@ metadata:
     - tze
     - Claude Fable 5
   status: active
-  last_reviewed: "2026-06-13"
+  last_reviewed: "2026-07-05"
 ---
 
 # Project Shape
@@ -48,18 +48,6 @@ Five distinct knowledge layers, each answering a different question:
 Four pillars live under `about/` (project self-knowledge, poetic names). `openspec/` stays at root — a product with its own structure/conventions.
 
 Pillars form a **traceability chain** — Doctrine principle → RFC decision → Spec requirement → Code → Test. Topology cross-cuts all: *where* doctrine is embodied, contracts apply, specs are implemented, work lands. `craft-and-care` is the engineering-character cross-cut: who an engineer must be when changing this repo — explicit, careful, reviewable, observable, maintainable.
-
-<!-- [DIAGRAM: traceability-chain]
-Style: conceptual, simple. Use /th-engineering (excalidraw-diagram).
-Layout: horizontal assembly line (left-to-right) with a cross-cutting band beneath.
-Elements:
-  - Top row: 5 nodes in a chain — "Doctrine principle" → "RFC design decision" → "Spec requirement" → "Code" → "Test"
-    Connected by arrows. Each node is a rounded rectangle, color-coded by pillar.
-  - Bottom band: A wide, semi-transparent rectangle spanning the full width labeled "Topology map: where components live, how they connect, what boundaries exist"
-    Connected to each top-row node with bidirectional dashed arrows (↕), showing topology cross-cuts every layer.
-  - The bottom band should visually "support" the chain, like a foundation or substrate.
-Argument: Every implementation decision traces back through this chain. Topology is not a phase — it cross-cuts all others.
--->
 
 ## Quick Start: Assess Shape
 
@@ -108,22 +96,6 @@ Bootstrapping is **consultative**, not template-filling. Extract shape from the 
 
 Read [`references/bootstrapping.md`](references/bootstrapping.md) for the phase-by-phase guide, including the local-skill authoring and skill-standards review loop.
 
-<!-- [DIAGRAM: pillar-order]
-Style: conceptual, simple. Use /th-engineering (excalidraw-diagram).
-Layout: horizontal chain of 5 nodes with a parallel bypass arrow.
-Elements:
-  - 5 pillars as distinct shapes, left-to-right:
-    1. "heart-and-soul" (WHY) — ellipse, warm color (origin/start)
-    2. "craft-and-care" (WHO WE ARE WHEN WE BUILD) — rounded rectangle, distinct color (engineering character) — drafted immediately after doctrine is coherent
-    3. "legends-and-lore" (HOW) — rectangle, cool color (process)
-    4. "openspec" (WHAT) — diamond or hexagon, accent color (decision/spec)
-    5. "lay-and-land" (WHERE) — rectangle, earth tone (structure)
-  - Sequential arrows connecting 1→2→3→4→5
-  - A dashed bypass arrow from node 3 to node 5, labeled "can start in parallel after architecture track"
-  - Below each node: the folder path (about/heart-and-soul/, about/craft-and-care/, about/legends-and-lore/, openspec/, about/lay-and-land/) as free-floating small text
-Argument: Order matters — each pillar grounds the next. Craft-and-care follows doctrine directly; topology can start early.
--->
-
 ## Workflow 2: Translate Ideas into Requirements
 
 The shape model funnels ideas into code. Idea → doctrine gate → topology placement → design sketch → WHEN/THEN spec scenarios → tasks. Ideas enter fuzzy, exit precise; each pillar sharpens them; bad ideas die early on doctrine misalignment.
@@ -131,23 +103,12 @@ The shape model funnels ideas into code. Idea → doctrine gate → topology pla
 To run this funnel end-to-end for one concrete feature request, use [`../project-feature-request/SKILL.md`](../project-feature-request/SKILL.md). This section is the model it implements.
 
 **When ideas don't fit:**
-- Contradicts doctrine → reject, or evolve doctrine (with full team alignment).
+- Contradicts doctrine → reject, or evolve doctrine via
+  [`references/doctrine-amendment.md`](references/doctrine-amendment.md) —
+  drafted by agents, adopted only by the human owner, downstream sweep in the
+  same session.
 - No technical path → park; write exploratory RFC when a path emerges.
 - Sound but not specifiable → too vague; break down further.
-
-<!-- [DIAGRAM: idea-funnel]
-Style: conceptual, simple. Use /th-engineering (excalidraw-diagram).
-Layout: vertical funnel/timeline — wide at top, narrowing toward bottom.
-Elements:
-  - Top: large cloud shape labeled "Idea / Insight" (abstract, fuzzy)
-  - 5 stages descending vertically, each with:
-    - A gate question (free-floating italic text to the right): "Does this align with doctrine?", "Where does this live?", "How would this work?", "What exactly must be built?", "How must this be executed well?", "Plan the work"
-    - The pillar that answers it (colored node matching the pillar's color): heart-and-soul, lay-and-land, legends-and-lore, openspec, craft-and-care, task planning
-  - Arrows between each stage, narrowing (funnel visual)
-  - Left side: a "reject" arrow branching off after the first gate, labeled "doctrine misalignment — idea dies early"
-  - Bottom: small precise rectangle labeled "Implementation tasks" (concrete, sharp)
-Argument: Ideas enter fuzzy and exit precise. Each pillar sharpens them. Bad ideas are killed early by doctrine.
--->
 
 ## Workflow 3: Audit and Maintain Shape Health
 
@@ -183,7 +144,7 @@ Read [`references/generate-overview.md`](references/generate-overview.md) for di
 
 ### Diagrams
 
-Rendered visuals for the shape model (each `.svg` has an editable `.excalidraw` source; regenerate via the `<!-- [DIAGRAM: ...] -->` specs with /th-engineering's excalidraw-diagram):
+Rendered visuals for the shape model (each `.svg` has an editable `.excalidraw` source). Regeneration specs live in [`references/diagram-specs.md`](references/diagram-specs.md) — load only when regenerating with /th-engineering's excalidraw-diagram:
 
 | Diagram | Shows |
 |---------|-------|
@@ -208,6 +169,7 @@ Rendered visuals for the shape model (each `.svg` has an editable `.excalidraw` 
 
 | Guide | Reference | Read when... |
 |-------|-----------|-------------|
+| Doctrine Amendment | [`references/doctrine-amendment.md`](references/doctrine-amendment.md) | Changing `about/heart-and-soul/` — proposal delta, adversarial review, owner adoption, downstream sweep |
 | Consultative Bootstrapping | [`references/consultative-bootstrapping.md`](references/consultative-bootstrapping.md) | Extracting shape from a human for a new project — interview tracks, challenge patterns, synthesis rules |
 | Review Protocol | [`references/review-protocol.md`](references/review-protocol.md) | Reviewing generated docs with independent subagents — agent specs, iteration rules, anti-patterns |
 | Bootstrapping Phases | [`references/bootstrapping.md`](references/bootstrapping.md) | Step-by-step phase guide for establishing shape from scratch |

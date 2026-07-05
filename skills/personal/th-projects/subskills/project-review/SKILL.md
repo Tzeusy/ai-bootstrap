@@ -8,7 +8,7 @@ metadata:
     - Claude Fable 5
     - Claude Sonnet 4.6
   status: active
-  last_reviewed: "2026-06-17"
+  last_reviewed: "2026-07-05"
 ---
 
 # Project Review
@@ -106,7 +106,7 @@ Collect subagent reports. Read [`references/report-template.md`](references/repo
 | **At risk** | 3+ categories <3 OR any at 1 OR 2+ critical risks; avg <3.0 |
 | **Severely at risk** | 5+ categories <3 OR multiple at 1 OR critical security/data risks; avg <2.0 |
 
-7. Prepare `/project-direction` handoff packet: confirmed findings only · Phase 0 baseline packet · required doctrine/lore/spec updates before planning · sequencing constraints + dependency hints · deprioritized items with reasons · evidence index.
+7. Prepare `/project-direction` handoff packet: confirmed findings only · Phase 0 baseline packet · required doctrine/lore/spec updates before planning · sequencing constraints + dependency hints · deprioritized items with reasons · evidence index. Write it to `docs/reviews/YYYY-MM-DD-{scope}-packet.md` with the reviewed commit SHA on the first line — that file is the cross-session handoff contract project-direction's receiver protocol reads; a packet living only in conversation dies with the session.
 
 ### Phase 3.5 — Veracity Gate
 
@@ -169,4 +169,4 @@ Output the report per `report-template.md`. Make the boundary explicit: `project
 
 ## After review: schedule with `/project-direction`
 
-Once findings are confirmed, invoke `/project-direction` with the Phase 3 handoff packet (Phase 0 baseline packet, not just the scorecard). Ownership stays separate: `project-review` audits, `/project-direction` plans.
+Once findings are confirmed, invoke `/project-direction` with the Phase 3 handoff packet at `docs/reviews/` (Phase 0 baseline packet, not just the scorecard). Ownership stays separate: `project-review` audits, `/project-direction` plans.

@@ -4,19 +4,21 @@ description: >
   Use for project-level engineering governance in any repository — establishing or auditing a
   project's knowledge architecture (doctrine, design contracts, specs, topology, engineering
   standards), deciding what to work on next via spec-driven planning, running a repo-wide
-  health audit, concretizing a feature request into a spec delta, or reconciling specs against
+  health audit, concretizing a feature request into a spec delta, amending a spec found wrong
+  mid-implementation, deriving the next milestone from the vision, or reconciling specs against
   implementation. Route to exactly one subskill per task. Triggers: "project shape", "bootstrap
   docs", "knowledge architecture", "what should we work on next", "prioritize features",
   "does the code match the spec", "should we build this", "break this down into chunks",
   "review this project", "audit the codebase", "assess project health", "I want to add X",
-  "spec this feature", "turn this idea into requirements", "reconcile spec vs implementation".
+  "spec this feature", "turn this idea into requirements", "reconcile spec vs implementation",
+  "the spec is wrong", "what's the next milestone".
 metadata:
   owner: tze
   authors:
     - tze
     - Claude Fable 5
   status: active
-  last_reviewed: "2026-06-13"
+  last_reviewed: "2026-07-05"
 compatibility: Subskill scripts require bash, git, grep, find. project-direction additionally assumes the bd (beads) CLI and an OpenSpec-capable environment for changeset synthesis.
 ---
 
@@ -40,6 +42,12 @@ Four subskills, one lifecycle:
 4. **Direction** — baseline + spec deltas + findings → prioritized, spec-linked
    work plan; hand execution to beads.
 
+Two loop-backs close the lifecycle: implementation discoveries re-enter via
+feature-request's **amendment mode** (spec wrong/ambiguous mid-task — the
+per-change drift fix; review's exhaustive reconciliation is the backstop), and
+vision generates new work via direction's **milestone synthesis** (doctrine →
+candidate milestones, no proposal needed).
+
 ## Discover subskills
 
 ```bash
@@ -53,8 +61,8 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 | Task intent | Subskill | Typical trigger |
 |---|---|---|
 | Bootstrap or audit the project's knowledge architecture (five pillars: heart-and-soul, legends-and-lore, openspec, lay-and-land, craft-and-care); decide where an idea should be documented; generate a layman overview. | [subskills/project-shape/SKILL.md](subskills/project-shape/SKILL.md) | "set up project structure", "bootstrap docs", "where should this go", "audit documentation health" |
-| Concretize ONE fuzzy feature/project request into a signed-off spec delta: motif, doctrine gate, topology placement, design sketch, WHEN/THEN scenarios. | [subskills/project-feature-request/SKILL.md](subskills/project-feature-request/SKILL.md) | "I want to add X", "spec this feature", "turn this idea into requirements", "what would it take to build X" |
-| Decide what to work on next; evaluate competing priorities; check roadmap alignment; turn approved specs into a prioritized beads work plan. | [subskills/project-direction/SKILL.md](subskills/project-direction/SKILL.md) | "what's highest leverage", "what should we work on next", "break this down", "is this roadmap aligned" |
+| Concretize ONE fuzzy feature/project request into a signed-off spec delta: motif, doctrine gate, topology placement, design sketch, WHEN/THEN scenarios. Also amendment mode: fix a spec found wrong/ambiguous mid-implementation. | [subskills/project-feature-request/SKILL.md](subskills/project-feature-request/SKILL.md) | "I want to add X", "spec this feature", "turn this idea into requirements", "what would it take to build X", "the spec is wrong" |
+| Decide what to work on next; evaluate competing priorities; check roadmap alignment; turn approved specs into a prioritized beads work plan. Also milestone synthesis: derive candidate work from doctrine when nothing is proposed. | [subskills/project-direction/SKILL.md](subskills/project-direction/SKILL.md) | "what's highest leverage", "what should we work on next", "break this down", "is this roadmap aligned", "what's the next milestone" |
 | Repo-wide health audit: code quality, reliability, security, docs, maintainability — scored, evidence-based, with a planning handoff packet. Includes the exhaustive spec-reconciliation mode (bidirectional spec↔code gap audit + remediation). | [subskills/project-review/SKILL.md](subskills/project-review/SKILL.md) | "review this project", "audit the codebase", "assess project health", "reconcile spec vs implementation", "what's implemented but undocumented" |
 
 ## Routing rules
@@ -88,8 +96,29 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   coverage is a finding, not a baseline. The OpenSpec file format subskills
   read/write is one shared contract,
   [`references/spec-format.md`](references/spec-format.md) at package root, not
-  owned by any single subskill.
+  owned by any single subskill. Its mechanical validator,
+  [`scripts/spec-trace-check.py`](scripts/spec-trace-check.py), runs before any
+  subagent spends tokens on semantic spec review.
+- Per-change spec sync: an implementation task that changes observable behavior
+  amends its governing spec in the same task (feature-request amendment mode).
+  Episodic reconciliation is the backstop, never the mechanism.
+- Autonomy contract — what agents may do without the human:
+
+  | Artifact | Agent may | Human must |
+  |---|---|---|
+  | Doctrine (`about/heart-and-soul/`) | draft, review, blast-radius sweep | adopt every amendment |
+  | Spec delta (proposed behavior) | draft + reconcile changeset | sign off before implementation |
+  | Main-spec bookkeeping of [Observed] behavior | edit directly | — |
+  | Beads/planning graph | generate from approved changeset | approve the changeset it derives from |
+
 - Every major claim cites evidence, labeled [Observed], [Inferred], or
   [Unknown].
 - Subskills cross-reference by relative path (`../project-shape/…`) inside this
   package; those paths are package-internal and stable.
+
+## Package maintenance
+
+After changing any subskill, script, or fixture in this package, run
+[`scripts/validate-th-projects.sh`](scripts/validate-th-projects.sh) — shell
+syntax, project-shape self-tests, fixture invariants, and the spec-trace
+fixtures — and fix every FAIL before committing.

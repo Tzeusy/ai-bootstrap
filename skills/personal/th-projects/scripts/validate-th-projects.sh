@@ -229,6 +229,40 @@ if require_file "$REVIEW_FIXTURE/expected-gate-output.md" \
   fi
 fi
 
+# ── 4. spec-trace-check fixtures ─────────────────────────────────────────────
+section "spec-trace-check fixtures"
+
+TRACE_SCRIPT="$ROOT/scripts/spec-trace-check.py"
+TRACE_FIXTURES="$ROOT/tests/fixtures/spec-trace"
+
+if [[ ! -f "$TRACE_SCRIPT" ]]; then
+  _fail "script missing: scripts/spec-trace-check.py"
+else
+  rc=0
+  out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/clean" 2>&1) || rc=$?
+  if [[ $rc -eq 0 ]]; then
+    _pass "spec-trace: clean fixture passes (exit 0)"
+  else
+    _fail "spec-trace: clean fixture failed (exit $rc): $out"
+  fi
+
+  rc=0
+  out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/violations" 2>&1) || rc=$?
+  if [[ $rc -ne 1 ]]; then
+    _fail "spec-trace: violations fixture expected exit 1, got $rc"
+  else
+    _pass "spec-trace: violations fixture fails (exit 1)"
+    for expected in "delta heading" "has no scenarios" "duplicate ID" \
+                    "names spec" "stale test citation" "1 WHEN and 1 THEN"; do
+      if echo "$out" | grep -q "$expected"; then
+        _pass "spec-trace: violations output reports '$expected'"
+      else
+        _fail "spec-trace: violations output missing expected finding '$expected'"
+      fi
+    done
+  fi
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo "=================================================="
