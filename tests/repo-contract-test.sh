@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# repo-contract-test.sh — minimal repo-contract drift guard (aib-86z).
+#
+# Enforces exactly two v1-mandatory requirements from
+# openspec/changes/bootstrap-project-shape/specs/repository-shape/spec.md:
+#
+#   Spec: REQ-repository-shape-002 (Provenance Visibility)
+#     README's "Skills Layout And Provenance" section and .gitmodules must
+#     agree on the submodule inventory, both directions.
+#
+#   Spec: REQ-repository-shape-006 (Local-Only State Exclusion)
+#     No tracked file may be (a) matched by .gitignore (declared-local-state
+#     drift) or (b) on the never-track denylist (session/auth/cache state).
+#
+# Deliberately nothing broader — v1 (about/heart-and-soul/v1.md) defers full
+# mirror-surface validation; scope decision recorded in
+# about/legends-and-lore/decisions/2026-07-06-adopt-minimal-repo-contract-guard.md.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+fail_count=0
+_pass() { echo "  PASS: $1"; }
+_fail() { echo "  FAIL: $1" >&2; fail_count=$((fail_count + 1)); }
+
+# ── Check 1: provenance (REQ-repository-shape-002) ───────────────────────────
+echo "=== README provenance vs .gitmodules ==="
+
+section=$(awk '/^## Skills Layout And Provenance/{f=1;next} f&&/^## /{exit} f' README.md)
+if [[ -z "$section" ]]; then
+  _fail "README.md has no '## Skills Layout And Provenance' section"
+else
+  # Forward: every registered submodule is mentioned in the section
+  while read -r path; do
+    if grep -qF "$path" <<<"$section"; then
+      _pass "submodule mentioned in README: $path"
+    else
+      _fail "submodule missing from README provenance section: $path"
+    fi
+  done < <(git config -f .gitmodules --get-regexp 'submodule\..*\.path' | awk '{print $2}')
+
+  # Reverse: every path the README claims as a current submodule is registered.
+  # Anchored on the "current submodules are" sentence; if that wording changes,
+  # fail loudly so this check gets updated rather than silently skipping.
+  claimed_block=$(sed -n '/current submodules are/,/\./p' <<<"$section")
+  if [[ -z "$claimed_block" ]]; then
+    _fail "README provenance section lost its 'current submodules are' sentence — update this check's anchor"
+  else
+    while read -r tok; do
+      if git config -f .gitmodules --get-regexp 'submodule\..*\.path' | awk '{print $2}' | grep -qxF "$tok"; then
+        _pass "README-claimed submodule is registered: $tok"
+      else
+        _fail "README claims submodule not in .gitmodules: $tok"
+      fi
+    done < <(grep -oE '`[^`]+`' <<<"$claimed_block" | tr -d '\`')
+  fi
+fi
+
+# ── Check 2: tracked local-only state (REQ-repository-shape-006) ─────────────
+echo "=== tracked local-state exclusion ==="
+
+ignored_tracked=$(git ls-files -ci --exclude-standard)
+if [[ -z "$ignored_tracked" ]]; then
+  _pass "no tracked file is matched by .gitignore"
+else
+  _fail "tracked-but-ignored files (declared local state committed to git):"
+  sed 's/^/         /' <<<"$ignored_tracked" >&2
+fi
+
+DENYLIST=('*.sqlite' '*.sqlite3' '*.log' '*settings.local.json' '*auth.json' '*oauth_creds.json' '*installation_id')
+for pat in "${DENYLIST[@]}"; do
+  hits=$(git ls-files -- "$pat")
+  if [[ -z "$hits" ]]; then
+    _pass "no tracked files match denylist pattern: $pat"
+  else
+    _fail "tracked local-state files match '$pat':"
+    sed 's/^/         /' <<<"$hits" >&2
+  fi
+done
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+echo ""
+if [[ $fail_count -gt 0 ]]; then
+  echo "FAIL: $fail_count repo-contract check(s) failed"
+  exit 1
+fi
+echo "PASS: repo contract holds (REQ-repository-shape-002, REQ-repository-shape-006)"

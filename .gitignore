@@ -61,8 +61,22 @@ skills/mattpocock-skills/
 *.db
 .beads-credential-key
 
-# Beads issue tracker (Dolt-backed local DB; sync via Dolt, not git)
-.beads/
+# Beads issue tracker (Dolt-backed local DB; sync via Dolt, not git).
+# Tracked exceptions: connection metadata + scaffolding are portable repo
+# config; activity logs and jsonl exports are machine-local state.
+.beads/*
+!.beads/.gitignore
+!.beads/README.md
+!.beads/config.yaml
+!.beads/metadata.json
+!.beads/hooks/
 
 # Transitory scratch artifacts (reviews, notes) — not canonical
 scratch/
+.worktrees/parallel-agents/aib-lqp.1/
+.worktrees/parallel-agents/aib-33y/
+.worktrees/parallel-agents/aib-c0n/
+.worktrees/parallel-agents/aib-mg8/
+.worktrees/parallel-agents/aib-lqp.2/
+.worktrees/parallel-agents/aib-b9x/
+.worktrees/parallel-agents/aib-lqp.3/
