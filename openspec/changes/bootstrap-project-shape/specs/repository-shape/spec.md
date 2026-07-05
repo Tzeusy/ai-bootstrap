@@ -1,6 +1,6 @@
 # Repository Shape Spec
 
-## Domain
+## ADDED Requirements
 
 This spec covers the repository-level structure and placement rules for shared AI-assistant knowledge in `ai-bootstrap/`.
 
@@ -8,6 +8,7 @@ This spec covers the repository-level structure and placement rules for shared A
 
 The repository MUST keep reusable cross-tool workflow skills in `skills/`, treating that tree as the primary local source used for installation and mirroring across supported assistant runtimes.
 
+ID: REQ-repository-shape-001
 Source: Doctrine rules 1, 3, and 7; RFC 0001 §Repository Layers, §Source-of-Truth Rules, §Distribution Model
 Scope: v1-mandatory
 
@@ -30,6 +31,7 @@ Scope: v1-mandatory
 
 The repository MUST preserve visible provenance for shared skills so contributors can distinguish locally authored workflow logic from upstream-derived material and intentional forks.
 
+ID: REQ-repository-shape-002
 Source: Doctrine rules 1, 3, and 7; RFC 0001 §Repository Layers, §Source-of-Truth Rules
 Scope: v1-mandatory
 
@@ -47,6 +49,7 @@ Scope: v1-mandatory
 
 The repository MUST preserve its standalone clone-or-submodule installation model and make clear that mirror layers do not supersede the source tree.
 
+ID: REQ-repository-shape-003
 Source: Doctrine rules 4 and 7; RFC 0001 §Distribution Model, §Documentation Contract
 Scope: v1-mandatory
 
@@ -64,6 +67,7 @@ Scope: v1-mandatory
 
 Agent definitions that remain useful across tools MAY live under `agents/`, but that layer MUST be treated as secondary reference material rather than the repository's primary workflow surface.
 
+ID: REQ-repository-shape-004
 Source: Doctrine rules 1 and 7; RFC 0001 §Repository Layers, §Source-of-Truth Rules
 Scope: v1-mandatory
 
@@ -76,6 +80,7 @@ Scope: v1-mandatory
 
 Tool-specific prompts, settings, rules, and metadata MUST live in their platform namespace and may diverge from shared content only when platform syntax or runtime behavior requires it.
 
+ID: REQ-repository-shape-005
 Source: Doctrine rules 2 and 4; RFC 0001 §Repository Layers, §Source-of-Truth Rules, §Distribution Model
 Scope: v1-mandatory
 
@@ -93,6 +98,7 @@ Scope: v1-mandatory
 
 Secrets, runtime IDs, caches, logs, session artifacts, and per-machine overrides MUST remain outside canonical versioned content or be explicitly ignored when runtime placement requires them under a tool namespace. Shared non-secret baseline settings MAY be versioned when they are intended as portable defaults.
 
+ID: REQ-repository-shape-006
 Source: Doctrine rule 5; RFC 0001 §Runtime and Local-Only State
 Scope: v1-mandatory
 
@@ -115,6 +121,7 @@ Scope: v1-mandatory
 
 Vendored or generated artifacts MUST have a documented regeneration path checked into the repository.
 
+ID: REQ-repository-shape-007
 Source: Doctrine rule 6; RFC 0001 §Distribution Model
 Scope: v1-mandatory
 
@@ -128,6 +135,7 @@ Scope: v1-mandatory
 The repository MUST maintain doctrine, design-contract, engineering-standard,
 topology, and specification documents covering repository shape.
 
+ID: REQ-repository-shape-008
 Source: Doctrine rule 7; RFC 0001 §Documentation Contract;
 about/craft-and-care/README.md
 Scope: v1-mandatory
@@ -154,6 +162,7 @@ repository-specific navigation skills on the tool skill surfaces
 (`.claude/skills`, `.codex/skills`, `.gemini/skills`), because those surfaces
 double as the user's global skill catalogs on installed machines.
 
+ID: REQ-repository-shape-009
 Source: RFC 0001 §Distribution Model, §Documentation Contract;
 about/craft-and-care/interfaces-and-dependencies.md
 Scope: v1-mandatory
@@ -181,6 +190,7 @@ Scope: v1-mandatory
 
 The repository MUST make it possible for contributors and auditors to trace placement rules across doctrine, design contracts, topology, and specifications.
 
+ID: REQ-repository-shape-010
 Source: Doctrine rule 7; RFC 0001 §Documentation Contract
 Scope: v1-mandatory
 
