@@ -233,6 +233,14 @@ parallel writers yourself.
 
 ## Handling Blockers
 
+A decision is not a blocker. Before reporting blocked, check
+`../../references/decision-autonomy.md`: if the obstacle is a choice between
+implementation options and none of its hard gates apply, decide it yourself via
+the protocol there, put the `[decision]` record in your report summary and the
+relevant commit message, and keep working. Report
+`blocked-awaiting-coordinator` only for genuinely external blockers or
+hard-gated decisions.
+
 If a hard blocker prevents completion:
 1. document what you tried and why it is blocked
 2. commit any useful partial progress

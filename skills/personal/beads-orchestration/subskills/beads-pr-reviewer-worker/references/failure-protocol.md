@@ -23,7 +23,7 @@ Stop immediately. Do not change code or GitHub state.
 Use when the worker cannot continue safely without outside help. Examples:
 - original bead or PR number cannot be resolved
 - GitHub auth or permissions are missing
-- rebase conflicts require human or coordinator judgment
+- rebase conflicts require coordinator judgment
 - required checks are failing for reasons you did not fix in this pass
 - merge readiness is false because of external blockers
 

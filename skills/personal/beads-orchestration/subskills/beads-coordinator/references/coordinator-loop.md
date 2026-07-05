@@ -365,8 +365,15 @@ Report first, then verify the reported branch / PR state:
    - `blocked-awaiting-coordinator`:
      - do not treat this as stalled
      - renew heartbeat
-     - convert `Blockers-JSON` entries into blocker beads and wire the original
-       bead to depend on them
+     - triage each `Blockers-JSON` entry against
+       `../../../references/decision-autonomy.md` first: a decision-shaped
+       entry with no hard gate is decided by the coordinator, recorded as a
+       `[decision]` note on the original bead, and the bead is re-dispatched
+       with the decision inlined — no blocker bead is created for it
+     - convert the remaining (external or hard-gated) `Blockers-JSON` entries
+       into blocker beads and wire the original bead to depend on them;
+       hard-gated decisions must use the escalation format from
+       `decision-autonomy.md`
      - convert `Discovered-Follow-Ups-JSON` entries into linked follow-up beads
      - set the original bead to `blocked`
      - preserve recovery state explicitly:
@@ -457,6 +464,14 @@ Polling modes:
   about to expire
 - idle mode: 10-15 minute polls when no workers are active and no dispatchable
   near-term review work exists
+
+Decision sweep: on every transition into idle mode — and at least once per
+session even if never idle — run the Coordinator Decision Sweep from
+`../../../references/decision-autonomy.md` over blocked and human-flagged
+beads. Decision debt is dispatchable work: a swept-and-decided bead re-enters
+the ready pool this cycle, so re-run Step 0 after a sweep that unblocked
+anything. An idle coordinator with decision-shaped blocked beads is not idle;
+it is avoiding a decision.
 
 Prefer low-cost evidence over narrative heartbeats:
 - worktree exists
