@@ -224,3 +224,28 @@ troubleshooting steps instead. Use `bd dolt status`, `bd version`, and
   --reinit-local`), then remove the orphaned `.beads/dolt` per-project data-dir
   once `metadata.json` shows server mode. Until then, bd writes are unsafe.
 - Observed: 2026-06-17, bd 1.0.4.
+
+### `bd worktree remove` may rewrite `.gitignore` comments
+- **Symptom**: after removing a worktree through `bd worktree remove`,
+  `.gitignore` is modified even though the removed worktree path is gone; in
+  observed cases, explanatory `# bd worktree` comments around ignored historical
+  worktree paths were stripped.
+- **Cause**: the helper rewrites the worktree ignore block instead of preserving
+  surrounding comments byte-for-byte.
+- **Workaround**: for cleanup of Rust/code worktrees that were created with
+  `git worktree add`, prefer plain `git worktree remove <path>` plus explicit
+  `git branch -D agent/<id>` and remote-branch cleanup after bead closure. If
+  `bd worktree remove` was already used, inspect `git diff -- .gitignore` and
+  restore comment-only churn unless the ignore entries themselves changed.
+- Observed: 2026-06-18, bd 1.0.4.
+
+## resolve_review_context.py: `missing-original-id` on freeform review-bead descriptions
+
+The pr-reviewer-worker helper `resolve_review_context.py` only recognizes the
+markers `Original implementation bead:` / `Review target bead:` in the review
+bead's description. A coordinator-authored description using freeform phrasing
+like `Original bead: bu-xxxxx` fails with `missing-original-id` even though the
+mapping is unambiguous (observed 2026-07-05, review bead bu-mm41k). Workaround:
+reviewer falls back to the ORIGINAL_BEAD value in its dispatch prompt +
+`gh pr view`. Durable fix: coordinators should write
+`Original implementation bead: <id>` verbatim in review-bead descriptions.
