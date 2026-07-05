@@ -80,3 +80,11 @@ scratch/
 .worktrees/parallel-agents/aib-lqp.2/
 .worktrees/parallel-agents/aib-b9x/
 .worktrees/parallel-agents/aib-lqp.3/
+
+# bv (beads viewer) local config and caches
+.bv/
+
+# codex runtime state DBs
+.codex/*.sqlite
+.codex/*.sqlite-shm
+.codex/*.sqlite-wal
