@@ -33,6 +33,12 @@ A project's **shape** = the knowledge architecture making it comprehensible to h
 - "Turn this idea into requirements"
 - "Map this system's topology"
 
+**Not for:** one concrete feature request (`../project-feature-request/` runs
+the funnel); prioritization or "what next" (`../project-direction/`); scored
+repo health audits (`../project-review/`); README/docs *craft* quality on a
+single doc (`/th-engineering` documentation — this subskill owns where
+knowledge lives, not how well one file reads).
+
 ## The Five-Pillar Model
 
 Five distinct knowledge layers, each answering a different question:
