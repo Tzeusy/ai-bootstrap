@@ -1,4 +1,4 @@
 interface:
   display_name: TH Projects
-  short_description: Route project governance work — shape the knowledge architecture, audit repo health, or plan spec-driven direction.
+  short_description: Route project governance work — shape the knowledge architecture, funnel a feature request into a spec delta, audit repo health, or plan spec-driven direction.
   default_prompt: Use $th-projects to route this project-level task to the right subskill.
