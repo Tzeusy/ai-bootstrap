@@ -59,6 +59,10 @@ rg -n "^name:|^description:" subskills/*/SKILL.md
 - Worktrees live at `.worktrees/parallel-agents/<id>` on branch `agent/<id>`.
 - `.beads/` is Dolt-backed and gitignored — never commit it to code branches.
 - bd 1.0.4 has no `--rig` flag: target another project with `bd -C <path> …`.
+- **Decide, don't defer.** Engineering-judgment choices are resolved
+  autonomously per [`references/decision-autonomy.md`](references/decision-autonomy.md);
+  blocking on a human is reserved for its hard-gate list. Load that file before
+  filing or reconciling any decision-shaped blocker.
 
 ## When `bd` itself misbehaves
 

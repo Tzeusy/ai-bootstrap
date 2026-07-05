@@ -147,6 +147,12 @@ Use the same monitoring process as normal workers, with these additions:
 
 If a worker or Team Lead reports a hard blocker:
 
+0. Triage the blocker against `../../../references/decision-autonomy.md`. If it
+   is decision-shaped (asks for a choice rather than an external event) and no
+   hard gate applies, do NOT create a blocker bead: decide via the protocol,
+   append the `[decision]` record to the bead's notes, and re-dispatch the same
+   bead with the decision inlined in the worker prompt. Only genuinely external
+   blockers and hard-gated decisions proceed to step 1.
 1. The coordinator creates a blocker issue:
    ```bash
    BLOCKER_JSON=$(bd create "Blocker: <description>" \

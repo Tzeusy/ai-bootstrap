@@ -55,6 +55,10 @@ State these hold for the entire run; the references elaborate, never override.
 - **`.beads/` is Dolt-managed.** Beads data lives in the Dolt DB, not git-tracked
   files. Never commit `.beads/` contents on a code branch; strip accidental
   `.beads/` diffs.
+- **Decide, don't defer.** Decision-shaped blockers are resolved by the
+  coordinator under `../../references/decision-autonomy.md`, not parked for a
+  human. Only its hard-gate list may block on a human, and only in its
+  escalation format.
 
 ## Read Order
 
@@ -64,6 +68,7 @@ State these hold for the entire run; the references elaborate, never override.
 | [`references/runtime-and-safety.md`](references/runtime-and-safety.md) | dispatch or mutate safely | Model-selection tables, atomic `--claim` + stall-heartbeat model + thresholds, mutation safety, closure rule, runtime dispatch notes, quality gates |
 | [`references/epic-coordination.md`](references/epic-coordination.md) | the bead is an epic or a worker hits a hard blocker | Epic classification, independent dispatch, Team Lead mode + prompt, blocker handling |
 | [`references/commands.md`](references/commands.md) | a quick command lookup | `bd` quick reference, claim/heartbeat checklist, session-completion checklist |
+| [`../../references/decision-autonomy.md`](../../references/decision-autonomy.md) | a worker reports a decision-shaped blocker, or blocked/human-flagged beads accumulate | Decision protocol, hard-gate list, decision record, escalation format, decision sweep |
 
 
 Diagrams (load only when you need a visual of the flow): the full cycle is

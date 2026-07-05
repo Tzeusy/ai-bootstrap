@@ -92,6 +92,10 @@ Example blocker entry:
   `PR-Number: n/a`, and `Branch-Pushed: yes`.
 - `blocked-awaiting-coordinator` requires at least one blocker object and the
   exact failing command.
+- `unblock_condition` must name an external event or a hard gate from
+  `../../../references/decision-autonomy.md`. "A human/coordinator decides
+  which approach" is not a valid unblock condition for an ungated engineering
+  choice — decide it and record a `[decision]` line instead.
 - `invalid-runtime-context` means stop before touching code or Beads lifecycle
   state.
 
