@@ -9,52 +9,36 @@ The capability specs layer answers **WHAT**: exactly what must be built, with te
 ```
 openspec/
 ├── config.yaml                  # OpenSpec configuration
+├── specs/                       # Main specs — current source of truth
+│   ├── <domain>/spec.md         # One spec per domain/subsystem
+│   └── ...
 └── changes/
     └── <change-name>/           # Active specification change
         ├── proposal.md          # Why this change, impact assessment
         ├── design.md            # Design decisions for this change
         ├── tasks.md             # Task breakdown with counts
         ├── .openspec.yaml       # Change metadata
-        └── specs/               # Normative capability specs
-            ├── <domain>/spec.md # One spec per domain/subsystem
+        └── specs/               # Delta specs — override main while active
+            ├── <domain>/spec.md # ADDED/MODIFIED/REMOVED Requirements
             └── ...
 ```
 
-## Requirement Format
+## Requirement Format and Traceability
 
-Every requirement follows a consistent testable pattern:
+File syntax — heading hierarchy, main-vs-delta headings, `ID`/`Source`/`Scope`
+lines, WHEN/THEN rules, test-tagging convention — is the package-wide shared
+contract: [`../../../references/spec-format.md`](../../../references/spec-format.md).
+Do not restate it; write to it.
 
-```markdown
-### Requirement: <Name>
+Pillar-level rules on top of that syntax:
 
-<Normative text using SHALL/MUST/SHOULD per RFC 2119>
-
-Source: RFC NNNN §X.Y
-Scope: v1-mandatory | v1-reserved | post-v1
-
-#### Scenario: <Name>
-- **WHEN** <precondition or trigger>
-- **THEN** <expected behavior or outcome>
-
-#### Scenario: <Another Name>
-- **WHEN** <different precondition>
-- **THEN** <expected behavior>
-```
-
-### Scope Tags
-
-- **v1-mandatory** — Must be implemented. Generates tasks, tests, and implementation planning.
-- **v1-reserved** — Schema defined, implementation may be minimal or stubbed. Forward-compatible.
-- **post-v1** — Documented for awareness. No implementation required.
-
-### Traceability
-
-Every requirement must include:
-- **Source**: Which RFC section and doctrine principle justify it
-- **Scenarios**: WHEN/THEN pairs that serve as acceptance criteria
-- **Scope**: Whether it's mandatory for current milestone
-
-The chain: `doctrine principle → RFC §section → spec requirement → WHEN/THEN scenario → test → code`
+- Every requirement traces both ways: **up** to an RFC section or doctrine
+  principle (its `Source:` line) and **down** to ≥1 WHEN/THEN scenario and a
+  test citing its `ID`.
+- The chain: `doctrine principle → RFC §section → spec requirement (ID) →
+  WHEN/THEN scenario → test → code`.
+- Check the chain mechanically before semantic review:
+  `uv run <th-projects>/scripts/spec-trace-check.py <repo-root>`.
 
 ## Spec Lifecycle
 

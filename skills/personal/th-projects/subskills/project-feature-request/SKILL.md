@@ -4,17 +4,19 @@ description: >
   Concretize a single fuzzy feature or project request into a signed-off
   specification delta before any planning or implementation: extract the
   motifs, gate against doctrine, place it in the topology, sketch the design,
-  and write testable WHEN/THEN scenarios. Use when someone proposes one concrete
-  thing to build. Triggers: "I want to add X", "spec this feature", "turn this
-  idea into requirements", "flesh out this request", "what would it take to
-  build X", "write a spec for X".
+  and write testable WHEN/THEN scenarios. Also the fast amendment path when
+  implementation reveals a spec is wrong or ambiguous. Use when someone
+  proposes one concrete thing to build. Triggers: "I want to add X", "spec
+  this feature", "turn this idea into requirements", "flesh out this request",
+  "what would it take to build X", "write a spec for X", "the spec is wrong",
+  "the spec doesn't match what I'm building".
 metadata:
   owner: tze
   authors:
     - tze
     - Claude Fable 5
   status: active
-  last_reviewed: "2026-06-13"
+  last_reviewed: "2026-07-05"
 ---
 
 # Project Feature Request
@@ -101,6 +103,30 @@ expectations) into acceptance criteria so quality is specified, not hoped for.
 Craft-and-care absent → assumed bar is `/th-engineering`'s engineering-bar
 default biases; cite that explicitly rather than inventing one.
 
+## Amendment Mode (mid-implementation)
+
+The fast path back into the funnel when an implementer discovers, mid-task,
+that the governing spec is wrong, ambiguous, or incomplete. Spec drift is
+created at exactly this moment — catching it here keeps project-review's
+exhaustive reconciliation a backstop, not routine maintenance.
+
+Run Gates 5–6 only, sized Small, after a one-line Gate 2 sanity check (the
+correction touches doctrine → full funnel, and possibly
+`../project-shape/references/doctrine-amendment.md`):
+
+- Amend the artifact that governs the work: the active changeset the task came
+  from, or the main spec when the correction is bookkeeping of
+  already-observed behavior (spec-format.md routing rule).
+- ID discipline per `../../references/spec-format.md`: a modified requirement
+  keeps its ID; genuinely new behavior takes the next free ID.
+- Record what changed and why in the driving bead/task notes, so the next
+  direction pass sees the amendment without re-deriving it.
+- Sign-off: still the user's for observable-behavior changes; a pure ambiguity
+  clarification (no behavior change) may proceed with a note in the bead.
+
+Kill condition: the "correction" is actually new scope → stop; it's a new
+request through the full funnel.
+
 ## Sign-off and Handoff
 
 Present the funnel summary: sizing, each gate's outcome with evidence, the spec
@@ -112,10 +138,18 @@ delta, open questions. Then:
 - **Doctrine conflict** → record the rejection and its reasoning where the
   project keeps decisions; do not soften into a backlog item. Default when
   no established home:
-  `about/legends-and-lore/decisions/YYYY-MM-DD-rejected-{slug}.md`.
+  `about/legends-and-lore/decisions/YYYY-MM-DD-rejected-{slug}.md`. The
+  requester may instead escalate a doctrine change —
+  `../project-shape/references/doctrine-amendment.md`; never both silently.
 - **Parked** (sound idea, no technical path yet) → write an exploratory RFC
   stub in legends-and-lore and stop. Default when no established home:
   `about/legends-and-lore/rfcs/YYYY-MM-DD-parked-{slug}.md`.
+
+Every park or reject also appends one line to the ideas ledger
+(`about/legends-and-lore/ideas-ledger.md`) in the same change — that index is
+what makes the decision visible to project-direction's milestone synthesis.
+Ledger template and maintenance contract:
+[`references/decision-record-template.md`](references/decision-record-template.md).
 
 Project ADR/RFC conventions take precedence over these defaults; see
 [`references/decision-record-template.md`](references/decision-record-template.md)

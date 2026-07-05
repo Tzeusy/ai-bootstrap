@@ -6,6 +6,15 @@ Run when the user asks to "reconcile spec vs implementation", "what's implemente
 
 Exhaustive by design: every spec checked, both directions, no sampling. Still consumes the Phase 0 baseline (shape scan) and the same evidence labels ([Observed], [Inferred], [Unknown]).
 
+## Phase R0: Mechanical pass first
+
+Run `uv run <th-projects>/scripts/spec-trace-check.py <repo-root>` before any
+subagent spends tokens: structural defects, ID integrity, and stale/missing
+test citations come out mechanically. Fix or note its findings, then scope R1
+on what remains — semantic judgment only where the script can't reach. When
+specs carry `ID:` lines (spec-format.md), key the R2 mapping table on
+requirement IDs instead of prose titles.
+
 ## Phase R1: Inventory both sides
 
 Build two parallel inventories with subagents — the orchestrator merges and decides, it doesn't do the heavy file-reading itself.

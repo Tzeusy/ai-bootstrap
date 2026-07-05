@@ -85,15 +85,26 @@ stating what would have to become true, and park.
 **Input**: all prior gates; `../../../references/spec-format.md`; existing
 `openspec/` tree.
 **Do**:
-- Extend an existing spec when the capability fits its scope; create
-  `openspec/specs/{category}-{name}/spec.md` only for genuinely new
-  capabilities
+- This is *proposed future behavior*, so it takes the delta path
+  (spec-format.md routing rule): scaffold a changeset with
+  `openspec new change "<slug>"` and write delta specs
+  (`## ADDED/MODIFIED Requirements`) under it. CLI unavailable → write the
+  full delta spec text into the funnel summary for `project-direction` to
+  integrate; never hand-write `openspec/changes/` structure.
 - Check active `openspec/changes/*/specs/` first — active changes override
-  main specs; build on them, don't fork
+  main specs; extend an active change covering the same capability rather
+  than forking a parallel one
+- Target an existing spec (`MODIFIED`, or `ADDED` requirements within its
+  scope) when the capability fits; name a new `{category}-{name}` spec only
+  for genuinely new capabilities
+- Give every requirement `ID`/`Source`/`Scope` lines per spec-format.md —
+  `Source:` cites the Gate 2 doctrine principle or Gate 4 design sketch
 - Write WHEN/THEN scenarios for success, error, and edge behavior (observable
   behavior only — no internal architecture)
 - Write the **out of scope** list — what this request deliberately does not
   cover; the anti-scope-creep contract
+- Validate mechanically before presenting:
+  `uv run <th-projects>/scripts/spec-trace-check.py <repo-root>`
 
 **Exit**: every Gate 1 success criterion maps to ≥1 scenario; every scenario is
 testable as written.

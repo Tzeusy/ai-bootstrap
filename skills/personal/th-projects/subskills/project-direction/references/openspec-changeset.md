@@ -54,7 +54,11 @@ scaffold and schema come from the tool.
   never fork a parallel truth.
 - Spec format follows `../../../references/spec-format.md`
   (heading hierarchy, WHEN/THEN bullets, naming, `[TARGET-STATE]` tags for
-  aspirational requirements).
+  aspirational requirements). Every requirement carries `ID`/`Source`/`Scope`
+  lines: `ADDED` takes the next free `REQ-{spec-name}-NNN` across main +
+  active delta specs, `MODIFIED` keeps the existing ID. Validate with
+  `uv run <th-projects>/scripts/spec-trace-check.py <repo-root>` before
+  reconciliation.
 - A changeset proposes; it does not sequence. Sequencing happens in Phase 3.
 - **Ground every new invariant against the code it retroactively binds.** When
   a requirement is universal or negative ("no X anywhere", "the only path is

@@ -7,7 +7,7 @@ metadata:
     - tze
     - Claude Fable 5
   status: active
-  last_reviewed: "2026-06-13"
+  last_reviewed: "2026-07-05"
 ---
 
 # Project Direction
@@ -47,7 +47,11 @@ Then check for upstream inputs — they change how much of each phase runs (Rece
 
 ### Receiver Protocol: Consume Upstream Packets, Don't Re-Derive
 
-**From `../project-review/` (handoff packet).** Fresh = repo HEAD matches reviewed commit, or user accepts staleness. Fresh packet:
+**From `../project-review/` (handoff packet).** Read the newest
+`docs/reviews/*-packet.md` (the shared packet home — review writes it, this
+subskill consumes it; ask before using anything older than the latest). Fresh
+= repo HEAD matches the packet's recorded commit SHA, or user accepts
+staleness. Fresh packet:
 - Adopt its Phase 0 baseline (pillar maturity, source-of-truth order, normative requirements, contradictions) → Phase 1 = doctrine *check*, not re-derivation.
 - Confirmed findings = Phase 2 evidence. Agent C skips review-scored dimensions (test confidence, observability, delivery readiness) → narrows to architectural fitness *for the proposed direction*.
 - Feed sequencing constraints, dependency hints, deprioritized items to Agent D + Phase 3.
@@ -70,12 +74,21 @@ Map every finding to concrete evidence (file/section references) and to phase ac
 Recommend the minimum precise changes required to reach acceptance.
 ```
 
-Two tiers, chosen per phase by what the phase did:
+Two tiers, chosen per phase by what the phase did; change-tier depth scales
+with blast radius (same sizing vocabulary as
+`../project-feature-request/SKILL.md`):
 
 | Tier | When | Protocol |
 |------|------|----------|
-| **Change-tier** | Phase *modified normative artifacts*: doctrine/lore edits, OpenSpec changeset create/modify | ≥4 dedicated passes (`R1`-`R4`), fresh subagent each, fixes applied between passes; continue while acceptance criteria unmet |
+| **Change-tier, small** | Modified one spec's requirements; no doctrine/lore edits, no cross-boundary contracts | 1 pass, fixes applied, 1 confirming pass |
+| **Change-tier, medium** | Several specs, new external surface, or lore edits | 2 passes + confirming pass |
+| **Change-tier, large** | Doctrine edits, new subsystem, or cross-boundary contract changes | ≥4 dedicated passes (`R1`-`R4`), fresh subagent each, fixes applied between passes; continue while acceptance criteria unmet |
 | **Verify-tier** | Phase only *consumed* normative artifacts: doctrine checks, drift analysis, graph from approved changeset | One verification pass; escalate to change-tier only if it finds the consumed artifacts need modification |
+
+Every change-tier pass uses a fresh subagent regardless of size — size sets
+the pass count, never self-review. Run
+`uv run <th-projects>/scripts/spec-trace-check.py <repo-root>` before the
+first pass; mechanical findings are fixed directly, not spent on subagents.
 
 Mechanical validations (cycle checks, spec-link coverage, mandate coverage) = scripts-and-checklists — run directly; not passes, no subagents.
 
@@ -137,6 +150,7 @@ Do not execute/deliver the beads plan here — hand off explicitly to the beads 
 Focus modes change which phases do real work and which tier applies — the phase *questions* are always answered, even if one line backed by a citation.
 
 - **Full direction analysis** (default): all phases as written; change-tier wherever normative artifacts change.
+- **Milestone synthesis** (vision-generative: "what next" with no proposals on hand, or a milestone just closed): doctrine *produces* the candidates instead of judging proposed ones — mandate coverage matrix, ideas-ledger unparking, ranked milestone brief; user selects before anything enters Phases 2-3. Read [`references/milestone-synthesis.md`](references/milestone-synthesis.md).
 - **Feature evaluation** ("should we build X?"): a *new, single* request routes to `../project-feature-request/SKILL.md` (its funnel returns a spec delta here). Run this mode only for portfolio questions (X vs competing priorities): Phase 1 verify-tier doctrine check on X, Phase 2 narrowed to the 8-dimension evaluation in `references/alignment-review.md`, Phase 3 only if X is approved. No commits unless specs changed.
 - **Spec-drift check** ("does code match spec?"): Phase 1 verify-tier (doctrine consumed). Phase 2 emphasizes B + C + D; produce a corrective changeset (change-tier) only for confirmed drift the user wants fixed — else deliver the drift inventory read-only. Phase 3 only when a changeset was produced.
 - **Work decomposition** ("break this down"): assumes an approved spec. Phase 1 skipped unless the spec lacks a doctrine link. Phase 2 = one verify-tier pass confirming implementability. Phase 3 is the primary artifact (mechanical validations + verify-tier pass).
@@ -165,6 +179,7 @@ Focus modes change which phases do real work and which tier applies — the phas
 
 | File | Read when | Content |
 |------|-----------|---------|
+| [`references/milestone-synthesis.md`](references/milestone-synthesis.md) | Milestone-synthesis focus mode | Deriving candidates from doctrine: mandate coverage matrix, ledger unparking, milestone brief format |
 | [`references/direction-model.md`](references/direction-model.md) | Phase 2 (agents A, B, C) | Analysis dimensions: project spirit, requirement classification, current-state assessment |
 | [`references/alignment-review.md`](references/alignment-review.md) | Phase 2 (agent D); feature evaluation | 8-dimension evaluation, classification buckets, push-back checklist, gap analysis |
 | [`references/openspec-changeset.md`](references/openspec-changeset.md) | Phase 2 step 3 | How to synthesize an OpenSpec changeset via the `openspec` CLI |
