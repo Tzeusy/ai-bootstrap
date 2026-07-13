@@ -22,8 +22,9 @@ local-first, single-author files).
 **Size**: Large — new subsystem, doctrine implications, cross-boundary
 contracts.
 
-**Separate subagent per gate.** Independent review of spec delta before
-sign-off.
+**One funnel owner.** Dedicated specialists may own the independent protocol
+design and user-experience review; a fresh reviewer checks the converged spec
+delta before sign-off.
 
 **Decision**: Approved (pending Gate 2 escalation resolution) → hand spec
 delta to `../project-direction/SKILL.md` for sequencing and decomposition.
@@ -32,17 +33,17 @@ delta to `../project-direction/SKILL.md` for sequencing and decomposition.
 > **Approved** → hand the spec delta to `../project-direction/SKILL.md`
 > for sequencing and decomposition.
 
-The sizing table: "Large: new subsystem, doctrine implications, or
-cross-boundary contracts → Subagent per gate; independent review of spec
-delta before sign-off." `project-direction` owns the work graph and
-sequencing — feature-request ends at the signed-off spec delta.
+The sizing table keeps one owner across the sequential gates, adding dedicated
+specialists only for independently reviewable artifacts or contested gates.
+`project-direction` owns the work graph and sequencing — feature-request ends
+at the signed-off spec delta.
 
 **Gate 2 escalation**: the request's "real-time, multi-user" model
 conflicts with the current "local-first, single-author" doctrine in
 `about/heart-and-soul/`. This triggers a doctrine-change escalation (not
 a silent rejection), which must be resolved before gates 3–6 proceed.
 
-## Gate Summary (Subagent-Level, Abbreviated)
+## Gate Summary (Abbreviated)
 
 - **G0**: shape present; `about/heart-and-soul/` and `about/lay-and-land/`
   both constrain this request.
@@ -56,7 +57,9 @@ a silent rejection), which must be resolved before gates 3–6 proceed.
 - **G3 Topology**: new `collab-service` (WebSocket); presence API; OT/CRDT
   library; auth integration; `openspec` editor client refactor.
 - **G4 Design sketch**: OT vs CRDT trade-off; wire contract for
-  `collab-service`; cursor/presence protocol; conflict scenarios.
+  `collab-service`; cursor/presence protocol; conflict scenarios. `/th-design`
+  adds discoverability, accessibility, loading, latency, and error-state
+  expectations for the human-facing collaboration surface.
 - **G5 Spec**: WHEN/THEN for concurrent edits, network partition,
   rejoin-after-disconnect, and single-user baseline.
 - **G6 Bar**: integration tests for conflict scenarios, observability for
@@ -77,6 +80,8 @@ a silent rejection), which must be resolved before gates 3–6 proceed.
    ordering — that is `project-direction`'s job.
 7. The funnel summary documents sizing rationale and each gate outcome.
 8. The spec delta is the terminal deliverable of this run.
+9. Funnel summary records the doctrine/spec baseline commit and human sign-off
+   identity/date before handoff.
 
 ## Boundary
 

@@ -75,6 +75,10 @@ Return to Gate 1 and split by motif.
 **Do** (medium+): draft the minimal RFC delta — the state machine, wire
 contract, or data shape genuinely new, plus trade-offs considered and rejected.
 Reuse existing contracts by reference.
+For a human-facing surface, load `/th-design` and only its relevant subskill;
+capture experience expectations (including discoverability, accessibility,
+loading/latency, errors, and interruption where applicable) as observable
+contract inputs. Backend-only work skips this callout.
 **Do** (small): one sentence — why no design delta is needed.
 **Exit**: a reviewer could disagree with something specific.
 **Kill / park**: no technically credible path — write the exploratory RFC stub
@@ -101,10 +105,13 @@ stating what would have to become true, and park.
   `Source:` cites the Gate 2 doctrine principle or Gate 4 design sketch
 - Write WHEN/THEN scenarios for success, error, and edge behavior (observable
   behavior only — no internal architecture)
-- Write the **out of scope** list — what this request deliberately does not
-  cover; the anti-scope-creep contract
+- Run `spec-format.md`'s Semantic Quality Gate. Cover each applicable risk
+  dimension or record why it is N/A; every Gate 1 success criterion maps to a
+  scenario, and no unresolved `TODO`/`TBD` survives in mandatory behavior
+- Put **out of scope** and non-goals in the changeset proposal; reference them
+  from the funnel summary rather than adding unsupported headings to delta specs
 - Validate mechanically before presenting:
-  `uv run <th-projects>/scripts/spec-trace-check.py <repo-root>`
+  `uv run <th-projects>/scripts/spec-trace-check.py <repo-root> --authoring`
 
 **Exit**: every Gate 1 success criterion maps to ≥1 scenario; every scenario is
 testable as written.
@@ -125,14 +132,21 @@ not a behavior. Return to Gate 1 for that slice.
 Craft-and-care absent → state the bar you assume, labeled [Inferred], so
 sign-off includes the quality contract, not just the feature.
 
-**Exit**: "done" is defined in the spec delta itself; an implementer needs no
-follow-up question to know what quality means here.
+Place testing, observability, migration, rollback, and review work in changeset
+tasks/acceptance criteria unless users can observe the behavior directly. If
+the project bar is absent or silent, load `/th-engineering` and only its one
+relevant subskill.
+
+**Exit**: "done" is defined across the changeset, including its observable spec
+delta and tasks/acceptance contract; an implementer needs no follow-up question
+to know what quality means here.
 
 ## Funnel Summary Template
 
 ```
 ## Feature Request: {name}
 Size: {small|medium|large}
+Baseline: {doctrine/spec commit SHA}
 - G1 Motif: {problem → motif} [evidence]
 - G2 Doctrine: {aligned|conflict|inferred} — {citation}
 - G3 Topology: {placement statement}
@@ -140,5 +154,6 @@ Size: {small|medium|large}
 - G5 Spec: {spec path(s), N scenarios, out-of-scope list}
 - G6 Bar: {standards imported | assumed bar}
 Open questions: {…}
+Sign-off: {human identity, date, approved artifact}
 Recommended handoff: {project-direction | beads-writer | park | reject}
 ```

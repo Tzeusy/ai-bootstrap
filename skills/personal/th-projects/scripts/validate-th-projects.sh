@@ -2,8 +2,8 @@
 # validate-th-projects.sh — Package-level validator for skills/personal/th-projects.
 #
 # Runs from any working directory; resolves all paths from BASH_SOURCE.
-# Checks: shell syntax, project-shape self-tests, and fixture structural
-# invariants (including the overclaim gate check for project-review).
+# Checks: shell syntax, project-shape self-tests, fixture structural invariants,
+# governance contracts, and spec-trace behavior.
 #
 # Exit 0 = all checks passed. Exit 1 = one or more failures.
 set -euo pipefail
@@ -166,6 +166,11 @@ else
   else
     _fail "project-feature-request: fixtures must include non-rejection outcomes"
   fi
+  if grep -Rqi 'subagent per gate' "$FEATURE_FIXTURES"; then
+    _fail "project-feature-request: fixtures retain the retired subagent-per-gate allocation"
+  else
+    _pass "project-feature-request: fixtures use one funnel owner with conditional specialists"
+  fi
 fi
 
 # ── 3c. project-review fixtures — overclaim gate check ───────────────────────
@@ -230,6 +235,36 @@ if require_file "$REVIEW_FIXTURE/expected-gate-output.md" \
 fi
 
 # ── 4. spec-trace-check fixtures ─────────────────────────────────────────────
+section "Governance contract checks"
+
+ROUTER="$ROOT/SKILL.md"
+SPEC_FORMAT="$ROOT/references/spec-format.md"
+WORK_ALLOCATION="$ROOT/references/work-allocation.md"
+FEATURE_SKILL="$ROOT/subskills/project-feature-request/SKILL.md"
+DIRECTION_SKILL="$ROOT/subskills/project-direction/SKILL.md"
+RECONCILIATION="$ROOT/subskills/project-review/references/spec-reconciliation.md"
+
+check_pattern "$ROUTER" 'VISION.*continuous constraint' \
+  "router: VISION is an always-on constraint"
+check_pattern "$ROUTER" 'Gap|TODO|adjacent idea' \
+  "router: proactive discovery capture is explicit"
+check_pattern "$SPEC_FORMAT" '^## Semantic Quality Gate' \
+  "spec format: semantic clarity/completeness gate exists"
+check_pattern "$FEATURE_SKILL" '/th-design' \
+  "feature request: user-surface specs route to th-design"
+if require_file "$WORK_ALLOCATION" \
+    "references/work-allocation.md exists"; then
+  check_pattern "$WORK_ALLOCATION" 'one bead.*cohesive.*independently verifiable outcome' \
+    "work allocation: one cohesive outcome per bead"
+  check_pattern "$WORK_ALLOCATION" 'overhead|amortiz' \
+    "work allocation: agent overhead affects granularity"
+fi
+check_pattern "$DIRECTION_SKILL" 'references/work-allocation.md' \
+  "project-direction: allocation contract is progressively discoverable"
+check_pattern "$RECONCILIATION" 'work-allocation.md' \
+  "spec reconciliation: gaps use the shared allocation contract"
+
+# ── 5. spec-trace-check fixtures ─────────────────────────────────────────
 section "spec-trace-check fixtures"
 
 TRACE_SCRIPT="$ROOT/scripts/spec-trace-check.py"
@@ -247,12 +282,44 @@ else
   fi
 
   rc=0
+  out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/clean" --authoring 2>&1) || rc=$?
+  if [[ $rc -eq 0 ]]; then
+    _pass "spec-trace: clean authoring fixture passes (exit 0)"
+  else
+    _fail "spec-trace: clean authoring fixture failed (exit $rc): $out"
+  fi
+
+  rc=0
+  out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/empty-authoring" --authoring 2>&1) || rc=$?
+  if [[ $rc -eq 1 ]] && echo "$out" | grep -q 'spec file has no requirements'; then
+    _pass "spec-trace: authoring mode rejects an empty delta beside a valid spec"
+  else
+    _fail "spec-trace: authoring mode must reject an empty delta beside a valid spec (exit $rc): $out"
+  fi
+
+  rc=0
+  out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/clean" --strict --tests-dir missing 2>&1) || rc=$?
+  if [[ $rc -eq 1 ]] && echo "$out" | grep -q 'strict mode cannot verify test citation'; then
+    _pass "spec-trace: strict mode rejects missing test discovery"
+  else
+    _fail "spec-trace: strict mode must reject missing test discovery (exit $rc): $out"
+  fi
+
+  rc=0
+  out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/added-reuses-id" --authoring 2>&1) || rc=$?
+  if [[ $rc -eq 1 ]] && echo "$out" | grep -q "duplicate ID 'REQ-core-auth-001'"; then
+    _pass "spec-trace: ADDED requirements cannot reuse main-spec IDs"
+  else
+    _fail "spec-trace: ADDED requirement reused a main-spec ID (exit $rc): $out"
+  fi
+
+  rc=0
   out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/violations" 2>&1) || rc=$?
   if [[ $rc -ne 1 ]]; then
     _fail "spec-trace: violations fixture expected exit 1, got $rc"
   else
     _pass "spec-trace: violations fixture fails (exit 1)"
-    for expected in "delta heading" "has no scenarios" "duplicate ID" \
+    for expected in "delta heading" "unsupported main-spec H2" "has no scenarios" "duplicate ID" \
                     "names spec" "stale test citation" "1 WHEN and 1 THEN"; do
       if echo "$out" | grep -q "$expected"; then
         _pass "spec-trace: violations output reports '$expected'"

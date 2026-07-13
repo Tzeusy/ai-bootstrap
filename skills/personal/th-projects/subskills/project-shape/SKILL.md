@@ -1,12 +1,11 @@
 ---
 name: project-shape
 description: >
-  Analyze and bootstrap the five-pillar knowledge architecture of a software project:
+  Use when analyzing or bootstrapping the five-pillar knowledge architecture of a software project:
   about/heart-and-soul (doctrine), about/legends-and-lore (RFCs/design contracts), about/lay-and-land
   (topology), about/craft-and-care (execution-quality standards), and openspec/ (capability specs
   at root). Use when: starting a new project's knowledge structure, auditing documentation health,
-  onboarding, deciding where ideas should be documented, translating ideas into requirements, or
-  mapping system topology. Triggers:
+  onboarding, deciding where knowledge belongs, or mapping system topology. Triggers:
   "project shape", "bootstrap docs", "where should this go", "what's this project about",
   "project pillars", "heart and soul", "spec structure", "knowledge architecture", "system
   map", "topology", "lay of the land", "set up project structure".
@@ -15,8 +14,9 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-05"
+  last_reviewed: "2026-07-13"
 ---
 
 # Project Shape
@@ -30,7 +30,6 @@ A project's **shape** = the knowledge architecture making it comprehensible to h
 - "Help me set up the docs structure for this project"
 - "What's this project about / where should this idea be documented?"
 - "Audit our documentation health — are the pillars coherent?"
-- "Turn this idea into requirements"
 - "Map this system's topology"
 
 **Not for:** one concrete feature request (`../project-feature-request/` runs
@@ -81,7 +80,9 @@ Bootstrapping is **consultative**, not template-filling. Extract shape from the 
 
 **Quality gates:**
 - Most capable model, max thinking budget when available.
-- Prefer one subagent per pillar for substantive generation/curation — keep each draft in a tighter context window when work partitions cleanly.
+- Keep one bootstrap owner. Use one subagent per substantive, independently
+  reviewable pillar cluster only when work partitions cleanly; group small
+  adjacent docs so context and review overhead do not exceed the drafting work.
 - Never self-review — independent review subagents when the environment supports them.
 - Challenge the user — accept vague answers only to push deeper, never to ship.
 
@@ -93,8 +94,13 @@ Bootstrapping is **consultative**, not template-filling. Extract shape from the 
 **Process:**
 
 1. **Interview** — Socratic extraction across five tracks (identity, boundaries, principles, architecture, contracts). Read [`references/consultative-bootstrapping.md`](references/consultative-bootstrapping.md) for question banks + challenge patterns.
-2. **Synthesize** — distill answers into drafts. Use the human's own language. Make trade-offs explicit. Flag contradictions. Prefer one subagent per pillar.
-3. **Independent review** — fresh subagents (no generation context) review each doc. Read [`references/review-protocol.md`](references/review-protocol.md) for the three review-agent specs (Coherence, Adversarial, Cross-Pillar).
+2. **Synthesize** — distill answers into drafts. Use the human's own language.
+   Make trade-offs explicit. Flag contradictions. Split to a pillar/doc-cluster
+   worker only when the artifact is substantive and independently reviewable.
+3. **Independent review** — fresh context reviews stable pillar/doc clusters;
+   combine coherence + adversarial lenses unless risk warrants separate agents,
+   then run cross-pillar review at convergence points. Read
+   [`references/review-protocol.md`](references/review-protocol.md).
 4. **Revise + present** — incorporate findings, present for validation. If "not quite right" → return to interview, don't patch.
 5. **Scaffold + install** — run `shape-init.sh` for structure, populate with reviewed docs, install local skills. Vet generated pillar skills with `/th-engineering` (skill-standards) before relying on them.
 
@@ -129,7 +135,8 @@ For an existing project, assess cross-pillar coherence and keep docs current.
 
 **Maintenance protocol** when code diverges from docs:
 1. **Detect** — compare implementation against spec requirements, RFC contracts, doctrine.
-2. **Update** — generate updated sections, preferring one subagent per affected pillar.
+2. **Update** — generate updated sections; group cohesive small edits and split
+   only substantive, independently reviewable pillar clusters.
 3. **Review the delta** — independent review agents on changed sections only.
 4. **Cross-check** — cross-pillar review if changes affect multiple pillars.
 5. **Present** — show diff + review summary before committing.
@@ -140,7 +147,12 @@ For an existing project, assess cross-pillar coherence and keep docs current.
 
 Synthesize pillars into a visual, layman-friendly `about/README.md` with embedded Excalidraw SVG diagrams — the public face of the project's shape.
 
-**Requirements:** ≥2 pillars exist (heart-and-soul + one other); prefer `/th-engineering` (excalidraw-diagram), fall back to Mermaid/prose; independent review subagents when available, else explicit accessibility/adversarial self-check + user validation.
+**Requirements:** ≥2 pillars exist (heart-and-soul + one other); use
+`/th-design` (information-design or accessibility) for the overview's human
+reading experience when needed, and `/th-engineering` (excalidraw-diagram) only
+when a diagram materially aids comprehension. Fall back to Mermaid/prose;
+independent review when available, else explicit accessibility/adversarial
+self-check + user validation.
 
 **Process:** extract layman-relevant essence per pillar → design 3-5 diagrams arguing the project's story → generate via excalidraw-diagram + render SVG (render-view-fix loop) → write structured markdown (thesis → what it's not → how it works → v1 delivers → principles → navigating docs) → review (accessibility + adversarial subagents) → commit to `about/README.md`, sources in `about/assets/`.
 

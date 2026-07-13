@@ -33,3 +33,7 @@ ID names the wrong spec directory.
 #### Scenario: Hash on write
 - **WHEN** a password is stored
 - **THEN** only a salted hash is persisted
+
+## Notes
+
+Arbitrary main-spec H2 headings are not part of the shared format.

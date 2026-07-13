@@ -73,7 +73,7 @@ Four patterns to watch for and resolve:
 
 | Pattern | Signal | Resolution |
 |---------|--------|------------|
-| **Code ahead of spec** | Implementation exists, no spec covers it | Create delta spec documenting the capability |
+| **Code ahead of spec** | Implementation exists, no spec covers it | Bookkeep observed behavior in the main spec with `[Observed]` evidence; use a signed-off delta only to propose behavior changes |
 | **Spec ahead of code** | v1-mandatory requirement, no implementation | Create implementation tasks for unimplemented requirements |
 | **Spec-code mismatch** | Behavior contradicts spec | Determine which is correct (consult RFC/doctrine), fix the wrong one |
 | **New feature** | Neither spec nor code exists | Start with explore, then spec, then code |
@@ -104,7 +104,8 @@ Keep the mapping table in the local `spec-and-spine` skill so agents can look up
 ## Evolution
 
 Specs evolve at the pace of implementation. When updating:
-1. Never silently edit — use the delta spec lifecycle
+1. Follow the shared spec-format routing rule: proposed behavior uses a delta;
+   observed-behavior bookkeeping edits the main spec with evidence
 2. Preserve RFC traceability on every modification
 3. After syncing, main specs become the new source of truth
 4. Bug fixes that reveal ambiguity → clarify the requirement

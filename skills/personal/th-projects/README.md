@@ -17,6 +17,7 @@ README is a signpost for humans browsing the repo, nothing more.
 | `subskills/project-review/` | Scored repo health audit; spec reconciliation |
 | `subskills/project-direction/` | Prioritized spec-driven work plan; milestone synthesis |
 | `references/spec-format.md` | Shared OpenSpec file contract (IDs, headings, test tagging) |
+| `references/work-allocation.md` | Shared cohesive-bead, ownership, overhead, and discovery-triage contract |
 | `scripts/spec-trace-check.py` | Mechanical spec-traceability validator (`uv run`) |
 | `scripts/validate-th-projects.sh` | Package self-test — run after any change here |
 | `tests/fixtures/` | Regression fixtures consumed by the validator |

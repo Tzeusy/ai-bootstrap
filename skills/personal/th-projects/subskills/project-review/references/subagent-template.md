@@ -12,19 +12,19 @@ Type: {type} | Maturity: {maturity} | Users: {users}
 Shape maturity summary: doctrine={absent|nascent|structured|mature}, design={...}, specs={...}, topology={...}
 
 ## Normative baseline
-{Paste the Phase 0 baseline packet from project-review. Include doctrine/lore/spec/topology sources, missing pillars, and contradictions.}
+Manifest: {path to the compact Phase 0 packet; include only the doctrine/lore/spec/topology entries this domain needs}
 
 ## Scan output
-{Paste the full scan output from project-scan.sh}
+{path to project-scan output + the scoped excerpt or exact artifact paths this domain owns}
 
 ## Your task
-{Paste the relevant domain section from investigation-guides.md}
+{link the relevant domain section from investigation-guides.md; do not paste unrelated domains}
 
 ## Scoring
-{For agents B-E only: paste the relevant category sections from scoring-rubric.md}
+{For agents B-E only: link the relevant category sections from scoring-rubric.md}
 
 Calibrate for project type using these adjustments:
-{Paste the relevant section from project-type-adaptations.md}
+{link the relevant section from project-type-adaptations.md}
 
 ## Investigation rules
 - If shaped artifacts exist, treat doctrine/lore/spec/topology as more authoritative than README marketing copy.
@@ -36,12 +36,14 @@ Calibrate for project type using these adjustments:
 - Skip categories that are N/A for this project type (explain why in one line)
 - If a category is not applicable, score it as `N/A` rather than forcing a 1-5
 - Distinguish between normative violations, generic health risks, and missing norms
+- Own evidence for the assigned concern. When another domain owns an overlapping
+  concern, cite its output path rather than rescanning the same files.
 
 ## Depth limits
 - Examine at most 30 files in detail per domain
 - For monorepos: sample 3-5 representative packages, plus shared/core code
 - For codebases >50k LOC: focus on entry points, hotspot files, and public API surface
-- Target 500-1000 words of output per scored category
+- Target 700-1400 words total per domain unless evidence volume requires more
 
 ## Output format
 Return a structured report with:

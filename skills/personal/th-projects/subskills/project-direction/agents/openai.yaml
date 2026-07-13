@@ -1,4 +1,4 @@
 interface:
   display_name: "Project Direction"
-  short_description: "Prioritize features, check spec-to-code drift, evaluate 'should we build X', derive milestone candidates from doctrine, sequence a roadmap, and produce a spec-driven work plan with a beads handoff"
+  short_description: "Prioritize competing work, derive milestones from VISION, sequence approved specs or confirmed drift into cohesive beads, and produce a spec-driven handoff"
   default_prompt: "What should this project work on next?"
