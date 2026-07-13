@@ -57,7 +57,7 @@ scaffold and schema come from the tool.
   aspirational requirements). Every requirement carries `ID`/`Source`/`Scope`
   lines: `ADDED` takes the next free `REQ-{spec-name}-NNN` across main +
   active delta specs, `MODIFIED` keeps the existing ID. Validate with
-  `uv run <th-projects>/scripts/spec-trace-check.py <repo-root>` before
+  `uv run <th-projects>/scripts/spec-trace-check.py <repo-root> --authoring` before
   reconciliation.
 - A changeset proposes; it does not sequence. Sequencing happens in Phase 3.
 - **Ground every new invariant against the code it retroactively binds.** When

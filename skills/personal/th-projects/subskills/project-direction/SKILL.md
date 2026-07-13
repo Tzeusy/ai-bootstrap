@@ -1,13 +1,14 @@
 ---
 name: project-direction
-description: Analyze a software project's true direction, validate alignment between specs/docs and implementation, and produce a prioritized, spec-driven work plan with beads (every non-trivial epic gets a report bead for human review). Use when deciding what to work on next, evaluating feature proposals, checking spec-to-code drift, sequencing roadmap items, or pushing back on misaligned requirements. Triggers on "what should we work on next", "prioritize features", "does the code match the spec", "is this roadmap aligned", "what's highest leverage", "should we build this", "is this tractable", "break this down into chunks".
+description: Use when deciding what a project should work on next, comparing competing priorities, deriving a milestone from VISION, sequencing an approved specification into an execution graph, or deciding what to do about already-confirmed spec drift. Triggers on "what should we work on next", "prioritize features", "is this roadmap aligned", "what's highest leverage", "what's the next milestone", "should we build this or Y", "break this approved spec down".
 metadata:
   owner: tze
   authors:
     - tze
     - Claude Fable 5
+    - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-05"
+  last_reviewed: "2026-07-13"
 ---
 
 # Project Direction
@@ -27,6 +28,13 @@ Do not use when:
 4. **Push back** — flag misaligned, premature, unrealistic, infeasible work directly.
 5. **Minimize churn** — remove dead paths over back-compat shims (`/th-engineering` cruft-cleanup is the bar); serialize conflicting work.
 6. **Rigor where truth changes** — deep reconciliation guards *changes to normative artifacts*; consuming them is one verification pass, not four.
+7. **VISION is continuous** — every candidate, spec delta, bead, discovery, and
+   closeout cites the doctrine mandate it advances. Revalidate when the recorded
+   baseline commit changes; never treat a past doctrine check as permanent.
+8. **Relentless, bounded progress** — resolve non-blocking gaps in scope, create
+   explicit investigation/spec-first work for real unknowns, and keep moving to
+   the next unblocked spec outcome. Never hide work in TODOs or smuggle adjacent
+   ideas into the active graph.
 
 ## Workflow
 
@@ -57,7 +65,11 @@ staleness. Fresh packet:
 - Feed sequencing constraints, dependency hints, deprioritized items to Agent D + Phase 3.
 - Findings flagged as needing doctrine/spec updates → Phase 1/2 work items, not re-investigation.
 
-**From `../project-feature-request/` (signed-off spec delta).** Funnel already did doctrine, topology, design, spec work — do not re-run. Phase 1 skipped unless delta changed doctrine; Phase 2 narrows to integrating delta into changeset; Phase 3 sequences it against existing work.
+**From `../project-feature-request/` (signed-off spec delta).** Funnel already
+did doctrine, topology, design, spec work — do not re-run while its recorded
+doctrine/spec commit still matches. If the baseline changed, revalidate only the
+affected mandates. Phase 2 narrows to integrating the delta; Phase 3 sequences
+it against existing work.
 
 **Cold start.** No packet, no delta → run phases as written.
 
@@ -87,7 +99,7 @@ with blast radius (same sizing vocabulary as
 
 Every change-tier pass uses a fresh subagent regardless of size — size sets
 the pass count, never self-review. Run
-`uv run <th-projects>/scripts/spec-trace-check.py <repo-root>` before the
+`uv run <th-projects>/scripts/spec-trace-check.py <repo-root> --authoring` before the
 first pass; mechanical findings are fixed directly, not spent on subagents.
 
 Mechanical validations (cycle checks, spec-link coverage, mandate coverage) = scripts-and-checklists — run directly; not passes, no subagents.
@@ -110,7 +122,7 @@ Acceptance: every proposed feature explicitly aligned/rejected/escalated against
 ### Phase 2: Specification Scan + Fitness/Gap Synthesis
 
 1. Run spec scan: `bash <skill_dir>/scripts/spec-scan.sh <repo_root>`
-2. Parallel investigation (A, B, C) then synthesis (D) — roles + dispatch in `references/subagent-template.md`:
+2. Parallel investigation (A, B, C) then synthesis (D) — roles + dispatch in `references/subagent-template.md`. Assign one primary evidence owner per concern; pass artifact paths plus a compact baseline manifest, not duplicated full documents:
 
 | Agent | Role | Input | Output |
 |-------|------|-------|--------|
@@ -126,12 +138,25 @@ Acceptance: spec intent, implemented spine, gap analysis coherent and actionable
 
 ### Phase 3: Beads Generation (Planning Graph Only)
 
-Call `/beads-orchestration` (beads-writer) to build a full acyclic dependency graph from the approved changeset.
+Call `/beads-orchestration` (beads-writer) to build a full acyclic dependency
+graph from the approved changeset. Load
+[`references/work-allocation.md`](../../references/work-allocation.md) before
+decomposing: one primary agent per cohesive independently verifiable outcome,
+with enough work to amortize dispatch/context/worktree/CI/review overhead.
 
-1. Generate epics/tasks, explicit dependencies, no cycles.
-2. Each bead traces to doctrine/lore/spec mandates + acceptance criteria.
-3. Include required reconciliation/report structural beads per beads-writer conventions (report beads use `scripts/epic-report-scaffold.sh`; see `references/epic-report.md`).
-4. Run mechanical graph validations (cycle check, mandate coverage, spec-link coverage), then **verify-tier** (graph consumes the approved changeset, does not modify it).
+1. Generate epics/tasks, explicit dependencies, no cycles or overlapping owners.
+2. Map every in-scope `v1-mandatory` requirement to an implementation bead and
+   verification path; one cohesive bead may cover several adjacent requirements.
+3. Triage gaps, TODOs, unknowns, and expanded ideas through the allocation
+   contract; keep corrections/local debt in scope, route boundary/spec changes
+   back to feature-request, and capture adjacent scope separately.
+4. Include one epic-level reconciliation/report closeout path per beads-writer
+   conventions (report beads use `scripts/epic-report-scaffold.sh`; see
+   `references/epic-report.md`). Do not add reconciliation beads per task.
+5. Add a milestone-close callback that refreshes VISION mandate coverage and
+   re-enters milestone synthesis when uncovered mandates remain.
+6. Run mechanical graph validations (cycle check, complete mandatory-mandate
+   coverage, spec-link coverage), then **verify-tier**.
 
 Acceptance: graph acyclic, prioritized, execution-ready, every bead spec-traceable. Delivery/execution NOT handled here — owned by `/beads-orchestration` (beads-coordinator).
 
@@ -165,7 +190,7 @@ Focus modes change which phases do real work and which tier applies — the phas
 | No clear direction | State it directly. Recommend a direction-setting workshop or `../project-shape/` bootstrap before feature work. |
 | Conflicting specs | Flag each contradiction with evidence from both sides. Do not resolve — escalate to user. |
 | Reconciliation won't converge | Convergence ceiling (6 passes): stop, present unresolved findings, await user judgment. |
-| Massive spec surface (>50 sections) | Agent B samples: fully audit core features, spot-check secondary. |
+| Massive spec surface (>50 sections) | Shard the inventory by non-overlapping capability slice. Never sample `v1-mandatory` requirements or active deltas; sample only explicitly post-v1/advisory material and label it. |
 
 ## Sample Triggers
 
@@ -184,6 +209,7 @@ Focus modes change which phases do real work and which tier applies — the phas
 | [`references/alignment-review.md`](references/alignment-review.md) | Phase 2 (agent D); feature evaluation | 8-dimension evaluation, classification buckets, push-back checklist, gap analysis |
 | [`references/openspec-changeset.md`](references/openspec-changeset.md) | Phase 2 step 3 | How to synthesize an OpenSpec changeset via the `openspec` CLI |
 | [`references/work-plan-template.md`](references/work-plan-template.md) | Handoff output | Output format, chunk/sequencing presentation, reconciliation reporting |
+| [`../../references/work-allocation.md`](../../references/work-allocation.md) | Phase 3 decomposition and discovery triage | Cohesive bead boundaries, overhead test, ownership, mandatory coverage, gap/TODO/unknown routing |
 | [`references/subagent-template.md`](references/subagent-template.md) | Phases 1-3 (reconciliation + dispatch) | Agent roles, dispatch template, depth limits, per-agent notes |
 | [`references/epic-report.md`](references/epic-report.md) | Phase 3 (report bead structure) | Report bead template/execution, diagram integration, spec compliance matrix |
 

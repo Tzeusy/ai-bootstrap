@@ -30,7 +30,9 @@ Project: {project_name}
 Type: {type} | Maturity: {maturity} | Users: {users}
 
 ## Scan output
-{paste full scan output from spec-scan.sh}
+Manifest: {path to compact Phase 1 baseline + spec-scan output}
+Artifacts: {exact spec/code paths this role owns}
+Prior evidence: {paths to fresh packet or upstream reports; do not paste them}
 
 ## Your task
 {Paste the relevant section from the appropriate reference file:
@@ -44,6 +46,8 @@ Type: {type} | Maturity: {maturity} | Users: {users}
 - Cite specific files and line numbers: `path/to/file.ts:42` or `spec/feature.md:§3.2`
 - Label claims: [Observed], [Inferred], [Unknown]
 - Specifications are source of truth unless user says otherwise
+- You are the primary evidence owner only for the assigned concern; cite a
+  sibling's artifact for overlapping evidence rather than rescanning it
 - If requirements are ambiguous or contradictory, flag the conflict — do not guess the intent
 - Do NOT hallucinate architecture, team process, or roadmap intent
 - Be blunt about overreach, misalignment, and infeasibility
@@ -52,7 +56,8 @@ Type: {type} | Maturity: {maturity} | Users: {users}
 - Read spec documents fully (they are the source of truth)
 - For code, examine at most 30 files in detail per agent
 - For large codebases: focus on entry points, core modules, and areas referenced by specs
-- Target 500-800 words per assessment dimension
+- Return the minimum complete evidence needed for synthesis; target 500-900
+  words total unless the assigned surface proves materially larger
 
 ## Output format
 Return a structured report matching the deliverable section from your reference file.

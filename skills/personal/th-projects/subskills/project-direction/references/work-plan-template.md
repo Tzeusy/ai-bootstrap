@@ -25,10 +25,12 @@ Signoff NOT required for:
 
 ### Decomposing into chunks
 
-Target: **3-10 hours per chunk**. Each chunk:
-- Independently completable (committed and tested on its own)
-- Clear objective (reading just the chunk description tells you what to do)
-- Verifiable (checkable acceptance criteria)
+Load the shared
+[`work-allocation.md`](../../../references/work-allocation.md) contract. Time is
+a sanity check, not the boundary: one chunk becomes one bead/primary-agent
+assignment only when it owns a cohesive independently verifiable outcome.
+Prefer a focused agent session with meaningful implementation over microtasks
+whose context, worktree, CI, and review overhead exceeds their useful work.
 
 #### Chunk template
 
@@ -42,6 +44,7 @@ Target: **3-10 hours per chunk**. Each chunk:
 **Scope**: S / M / L / XL
 **Parallelizable**: Yes / No — {reason}
 **Serialize with**: {chunk IDs that would conflict}
+**Primary owner**: {one bead/agent; specialists advise this owner}
 
 **Acceptance criteria**:
 - [ ] {concrete, testable criterion}
@@ -66,26 +69,25 @@ Unsafe when:
 
 When in doubt, serialize. Coordination-failure cost (merge conflicts, repeated test runs, architecture churn) exceeds the parallelism benefit.
 
-### Reconciliation steps
+### Reconciliation
 
-Proportional to risk (see SKILL.md "Reconciliation Protocol"): a chunk that **modifies normative artifacts** (doctrine/lore edits, an OpenSpec changeset) gets **change-tier** — ≥4 dedicated passes (`R1`-`R4`), fresh subagent each, continuing while acceptance criteria unmet, up to the 6-pass ceiling. A chunk that only **consumes** approved artifacts gets **verify-tier** — one pass. Mechanical validations (cycle checks, spec-link coverage) run directly, don't count as passes. Report the tier and pass count per chunk.
-
-After each completed chunk, add a reconciliation task (checklist below = verify-tier baseline; escalate to change-tier if the chunk edited normative artifacts):
+Use SKILL.md's authoritative risk-scaled reconciliation protocol; do not restate
+pass counts here. Keep requirement-level reconciliation inside each
+implementation bead's acceptance criteria:
 
 ```markdown
-### Reconciliation: {chunk title}
-
-Check:
 - [ ] Implemented behavior matches spec section {ref}
 - [ ] Tests cover the acceptance criteria from this chunk
 - [ ] No drift was introduced to adjacent features
-- [ ] No cleanup or follow-up edits needed
-- [ ] Spec is still accurate (update if implementation revealed spec gaps)
+- [ ] Discoveries are classified per work-allocation.md; governing artifacts
+      are amended before continuing and adjacent ideas are durably separated
 ```
 
 Reconciliation applies regardless of who/what did the work — person, subagent, or pipeline.
 
-For multi-chunk work blocks, add a **block-level reconciliation** after the final chunk:
+For an epic, add exactly one **epic-level reconciliation/closeout** after all
+implementation children. It owns cross-child and end-to-end behavior rather
+than repeating every child's checks:
 
 ```markdown
 ### Block Reconciliation: {block title}
@@ -95,7 +97,12 @@ Check:
 - [ ] End-to-end user flow works as spec describes
 - [ ] No regression in adjacent features
 - [ ] Spec sections referenced by this block are current
-- [ ] Tech debt or follow-up work is documented (not left as TODO comments)
+- [ ] Every in-scope `v1-mandatory` requirement is implemented or changed by an
+      approved spec amendment; partial/contradicted/deferred is not completion
+- [ ] Gaps, TODOs, unknowns, and expanded ideas are classified and durably
+      routed; no actionable TODO comment is the only record
+- [ ] VISION mandate coverage is refreshed; uncovered mandates trigger the
+      next-milestone callback
 ```
 
 ---

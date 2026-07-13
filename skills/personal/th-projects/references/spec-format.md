@@ -8,8 +8,13 @@ doctrine → RFC → spec → test chain mechanically checkable.
 Validate mechanically before semantic review:
 
 ```bash
-uv run <th-projects>/scripts/spec-trace-check.py <repo-root> [--tests-dir <dir>] [--strict]
+uv run <th-projects>/scripts/spec-trace-check.py <repo-root> [--tests-dir <dir>] [--authoring|--strict]
 ```
+
+Use `--authoring` before signing off new/modified specs: required fields and
+placement fail closed, while future requirements need not have implementation
+tests yet. Use `--strict` at implementation/milestone closeout to require both
+authoring integrity and test citations.
 
 Not defined here:
 
@@ -28,11 +33,18 @@ Not defined here:
 | **Main spec** | `openspec/specs/{spec-name}/spec.md` | `## Purpose`, `## Requirements` | Bookkeeping observed behavior (reconciliation R4); `openspec archive` syncing a finished change |
 | **Delta spec** | `openspec/changes/{change}/specs/{spec-name}/spec.md` | `## ADDED Requirements`, `## MODIFIED Requirements`, `## REMOVED Requirements`, `## RENAMED Requirements` | Proposing future behavior (feature funnel Gate 5, direction Phase 2) |
 
-Routing rule: **proposed future behavior goes through a delta changeset;
-documenting behavior the code already exhibits edits main specs directly.**
+Authoritative routing rule:
+
+| Intent | Artifact |
+|---|---|
+| Propose or change observable behavior | Delta spec in an active changeset; human sign-off before implementation. |
+| Document behavior already observed in code | Main-spec bookkeeping edit, labeled `[Observed]`; no future-behavior claim. |
+| Correct ambiguity without changing behavior | Amend the governing active delta, or the main spec when no active delta governs it; record why. |
+
 Active (non-archived) changes override main specs — always check
 `openspec/changes/*/specs/` before extending a main spec, and build on an
-active delta rather than forking it.
+active delta rather than forking it. This table overrides any older guide that
+says all spec edits require a changeset.
 
 `MODIFIED`/`REMOVED`/`RENAMED` sections match requirements by their exact
 `### Requirement:` title text — copy the title verbatim from the main spec.
@@ -80,6 +92,10 @@ Three plain-text lines immediately after each `### Requirement:` heading:
   `v1-reserved` (schema defined, implementation may stub) · `post-v1`
   (documented for awareness only).
 
+Normative language and `Scope` must agree: a `post-v1` requirement cannot use
+`MUST` to imply current delivery, and a `v1-mandatory` requirement cannot be
+softened into optional or deferred behavior without an approved spec amendment.
+
 The chain these fields close: doctrine principle → RFC §section → spec
 requirement (`ID`) → WHEN/THEN scenario → test citing the ID → code.
 
@@ -104,6 +120,43 @@ requirements and stale IDs (cited in tests, absent from specs).
 - Bold keywords: `**WHEN**`, `**THEN**`, `**AND**`
 - 1 WHEN, 1 THEN, 0-4 AND lines per scenario
 - Describe *observable behavior*, not implementation details
+
+## Semantic Quality Gate
+
+A mechanically valid spec is not necessarily complete. Before sign-off, verify:
+
+1. **Clear** — one normative behavior per requirement; actor, trigger, outcome,
+   and externally visible side effects are unambiguous. Delete narrative and
+   duplicated rationale that do not constrain behavior.
+2. **Comprehensive** — every stated success criterion maps to a scenario. For
+   each applicable risk dimension, cover it or record an explicit N/A reason:
+   failure/recovery, authorization/privacy, concurrency/ordering/idempotency,
+   lifecycle/retention, limits/performance, compatibility/migration, and human-
+   interface accessibility/discoverability/loading/error behavior.
+3. **Concise** — requirements state intent once; scenarios add distinct cases,
+   not paraphrases. Design and implementation detail live in their own
+   artifacts.
+4. **Bounded** — proposed changes record in-scope and out-of-scope behavior in
+   the changeset proposal; no `TODO`, `TBD`, or unresolved `[Unknown]` remains in
+   a `v1-mandatory` requirement at sign-off.
+5. **Traceable** — every requirement cites VISION/doctrine or a design contract,
+   and every `v1-mandatory` requirement has an implementation and verification
+   path before milestone closeout.
+
+When a change has a human-facing surface, consult `/th-design` for the relevant
+experience subdomain and translate its conclusions into observable scenarios.
+For delivery-quality constraints, consult project `craft-and-care` first, then
+the one relevant `/th-engineering` subskill when the project bar is silent.
+
+## Artifact Placement
+
+| Content | Home |
+|---|---|
+| Observable capability behavior | Main or delta spec requirement/scenario |
+| Why, value, scope, explicit non-goals | Changeset `proposal.md` |
+| State machines, wire/data contracts, technical trade-offs | Changeset `design.md` or project RFC |
+| Tests, observability, migration, rollback, review steps | Changeset tasks/acceptance criteria, unless itself observable behavior |
+| User-experience contract | Spec scenarios, informed by the relevant `/th-design` subskill |
 
 ## Formatting Conventions
 
@@ -157,6 +210,6 @@ Adapt categories to match the project's own architecture.
 ## Legacy Specs Without IDs
 
 Pre-existing specs missing `ID`/`Source`/`Scope` lines are not violations —
-`spec-trace-check.py` warns (errors only under `--strict`). Backfill
+`spec-trace-check.py` warns (errors under `--authoring` or `--strict`). Backfill
 opportunistically: any edit that touches a requirement adds its fields in the
 same change. New requirements always carry all three.

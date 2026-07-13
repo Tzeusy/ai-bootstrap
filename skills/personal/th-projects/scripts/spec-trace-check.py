@@ -9,18 +9,19 @@ Validates the spec side of the doctrine -> RFC -> spec -> test chain defined
 in th-projects references/spec-format.md:
 
   ERRORS (always fail):
-    - main spec using delta headings, or delta spec using main headings
+    - unsupported H2 headings for the detected main/delta spec kind
     - requirement with no scenario (main specs; delta ADDED/MODIFIED)
     - scenario without exactly 1 WHEN and 1 THEN bullet
     - duplicate or malformed requirement IDs (ID spec-name must match dir)
     - stale test citations: REQ- IDs cited in tests but absent from specs
 
-  WARNINGS (errors under --strict):
+  WARNINGS (field warnings are errors under --authoring or --strict):
     - requirement missing ID / Source / Scope lines (legacy specs)
+    - ID / Source / Scope not immediately after the requirement in that order
     - v1-mandatory requirement with no test citation (when a test tree exists)
 
 Usage:
-  uv run spec-trace-check.py <repo-root> [--tests-dir DIR ...] [--strict]
+  uv run spec-trace-check.py <repo-root> [--tests-dir DIR ...] [--authoring] [--strict]
 
 Exit 0 = clean (warnings allowed unless --strict). Exit 1 = findings.
 Exit 2 = no openspec/ tree found.
@@ -62,6 +63,7 @@ class Requirement:
     id_line: int | None = None
     has_source: bool = False
     scope: str | None = None
+    metadata_ordered: bool = False
     scenarios: int = 0
 
 
@@ -102,16 +104,30 @@ def parse_spec(path: Path, spec_name: str, is_delta: bool, f: Findings) -> list:
             cur = None
             h2 = m2.group(1).strip()
             cur_op = h2
-            if is_delta and h2 in MAIN_H2:
-                f.error(rel, i, f"delta spec uses main-spec heading '## {h2}' — use ADDED/MODIFIED/REMOVED/RENAMED Requirements")
-            elif not is_delta and h2 in DELTA_H2:
-                f.error(rel, i, f"main spec uses delta heading '## {h2}' — main specs use '## Requirements'")
+            allowed = DELTA_H2 if is_delta else MAIN_H2
+            if h2 not in allowed:
+                if is_delta and h2 in MAIN_H2:
+                    msg = f"delta spec uses main-spec heading '## {h2}'"
+                elif not is_delta and h2 in DELTA_H2:
+                    msg = f"main spec uses delta heading '## {h2}'"
+                else:
+                    kind = "delta" if is_delta else "main"
+                    expected = ", ".join(f"## {name}" for name in sorted(allowed))
+                    msg = f"unsupported {kind}-spec H2 '## {h2}' (allowed: {expected})"
+                f.error(rel, i, msg)
             continue
         m3 = re.match(r"^### Requirement:\s*(.+)$", line)
         if m3:
             close_scenario()
             cur = Requirement(title=m3.group(1).strip(), spec_name=spec_name,
                               file=path, line=i, op=cur_op or "?")
+            following = lines[i:i + 3]
+            cur.metadata_ordered = (
+                len(following) == 3
+                and ID_LINE_RE.match(following[0]) is not None
+                and SOURCE_LINE_RE.match(following[1]) is not None
+                and SCOPE_LINE_RE.match(following[2]) is not None
+            )
             reqs.append(cur)
             continue
         m4 = re.match(r"^#### Scenario:", line)
@@ -157,8 +173,13 @@ def check_requirements(reqs, f: Findings, strict_missing_fields: bool):
                 f.error(rel, r.id_line, f"ID '{r.req_id}' names spec '{m.group(1)}' but lives in spec '{r.spec_name}'")
             elif r.req_id in seen_ids:
                 prev = seen_ids[r.req_id]
-                if prev.op == "Requirements" and r.op != "Requirements" and prev.title == r.title:
-                    pass  # delta legitimately re-states a main-spec requirement it modifies
+                restates_existing = r.op in {
+                    "MODIFIED Requirements",
+                    "REMOVED Requirements",
+                    "RENAMED Requirements",
+                }
+                if prev.op == "Requirements" and restates_existing and prev.title == r.title:
+                    pass
                 else:
                     f.error(rel, r.id_line, f"duplicate ID '{r.req_id}' (also at {prev.file}:{prev.line})")
             else:
@@ -168,6 +189,9 @@ def check_requirements(reqs, f: Findings, strict_missing_fields: bool):
                    (("ID", r.req_id), ("Source", r.has_source), ("Scope", r.scope)) if not ok]
         if missing:
             report(rel, r.line, f"requirement '{r.title}' missing {'/'.join(missing)} line(s)")
+        elif not r.metadata_ordered:
+            report(rel, r.line,
+                   f"requirement '{r.title}' must place ID, Source, Scope immediately after its heading, in that order")
     return seen_ids
 
 
@@ -198,6 +222,8 @@ def main() -> int:
                     help="test directory relative to repo root (repeatable; default: auto-detect tests/ + test/)")
     ap.add_argument("--strict", action="store_true",
                     help="treat missing ID/Source/Scope and uncovered v1-mandatory requirements as errors")
+    ap.add_argument("--authoring", action="store_true",
+                    help="treat missing or displaced ID/Source/Scope as errors without requiring implementation test coverage")
     args = ap.parse_args()
 
     repo = args.repo_root.resolve()
@@ -210,17 +236,28 @@ def main() -> int:
     reqs: list[Requirement] = []
 
     for spec in sorted(openspec.glob("specs/*/spec.md")):
-        reqs += parse_spec(spec, spec.parent.name, is_delta=False, f=f)
+        parsed = parse_spec(spec, spec.parent.name, is_delta=False, f=f)
+        if (args.authoring or args.strict) and not parsed:
+            f.error(spec, 1, "spec file has no requirements")
+        reqs += parsed
     for spec in sorted(openspec.glob("changes/*/specs/*/spec.md")):
         if "archive" in spec.relative_to(openspec).parts:
             continue
-        reqs += parse_spec(spec, spec.parent.name, is_delta=True, f=f)
+        parsed = parse_spec(spec, spec.parent.name, is_delta=True, f=f)
+        if (args.authoring or args.strict) and not parsed:
+            f.error(spec, 1, "spec file has no requirements")
+        reqs += parsed
 
     if not reqs and not f.errors:
+        if args.authoring or args.strict:
+            print("ERROR  no requirements found under openspec/ — authoring/strict validation fails closed")
+            return 1
         print("no requirements found under openspec/ — nothing to check")
         return 0
 
-    seen_ids = check_requirements(reqs, f, strict_missing_fields=args.strict)
+    seen_ids = check_requirements(
+        reqs, f, strict_missing_fields=args.strict or args.authoring
+    )
 
     test_files = find_test_files(repo, args.tests_dir)
     cited: set[str] = set()
@@ -245,7 +282,13 @@ def main() -> int:
             if r.scope == "v1-mandatory" and rid not in cited:
                 report(r.file, r.line, f"v1-mandatory requirement '{rid}' has no test citation")
     else:
-        print("note: no test tree found — skipping test-citation coverage", file=sys.stderr)
+        mandatory = [r for r in reqs if r.scope == "v1-mandatory"]
+        if args.strict and mandatory:
+            for r in mandatory:
+                f.error(r.file, r.line,
+                        f"strict mode cannot verify test citation for '{r.req_id or r.title}' because no test files were found")
+        else:
+            print("note: no test tree found — skipping test-citation coverage", file=sys.stderr)
 
     for msg in f.errors + f.warnings:
         print(msg)

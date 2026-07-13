@@ -211,6 +211,14 @@ _Claims that were challenged in Phase 3.5 and did not survive. Not planning inpu
 
 {If no claims were invalidated, write: "All Critical/High/P0/P1 claims confirmed. Ledger empty."}
 
+### E. Evidence Gaps
+
+_Material unknowns that need bounded investigation. These are not confirmed
+risks and do not justify remediation until evidence is obtained._
+
+| Unknown | Why material | Evidence sought | Owner | Blocking? | Investigation | Revisit trigger |
+|---------|--------------|-----------------|-------|-----------|---------------|-----------------|
+
 ---
 
 **Verdict**: {exactly one of: Healthy | Healthy but fragile | Functional but accumulating debt | At risk | Severely at risk}

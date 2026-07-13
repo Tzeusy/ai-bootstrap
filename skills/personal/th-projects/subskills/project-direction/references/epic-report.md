@@ -28,14 +28,15 @@ Description: |
   Bootstrap with:
     bash <skill_dir>/scripts/epic-report-scaffold.sh {epic-id}
 
-  Then fill sections, generate diagrams via /th-engineering (excalidraw-diagram),
-  create follow-up beads, and commit.
+  Then fill sections, generate a diagram only when it materially improves
+  comprehension, triage discoveries, and commit.
 
 Acceptance criteria:
   - Report exists at docs/reports/{epic-id}-{slug}.md
-  - Architecture diagram(s) rendered and embedded
+  - Diagram decision recorded; useful diagrams rendered and embedded
   - Spec compliance matrix complete
-  - Follow-up beads created for remaining TODOs
+  - Discoveries classified and durably routed; no TODO auto-filed without triage
+  - Every in-scope v1-mandatory requirement implemented or changed by an approved spec amendment
   - Report linked to epic via bd update --append-notes
 ```
 
@@ -79,7 +80,9 @@ See the section guide below.
 
 ### Step 4: Generate diagrams
 
-Use `/th-engineering` (excalidraw-diagram) for architecture/workflow diagrams. Render to SVG (package standard — `--format svg` via the excalidraw-diagram render pipeline) and embed in the report markdown.
+When the sizing table below says a diagram materially improves comprehension,
+use `/th-engineering` (excalidraw-diagram), render to SVG, and embed it. Otherwise
+record "diagram not needed" with the reason; diagram tooling is not ceremony.
 
 **Color conventions**:
 - New/added components: `#a7f3d0` fill (green)
@@ -99,20 +102,37 @@ Use `/th-engineering` (excalidraw-diagram) for architecture/workflow diagrams. R
 
 Store diagram sources at `docs/reports/diagrams/<epic-id>-*.excalidraw` with rendered SVGs alongside.
 
-### Step 5: Create follow-up beads
+### Step 5: Triage discoveries
 
-For each TODO or gap found while writing the report:
+Load [`work-allocation.md`](../../../references/work-allocation.md). Classify each
+gap, TODO, unknown, or expanded idea before assigning it: current-spec work may
+stay in the epic when cohesive; boundary/spec changes return to feature-request;
+evidence gaps become bounded investigations; adjacent ideas enter the ideas
+ledger or a separate spec-first path. Never auto-parent every line item to the
+epic.
+
+For an authorized, independently verifiable follow-up outcome:
 
 ```bash
 NEW_ID=$(bd create --title="..." --type=task --priority=2 --parent=<epic-id> --json | jq -r '.id')
 bd dep add $NEW_ID <depends-on-id>  # if needed
 ```
 
-### Step 6: Close out
+### Step 6: Close out or fail closed
+
+Do not close the report bead or declare the epic complete while an in-scope
+`v1-mandatory` requirement is `Partially implemented`, `Contradicted`, or
+`Deferred`. Either finish the approved behavior or obtain an approved spec
+amendment that removes/reclassifies it. `Not applicable` also requires the
+governing spec to make that true.
+
+Refresh VISION mandate coverage. When uncovered mandates remain, record the
+milestone-close callback to project-direction's milestone synthesis before
+closing.
 
 ```bash
 bd update <epic-id> --append-notes "Epic report: docs/reports/<epic-id>-<slug>.md"
-bd close <report-bead-id> --reason="Report generated. Created N follow-up beads."
+bd close <report-bead-id> --reason="Report verified; mandatory spec coverage complete. Routed N discoveries."
 git add docs/reports/ && git commit -m "docs: epic report for <epic-id>"
 ```
 

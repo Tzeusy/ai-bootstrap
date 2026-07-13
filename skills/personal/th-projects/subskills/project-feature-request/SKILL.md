@@ -1,22 +1,20 @@
 ---
 name: project-feature-request
 description: >
-  Concretize a single fuzzy feature or project request into a signed-off
-  specification delta before any planning or implementation: extract the
-  motifs, gate against doctrine, place it in the topology, sketch the design,
-  and write testable WHEN/THEN scenarios. Also the fast amendment path when
-  implementation reveals a spec is wrong or ambiguous. Use when someone
-  proposes one concrete thing to build. Triggers: "I want to add X", "spec
-  this feature", "turn this idea into requirements", "flesh out this request",
-  "what would it take to build X", "write a spec for X", "the spec is wrong",
-  "the spec doesn't match what I'm building".
+  Use when one concrete feature or project request is still fuzzy and needs a
+  signed-off behavior specification before planning or implementation, or when
+  implementation reveals its governing spec is wrong, ambiguous, or incomplete.
+  Triggers: "I want to add X", "spec this feature", "turn this idea into
+  requirements", "what would it take to build X", "write a spec for X", "the
+  spec is wrong", "the spec doesn't match what I'm building".
 metadata:
   owner: tze
   authors:
     - tze
     - Claude Fable 5
+    - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-05"
+  last_reviewed: "2026-07-13"
 ---
 
 # Project Feature Request
@@ -42,7 +40,7 @@ Classify early; it sets every gate's depth:
 |------|---------|-----------|
 | **Small** | One component, no new boundaries, no doctrine tension | All gates inline in one pass; minutes, not sessions |
 | **Medium** | Several components, new external surface, or observable-behavior changes | Each gate answered explicitly in funnel summary; design sketch required |
-| **Large** | New subsystem, doctrine implications, or cross-boundary contracts | Subagent per gate; independent review of spec delta before sign-off |
+| **Large** | New subsystem, doctrine implications, or cross-boundary contracts | One funnel owner; add a dedicated specialist only for an independent artifact or contested gate; independent spec review before sign-off |
 
 ## Interview Discipline
 
@@ -90,18 +88,24 @@ request that lives "everywhere" isn't concrete — return to Gate 1.
 **Gate 4 — Design sketch.** Medium+ → draft the design delta: state machines,
 wire contracts, trade-offs considered, in `about/legends-and-lore/` style (see
 `../project-shape/references/pillar-legends-and-lore.md`). Small → one sentence
-on why no sketch is needed.
+on why no sketch is needed. Human-facing surface → load `/th-design`, select
+only the relevant subskill (design-bar by default; discoverability,
+accessibility, interaction-speed, information-design, or visual-language when
+specifically implicated), and make its conclusions part of the behavior
+contract. Backend-only work does not load `/th-design`.
 
 **Gate 5 — Specification.** Write the spec delta: WHEN/THEN scenarios,
-acceptance criteria, explicit **out of scope** list, per
+behavioral completeness sweep, per
 `../../references/spec-format.md` and existing `openspec/` conventions (active
-changes override main specs — extend, don't fork).
+changes override main specs — extend, don't fork). Put scope/non-goals in the
+changeset proposal and design details in the design/RFC artifact; keep the
+capability spec strictly observable.
 
 **Gate 6 — Engineering bar.** Pull relevant standards from
-`about/craft-and-care/` (testing discipline, observability, review
-expectations) into acceptance criteria so quality is specified, not hoped for.
-Craft-and-care absent → assumed bar is `/th-engineering`'s engineering-bar
-default biases; cite that explicitly rather than inventing one.
+`about/craft-and-care/` into the changeset tasks/acceptance contract. When the
+project bar is absent or silent, load `/th-engineering` and its one relevant
+subskill; do not copy the whole router. Quality constraints enter capability
+scenarios only when externally observable.
 
 ## Amendment Mode (mid-implementation)
 
@@ -110,9 +114,11 @@ that the governing spec is wrong, ambiguous, or incomplete. Spec drift is
 created at exactly this moment — catching it here keeps project-review's
 exhaustive reconciliation a backstop, not routine maintenance.
 
-Run Gates 5–6 only, sized Small, after a one-line Gate 2 sanity check (the
-correction touches doctrine → full funnel, and possibly
-`../project-shape/references/doctrine-amendment.md`):
+Start with a Gate 2 VISION sanity check, then route by blast radius — not by the
+word "amendment": behavior-only clarification → Gates 5–6; user-experience,
+boundary, topology, or contract change → resume at Gate 3 or 4; doctrine impact
+→ full funnel and possibly
+`../project-shape/references/doctrine-amendment.md`.
 
 - Amend the artifact that governs the work: the active changeset the task came
   from, or the main spec when the correction is bookkeeping of
@@ -124,13 +130,17 @@ correction touches doctrine → full funnel, and possibly
 - Sign-off: still the user's for observable-behavior changes; a pure ambiguity
   clarification (no behavior change) may proceed with a note in the bead.
 
-Kill condition: the "correction" is actually new scope → stop; it's a new
-request through the full funnel.
+Kill condition: the "correction" is actually new scope → record it durably in
+the ideas ledger or a separate spec-first bead, keep it out of the active bead,
+and run it through the full funnel. Do not lose it and do not implement it
+silently.
 
 ## Sign-off and Handoff
 
-Present the funnel summary: sizing, each gate's outcome with evidence, the spec
-delta, open questions. Then:
+Present the funnel summary: sizing, each gate's outcome with evidence, the
+doctrine/spec baseline commit, the spec delta, open questions, and the human
+sign-off identity/date. A stale baseline is not approval: revalidate affected
+VISION mandates before allocation. Then:
 
 - **Approved** → hand the spec delta to `../project-direction/SKILL.md` for
   sequencing and decomposition; for a small single-task request, file directly

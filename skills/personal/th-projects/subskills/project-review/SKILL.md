@@ -1,14 +1,15 @@
 ---
 name: project-review
-description: Use when auditing a repository's overall health, tech debt, maintainability, or architecture quality; processing a third-party repo-wide audit; or reconciling OpenSpec specs against the implementation (bidirectional gap analysis and remediation). For repository-level assessment such as "review this project", "audit the codebase", "assess project health", or "reconcile spec vs implementation" — not single-PR review.
+description: Use when auditing a repository's overall health, tech debt, maintainability, or architecture quality; processing a third-party repo-wide audit; or exhaustively reconciling OpenSpec specs against implementation. Triggers include "review this project", "audit the codebase", "assess project health", "does code match the spec", and "reconcile spec vs implementation" — not single-PR review or backlog prioritization.
 metadata:
   owner: tze
   authors:
     - tze
     - Claude Fable 5
     - Claude Sonnet 4.6
+    - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-05"
+  last_reviewed: "2026-07-13"
 ---
 
 # Project Review
@@ -27,7 +28,8 @@ Every major claim cites specific files/sections. Label assertions [Observed] / [
 
 ### Phase 0 — Normative baseline via `/project-shape`
 
-Read `../project-shape/SKILL.md`, then:
+Run project-shape's scanner directly; load its maturity rubric only when
+interpreting the score. Do not load the full sibling skill for this baseline:
 
 ```bash
 bash ../project-shape/scripts/shape-scan.sh <repo_root>
@@ -81,8 +83,14 @@ Dispatch plan:
 
 Strategy:
 - Launch A-F in parallel for a full review.
-- Pass the Phase 0 baseline packet + Phase 1 scan output to every subagent.
+- Pass artifact paths plus a compact Phase 0 manifest and scoped scan excerpt;
+  do not paste the same full baseline/scan into every prompt. Assign one primary
+  evidence owner per concern so overlapping domains cite rather than rescan.
 - Change-level quality bars live in `/th-engineering` subskills — B: code-readability + dependency-hygiene; C: test-rigor (+ diagnosis for flake/root-cause evidence); E: documentation. When craft-and-care is absent/silent on a domain, agents cite those bars rather than inventing criteria; `investigation-guides.md` stays the evidence checklist, not a second bar.
+- Human-facing surfaces load `/th-design` only for implicated experience
+  concerns (design-bar by default; accessibility, discoverability,
+  information-design, interaction-speed, or visual-language when specific).
+  Backend-only scopes do not pay this context cost.
 - Agent F's roadmap draft is advisory only — no beads, no scheduling.
 
 Each subagent receives: Phase 0 baseline packet · shape-scan output · project-scan output · project context (type/users/maturity/scope) · its domain section from `investigation-guides.md` · relevant rubric sections from [`references/scoring-rubric.md`](references/scoring-rubric.md) · relevant calibration from `project-type-adaptations.md`.
@@ -135,7 +143,7 @@ Output the report per `report-template.md`. Make the boundary explicit: `project
 - **Focused review** (user names categories): dispatch only relevant subagents. Still include normative baseline, scorecard for scoped categories, risk register, handoff packet.
 - **Quick health check** (fast answer): shape scan + project scan + Agent A, then a brief orchestrator sweep of obvious high-risk areas (tests, CI, auth/secrets, docs). Output: exec summary, provisional scorecard, top 5 risks, explicit low-confidence markers. Don't pass this off as a full review.
 - **Third-party deep-dive** ("process this review/audit"): fact-check external findings, filter through actual context, convert confirmed findings into a handoff packet, route planning to `/project-direction`. Read [`references/third-party-review.md`](references/third-party-review.md) for the five-step protocol.
-- **Spec reconciliation** ("reconcile spec vs implementation", "what's implemented but undocumented", "what's specified but missing"): exhaustive bidirectional spec↔code mapping with remediation — undocumented features get specs, unimplemented requirements get beads, strategic gaps escalate to `/project-direction`. Read [`references/spec-reconciliation.md`](references/spec-reconciliation.md). Samples nothing; the one mode permitted to create remediation artifacts, since each traces 1:1 to a confirmed spec gap.
+- **Spec reconciliation** ("reconcile spec vs implementation", "what's implemented but undocumented", "what's specified but missing"): exhaustive bidirectional spec↔code mapping, report-only by default. Remediation requires explicit authorization; then observed behavior gets spec bookkeeping, cohesive unimplemented outcomes get beads, and strategic gaps escalate to `/project-direction`. Read [`references/spec-reconciliation.md`](references/spec-reconciliation.md). Samples nothing.
 
 ## Anti-patterns
 
@@ -150,7 +158,7 @@ Output the report per `report-template.md`. Make the boundary explicit: `project
 
 | File | Read when | Answers |
 |------|-----------|---------|
-| [`../project-shape/SKILL.md`](../project-shape/SKILL.md) | Phase 0 | Five-pillar model, shape assessment workflow, normative source hierarchy |
+| [`../project-shape/references/maturity-rubric.md`](../project-shape/references/maturity-rubric.md) | Phase 0 score interpretation | Conservative per-pillar/repo maturity rules; load only when the scanner result needs interpretation |
 | [`../project-direction/SKILL.md`](../project-direction/SKILL.md) | Phase 3-4 | Planning contract, sequencing expectations, handoff target |
 | [`references/scoring-rubric.md`](references/scoring-rubric.md) | Phase 2 | 1-5 criteria per category with evidence guidance |
 | [`references/investigation-guides.md`](references/investigation-guides.md) | Phase 2 | Per-domain checklists, search patterns, deliverables |

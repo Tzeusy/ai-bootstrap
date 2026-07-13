@@ -82,7 +82,7 @@ Assign exactly one label:
 | `[Confirmed]` | Keep in risk register / roadmap. Add both supporting and contradictory evidence checked to the finding body. |
 | `[Overstated]` | Demote severity by at least one tier. Rewrite the claim to reflect actual scope. Keep in risk register at lower severity. |
 | `[Incorrect]` | Remove from risk register and roadmap. Add to Veracity Ledger with invalidating evidence. |
-| `[Unverifiable]` | Remove from risk register and roadmap. Add to Veracity Ledger with the reason evidence could not be obtained. Optionally note as a low-confidence observation if still useful. |
+| `[Unverifiable]` | Remove the unproven claim from risk register/roadmap. Add it to the Veracity Ledger and, when plausible impact is material, to an Evidence Gaps lane with evidence target, owner, blocking status, bounded investigation, and revisit trigger. |
 
 ---
 
@@ -124,8 +124,16 @@ Every invalidated claim goes into the Veracity Ledger (Appendix D of
 - is **excluded** from the risk register, roadmap, and handoff packet
 
 The ledger is included in the delivered report as an audit trail. Reviewers
-and project-direction planners must not treat Veracity Ledger entries as
-planning inputs.
+and project-direction planners must not treat the invalidated claim as fact.
+An explicitly separated Evidence Gaps lane may be planning input only for the
+investigation needed to obtain evidence, never for the claimed remediation.
+
+### Evidence gap entry format
+
+```markdown
+| Unknown | Why material | Evidence sought | Owner | Blocking? | Investigation | Revisit trigger |
+|---------|--------------|-----------------|-------|-----------|---------------|-----------------|
+```
 
 ### Ledger entry format
 

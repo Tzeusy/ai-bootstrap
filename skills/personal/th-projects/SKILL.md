@@ -17,8 +17,9 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-05"
+  last_reviewed: "2026-07-13"
 compatibility: Subskill scripts require bash, git, grep, find. project-direction additionally assumes the bd (beads) CLI and an OpenSpec-capable environment for changeset synthesis.
 ---
 
@@ -42,11 +43,12 @@ Four subskills, one lifecycle:
 4. **Direction** — baseline + spec deltas + findings → prioritized, spec-linked
    work plan; hand execution to beads.
 
-Two loop-backs close the lifecycle: implementation discoveries re-enter via
-feature-request's **amendment mode** (spec wrong/ambiguous mid-task — the
-per-change drift fix; review's exhaustive reconciliation is the backstop), and
-vision generates new work via direction's **milestone synthesis** (doctrine →
-candidate milestones, no proposal needed).
+VISION is a **continuous constraint**, not a one-time gate: proposal, spec,
+allocation, implementation discovery, reconciliation, and milestone closeout
+must still serve cited doctrine. Implementation discoveries re-enter at the
+earliest affected feature-request gate; milestone closeout returns uncovered
+mandates to direction's **milestone synthesis**. The lifecycle stops only at a
+hard human gate or when the approved spec is achieved and verified.
 
 ## Discover subskills
 
@@ -84,6 +86,11 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   reference). Backlog mechanics without direction analysis →
   `/beads-orchestration` (beads-writer). AI-tooling harness hygiene (installed
   skills, dotfiles, snapshot state) → `/th-tooling`.
+- **Design and engineering bars**: user-facing behavior or interaction contracts
+  → `/th-design`; implementation quality, tests, dependencies, diagnosis, docs,
+  or diagrams → `/th-engineering`. Load the router only when the concern exists,
+  then its one relevant subskill; carry conclusions into the spec or bead rather
+  than copying whole skill bodies.
 - **Fallback**: project-adjacent but no row fits → answer from router context or
   ask. Do not load a subskill to browse.
 
@@ -102,6 +109,17 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 - Per-change spec sync: an implementation task that changes observable behavior
   amends its governing spec in the same task (feature-request amendment mode).
   Episodic reconciliation is the backstop, never the mechanism.
+- VISION/doctrine remains binding after sign-off. Record the baseline commit in
+  spec handoffs; if it changed, revalidate affected mandates before allocation
+  or resumption.
+- Gap, TODO, unknown, and adjacent idea discovery is proactive but never silent
+  scope expansion. Classify it as current-spec correction, boundary/design
+  change, evidence unknown, new scope, or local debt; route to the earliest
+  governing gate and record it durably.
+- Work graphs follow
+  [`references/work-allocation.md`](references/work-allocation.md): one bead and
+  primary agent per cohesive independently verifiable outcome, with enough work
+  to amortize context/worktree/CI/review overhead and no overlapping ownership.
 - Autonomy contract — what agents may do without the human:
 
   | Artifact | Agent may | Human must |

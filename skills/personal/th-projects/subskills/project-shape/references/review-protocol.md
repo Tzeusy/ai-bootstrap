@@ -141,7 +141,9 @@ Output: Ranked list of cross-pillar issues, each with affected documents and fix
 ### For New Projects (bootstrapping)
 
 1. **Generate** — consultative bootstrapping protocol per document, preferring per-pillar subagents when substantial
-2. **Review sequentially** — after each doc, run Review Agents 1 and 2
+2. **Review stable clusters** — after a coherent pillar/doc cluster stabilizes,
+   run one fresh reviewer with Coherence + Adversarial lenses; split the lenses
+   only for high-risk or contested artifacts
 3. **Revise** — incorporate findings, re-synthesize if needed
 4. **Cross-review** — after all pillars exist, run Review Agent 3
 5. **Present** — reviewed docs + summary of what changed during review
@@ -150,23 +152,27 @@ Output: Ranked list of cross-pillar issues, each with affected documents and fix
 
 1. **Detect drift** — code diverges from docs → flag for review
 2. **Update** — generate updated sections, per-pillar curation subagents when multiple pillars affected
-3. **Review the delta** — Review Agents 1 and 2 on changed sections only
+3. **Review the delta** — one fresh reviewer applies Coherence + Adversarial to
+   the changed cluster; split only when risk warrants
 4. **Cross-check** — Review Agent 3 if changes affect cross-pillar coherence
 5. **Present** — diff + review findings
 
 ### Iteration Rules
 
-- **First round**: always run both Coherence and Adversarial
+- **First round**: always apply both Coherence and Adversarial lenses; they may
+  share one fresh invocation for a coherent cluster
 - **Second round**: only if first round produced REVISE verdicts on major items
 - **Third round**: stop. Three non-converging rounds means the issue is upstream (unclear user intent) — return to interview
-- **Cross-pillar**: after every pillar added or substantially changed
+- **Cross-pillar**: at stable convergence points, and again only when a revision
+  changes a cross-pillar contract
 
 ## Model Configuration for Review Agents
 
 - Capable model, no extended thinking needed — evaluating, not generating
 - Key requirement: **fresh context** — review agent must NOT see the generation conversation
 - Use `Agent` tool with a clean prompt (no history) for independence
-- Each review agent runs in its own invocation — do not batch reviews
+- Do not batch unrelated pillars into one reviewer. Combining review lenses on
+  one coherent artifact is encouraged; combining unrelated artifacts is not.
 
 ## Fallback When Subagents Are Unavailable
 
