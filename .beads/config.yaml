@@ -62,6 +62,8 @@ dolt.database: "aib"
 
 export.git-add: false
 
-export.auto: true
+export.auto: false
 
 export.interval: 0
+
+sync.remote: "https://github.com/Tzeusy/ai-bootstrap"
