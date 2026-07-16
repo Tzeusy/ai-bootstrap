@@ -314,6 +314,22 @@ else
   fi
 
   rc=0
+  out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/single-restatements" --authoring 2>&1) || rc=$?
+  if [[ $rc -eq 0 ]]; then
+    _pass "spec-trace: one matching MODIFIED or REMOVED delta may restate each main-spec ID"
+  else
+    _fail "spec-trace: allowed main-plus-one restatement failed (exit $rc): $out"
+  fi
+
+  rc=0
+  out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/multiple-restatements" --authoring 2>&1) || rc=$?
+  if [[ $rc -eq 1 ]] && echo "$out" | grep -q "duplicate ID 'REQ-core-auth-001'"; then
+    _pass "spec-trace: multiple active deltas cannot restate one main-spec ID"
+  else
+    _fail "spec-trace: multiple active deltas reused a main-spec ID (exit $rc): $out"
+  fi
+
+  rc=0
   out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/violations" 2>&1) || rc=$?
   if [[ $rc -ne 1 ]]; then
     _fail "spec-trace: violations fixture expected exit 1, got $rc"
