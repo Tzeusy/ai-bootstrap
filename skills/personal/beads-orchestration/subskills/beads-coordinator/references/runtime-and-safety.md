@@ -70,12 +70,17 @@ The coordinator has discretion on subagent model choice based on task type.
 
 ### Complexity Constants
 
-| Strategy | Models (subject to change) |
-|---|---|
-| `EPIC_COMPLEXITY_MODEL` | Opus 4.8, gpt-5.3-codex, gemini-3-pro |
-| `HIGH_COMPLEXITY_MODEL` | Sonnet 4.6, gpt-5.3-codex, gemini-3-pro |
-| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 4.6, gpt-5.3-codex, gemini-3-pro |
-| `LOW_COMPLEXITY_MODEL` | 4.5 Haiku, gpt-5.3-codex-spark, gemini-3-flash-preview |
+| Strategy | Claude | ChatGPT | Gemini |
+|---|---|---|---|
+| `EPIC_COMPLEXITY_MODEL` | Opus 4.8 | 5.6 Sol Max | gemini-3-pro |
+| `HIGH_COMPLEXITY_MODEL` | Sonnet 5 | 5.6 Terra Max | gemini-3-pro |
+| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5 | 5.6 Luna High | gemini-3-pro |
+| `LOW_COMPLEXITY_MODEL` | 4.5 Haiku | 5.6 Luna Medium | gemini-3-flash-preview |
+
+The ChatGPT column is a Pareto frontier: move up only when the assigned
+complexity tier requires it. Reserve Sol Max for the most complicated tasks at
+`EPIC_COMPLEXITY_MODEL`; never use it for high-, medium-, or low-complexity
+work.
 
 ### Assignment Rules
 
