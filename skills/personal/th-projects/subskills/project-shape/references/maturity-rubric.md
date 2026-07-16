@@ -69,3 +69,24 @@ The scanner currently uses conservative text heuristics rather than full semanti
 - **Topology cross-links**: mentions of RFCs, doctrine, specs, or pillar names in topology docs
 
 These heuristics are intentionally strict. False negatives are preferable to flattering false positives.
+
+The active spec corpus includes canonical `openspec/specs/**/spec.md` files and
+specs under direct children of `openspec/changes/`. It excludes
+`openspec/changes/archive/` so historical scaffolds and superseded traceability
+do not dilute the current project assessment.
+
+## Machine-Checkable Gates
+
+Every scan ends with stable `KEY=value` lines:
+
+- `SHAPE_LEVEL` is `UNSHAPED`, `NASCENT`, `STRUCTURED`, `SHAPED`, or `MATURE`.
+- `MATURE_TRACEABILITY_GATE` is `PASS` only when every mature traceability
+  threshold above passes; otherwise it is `FAIL`.
+- `ACTIVE_CHANGE_COUNT` excludes the `archive` container.
+- `ACTIVE_SPEC_COUNT`, `ACTIVE_SPEC_SOURCE_COUNT`, and
+  `ACTIVE_SPEC_SCENARIO_COUNT` describe only the active spec corpus.
+
+Automation may gate mature readiness with both
+`SHAPE_LEVEL=MATURE` and `MATURE_TRACEABILITY_GATE=PASS`. A fully structured
+project that misses either the authorship/navigation checks or a traceability
+threshold remains `SHAPED`.
