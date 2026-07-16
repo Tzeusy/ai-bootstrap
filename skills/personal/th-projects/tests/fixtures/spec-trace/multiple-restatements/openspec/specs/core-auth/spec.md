@@ -1,7 +1,7 @@
 # Core Auth
 
 ## Purpose
-Defines authentication behavior.
+Defines signed session-token issuance, rotation, revocation, and retirement behavior.
 
 ## Requirements
 
