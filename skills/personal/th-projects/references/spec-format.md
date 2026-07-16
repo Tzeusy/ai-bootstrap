@@ -84,7 +84,9 @@ Three plain-text lines immediately after each `### Requirement:` heading:
 - **ID** — `REQ-{spec-name}-NNN`; `{spec-name}` is the spec directory name,
   `NNN` zero-padded and unique within the spec. IDs are permanent: `MODIFIED`
   keeps the ID, `REMOVED` retires it forever (never reuse), `ADDED` takes the
-  next free number across main + active delta specs.
+  next free number across main + active delta specs. A main requirement may
+  pair with one matching active `MODIFIED` or `REMOVED` restatement; a second
+  active delta restating that identity is a conflict and must be reconciled.
 - **Source** — what justifies the requirement: RFC section
   (`RFC 0003 §2.1`), doctrine principle (`heart-and-soul/vision.md #3`), or
   observed behavior (`[Observed] src/config/loader.py`). One line, citable.

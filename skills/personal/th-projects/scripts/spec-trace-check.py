@@ -161,6 +161,7 @@ def parse_spec(path: Path, spec_name: str, is_delta: bool, f: Findings) -> list:
 
 def check_requirements(reqs, f: Findings, strict_missing_fields: bool):
     seen_ids: dict[str, Requirement] = {}
+    restated_ids: set[str] = set()
     for r in reqs:
         rel, needs_scenarios = r.file, r.op not in SCENARIO_FREE_OPS
         if needs_scenarios and r.scenarios == 0:
@@ -176,10 +177,14 @@ def check_requirements(reqs, f: Findings, strict_missing_fields: bool):
                 restates_existing = r.op in {
                     "MODIFIED Requirements",
                     "REMOVED Requirements",
-                    "RENAMED Requirements",
                 }
-                if prev.op == "Requirements" and restates_existing and prev.title == r.title:
-                    pass
+                if (
+                    prev.op == "Requirements"
+                    and restates_existing
+                    and prev.title == r.title
+                    and r.req_id not in restated_ids
+                ):
+                    restated_ids.add(r.req_id)
                 else:
                     f.error(rel, r.id_line, f"duplicate ID '{r.req_id}' (also at {prev.file}:{prev.line})")
             else:
