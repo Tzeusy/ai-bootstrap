@@ -250,6 +250,8 @@ check_pattern "$ROUTER" 'Gap|TODO|adjacent idea' \
   "router: proactive discovery capture is explicit"
 check_pattern "$SPEC_FORMAT" '^## Semantic Quality Gate' \
   "spec format: semantic clarity/completeness gate exists"
+check_pattern "$SPEC_FORMAT" 'normative SHALL/MUST paragraph.*contiguous.*ID.*Source.*Scope.*scenarios' \
+  "spec format: canonical requirement ordering is explicit"
 check_pattern "$FEATURE_SKILL" '/th-design' \
   "feature request: user-surface specs route to th-design"
 if require_file "$WORK_ALLOCATION" \
@@ -287,6 +289,24 @@ else
     _pass "spec-trace: clean authoring fixture passes (exit 0)"
   else
     _fail "spec-trace: clean authoring fixture failed (exit $rc): $out"
+  fi
+
+  rc=0
+  out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/ordering-violations" 2>&1) || rc=$?
+  if [[ $rc -ne 1 ]]; then
+    _fail "spec-trace: ordering violations fixture expected exit 1, got $rc"
+  else
+    _pass "spec-trace: ordering violations fixture fails (exit 1)"
+    for expected in "normative SHALL/MUST paragraph before ID/Source/Scope" \
+                    "contiguous ID, Source, Scope after its normative paragraph" \
+                    "place ID, Source, Scope before its first scenario" \
+                    "place scenarios immediately after ID, Source, Scope"; do
+      if echo "$out" | grep -q "$expected"; then
+        _pass "spec-trace: ordering violations output reports '$expected'"
+      else
+        _fail "spec-trace: ordering violations output missing expected finding '$expected'"
+      fi
+    done
   fi
 
   rc=0

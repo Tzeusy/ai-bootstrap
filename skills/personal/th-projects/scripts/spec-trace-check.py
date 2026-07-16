@@ -14,10 +14,11 @@ in th-projects references/spec-format.md:
     - scenario without exactly 1 WHEN and 1 THEN bullet
     - duplicate or malformed requirement IDs (ID spec-name must match dir)
     - stale test citations: REQ- IDs cited in tests but absent from specs
+    - requirement block ordering is not heading, normative SHALL/MUST
+      paragraph, contiguous ID / Source / Scope, then scenarios
 
   WARNINGS (field warnings are errors under --authoring or --strict):
     - requirement missing ID / Source / Scope lines (legacy specs)
-    - ID / Source / Scope not immediately after the requirement in that order
     - v1-mandatory requirement with no test citation (when a test tree exists)
 
 Usage:
@@ -47,6 +48,7 @@ ID_LINE_RE = re.compile(r"^ID:\s*(\S+)\s*$")
 ID_FORMAT_RE = re.compile(r"^REQ-([a-z0-9-]+)-(\d{3})$")
 SOURCE_LINE_RE = re.compile(r"^Source:\s*\S")
 SCOPE_LINE_RE = re.compile(r"^Scope:\s*(v1-mandatory|v1-reserved|post-v1)\s*$")
+NORMATIVE_RE = re.compile(r"\b(?:SHALL|MUST)\b")
 TEST_ID_RE = re.compile(r"REQ[-_][a-z0-9]+(?:[-_][a-z0-9]+)*[-_]\d{3}", re.IGNORECASE)
 TEST_FILE_HINT = re.compile(r"(^|[._-])(test|spec)s?([._-]|$)", re.IGNORECASE)
 TEST_SUFFIXES = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".java", ".kt", ".rb", ".sh", ".ex", ".exs", ".cs", ".swift"}
@@ -63,7 +65,10 @@ class Requirement:
     id_line: int | None = None
     has_source: bool = False
     scope: str | None = None
+    normative_first: bool = False
     metadata_ordered: bool = False
+    metadata_before_scenarios: bool = True
+    scenarios_after_metadata: bool = True
     scenarios: int = 0
 
 
@@ -121,13 +126,68 @@ def parse_spec(path: Path, spec_name: str, is_delta: bool, f: Findings) -> list:
             close_scenario()
             cur = Requirement(title=m3.group(1).strip(), spec_name=spec_name,
                               file=path, line=i, op=cur_op or "?")
-            following = lines[i:i + 3]
-            cur.metadata_ordered = (
-                len(following) == 3
-                and ID_LINE_RE.match(following[0]) is not None
-                and SOURCE_LINE_RE.match(following[1]) is not None
-                and SCOPE_LINE_RE.match(following[2]) is not None
-            )
+            block_end = len(lines)
+            for candidate in range(i, len(lines)):
+                if re.match(r"^##(?:# Requirement:)?\s", lines[candidate]):
+                    block_end = candidate
+                    break
+            block = lines[i:block_end]
+            nonblank = [offset for offset, value in enumerate(block) if value.strip()]
+            scenario_offsets = [
+                offset for offset, value in enumerate(block)
+                if re.match(r"^#### Scenario:", value)
+            ]
+            first_scenario = scenario_offsets[0] if scenario_offsets else len(block)
+
+            id_offsets = []
+            source_offsets = []
+            scope_offsets = []
+            for offset, value in enumerate(block):
+                mid = ID_LINE_RE.match(value)
+                if mid:
+                    id_offsets.append(offset)
+                    if cur.req_id is None:
+                        cur.req_id, cur.id_line = mid.group(1), i + offset + 1
+                if SOURCE_LINE_RE.match(value):
+                    source_offsets.append(offset)
+                    cur.has_source = True
+                msc = SCOPE_LINE_RE.match(value)
+                if msc:
+                    scope_offsets.append(offset)
+                    if cur.scope is None:
+                        cur.scope = msc.group(1)
+                elif value.startswith("Scope:"):
+                    f.error(path, i + offset + 1,
+                            f"invalid Scope value: {value!r} (use v1-mandatory | v1-reserved | post-v1)")
+
+            if nonblank:
+                paragraph_start = nonblank[0]
+                paragraph_end = paragraph_start
+                while paragraph_end + 1 < len(block) and block[paragraph_end + 1].strip():
+                    paragraph_end += 1
+                paragraph = "\n".join(block[paragraph_start:paragraph_end + 1])
+                cur.normative_first = NORMATIVE_RE.search(paragraph) is not None
+
+                metadata_start = paragraph_end + 1
+                while metadata_start < len(block) and not block[metadata_start].strip():
+                    metadata_start += 1
+                expected = block[metadata_start:metadata_start + 3]
+                cur.metadata_ordered = (
+                    cur.normative_first
+                    and len(expected) == 3
+                    and ID_LINE_RE.match(expected[0]) is not None
+                    and SOURCE_LINE_RE.match(expected[1]) is not None
+                    and SCOPE_LINE_RE.match(expected[2]) is not None
+                )
+                if cur.metadata_ordered and scenario_offsets:
+                    after_metadata = metadata_start + 3
+                    while after_metadata < len(block) and not block[after_metadata].strip():
+                        after_metadata += 1
+                    cur.scenarios_after_metadata = after_metadata == first_scenario
+
+            metadata_offsets = id_offsets + source_offsets + scope_offsets
+            if metadata_offsets:
+                cur.metadata_before_scenarios = max(metadata_offsets) < first_scenario
             reqs.append(cur)
             continue
         m4 = re.match(r"^#### Scenario:", line)
@@ -143,18 +203,6 @@ def parse_spec(path: Path, spec_name: str, is_delta: bool, f: Findings) -> list:
             elif re.match(r"^-\s+\*\*THEN\*\*", line):
                 then_count += 1
             continue
-        if cur and cur.scenarios == 0:
-            mid = ID_LINE_RE.match(line)
-            if mid:
-                cur.req_id, cur.id_line = mid.group(1), i
-            elif SOURCE_LINE_RE.match(line):
-                cur.has_source = True
-            else:
-                msc = SCOPE_LINE_RE.match(line)
-                if msc:
-                    cur.scope = msc.group(1)
-                elif line.startswith("Scope:"):
-                    f.error(rel, i, f"invalid Scope value: {line!r} (use v1-mandatory | v1-reserved | post-v1)")
     close_scenario()
     return reqs
 
@@ -184,14 +232,23 @@ def check_requirements(reqs, f: Findings, strict_missing_fields: bool):
                     f.error(rel, r.id_line, f"duplicate ID '{r.req_id}' (also at {prev.file}:{prev.line})")
             else:
                 seen_ids[r.req_id] = r
-        report = f.error if strict_missing_fields else f.warn
+        field_report = f.error if strict_missing_fields else f.warn
         missing = [name for name, ok in
                    (("ID", r.req_id), ("Source", r.has_source), ("Scope", r.scope)) if not ok]
         if missing:
-            report(rel, r.line, f"requirement '{r.title}' missing {'/'.join(missing)} line(s)")
+            field_report(rel, r.line, f"requirement '{r.title}' missing {'/'.join(missing)} line(s)")
+        elif not r.normative_first:
+            f.error(rel, r.line,
+                    f"requirement '{r.title}' must place a normative SHALL/MUST paragraph before ID/Source/Scope")
+        elif not r.metadata_before_scenarios:
+            f.error(rel, r.line,
+                    f"requirement '{r.title}' must place ID, Source, Scope before its first scenario")
         elif not r.metadata_ordered:
-            report(rel, r.line,
-                   f"requirement '{r.title}' must place ID, Source, Scope immediately after its heading, in that order")
+            f.error(rel, r.line,
+                    f"requirement '{r.title}' must place contiguous ID, Source, Scope after its normative paragraph")
+        elif needs_scenarios and not r.scenarios_after_metadata:
+            f.error(rel, r.line,
+                    f"requirement '{r.title}' must place scenarios immediately after ID, Source, Scope")
     return seen_ids
 
 
@@ -223,7 +280,7 @@ def main() -> int:
     ap.add_argument("--strict", action="store_true",
                     help="treat missing ID/Source/Scope and uncovered v1-mandatory requirements as errors")
     ap.add_argument("--authoring", action="store_true",
-                    help="treat missing or displaced ID/Source/Scope as errors without requiring implementation test coverage")
+                    help="treat missing ID/Source/Scope as errors without requiring implementation test coverage")
     args = ap.parse_args()
 
     repo = args.repo_root.resolve()
