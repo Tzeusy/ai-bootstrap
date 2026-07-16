@@ -62,11 +62,11 @@ Main spec:
 ## Requirements
 
 ### Requirement: {Requirement Title}
+{1-2 sentence normative description containing SHALL or MUST}
+
 ID: REQ-{spec-name}-001
 Source: {RFC/design-doc §section, doctrine principle, or [Observed] code ref}
 Scope: v1-mandatory
-
-{1-2 sentence normative description; SHALL/MUST/SHOULD per RFC 2119}
 
 #### Scenario: {Scenario Name}
 - **WHEN** {condition/trigger}
@@ -77,9 +77,14 @@ Scope: v1-mandatory
 Delta spec: identical requirement/scenario blocks under the delta-operation
 H2s instead of `## Requirements`, and no `## Purpose` section.
 
+## Requirement Block Ordering
+
+The canonical block order is: requirement heading → normative SHALL/MUST paragraph → contiguous `ID`, `Source`, `Scope` lines → scenarios. The normative paragraph must be the first non-empty content after the heading so OpenSpec 1.3.1 recognizes the requirement; metadata-first blocks are invalid. Keep the three metadata lines adjacent, and put the first scenario immediately after them without displaced prose.
+
 ## Traceability Fields
 
-Three plain-text lines immediately after each `### Requirement:` heading:
+Three contiguous plain-text lines immediately after the normative paragraph,
+before any `#### Scenario:` heading:
 
 - **ID** — `REQ-{spec-name}-NNN`; `{spec-name}` is the spec directory name,
   `NNN` zero-padded and unique within the spec. IDs are permanent: `MODIFIED`
@@ -94,8 +99,9 @@ Three plain-text lines immediately after each `### Requirement:` heading:
   `v1-reserved` (schema defined, implementation may stub) · `post-v1`
   (documented for awareness only).
 
-Normative language and `Scope` must agree: a `post-v1` requirement cannot use
-`MUST` to imply current delivery, and a `v1-mandatory` requirement cannot be
+Normative language and `Scope` must agree. Every requirement paragraph uses
+`SHALL` or `MUST`; qualify a `post-v1` obligation with its future scope so it
+does not imply current delivery. A `v1-mandatory` requirement cannot be
 softened into optional or deferred behavior without an approved spec amendment.
 
 The chain these fields close: doctrine principle → RFC §section → spec
@@ -211,7 +217,9 @@ Adapt categories to match the project's own architecture.
 
 ## Legacy Specs Without IDs
 
-Pre-existing specs missing `ID`/`Source`/`Scope` lines are not violations —
-`spec-trace-check.py` warns (errors under `--authoring` or `--strict`). Backfill
-opportunistically: any edit that touches a requirement adds its fields in the
-same change. New requirements always carry all three.
+Pre-existing specs missing `ID`/`Source`/`Scope` lines are warnings by default
+and errors under `--authoring` or `--strict`. Invalid block ordering is always
+an error because OpenSpec cannot parse metadata-first requirements. Backfill
+opportunistically: any edit that touches a requirement restores the canonical
+order and adds its fields in the same change. New requirements always use the
+canonical order and carry all three fields.
