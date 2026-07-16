@@ -6,11 +6,11 @@ Defines authentication behavior.
 ## Requirements
 
 ### Requirement: Session Tokens
+Sessions SHALL use signed tokens.
+
 ID: REQ-core-auth-001
 Source: RFC 0002 §3
 Scope: v1-mandatory
-
-Sessions SHALL use signed tokens.
 
 #### Scenario: Token is signed
 - **WHEN** a session token is issued

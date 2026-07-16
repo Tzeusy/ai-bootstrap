@@ -115,12 +115,12 @@ else
   # Routing variety: fixtures must cover both project-review and project-direction
   # (the "does code match spec?" case routes to review; "act on confirmed drift"
   # routes to direction — both must be present)
-  if echo "$all_routes" | grep -q 'project-review'; then
+  if grep -q 'project-review' <<<"$all_routes"; then
     _pass "project-direction: fixtures include a project-review routing case"
   else
     _fail "project-direction: fixtures must include a case routing to project-review"
   fi
-  if echo "$all_routes" | grep -q 'project-direction'; then
+  if grep -q 'project-direction' <<<"$all_routes"; then
     _pass "project-direction: fixtures include a project-direction routing case"
   else
     _fail "project-direction: fixtures must include a case routing to project-direction"
@@ -156,12 +156,12 @@ else
   done
 
   # Decision variety: must include Reject and at least one non-rejection outcome
-  if echo "$all_decisions" | grep -qi 'Reject'; then
+  if grep -qi 'Reject' <<<"$all_decisions"; then
     _pass "project-feature-request: fixtures include at least one Reject decision"
   else
     _fail "project-feature-request: fixtures must include at least one Reject decision"
   fi
-  if echo "$all_decisions" | grep -qiE 'Approved|Park|Not specifiable'; then
+  if grep -qiE 'Approved|Park|Not specifiable' <<<"$all_decisions"; then
     _pass "project-feature-request: fixtures include non-rejection outcomes (Approved/Park/Not specifiable)"
   else
     _fail "project-feature-request: fixtures must include non-rejection outcomes"
@@ -250,6 +250,8 @@ check_pattern "$ROUTER" 'Gap|TODO|adjacent idea' \
   "router: proactive discovery capture is explicit"
 check_pattern "$SPEC_FORMAT" '^## Semantic Quality Gate' \
   "spec format: semantic clarity/completeness gate exists"
+check_pattern "$SPEC_FORMAT" 'normative SHALL/MUST paragraph.*contiguous.*ID.*Source.*Scope.*scenarios' \
+  "spec format: canonical requirement ordering is explicit"
 check_pattern "$FEATURE_SKILL" '/th-design' \
   "feature request: user-surface specs route to th-design"
 if require_file "$WORK_ALLOCATION" \
@@ -290,8 +292,31 @@ else
   fi
 
   rc=0
+  out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/ordering-violations" 2>&1) || rc=$?
+  if [[ $rc -ne 1 ]]; then
+    _fail "spec-trace: ordering violations fixture expected exit 1, got $rc"
+  else
+    _pass "spec-trace: ordering violations fixture fails (exit 1)"
+    for expected in "normative SHALL/MUST paragraph before ID/Source/Scope" \
+                    "contiguous ID, Source, Scope after its normative paragraph" \
+                    "place ID, Source, Scope before its first scenario" \
+                    "place scenarios immediately after ID, Source, Scope"; do
+      if grep -q "$expected" <<<"$out"; then
+        _pass "spec-trace: ordering violations output reports '$expected'"
+      else
+        _fail "spec-trace: ordering violations output missing expected finding '$expected'"
+      fi
+    done
+    if grep -q "requirement 'Metadata First With Missing Scope' must place a normative SHALL/MUST paragraph" <<<"$out"; then
+      _pass "spec-trace: missing fields do not suppress ordering errors"
+    else
+      _fail "spec-trace: missing field suppressed a metadata-first ordering error: $out"
+    fi
+  fi
+
+  rc=0
   out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/empty-authoring" --authoring 2>&1) || rc=$?
-  if [[ $rc -eq 1 ]] && echo "$out" | grep -q 'spec file has no requirements'; then
+  if [[ $rc -eq 1 ]] && grep -q 'spec file has no requirements' <<<"$out"; then
     _pass "spec-trace: authoring mode rejects an empty delta beside a valid spec"
   else
     _fail "spec-trace: authoring mode must reject an empty delta beside a valid spec (exit $rc): $out"
@@ -299,7 +324,7 @@ else
 
   rc=0
   out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/clean" --strict --tests-dir missing 2>&1) || rc=$?
-  if [[ $rc -eq 1 ]] && echo "$out" | grep -q 'strict mode cannot verify test citation'; then
+  if [[ $rc -eq 1 ]] && grep -q 'strict mode cannot verify test citation' <<<"$out"; then
     _pass "spec-trace: strict mode rejects missing test discovery"
   else
     _fail "spec-trace: strict mode must reject missing test discovery (exit $rc): $out"
@@ -307,7 +332,7 @@ else
 
   rc=0
   out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/added-reuses-id" --authoring 2>&1) || rc=$?
-  if [[ $rc -eq 1 ]] && echo "$out" | grep -q "duplicate ID 'REQ-core-auth-001'"; then
+  if [[ $rc -eq 1 ]] && grep -q "duplicate ID 'REQ-core-auth-001'" <<<"$out"; then
     _pass "spec-trace: ADDED requirements cannot reuse main-spec IDs"
   else
     _fail "spec-trace: ADDED requirement reused a main-spec ID (exit $rc): $out"
@@ -337,7 +362,7 @@ else
     _pass "spec-trace: violations fixture fails (exit 1)"
     for expected in "delta heading" "unsupported main-spec H2" "has no scenarios" "duplicate ID" \
                     "names spec" "stale test citation" "1 WHEN and 1 THEN"; do
-      if echo "$out" | grep -q "$expected"; then
+      if grep -q "$expected" <<<"$out"; then
         _pass "spec-trace: violations output reports '$expected'"
       else
         _fail "spec-trace: violations output missing expected finding '$expected'"

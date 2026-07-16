@@ -136,8 +136,7 @@ The repository MUST maintain doctrine, design-contract, engineering-standard,
 topology, and specification documents covering repository shape.
 
 ID: REQ-repository-shape-008
-Source: Doctrine rule 7; RFC 0001 §Documentation Contract;
-about/craft-and-care/README.md
+Source: Doctrine rule 7; RFC 0001 §Documentation Contract; about/craft-and-care/README.md
 Scope: v1-mandatory
 
 #### Scenario: Pillar inventory
@@ -163,8 +162,7 @@ repository-specific navigation skills on the tool skill surfaces
 double as the user's global skill catalogs on installed machines.
 
 ID: REQ-repository-shape-009
-Source: RFC 0001 §Distribution Model, §Documentation Contract;
-about/craft-and-care/interfaces-and-dependencies.md
+Source: RFC 0001 §Distribution Model, §Documentation Contract; about/craft-and-care/interfaces-and-dependencies.md
 Scope: v1-mandatory
 
 #### Scenario: In-repo discovery

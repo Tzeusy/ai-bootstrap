@@ -6,11 +6,11 @@ Authentication and session handling.
 ## ADDED Requirements
 
 ### Requirement: Session Tokens
+Sessions SHALL use signed tokens.
+
 ID: REQ-core-auth-001
 Source: RFC 0002 §3
 Scope: v1-mandatory
-
-Sessions SHALL use signed tokens.
 
 #### Scenario: Two WHENs is malformed
 - **WHEN** a token is issued
@@ -18,17 +18,17 @@ Sessions SHALL use signed tokens.
 - **THEN** the signature is checked
 
 ### Requirement: Token Revocation
+The system SHALL revoke active tokens on demand.
+
 ID: REQ-core-auth-001
 Scope: v1-mandatory
 
-Duplicate ID above; also missing Source; also no scenario.
-
 ### Requirement: Password Hashing
+The system SHALL store only salted password hashes.
+
 ID: REQ-wrong-spec-002
 Source: RFC 0002 §4
 Scope: v1-mandatory
-
-ID names the wrong spec directory.
 
 #### Scenario: Hash on write
 - **WHEN** a password is stored
