@@ -14,6 +14,7 @@ set -euo pipefail
 
 ROOT="${1:-.}"
 ROOT="$(cd "$ROOT" && pwd)"
+active_change_count=0
 
 echo "=== Project Shape Scan ==="
 echo "Root: $ROOT"
@@ -48,7 +49,10 @@ check_file() {
 is_placeholder_file() {
   local file="$1"
   [ -f "$file" ] || return 1
-  if grep -Eq 'SHAPE-SCAFFOLD|<name>|<Title>|\[domain\]|\[summary\]|\[Contract from RFCs\]|\[Boundary from topology\]|\[Rule from doctrine\]|One paragraph thesis statement|Add rows for|Replace this scaffold|placeholder/template content' "$file"; then
+  if grep -Eq 'SHAPE-SCAFFOLD|\[domain\]|\[summary\]|\[Contract from RFCs\]|\[Boundary from topology\]|\[Rule from doctrine\]|One paragraph thesis statement|Add rows for|Replace this scaffold|placeholder/template content' "$file"; then
+    return 0
+  fi
+  if grep -Eq '^#{1,6}.*<Title>|^\*\*Author:\*\*[[:space:]]*<name>[[:space:]]*$|^name:[[:space:]]*<name>[[:space:]]*$' "$file"; then
     return 0
   fi
   if grep -Eq '^[[:space:]]*[0-9]+\.$|^[[:space:]]*-$|^\|[[:space:]]*\|([[:space:]]*\|)+$' "$file"; then
@@ -100,6 +104,59 @@ count_files_matching() {
   while IFS= read -r file; do
     grep -Eiq "$grep_pattern" "$file" && matches=$((matches + 1))
   done < <(find "$dir" -type f -name "$pattern" 2>/dev/null | sort)
+  echo "$matches"
+}
+
+list_active_change_dirs() {
+  local changes_dir="$1"
+  [ -d "$changes_dir" ] || return 0
+  find "$changes_dir" -maxdepth 1 -mindepth 1 -type d ! -name archive 2>/dev/null | sort
+}
+
+list_active_spec_files() {
+  local openspec_dir="$1"
+  if [ -d "$openspec_dir/specs" ]; then
+    find "$openspec_dir/specs" -name 'spec.md' -type f 2>/dev/null
+  fi
+  while IFS= read -r change_dir; do
+    [ -d "$change_dir/specs" ] || continue
+    find "$change_dir/specs" -name 'spec.md' -type f 2>/dev/null
+  done < <(list_active_change_dirs "$openspec_dir/changes")
+}
+
+list_active_openspec_markdown_files() {
+  local openspec_dir="$1"
+  [ -d "$openspec_dir" ] || return 0
+  find "$openspec_dir" -name '*.md' -type f \
+    ! -path "$openspec_dir/changes/archive/*" 2>/dev/null | sort
+}
+
+count_stream_paths() {
+  local count=0 file
+  while IFS= read -r file; do
+    [ -e "$file" ] || continue
+    count=$((count + 1))
+  done
+  echo "$count"
+}
+
+count_authored_stream_files() {
+  local count=0 file
+  while IFS= read -r file; do
+    [ -f "$file" ] || continue
+    if ! is_placeholder_file "$file"; then
+      count=$((count + 1))
+    fi
+  done
+  echo "$count"
+}
+
+count_stream_files_matching() {
+  local grep_pattern="$1" matches=0 file
+  while IFS= read -r file; do
+    [ -f "$file" ] || continue
+    grep -Eiq "$grep_pattern" "$file" && matches=$((matches + 1))
+  done
   echo "$matches"
 }
 
@@ -396,23 +453,21 @@ echo ""
 # --- Pillar 3: Capability Specs (openspec/ — always at root) ---
 echo "## Pillar 3: Capability Specs (WHAT)"
 if check_dir "openspec/" "$ROOT/openspec"; then
-  total_md=$(find "$ROOT/openspec" -name '*.md' -type f 2>/dev/null | wc -l)
-  authored_md=$(count_authored_markdown_files "$ROOT/openspec")
+  total_md=$(list_active_openspec_markdown_files "$ROOT/openspec" | count_stream_paths)
+  authored_md=$(list_active_openspec_markdown_files "$ROOT/openspec" | count_authored_stream_files)
   spec_state=$(classify_content_state "$authored_md" "$total_md")
-  substantive_specs=0
+  substantive_specs=$(list_active_spec_files "$ROOT/openspec" | count_authored_stream_files)
   if [ -d "$ROOT/openspec/changes" ]; then
-    change_count=$(find "$ROOT/openspec/changes" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
-    echo "    - Changes: $change_count spec changes"
-    for change_dir in "$ROOT/openspec/changes"/*/; do
-      [ -d "$change_dir" ] || continue
+    active_change_count=$(list_active_change_dirs "$ROOT/openspec/changes" | count_stream_paths)
+    echo "    - Changes: $active_change_count active spec changes"
+    while IFS= read -r change_dir; do
       change_name=$(basename "$change_dir")
       if [ -d "$change_dir/specs" ]; then
         spec_count=$(find "$change_dir/specs" -name 'spec.md' -type f 2>/dev/null | wc -l)
         authored_spec_count=$(count_authored_markdown_files "$change_dir/specs")
-        substantive_specs=$((substantive_specs + authored_spec_count))
         echo "    - $change_name: $spec_count capability specs ($authored_spec_count authored)"
       fi
-    done
+    done < <(list_active_change_dirs "$ROOT/openspec/changes")
   fi
   if [ "$substantive_specs" -eq 0 ]; then
     spec_state="scaffolded"
@@ -537,9 +592,9 @@ if [ -n "${LAL_DIR:-}" ]; then
 fi
 
 if [ -d "$ROOT/openspec" ]; then
-  spec_docs=$(count_files_matching "$ROOT/openspec" 'spec.md' '.')
-  spec_source_refs=$(count_files_matching "$ROOT/openspec" 'spec.md' '^Source:[[:space:]]')
-  spec_scenarios=$(count_files_matching "$ROOT/openspec" 'spec.md' '^#{3,4}[[:space:]]*Scenario:|^[[:space:]]*-[[:space:]]*\*\*WHEN\*\*')
+  spec_docs=$(list_active_spec_files "$ROOT/openspec" | count_stream_paths)
+  spec_source_refs=$(list_active_spec_files "$ROOT/openspec" | count_stream_files_matching '^Source:[[:space:]]')
+  spec_scenarios=$(list_active_spec_files "$ROOT/openspec" | count_stream_files_matching '^#{3,4}[[:space:]]*Scenario:|^[[:space:]]*-[[:space:]]*\*\*WHEN\*\*')
 fi
 
 if [ -n "${LAY_DIR:-}" ] && [ -d "$LAY_DIR" ]; then
@@ -595,20 +650,8 @@ echo "  Local skills installed: $skills/5"
 echo "  Pillars needing authoring: $scaffolded_pillars/5"
 echo "  Local skill templates still uncustomized: $template_skills/5"
 
-if [ "$pillars" -eq 0 ]; then
-  echo "  Assessment: UNSHAPED — No knowledge architecture detected"
-elif [ "$pillars" -eq 1 ]; then
-  echo "  Assessment: NASCENT — Beginning to take shape"
-elif [ "$pillars" -le 4 ]; then
-  echo "  Assessment: STRUCTURED — $(( 5 - pillars )) pillar(s) missing"
-elif [ "$pillars" -eq 5 ] && [ "$scaffolded_pillars" -gt 0 ]; then
-  echo "  Assessment: SHAPED — Full structure present, but authored content is still incomplete"
-elif [ "$pillars" -eq 5 ] && [ "$skills" -lt 5 ]; then
-  echo "  Assessment: SHAPED — All pillars present, install remaining local skills"
-elif [ "$pillars" -eq 5 ] && [ "$template_skills" -gt 0 ]; then
-  echo "  Assessment: SHAPED — Pillars are authored, but local skill templates still need customization"
-elif [ "$pillars" -eq 5 ] && {
-  [ "$doctrine_rules" -eq 0 ] ||
+mature_traceability_gate="PASS"
+if [ "$doctrine_rules" -eq 0 ] ||
   [ "$rfc_docs" -eq 0 ] ||
   [ "$rfc_doctrine_refs" -lt "$rfc_docs" ] ||
   [ "$spec_docs" -eq 0 ] ||
@@ -617,9 +660,42 @@ elif [ "$pillars" -eq 5 ] && {
   [ "$topology_docs" -eq 0 ] ||
   [ "$topology_cross_refs" -eq 0 ] ||
   [ "$standards_docs" -eq 0 ] ||
-  [ "$standards_cross_refs" -eq 0 ];
-}; then
-  echo "  Assessment: SHAPED — Structure is complete, but traceability is not yet strong enough for mature status"
-elif [ "$pillars" -eq 5 ] && [ "$skills" -eq 5 ]; then
-  echo "  Assessment: MATURE — Full shape with agent navigation"
+  [ "$standards_cross_refs" -eq 0 ]; then
+  mature_traceability_gate="FAIL"
 fi
+
+if [ "$pillars" -eq 0 ]; then
+  shape_level="UNSHAPED"
+  assessment="UNSHAPED — No knowledge architecture detected"
+elif [ "$pillars" -eq 1 ]; then
+  shape_level="NASCENT"
+  assessment="NASCENT — Beginning to take shape"
+elif [ "$pillars" -le 4 ]; then
+  shape_level="STRUCTURED"
+  assessment="STRUCTURED — $(( 5 - pillars )) pillar(s) missing"
+elif [ "$pillars" -eq 5 ] && [ "$scaffolded_pillars" -gt 0 ]; then
+  shape_level="SHAPED"
+  assessment="SHAPED — Full structure present, but authored content is still incomplete"
+elif [ "$pillars" -eq 5 ] && [ "$skills" -lt 5 ]; then
+  shape_level="SHAPED"
+  assessment="SHAPED — All pillars present, install remaining local skills"
+elif [ "$pillars" -eq 5 ] && [ "$template_skills" -gt 0 ]; then
+  shape_level="SHAPED"
+  assessment="SHAPED — Pillars are authored, but local skill templates still need customization"
+elif [ "$pillars" -eq 5 ] && [ "$mature_traceability_gate" = "FAIL" ]; then
+  shape_level="SHAPED"
+  assessment="SHAPED — Structure is complete, but traceability is not yet strong enough for mature status"
+elif [ "$pillars" -eq 5 ] && [ "$skills" -eq 5 ]; then
+  shape_level="MATURE"
+  assessment="MATURE — Full shape with agent navigation"
+fi
+
+echo "  Assessment: $assessment"
+echo ""
+echo "## Machine Check"
+echo "SHAPE_LEVEL=$shape_level"
+echo "MATURE_TRACEABILITY_GATE=$mature_traceability_gate"
+echo "ACTIVE_CHANGE_COUNT=$active_change_count"
+echo "ACTIVE_SPEC_COUNT=$spec_docs"
+echo "ACTIVE_SPEC_SOURCE_COUNT=$spec_source_refs"
+echo "ACTIVE_SPEC_SCENARIO_COUNT=$spec_scenarios"

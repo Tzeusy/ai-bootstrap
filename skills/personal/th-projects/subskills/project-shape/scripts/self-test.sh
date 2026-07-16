@@ -46,6 +46,8 @@ case_fresh_scaffold_not_mature() {
   out="$(bash "$SCAN_SCRIPT" "$repo")"
   assert_contains "$out" "Assessment: SHAPED — Full structure present, but authored content is still incomplete" "fresh scaffold should not be mature"
   assert_contains "$out" "Pillars needing authoring: 5/5" "fresh scaffold should report scaffolded pillars"
+  assert_contains "$out" "SHAPE_LEVEL=SHAPED" "shaped threshold should be machine-checkable"
+  assert_contains "$out" "MATURE_TRACEABILITY_GATE=FAIL" "failed mature traceability threshold should be machine-checkable"
   assert_not_contains "$out" "Assessment: MATURE" "fresh scaffold must never report mature"
 }
 
@@ -289,6 +291,47 @@ EOF
   assert_contains "$out" "Assessment: UNSHAPED" "review-only docs should not inflate maturity"
 }
 
+case_property_agent_active_specs_ignore_archive() {
+  local repo="$TMP_ROOT/property-agent"
+  local out
+
+  cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+  rm -rf "$repo/openspec"
+  cp -R "$FIXTURES_DIR/property-agent-openspec/openspec" "$repo/openspec"
+
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "Changes: 1 active spec changes" "archive container should not count as an active change"
+  assert_not_contains "$out" "2026-03-19-retired-listing-search" "archived changes should not be reported as active"
+  assert_contains "$out" "Content: AUTHORED" "archived scaffolds and literal angle-bracket URLs should not mark active specs mixed"
+  assert_not_contains "$out" "Content: MIXED" "literal URL parameters must not be treated as scaffold tokens"
+  assert_contains "$out" "Specs with source references: 2/2" "traceability should use canonical plus active-change specs only"
+  assert_contains "$out" "Specs with scenarios: 2/2" "scenario coverage should use the active spec corpus"
+  assert_contains "$out" "ACTIVE_CHANGE_COUNT=1" "active change count should be machine-checkable"
+  assert_contains "$out" "ACTIVE_SPEC_COUNT=2" "active spec count should be machine-checkable"
+  assert_contains "$out" "MATURE_TRACEABILITY_GATE=PASS" "mature traceability threshold should be machine-checkable"
+  assert_contains "$out" "SHAPE_LEVEL=MATURE" "final maturity level should be machine-checkable"
+}
+
+case_template_angle_brackets_remain_scaffolded() {
+  local repo="$TMP_ROOT/template-angle-brackets"
+  local out
+
+  mkdir -p "$repo/about/legends-and-lore/rfcs"
+  cat > "$repo/about/legends-and-lore/rfcs/0001-template.md" <<'EOF'
+# RFC 0001: <Title>
+
+**Author:** <name>
+
+## Design
+
+Describe the contract.
+EOF
+
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "Content: SCAFFOLDED" "RFC title and author template tokens should remain scaffold markers"
+  assert_contains "$out" "Contracts: 1 documents in about/legends-and-lore/rfcs/ (0 authored)" "template RFC should not count as authored"
+}
+
 run_case "fresh scaffold is not mature" case_fresh_scaffold_not_mature
 run_case "unsupported frontmatter keys are rejected" case_invalid_frontmatter_rejected
 run_case "fully authored repo is mature" case_authored_repo_can_be_mature
@@ -297,5 +340,7 @@ run_case "legacy layout is detected conservatively" case_legacy_layout_detected
 run_case "html comments do not trigger scaffold classification" case_html_comments_do_not_trigger_scaffold
 run_case "ARCHITECTURE.md does not double-count topology" case_architecture_file_does_not_double_count_topology
 run_case "review-only docs do not create design pillar" case_reviews_only_do_not_create_design_pillar
+run_case "Property Agent active specs ignore archive history" case_property_agent_active_specs_ignore_archive
+run_case "template angle brackets remain scaffolded" case_template_angle_brackets_remain_scaffolded
 
 echo "PASS: $pass_count project-shape self-test cases"
