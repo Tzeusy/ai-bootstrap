@@ -16,6 +16,16 @@ The system MUST reject metadata before the normative paragraph.
 - **WHEN** the requirement is validated
 - **THEN** the ordering is rejected
 
+### Requirement: Metadata First With Missing Scope
+ID: REQ-core-ordering-006
+Source: RFC 0001 §6
+
+The system MUST reject metadata before the normative paragraph even when a field is missing.
+
+#### Scenario: Incomplete metadata-first ordering is inspected
+- **WHEN** the requirement is validated
+- **THEN** the ordering is rejected
+
 ### Requirement: Split Metadata
 The system MUST keep requirement metadata contiguous.
 

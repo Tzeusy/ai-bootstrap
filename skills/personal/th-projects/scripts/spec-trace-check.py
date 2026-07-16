@@ -237,16 +237,16 @@ def check_requirements(reqs, f: Findings, strict_missing_fields: bool):
                    (("ID", r.req_id), ("Source", r.has_source), ("Scope", r.scope)) if not ok]
         if missing:
             field_report(rel, r.line, f"requirement '{r.title}' missing {'/'.join(missing)} line(s)")
-        elif not r.normative_first:
+        if not r.normative_first:
             f.error(rel, r.line,
                     f"requirement '{r.title}' must place a normative SHALL/MUST paragraph before ID/Source/Scope")
         elif not r.metadata_before_scenarios:
             f.error(rel, r.line,
                     f"requirement '{r.title}' must place ID, Source, Scope before its first scenario")
-        elif not r.metadata_ordered:
+        elif not missing and not r.metadata_ordered:
             f.error(rel, r.line,
                     f"requirement '{r.title}' must place contiguous ID, Source, Scope after its normative paragraph")
-        elif needs_scenarios and not r.scenarios_after_metadata:
+        elif not missing and needs_scenarios and not r.scenarios_after_metadata:
             f.error(rel, r.line,
                     f"requirement '{r.title}' must place scenarios immediately after ID, Source, Scope")
     return seen_ids
