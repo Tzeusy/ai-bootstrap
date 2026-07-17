@@ -38,12 +38,12 @@ def first_record(payload):
 
 def extract_original_id(description):
     patterns = [
-        r"Original implementation bead:\s*([^\s.]+)",
+        r"Original implementation bead(?:\s*:\s*|\s+)([^\s.]+)",
         r"Review target bead:\s*([^\s.]+)",
     ]
     matches = []
     for pattern in patterns:
-        match = re.search(pattern, description or "")
+        match = re.search(pattern, description or "", flags=re.IGNORECASE)
         if match:
             matches.append(match.group(1))
     matches = [match for match in matches if match]
