@@ -286,7 +286,9 @@ class ResolveReviewContextTests(unittest.TestCase):
     def _make_bins(self, bin_dir: FakeBinDir, *,
                    description: str = "Original implementation bead: aib-abc\nhttps://github.com/owner/repo/pull/99",
                    bd_list: list | None = None,
-                   review_dependencies: list | None = None) -> None:
+                   review_dependencies: list | None = None,
+                   original_id: str = "aib-abc",
+                   pr_number: int = 99) -> None:
         review_json = json.dumps([{
             "id": "aib-xyz",
             "description": description,
@@ -294,21 +296,21 @@ class ResolveReviewContextTests(unittest.TestCase):
         }])
         bd_list_json = json.dumps(bd_list or [])
         pr_json = json.dumps({
-            "number": 99,
-            "url": "https://github.com/owner/repo/pull/99",
+            "number": pr_number,
+            "url": f"https://github.com/owner/repo/pull/{pr_number}",
             "state": "OPEN",
             "isDraft": False,
             "mergeStateStatus": "CLEAN",
             "reviewDecision": None,
-            "headRefName": "agent/aib-abc",
+            "headRefName": f"agent/{original_id}",
             "baseRefName": "main",
             "mergedAt": None,
             "headRefOid": "abc123",
         })
         original_json = json.dumps([{
-            "id": "aib-abc",
+            "id": original_id,
             "description": "Implement thing",
-            "external_ref": "gh-pr:99",
+            "external_ref": f"gh-pr:{pr_number}",
         }])
 
         bin_dir.add("bd", f"""
@@ -321,7 +323,7 @@ if 'show' in argv:
     if issue_id == 'aib-xyz':
         print({repr(review_json)})
         sys.exit(0)
-    elif issue_id == 'aib-abc':
+    elif issue_id == {original_id!r}:
         print({repr(original_json)})
         sys.exit(0)
 
@@ -364,6 +366,51 @@ sys.exit(1)
         self.assertEqual(payload["pr_number"], 99)
         self.assertEqual(payload["owner"], "owner")
         self.assertEqual(payload["repo"], "repo")
+
+    def test_success_resolves_context_from_review_target_marker(self) -> None:
+        description = "REVIEW TARGET BEAD: aib-abc\nhttps://github.com/owner/repo/pull/99"
+        with FakeBinDir() as fbd:
+            self._make_bins(fbd, description=description)
+            result = run_script("resolve_review_context.py",
+                                ["--issue-id", "aib-xyz"],
+                                env=fbd.env())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["original_id"], "aib-abc")
+
+    def test_success_resolves_context_from_coordinator_wording_without_colon(self) -> None:
+        description = (
+            "Review PR #1214 for ORIGINAL IMPLEMENTATION BEAD hud-1izx4. "
+            "Confirm the Windows-only build script uses required-manifest semantics."
+        )
+        with FakeBinDir() as fbd:
+            self._make_bins(
+                fbd,
+                description=description,
+                original_id="hud-1izx4",
+                pr_number=1214,
+            )
+            result = run_script("resolve_review_context.py",
+                                ["--issue-id", "aib-xyz"],
+                                env=fbd.env())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["original_id"], "hud-1izx4")
+        self.assertEqual(payload["pr_number"], 1214)
+
+    def test_ignores_prose_without_a_bead_shaped_original_id(self) -> None:
+        description = (
+            "Review the original implementation bead before merging. "
+            "https://github.com/owner/repo/pull/99"
+        )
+        with FakeBinDir() as fbd:
+            self._make_bins(fbd, description=description, bd_list=[])
+            result = run_script("resolve_review_context.py",
+                                ["--issue-id", "aib-xyz"],
+                                env=fbd.env())
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stderr)
+        self.assertEqual(payload["error_code"], "missing-original-id")
 
     def test_ambiguous_original_id_fails(self) -> None:
         # Both patterns match but yield different IDs — the real ambiguity case.
