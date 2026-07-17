@@ -368,7 +368,7 @@ sys.exit(1)
         self.assertEqual(payload["repo"], "repo")
 
     def test_success_resolves_context_from_review_target_marker(self) -> None:
-        description = "Review target bead: aib-abc\nhttps://github.com/owner/repo/pull/99"
+        description = "REVIEW TARGET BEAD: aib-abc\nhttps://github.com/owner/repo/pull/99"
         with FakeBinDir() as fbd:
             self._make_bins(fbd, description=description)
             result = run_script("resolve_review_context.py",
@@ -380,7 +380,7 @@ sys.exit(1)
 
     def test_success_resolves_context_from_coordinator_wording_without_colon(self) -> None:
         description = (
-            "Review PR #1214 for original implementation bead hud-1izx4. "
+            "Review PR #1214 for ORIGINAL IMPLEMENTATION BEAD hud-1izx4. "
             "Confirm the Windows-only build script uses required-manifest semantics."
         )
         with FakeBinDir() as fbd:
@@ -397,6 +397,20 @@ sys.exit(1)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["original_id"], "hud-1izx4")
         self.assertEqual(payload["pr_number"], 1214)
+
+    def test_ignores_prose_without_a_bead_shaped_original_id(self) -> None:
+        description = (
+            "Review the original implementation bead before merging. "
+            "https://github.com/owner/repo/pull/99"
+        )
+        with FakeBinDir() as fbd:
+            self._make_bins(fbd, description=description, bd_list=[])
+            result = run_script("resolve_review_context.py",
+                                ["--issue-id", "aib-xyz"],
+                                env=fbd.env())
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stderr)
+        self.assertEqual(payload["error_code"], "missing-original-id")
 
     def test_ambiguous_original_id_fails(self) -> None:
         # Both patterns match but yield different IDs — the real ambiguity case.

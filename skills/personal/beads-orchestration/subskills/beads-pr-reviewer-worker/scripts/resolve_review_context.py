@@ -10,6 +10,9 @@ import subprocess
 import sys
 
 
+BEAD_ID_PATTERN = r"[a-z][a-z0-9]*(?:-[a-z0-9]+)+"
+
+
 def fail(code, message, **extra):
     payload = {"ok": False, "error_code": code, "error": message}
     payload.update(extra)
@@ -38,12 +41,12 @@ def first_record(payload):
 
 def extract_original_id(description):
     patterns = [
-        r"Original implementation bead(?:\s*:\s*|\s+)([^\s.]+)",
-        r"Review target bead:\s*([^\s.]+)",
+        rf"\b(?i:original implementation bead)(?:\s*:\s*|\s+)({BEAD_ID_PATTERN})(?![a-z0-9-])",
+        rf"\b(?i:review target bead):\s*({BEAD_ID_PATTERN})(?![a-z0-9-])",
     ]
     matches = []
     for pattern in patterns:
-        match = re.search(pattern, description or "", flags=re.IGNORECASE)
+        match = re.search(pattern, description or "")
         if match:
             matches.append(match.group(1))
     matches = [match for match in matches if match]
