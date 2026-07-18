@@ -80,6 +80,24 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         self.assertIn("`agent/<original-id>`", contents)
         self.assertIn("Re-review hand-back starts at Stage 2", contents)
 
+    def test_post_merge_cleanup_maps_original_and_review_ids(self) -> None:
+        contents = LOOP.read_text(encoding="utf-8")
+        cleanup = contents.split(
+            "### Post-closure branch and worktree cleanup (merged PRs)", 1
+        )[1].split("Priority rule:", 1)[0]
+        for command in (
+            'git push origin --delete "agent/${ORIGINAL_ID}"',
+            'bd worktree remove ".worktrees/parallel-agents/${REVIEW_ID}"',
+            'git branch -D "agent/${ORIGINAL_ID}"',
+            'git branch -D "agent/${REVIEW_ID}"',
+        ):
+            self.assertIn(command, cleanup)
+        self.assertIn(
+            "the transferred worktree path remains keyed by `REVIEW_ID`",
+            cleanup,
+        )
+        self.assertNotIn("agent/<id>", cleanup)
+
 
 if __name__ == "__main__":
     unittest.main()

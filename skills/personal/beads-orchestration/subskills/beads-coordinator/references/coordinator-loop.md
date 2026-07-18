@@ -136,17 +136,27 @@ Handle each case:
 ### Post-closure branch and worktree cleanup (merged PRs)
 
 The reviewer merges with `gh pr merge --squash` and does **not** delete the
-branch, so the `agent/<id>` branch name survives until the coordinator removes
-it. This keeps branch-name → bead correlation intact if a crash happens between
-merge and the worker report. Branch deletion is therefore the coordinator's
-responsibility, performed only **after** the relevant bead(s) are closed:
+branch, so the PR branch `agent/${ORIGINAL_ID}` survives until the coordinator
+removes it. This keeps branch-name → bead correlation intact if a crash happens
+between merge and the worker report. Branch deletion is therefore the
+coordinator's responsibility, performed only **after** the relevant bead(s) are
+closed.
+
+Keep the two-stage review topology explicit during cleanup: `ORIGINAL_ID` owns
+the remote PR branch and its checked-out local branch, while `REVIEW_ID` owns
+the reviewer worktree path and any temporary `agent/${REVIEW_ID}` branch. When
+the reviewer worktree was transferred sequentially to a correction worker,
+the transferred worktree path remains keyed by `REVIEW_ID` even though its
+checked-out branch is `agent/${ORIGINAL_ID}`. Remove that worktree before
+deleting local branches so the checked-out original branch is no longer in use:
 
 ```bash
 # After bd close on the review/original beads:
-git push origin --delete "agent/<id>" 2>/dev/null \
-  || gh api -X DELETE "repos/<owner>/<repo>/git/refs/heads/agent/<id>" 2>/dev/null || true
-bd worktree remove ".worktrees/parallel-agents/<id>" --force 2>/dev/null || true
-git branch -D "agent/<id>" 2>/dev/null || true
+git push origin --delete "agent/${ORIGINAL_ID}" 2>/dev/null \
+  || gh api -X DELETE "repos/<owner>/<repo>/git/refs/heads/agent/${ORIGINAL_ID}" 2>/dev/null || true
+bd worktree remove ".worktrees/parallel-agents/${REVIEW_ID}" --force 2>/dev/null || true
+git branch -D "agent/${ORIGINAL_ID}" 2>/dev/null || true
+git branch -D "agent/${REVIEW_ID}" 2>/dev/null || true
 ```
 
 Do not delete the branch before closure; correlation depends on it.
@@ -504,8 +514,9 @@ Reviewer-worker report contract:
 When a reviewer worker completes:
 - if it reports `merged-pr`, confirm the PR is merged, then renew the heartbeat,
   close the review and original beads, and run the post-closure branch/worktree
-  cleanup in Step 0b (`git push origin --delete agent/<id>`, remove the worktree
-  and local branch) — the reviewer left the branch in place on purpose
+  cleanup in Step 0b (delete the `ORIGINAL_ID` PR branch, remove the
+  `REVIEW_ID` worktree, then delete the original and temporary review local
+  branches) — the reviewer left the PR branch in place on purpose
 - if it reports `blocked-awaiting-coordinator`, keep the review bead blocked
   and create any follow-up merge-blocker bead from the structured report if one
   does not already exist
