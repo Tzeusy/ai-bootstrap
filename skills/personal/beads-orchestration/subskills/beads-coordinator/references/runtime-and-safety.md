@@ -94,6 +94,23 @@ work.
 | Simple bugfixes | `MEDIUM_COMPLEXITY_MODEL` |
 | Formatting, linting | `LOW_COMPLEXITY_MODEL` |
 
+## Review Risk Tiers
+
+Every review verdict is bound to the **exact head SHA** inspected. If the head
+moves, merge readiness expires until that SHA is reviewed.
+
+| Tier | Examples | Review policy |
+|---|---|---|
+| High | auth/authorization, approvals, secrets, cross-schema boundaries, migrations/persisted contracts, concurrency/distributed state, replay/idempotence, data loss | Dedicated independent exact-head review. Any reviewer-authored semantic fix or material risk-changing correction requires a fresh independent reviewer. |
+| Standard | Cohesive product/backend/UI behavior with bounded failure surface | Independent exact-head review; retain the same reviewer for correction rechecks when independence is intact. |
+| Low | Tiny docs, tests, formatting, chore, or mechanical refactor with no observable contract/risk change | Schedule a sequential convoy of 3-4 same-domain review beads to one sticky reviewer identity. Process one PR/SHA and emit one verdict at a time; escalate on any semantic finding. |
+
+Risk tiers reduce repeated context loading, never the evidence required for the
+actual change. Do not batch high-risk work or merge an unreviewed moved head.
+"Sequential convoy" never means one multi-PR reviewer worker: the one-bead,
+one-PR report contract remains intact, and the coordinator dispatches the next
+low-risk bead only after the prior verdict returns.
+
 ### Reconciliation Floor (mandatory)
 
 A reconciliation bead (label `reconciliation`, title `Reconcile spec-to-code

@@ -7,7 +7,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-06-12"
+  last_reviewed: "2026-07-18"
 compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, gh, and python3 available, plus authenticated GitHub access and network access for review, push, and merge operations.
 ---
 
@@ -21,7 +21,7 @@ You are a **Beads PR Reviewer Worker**. Process exactly one dedicated
 Your job is to:
 - resolve the original implementation bead and canonical PR,
 - review unresolved feedback and new notable issues,
-- apply follow-up fixes on the PR head branch when needed,
+- leave actionable, resolvable findings for the implementation/recovery lane,
 - decide whether the PR is mergeable,
 - report the outcome in a machine-readable form for the coordinator.
 
@@ -57,6 +57,8 @@ by users.
 - Assume the coordinator already claimed the review bead and applied the
   `review-running` lock. Do not try to claim or release that lock yourself.
 - Do not create hidden parallel code-writing tracks under one review bead.
+- Preserve reviewer independence: do not author semantic corrections on the
+  head being reviewed. The original author or a recovery worker owns fixes.
 - Do not require a synthetic "no issues detected" marker thread in order to
   merge. Audit comments are optional, not merge gates.
 
@@ -65,10 +67,10 @@ by users.
 Some repositories define a project-local `craft-and-care` skill as the
 execution-quality bar for implementation work.
 
-Before applying fixes, check for a repository-level `craft-and-care` skill in
+Before reviewing, check for a repository-level `craft-and-care` skill in
 the project's standard skill locations. If one exists:
-- read it before implementation,
-- follow its guidance as a required quality bar for any review fixes,
+- read it before review,
+- follow its guidance as the quality bar for findings and merge readiness,
 - use it again before handoff to review the actual diff for violations or
   missing cleanup.
 
@@ -148,6 +150,10 @@ gh auth status
    - `repo`
    - `head_branch`
    - `base_branch`
+7. Record reviewer identity (runtime agent ID when available plus authenticated
+   GitHub login) and classify the PR as `high`, `standard`, or `low` using the
+   coordinator's
+   [review risk tiers](../beads-coordinator/references/runtime-and-safety.md#review-risk-tiers).
 
 If review context cannot be resolved, stop and report
 `blocked-awaiting-coordinator`.
@@ -177,10 +183,22 @@ PREP_JSON=$(python3 scripts/prepare_pr_branch.py \
 
 3. If branch preparation reports `status=rebase-conflict` or
    `status=blocked`, stop and report `blocked-awaiting-coordinator`.
+4. The helper pushes any rebased or `.beads`-cleaned prepared head with
+   `--force-with-lease`. Before review, verify its reported `head_commit`
+   equals both local `HEAD` and the GitHub PR head; otherwise stop as
+   `blocked-awaiting-coordinator`.
+
+The helper's deterministic .beads branch-hygiene cleanup is non-semantic
+pre-review preparation and is authorized by this workflow. It does not count
+as reviewer-authored correction work or require `pushed-review-fixes`: the
+reviewer begins substantive review only after the cleanup is pushed and then
+reviews that resulting exact head. Any change outside `.beads/` remains a
+semantic reviewer-authored change and must use the exceptional fixer path with
+a fresh independent reviewer.
 
 Never stash, check out `main`, or push `main` from the worktree.
 
-### Phase 3: Review And Apply Fixes
+### Phase 3: Review And Classify Findings
 
 1. Fetch review threads with:
 
@@ -196,11 +214,12 @@ THREADS_JSON=$(python3 scripts/list_review_threads.py \
    context.
 3. For each unresolved thread:
    - inspect the feedback in code and tests,
-   - if a fix is needed, apply the minimal durable fix on the PR head branch,
-   - run the relevant quality gates for that fix,
-   - reply in-thread with a concrete verdict: `fixed`, `answered`, or
-     `won't-fix`,
-   - resolve the thread only after the fix or answer is real.
+   - classify it as current-PR correctness, prerequisite blocker, new behavior,
+     or duplicate,
+   - reply in-thread with a concrete verdict: `correction-required`,
+     `answered`, `won't-fix`, or `duplicate`,
+   - leave correction threads unresolved for the implementation/recovery lane;
+     resolve only after the answer or corrected exact head is real.
 4. Use the bundled thread helpers instead of raw ad hoc API calls:
 
 ```bash
@@ -233,22 +252,40 @@ python3 scripts/create_inline_review_comment.py \
   --dedupe-key "${ISSUE_ID}:${PATH}:${LINE}"
 ```
 
-6. Keep commits focused:
+6. Default to **no code changes**. Return current-outcome corrections to the
+   original author when resumable or a recovery worker on the same PR branch.
+   This keeps one implementation owner and one independent reviewer.
+
+   Fail-closed behavior, auth/authorization, approvals, persistence, migrations,
+   cross-schema access, concurrency, replay/idempotence, and data-loss handling
+   are semantic regardless of line count.
+
+7. Exceptional reviewer-as-fixer path: only use when the coordinator explicitly
+   authorizes an urgent mechanical correction and no implementation lane can be
+   resumed. Keep the commit focused, verify it, and report
+   `pushed-review-fixes`; the resulting head requires a fresh independent
+   reviewer before merge.
 
 ```bash
 git add <files>
 git commit -m "fix: <summary> [${ISSUE_ID}]"
 ```
 
-7. Push follow-up fixes with lease after verification:
+8. Push exceptional fixes with lease after verification:
 
 ```bash
 git push --force-with-lease origin "${PR_HEAD_BRANCH}"
 ```
 
+9. When this pass creates the second substantive reopening, call out the
+   two-correction checkpoint in `Summary`: same invariant rewrites the active
+   acceptance/failure matrix; a new trust boundary, subsystem, or risk class
+   becomes a spec-gated prerequisite.
+
 ### Phase 4: Verify
 
-Run all required project quality gates for any code changes you made. Typical
+Run all required project quality gates needed to substantiate the review, and
+all gates affected by any exceptional code change. Typical
 gates:
 - lint
 - typecheck
@@ -284,7 +321,9 @@ MERGE_JSON=$(python3 scripts/evaluate_merge_readiness.py \
   --pr-number "${PR_NUMBER}")
 ```
 
-2. Merge is allowed only when all are true:
+2. Record `Reviewed-Head-Commit` immediately before the final review verdict.
+   Merge is allowed only when `git rev-parse HEAD` and the GitHub PR head both
+   still equal that exact head SHA and all are true:
    - PR state is `OPEN`
    - PR is not draft
    - unresolved review thread count is zero
@@ -294,7 +333,9 @@ MERGE_JSON=$(python3 scripts/evaluate_merge_readiness.py \
 3. Never call `gh pr merge` unless the merge-readiness helper returns
    `merge_ok: true`. If required checks could not be fetched or validated, that
    is a blocker and must fail closed.
-4. If merge is safe, merge the PR (do **not** delete the branch):
+4. If the head moved after review, stop and report
+   `blocked-awaiting-coordinator`; never merge an unreviewed head.
+5. If merge is safe, merge the PR (do **not** delete the branch):
 
 ```bash
 gh pr merge "${PR_NUMBER}" --squash
@@ -306,11 +347,11 @@ survives a crash between merge and the worker report.
 
 Then confirm the PR is actually merged before reporting success.
 
-5. If merge is not safe, do not mutate Beads state. Report the retry reason in
+6. If merge is not safe, do not mutate Beads state. Report the retry reason in
    `Blockers-JSON` or `Discovered-Follow-Ups-JSON` so the coordinator can
    create or wire the right follow-up work.
 
-6. If you intentionally close the PR instead of merging it, leave an
+7. If you intentionally close the PR instead of merging it, leave an
    explanatory comment first, then close the PR.
 
 ## Failure Protocol
@@ -319,6 +360,8 @@ Use [`references/failure-protocol.md`](references/failure-protocol.md) when
 something goes wrong. The short version:
 
 - unexpected runtime/bootstrap failure -> `invalid-runtime-context`
+- actionable current-outcome findings left for implementation ->
+  `corrections-required`
 - unresolved context, rebase conflicts, missing permissions, or external gate
   failures -> `blocked-awaiting-coordinator`
 - review fixes pushed but merge still not safe -> `pushed-review-fixes`
@@ -341,12 +384,15 @@ plain text. Collections are compact valid JSON arrays.
 ````text
 ## PR Reviewer Report: <ISSUE_ID>
 
-Status: merged-pr | pushed-review-fixes | blocked-awaiting-coordinator | invalid-runtime-context
+Status: merged-pr | corrections-required | pushed-review-fixes | blocked-awaiting-coordinator | invalid-runtime-context
 Issue: <ISSUE_ID>
 Original-Issue: <original bead id or unknown>
 Branch: <head branch or n/a>
 Worktree: <WORKTREE_PATH>
 Head-Commit: <git rev-parse HEAD or n/a>
+Reviewed-Head-Commit: <exact reviewed head SHA or n/a>
+Reviewer-Identity: <runtime agent id and/or GitHub login>
+Risk-Tier: high | standard | low
 Branch-Pushed: yes | no
 PR-URL: <url or n/a>
 PR-Number: <number or n/a>
@@ -380,8 +426,11 @@ Rules:
 - use exactly one `Status` value
 - `merged-pr` means the PR was merged and confirmed, but no Beads closure was
   performed here
-- `pushed-review-fixes` means code or review replies were pushed, but another
-  review/merge cycle is still needed
+- `corrections-required` means actionable unresolved threads were returned to
+  the original author or recovery worker; the reviewer did not author semantic
+  corrections
+- `pushed-review-fixes` means exceptional reviewer-authored code was pushed;
+  another fresh independent reviewer must assess the new head
 - `blocked-awaiting-coordinator` requires at least one blocker object
 - `invalid-runtime-context` means bootstrap failed before meaningful review work
 - if there are no review actions, follow-ups, or blockers, use `[]`
@@ -393,8 +442,8 @@ JSON object schemas:
 ```json
 {
   "thread_url": "https://github.com/owner/repo/pull/123#discussion_r1",
-  "action": "fixed",
-  "summary": "Added validation and updated the failing test"
+  "action": "correction-required",
+  "summary": "Fail closed when the evidence field is malformed"
 }
 ```
 

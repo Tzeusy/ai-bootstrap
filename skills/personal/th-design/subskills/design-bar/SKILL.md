@@ -10,8 +10,9 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-03"
+  last_reviewed: "2026-07-18"
 ---
 
 # Design Bar
@@ -152,4 +153,20 @@ A user-facing change is complete when all of these hold:
   color inconsistency on a settings page.
 - When two biases tension (e.g. density vs. accessibility), prefer the one
   protecting the user's flow and ability to act; say which you chose and why.
-- Small in-scope violations get fixed, not filed.
+- Classify findings before expanding work:
+  - Small, local violations clearly inside the approved outcome (label, focus,
+    copy, spacing, existing-state feedback) get fixed in the current change by
+    its implementation owner, not filed as new beads.
+  - Missing correctness required for the approved flow stays in the current
+    task/PR even when non-trivial; rewrite acceptance scenarios when repeated
+    review shows the original matrix was incomplete.
+  - Consent, authentication, trust-boundary, persisted-contract, or new behavior
+    discoveries return to `/th-projects` at the earliest affected feature/spec
+    gate before implementation; if required for the active outcome, link them
+    as a prerequisite rather than absorbing them. Do not improvise product
+    policy during review.
+  - Duplicate or already-active outcomes link to existing work; do not create a
+    second finding bead.
+- Preserve independent review: "fix now" assigns work to the current author or
+  recovery lane. If a reviewer authors a semantic correction, require a fresh
+  independent review of the exact resulting head.

@@ -19,7 +19,7 @@ metadata:
     - Claude Fable 5
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-13"
+  last_reviewed: "2026-07-18"
 compatibility: Subskill scripts require bash, git, grep, find. project-direction additionally assumes the bd (beads) CLI and an OpenSpec-capable environment for changeset synthesis.
 ---
 

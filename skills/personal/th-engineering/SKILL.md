@@ -17,8 +17,9 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - OpenAI Codex
   status: active
-  last_reviewed: "2026-06-12"
+  last_reviewed: "2026-07-18"
 compatibility: skill-standards auditing and excalidraw rendering require uv and Python 3.11+; excalidraw-diagram additionally requires Playwright Chromium setup on first render.
 ---
 
@@ -94,7 +95,9 @@ Subskills are independent subdomains; multi-subdomain work parallelizes:
   file:line (or skill-path) evidence and the expectation it violates.
 - engineering-bar's default biases are the baseline all subskills assume; a
   project's `about/craft-and-care/` overrides them where present.
-- Fix-it-now beats file-it-away: small in-scope findings get fixed, not
-  ticketed.
+- Fix-it-now beats file-it-away: the current implementation/recovery owner fixes
+  small in-scope findings. Independent reviewers retain verifier ownership;
+  new architecture, trust-boundary, contract, or risk-class findings return to
+  `/th-projects` allocation/spec gates instead of silently expanding the diff.
 - Subskills reference each other by relative path (`../engineering-bar/…`);
   those paths are package-internal and stable.
