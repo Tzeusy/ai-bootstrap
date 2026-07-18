@@ -69,6 +69,12 @@
 
 Write examples and real beads for a cold-start executor. Assume the person or agent picking up the bead later does not have access to the bead writer's current conversational context. Subbeads should be written as if they are full prompts by themselves, not shorthand continuations of the current planning session.
 
+The commands below illustrate field selection and dependency wiring. Before
+creating real implementation work, extend each example to the workflow's full
+Dispatch Packet (outcome/non-goals, governing intent, surface/risk map,
+relevant behavior matrix, docs impact, and named verification); syntax examples
+are not automatically packet-complete or runnable-now.
+
 ### Bug Report
 
 ```bash
@@ -168,7 +174,7 @@ bd dep add $JWT_ID $HASH_ID
 
 # Final reconciliation bead (always create last; label drives the model floor)
 RECON_ID=$(bd create --title="Reconcile spec-to-code (gen-1) for auth system" --type=task --priority=1 --parent=$EPIC --label reconciliation \
-  --description="Deep-dive review: map each epic requirement to implementing child beads and code changes. For uncovered requirements, create implementation/fix child beads under this epic. If gaps remain after those beads close, create a follow-up reconciliation bead for the next generation (up to gen-3). Keep this bead open until all gap beads close, then re-run the checklist and close with a coverage summary." \
+  --description="Deep-dive review: map each epic requirement to implementing child beads and code changes. Report uncovered requirements as cold-start-ready gap candidates to the coordinator; dispatched workers never mutate Beads lifecycle. If gaps remain, report the next reconciliation generation needed (up to gen-3). The coordinator materializes/depend-wires gaps and owns closure after a later checklist reports full coverage." \
   --json | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 
 # Ensure reconciliation runs last by depending on all implementation children

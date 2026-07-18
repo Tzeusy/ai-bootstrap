@@ -9,6 +9,26 @@ the worker report and let the coordinator reconcile it.
 
 ## Failure Classes
 
+### `corrections-required`
+
+Use when review found actionable correctness gaps inside the accepted outcome.
+Leave resolvable threads and return implementation to the **original author**
+when resumable or a **recovery worker** on the same PR branch. Do not create a
+new review bead and do not author semantic code in the independent review lane.
+
+Bind every verdict to the **exact head SHA** reviewed. Prefer the same
+independent reviewer for the corrected-head recheck while independence remains
+intact. Require a **fresh independent reviewer** after any reviewer-authored
+semantic change or a high-risk correction involving auth, approvals, migrations,
+cross-schema access, concurrency, or data loss.
+
+Apply the **two-correction checkpoint** after two substantive reopenings:
+
+- same seam/invariant: retain the PR, rewrite its acceptance/failure matrix,
+  and return it to the implementation owner;
+- new subsystem, trust boundary, architecture prerequisite, or risk class:
+  report a linked blocker and require upstream spec/design triage before resume.
+
 ### `invalid-runtime-context`
 
 Use when bootstrap failed before meaningful work started. Examples:
@@ -38,12 +58,12 @@ Rules:
 ### `pushed-review-fixes`
 
 Use when:
-- you made review fixes and pushed them, but merge is still not safe, or
-- you replied to review threads and intentionally left the PR open for another
-  cycle
+- the coordinator explicitly authorized the exceptional reviewer-as-fixer path
+  and you pushed a mechanical correction
 
 This is not a hard failure. It means the coordinator should retry review later
-or create explicit follow-up work from the reported blockers.
+with a fresh independent reviewer or create explicit follow-up work from the
+reported blockers. Never merge the reviewer-authored head in the same pass.
 
 Retries must be idempotent:
 - use stable dedupe keys for thread replies and inline review comments

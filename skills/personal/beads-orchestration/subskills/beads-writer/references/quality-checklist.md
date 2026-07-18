@@ -11,7 +11,12 @@ Use this reference before finalizing or after creating beads.
 - [ ] A fresh independent session could execute the bead as written
 - [ ] If this is a subbead, it is comprehensive enough to serve as a standalone prompt
 - [ ] Acceptance criteria are testable and enumerated
-- [ ] The bead is not a duplicate of an existing open issue
+- [ ] The bead is not a duplicate of open/recently closed work or an active PR
+- [ ] The cohesion scan found no sibling sharing two or more allocation signals,
+      or the bundle/serialization override is recorded
+- [ ] Structured fields contain a complete dispatch-ready packet: outcome,
+      non-goals, governing intent, surface/trust-boundary map, relevant behavior
+      matrix, documentation impact, and observable verification
 - [ ] Dependencies are linked intentionally
 - [ ] Labels reuse the existing taxonomy
 - [ ] The bead has one testable outcome

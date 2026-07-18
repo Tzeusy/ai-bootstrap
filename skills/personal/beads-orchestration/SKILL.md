@@ -7,7 +7,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-06-12"
+  last_reviewed: "2026-07-18"
 compatibility: Requires bd (beads) CLI v1.0.4+, git, and a Beads-backed repository. Execution subskills additionally require gh (authenticated), jq, python3, and git worktree support.
 ---
 
@@ -33,7 +33,7 @@ rg -n "^name:|^description:" subskills/*/SKILL.md
 |---|---|---|
 | Run the unattended loop: select ready issues, claim, dispatch workers, reconcile outcomes. Owns ALL `bd` lifecycle mutations. | [subskills/beads-coordinator/SKILL.md](subskills/beads-coordinator/SKILL.md) | "while true, tackle the next issue", "keep N workers processing the backlog" |
 | Implement exactly one Beads issue; requires ISSUE_ID and WORKTREE_PATH from a coordinator or operator. | [subskills/beads-worker/SKILL.md](subskills/beads-worker/SKILL.md) | Dispatched with a worker contract for one implementation bead |
-| Process one `pr-review-task` bead: triage review threads, apply fixes, assess merge readiness. | [subskills/beads-pr-reviewer-worker/SKILL.md](subskills/beads-pr-reviewer-worker/SKILL.md) | Dispatched with a `pr-review-task` bead for an open GitHub PR |
+| Process one `pr-review-task` bead: triage threads, report corrections to the implementation lane, attest exact-head merge readiness. | [subskills/beads-pr-reviewer-worker/SKILL.md](subskills/beads-pr-reviewer-worker/SKILL.md) | Dispatched with a `pr-review-task` bead for an open GitHub PR |
 | Reconcile stale worker state, PR-review bookkeeping, and orphaned worktrees before dispatching new work. | [subskills/beads-cleanup/SKILL.md](subskills/beads-cleanup/SKILL.md) | Coordinator preflight; recovery after a crashed loop; "clean up stale beads state" |
 | Create or decompose backlog issues: features, bugs, epics, grooming, vague ask → actionable beads. | [subskills/beads-writer/SKILL.md](subskills/beads-writer/SKILL.md) | "file beads for X", "break this epic down", backlog grooming |
 
@@ -54,8 +54,12 @@ rg -n "^name:|^description:" subskills/*/SKILL.md
 
 ## Shared invariants (all subskills)
 
-- The coordinator is the **sole mutation authority** for bead lifecycle
-  (`bd create/update/dep/close`); workers and cleanup report instead of mutating.
+- During an execution run, the coordinator is the **sole mutation authority**
+  for canonical lifecycle state (`bd create/update/dep/close`); dispatched
+  workers and cleanup report instead of mutating. The standalone beads-writer
+  may create/update/depend backlog items during explicit authoring before
+  dispatch, but hands mutation authority to the coordinator once execution
+  starts.
 - Worktrees live at `.worktrees/parallel-agents/<id>` on branch `agent/<id>`.
 - `.beads/` is Dolt-backed and gitignored — never commit it to code branches.
 - bd 1.0.4 has no `--rig` flag: target another project with `bd -C <path> …`.

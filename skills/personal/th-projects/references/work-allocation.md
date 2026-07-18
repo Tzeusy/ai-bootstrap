@@ -33,6 +33,65 @@ or one outcome has a different hard dependency, risk class, or sign-off gate.
 Never split by file, layer, requirement, scenario, TODO, or subagent specialty
 alone. Never merge unrelated outcomes merely to fill a worker session.
 
+Run a **cohesion scan** across proposed, ready, and recently completed work
+before materializing or dispatching the graph. The cohesion threshold is two or more shared signals; treat those candidates as one bundle or serialize them:
+
+- primary module, interface, or state machine;
+- focused tests, fixtures, or failure-injection harness;
+- migration, checkpoint, config, or persisted contract;
+- expected PR and reviewer decision surface; or
+- individually micro-sized implementation whose setup/CI/review cost rivals
+  the change itself.
+
+Override that threshold only when the outcomes have independent rollback and
+verification paths **and** a different dependency, risk class, or sign-off
+gate. Record the reason. Large diffs are not automatically over-sized: keep a
+single protocol, vertical user outcome, or exhaustive sweep cohesive when
+splitting would create an unstable intermediate contract.
+
+For tightened required contracts spanning stored data, producers, retries, or
+consumers, prefer the additive sequence **representation → propagation → enforcement**:
+
+1. **representation** — add the optional persisted/wire shape and compatibility;
+2. **propagation** — update every producer, replay, deferred, and round-trip
+   path while the field remains optional; then
+3. **enforcement** — activate fail-closed requirements only after propagation
+   coverage is proven.
+
+Each phase may be a bead when it has an independent rollback and verification
+story. Do not split merely by frontend/backend or language.
+
+## Dispatch Readiness Packet
+
+Do not dispatch an implementation bead until its structured fields make these
+items explicit. Use `description`, `design`, and `acceptance_criteria`; prose
+hidden in creator-session context does not count.
+
+- **Outcome and non-goals** — observable result plus explicit exclusions.
+- **Governing intent** — doctrine/VISION mandate, exact spec requirement, and
+  baseline commit when the project uses them.
+- **Surface map** — owned modules/interfaces plus trust boundaries, schemas,
+  runtimes, persistence/deferred paths, and callers affected.
+- **Behavior matrix** — happy path and relevant failure, concurrency,
+  idempotence, retry/replay, compatibility, and rollback semantics. Omit an
+  axis only when demonstrably irrelevant.
+- **Documentation impact** — docs/spec/RFC updates required in this change, or
+  an explicit "none" with reason.
+- **Verification** — named behavior-executing checks at the real seam and any
+  required source-scan/completeness gate.
+
+An empty structured `acceptance_criteria` field is not dispatch-ready even when
+the description contains an informal checklist.
+
+Use two distinct states:
+
+- **packet-complete** — the structured packet above is semantically complete;
+- **runnable-now** — packet-complete, dependencies clear, no ownership overlap,
+  required sign-off present, and an appropriate worker/reviewer lane available.
+
+Only runnable-now work dispatches. A blocked bead can be packet-complete without
+being runnable-now.
+
 ## Ownership and Dependencies
 
 - Give each bead one accountable primary agent. Specialists advise that owner;
@@ -62,6 +121,21 @@ Classify every gap, TODO, unknown, or expanded idea before assigning work:
 Do not leave actionable TODO comments as the only record. Do not create a bead
 for every discovered line item before doctrine, spec, and cohesion triage.
 
+Before creating a discovery bead, search open and recently closed beads, active
+PRs/branches, and concrete symbols/files. Link provenance to an existing item
+or close as duplicate when the outcome already exists.
+
+Apply a **two-correction checkpoint** after two substantive review reopenings:
+
+- Same seam or invariant: retain the active bead/PR, rewrite its behavior
+  matrix and acceptance criteria, then continue with the current owner.
+- New subsystem, trust boundary, security decision, architecture prerequisite,
+  or risk class: split a linked prerequisite blocker and return to the earliest
+  affected spec/design gate before resuming.
+- Reviewer-authored semantic correction: require a fresh independent reviewer
+  on the resulting exact head. Otherwise prefer the same independent reviewer
+  for recheck so context is reused.
+
 ## Handoff Check
 
 Before materializing the graph, verify:
@@ -74,3 +148,5 @@ Before materializing the graph, verify:
    and cannot masquerade as completion.
 5. The graph ends with one cross-child reconciliation/closeout path and a next-
    milestone callback when doctrine mandates remain uncovered.
+6. Every implementation bead has a complete Dispatch Readiness Packet, and the
+   cohesion scan found no duplicate or overhead-dominated boundary.

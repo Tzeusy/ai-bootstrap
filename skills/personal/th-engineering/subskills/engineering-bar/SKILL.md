@@ -10,8 +10,9 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - OpenAI Codex
   status: active
-  last_reviewed: "2026-06-12"
+  last_reviewed: "2026-07-18"
 ---
 
 # Engineering Bar
@@ -114,4 +115,16 @@ A non-trivial change is complete when all of these hold:
   vague name in a test helper.
 - When two biases tension (e.g. explicitness vs. simplicity), prefer the one
   protecting future readers and operators; say which you chose and why.
-- Small in-scope violations get fixed, not filed.
+- Classify findings before changing scope:
+  - Small, local violations clearly inside the approved outcome (naming,
+    fixture clarity, missing focused assertion, dead local cruft) get fixed in
+    the current change by its implementation owner, not filed separately.
+  - Missing correctness for the accepted outcome remains in the active task/PR;
+    repeated corrections rewrite the acceptance/failure matrix before more work.
+  - A new subsystem, process-global state decision, trust boundary, migration,
+    concurrency model, or other risk-class change becomes a linked prerequisite
+    and returns to `/th-projects` at the earliest governing spec/allocation gate.
+  - New behavior is spec-first; duplicates link to existing work.
+- Preserve independent review. "Fix now" does not turn the reviewer into the
+  implementation owner. If the reviewer authors semantic code, require fresh
+  independent review of the exact resulting head.

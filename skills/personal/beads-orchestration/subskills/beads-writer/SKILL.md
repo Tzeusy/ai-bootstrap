@@ -7,7 +7,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-04-16"
+  last_reviewed: "2026-07-18"
 compatibility: Requires a Beads-backed repository with the `bd` CLI available. Assumes the agent can inspect the target project workspace before creating issues.
 ---
 
@@ -34,6 +34,9 @@ Every bead must be a self-contained handoff for a future independent session. Su
 
 - Ground every bead in the target repo's actual code, naming, issue graph, and constraints before writing it.
 - Prefer one bead per testable outcome. Split unrelated acceptance criteria.
+- Apply the shared
+  [`th-projects` work-allocation contract](../../../th-projects/references/work-allocation.md)
+  before creating or decomposing implementation work.
 - Keep epics focused: 3-7 children is usually the right range once overhead is counted.
 - End every epic with a terminal reconciliation bead that depends on all implementation children.
 - Use `bd create`, not `bd q`, when you need a real description.
@@ -44,6 +47,7 @@ Every bead must be a self-contained handoff for a future independent session. Su
 | File | Read when | Content |
 |------|-----------|---------|
 | [`references/workflow.md`](references/workflow.md) | Every real use of this skill | Research-first workflow, decomposition rules, creation sequence, and verification flow |
+| [`../../../th-projects/references/work-allocation.md`](../../../th-projects/references/work-allocation.md) | Shaping implementation boundaries or dispatch packets | Cohesion threshold, additive rollout, structured dispatch readiness, and discovery triage |
 | [`references/fields-and-examples.md`](references/fields-and-examples.md) | Crafting issue text or choosing fields | Field schema, type/priority guidance, and example beads |
 | [`references/reconciliation-beads.md`](references/reconciliation-beads.md) | Writing or checking an epic | Required reconciliation-bead contract, generation rules, and template |
 | [`references/quality-checklist.md`](references/quality-checklist.md) | Before finalizing or after creating beads | Final checklist, persistence checks, and anti-patterns |
