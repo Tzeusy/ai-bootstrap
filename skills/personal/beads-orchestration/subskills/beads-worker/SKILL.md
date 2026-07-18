@@ -7,7 +7,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-06-12"
+  last_reviewed: "2026-07-18"
 compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, gh, and python3 available, plus authenticated GitHub access and network access for push and PR operations.
 ---
 
@@ -41,6 +41,10 @@ by users.
 | `WORKTREE_PATH` | Dedicated isolated git worktree for this worker |
 | `REPO_ROOT` | Main repository root for read-only orientation |
 | `ISSUE_JSON` | (Optional/legacy) Full issue JSON if inlined by an older coordinator. When absent, self-fetch: `bd show "${ISSUE_ID}" --json` |
+| `REVIEW_CORRECTION_MODE` | (Optional) `yes` when correcting an already-open PR after independent review |
+| `EXISTING_PR_NUMBER` | Required in correction mode; canonical PR to update instead of creating another |
+| `REVIEW_BEAD_ID` | Required in correction mode; canonical review bead retained by the coordinator |
+| `CORRECTION_THREADS_JSON` | Required in correction mode; unresolved review findings that define the correction pass |
 
 ## Non-Negotiables
 
@@ -127,6 +131,9 @@ ISSUE_JSON=$(bd show "${ISSUE_ID}" --json)
    If the coordinator already inlined `ISSUE_JSON`, use that; otherwise run the
    command above.
 2. Read the assigned issue carefully.
+   In `REVIEW_CORRECTION_MODE=yes`, also verify `EXISTING_PR_NUMBER` is open on
+   `agent/${ISSUE_ID}`, read `CORRECTION_THREADS_JSON`, and treat those threads
+   plus the coordinator-updated acceptance criteria as the bounded task.
 3. Inspect referenced dependencies if needed: `bd show <dep-id> --json`.
 4. Read `AGENTS.md` / `CLAUDE.md` or equivalent project guidance.
 5. If a repository-level `craft-and-care` skill exists, read it before
@@ -171,6 +178,23 @@ violate explicit project guidance around:
 ## Phase 5: Choose Handoff Path
 
 Use conservative routing. When in doubt, open a PR.
+
+### Existing-PR correction path
+
+When `REVIEW_CORRECTION_MODE=yes`, this path takes precedence over the routing
+table below:
+
+1. Push the corrected `agent/${ISSUE_ID}` head with `--force-with-lease`.
+2. Confirm `gh pr view "${EXISTING_PR_NUMBER}"` is still open, targets that
+   branch, and reports the pushed head SHA.
+3. Do not call `gh pr create`; the canonical PR and review bead already exist.
+4. Report `completed-pr-opened` with the existing PR URL/number so the
+   coordinator can restore the review dependency and exact-head review lane.
+
+```bash
+git push --force-with-lease origin "agent/${ISSUE_ID}"
+gh pr view "${EXISTING_PR_NUMBER}" --json state,url,headRefName,headRefOid
+```
 
 | PR required | Direct-merge candidate |
 |---|---|

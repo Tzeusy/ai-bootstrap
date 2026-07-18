@@ -19,8 +19,9 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-03"
+  last_reviewed: "2026-07-18"
 ---
 
 # TH Design
@@ -116,5 +117,9 @@ but scale dispatch to scope:
   language as a normative spec (e.g. `openspec/specs/*design-language*/`) —
   changes to the language then go through the spec workflow, not ad-hoc edits.
 - Expectations apply to specs and mockups as much as built UI.
+- "Fix it now" means the current implementation owner corrects small findings
+  inside the approved outcome; it does not make an independent reviewer the
+  code owner. Consent/auth, trust-boundary, contract, or genuinely new behavior
+  discoveries return to `/th-projects` at the earliest affected spec gate.
 - Subskills reference each other by relative path (`../design-bar/…`); those
   paths are package-internal and stable.

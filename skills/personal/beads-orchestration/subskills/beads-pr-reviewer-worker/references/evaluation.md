@@ -46,6 +46,7 @@ shape.
 
 Minimum accepted reviewer statuses:
 - `merged-pr`
+- `corrections-required`
 - `pushed-review-fixes`
 - `blocked-awaiting-coordinator`
 - `invalid-runtime-context`
@@ -57,12 +58,17 @@ names, fix the contract drift before shipping the skill update.
 
 On a safe test PR:
 1. resolve context
-2. prepare branch
+2. prepare branch; if rebase or cleanup moves the head, verify the helper pushes
+   it with lease and reports the exact prepared head
 3. list threads
 4. post a reply with a stable dedupe key
 5. rerun the same reply and verify it is skipped as duplicate
 6. evaluate merge readiness with required checks available
 7. verify a required-check fetch failure fails closed
+8. verify a correction report records the exact reviewed head and leaves the
+   implementation lane—not the reviewer—as code owner
+9. simulate two substantive reopenings and verify the two-correction checkpoint
+   distinguishes same-invariant continuation from a new risk-class blocker
 
 ## Exit Criteria
 
@@ -70,4 +76,5 @@ Do not consider the skill update complete unless:
 - description and trigger examples look correct
 - helper scripts compile and expose `--help`
 - reviewer/coordinator status vocabularies match
+- exact-head and reviewer-independence rules match
 - the merge-readiness helper fails closed when check status is unavailable

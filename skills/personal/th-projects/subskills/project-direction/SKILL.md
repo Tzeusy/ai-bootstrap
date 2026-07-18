@@ -8,7 +8,7 @@ metadata:
     - Claude Fable 5
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-13"
+  last_reviewed: "2026-07-18"
 ---
 
 # Project Direction
@@ -145,17 +145,25 @@ decomposing: one primary agent per cohesive independently verifiable outcome,
 with enough work to amortize dispatch/context/worktree/CI/review overhead.
 
 1. Generate epics/tasks, explicit dependencies, no cycles or overlapping owners.
-2. Map every in-scope `v1-mandatory` requirement to an implementation bead and
+2. Run the allocation contract's dedupe and cohesion scan across open/recently
+   closed beads, active PRs, and the proposed graph. Merge or serialize shared
+   surfaces before creating more review lanes.
+3. Populate every implementation bead's **Dispatch Readiness Packet** in its
+   structured description/design/acceptance fields; incomplete structured
+   acceptance criteria block dispatch.
+4. Map every in-scope `v1-mandatory` requirement to an implementation bead and
    verification path; one cohesive bead may cover several adjacent requirements.
-3. Triage gaps, TODOs, unknowns, and expanded ideas through the allocation
+5. Triage gaps, TODOs, unknowns, and expanded ideas through the allocation
    contract; keep corrections/local debt in scope, route boundary/spec changes
    back to feature-request, and capture adjacent scope separately.
-4. Include one epic-level reconciliation/report closeout path per beads-writer
+6. Sequence tightened cross-cutting contracts as representation → propagation →
+   enforcement when that creates independently safe rollout and rollback points.
+7. Include one epic-level reconciliation/report closeout path per beads-writer
    conventions (report beads use `scripts/epic-report-scaffold.sh`; see
    `references/epic-report.md`). Do not add reconciliation beads per task.
-5. Add a milestone-close callback that refreshes VISION mandate coverage and
+8. Add a milestone-close callback that refreshes VISION mandate coverage and
    re-enters milestone synthesis when uncovered mandates remain.
-6. Run mechanical graph validations (cycle check, complete mandatory-mandate
+9. Run mechanical graph validations (cycle check, complete mandatory-mandate
    coverage, spec-link coverage), then **verify-tier**.
 
 Acceptance: graph acyclic, prioritized, execution-ready, every bead spec-traceable. Delivery/execution NOT handled here — owned by `/beads-orchestration` (beads-coordinator).

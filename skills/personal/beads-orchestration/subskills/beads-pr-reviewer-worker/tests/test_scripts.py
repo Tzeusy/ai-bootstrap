@@ -547,6 +547,57 @@ sys.exit(0)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "blocked")
 
+    def test_push_failure_after_rebase_returns_blocked(self) -> None:
+        with FakeBinDir() as fbd:
+            fbd.add("git", """
+import sys
+
+argv = sys.argv[1:]
+if argv[:2] == ['rev-parse', 'origin/agent/test-1']:
+    print('old-head')
+elif argv[:2] == ['rev-parse', 'HEAD']:
+    print('rebased-head')
+elif argv[:1] == ['diff']:
+    print('')
+elif argv[:1] == ['push']:
+    print('push failed: remote rejected', file=sys.stderr)
+    sys.exit(1)
+sys.exit(0)
+""")
+            result = run_script(
+                "prepare_pr_branch.py",
+                ["--base-branch", "main", "--head-branch", "agent/test-1"],
+                env=fbd.env(),
+            )
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "blocked")
+        self.assertIn("prepared head", payload["error"])
+
+    def test_successful_rebase_pushes_and_reports_prepared_head(self) -> None:
+        with FakeBinDir() as fbd:
+            fbd.add("git", """
+import sys
+
+argv = sys.argv[1:]
+if argv[:2] == ['rev-parse', 'origin/agent/test-1']:
+    print('old-head')
+elif argv[:2] == ['rev-parse', 'HEAD']:
+    print('rebased-head')
+elif argv[:1] == ['diff']:
+    print('')
+sys.exit(0)
+""")
+            result = run_script(
+                "prepare_pr_branch.py",
+                ["--base-branch", "main", "--head-branch", "agent/test-1"],
+                env=fbd.env(),
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["pushed_prepared_head"])
+        self.assertEqual(payload["head_commit"], "rebased-head")
+
     def test_dry_run_skips_all_git_mutations(self) -> None:
         """In --dry-run mode the script must not invoke git at all."""
         with FakeBinDir() as fbd:

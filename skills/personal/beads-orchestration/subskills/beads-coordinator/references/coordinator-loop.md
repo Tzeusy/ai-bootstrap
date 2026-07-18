@@ -6,6 +6,8 @@ heartbeat rules, worker bootstrap rules, monitoring details, or adaptive polling
 ## Preflight
 
 - Before entering the loop, run `../beads-cleanup/SKILL.md`. This is mandatory.
+- Run `bd doctor` once at startup and again after any unexpected `bd` error;
+  do not spend worker cycles on a sick tracker.
 - Create a fresh coordinator session ID for this run (used as the stall-heartbeat
   owner; atomic claiming is handled by `bd update --claim`).
 - If running from outside the target rig, point `bd` at the rig workspace with
@@ -134,17 +136,27 @@ Handle each case:
 ### Post-closure branch and worktree cleanup (merged PRs)
 
 The reviewer merges with `gh pr merge --squash` and does **not** delete the
-branch, so the `agent/<id>` branch name survives until the coordinator removes
-it. This keeps branch-name → bead correlation intact if a crash happens between
-merge and the worker report. Branch deletion is therefore the coordinator's
-responsibility, performed only **after** the relevant bead(s) are closed:
+branch, so the PR branch `agent/${ORIGINAL_ID}` survives until the coordinator
+removes it. This keeps branch-name → bead correlation intact if a crash happens
+between merge and the worker report. Branch deletion is therefore the
+coordinator's responsibility, performed only **after** the relevant bead(s) are
+closed.
+
+Keep the two-stage review topology explicit during cleanup: `ORIGINAL_ID` owns
+the remote PR branch and its checked-out local branch, while `REVIEW_ID` owns
+the reviewer worktree path and any temporary `agent/${REVIEW_ID}` branch. When
+the reviewer worktree was transferred sequentially to a correction worker,
+the transferred worktree path remains keyed by `REVIEW_ID` even though its
+checked-out branch is `agent/${ORIGINAL_ID}`. Remove that worktree before
+deleting local branches so the checked-out original branch is no longer in use:
 
 ```bash
 # After bd close on the review/original beads:
-git push origin --delete "agent/<id>" 2>/dev/null \
-  || gh api -X DELETE "repos/<owner>/<repo>/git/refs/heads/agent/<id>" 2>/dev/null || true
-bd worktree remove ".worktrees/parallel-agents/<id>" --force 2>/dev/null || true
-git branch -D "agent/<id>" 2>/dev/null || true
+git push origin --delete "agent/${ORIGINAL_ID}" 2>/dev/null \
+  || gh api -X DELETE "repos/<owner>/<repo>/git/refs/heads/agent/${ORIGINAL_ID}" 2>/dev/null || true
+bd worktree remove ".worktrees/parallel-agents/${REVIEW_ID}" --force 2>/dev/null || true
+git branch -D "agent/${ORIGINAL_ID}" 2>/dev/null || true
+git branch -D "agent/${REVIEW_ID}" 2>/dev/null || true
 ```
 
 Do not delete the branch before closure; correlation depends on it.
@@ -175,8 +187,10 @@ Safe PR-review bead creation pattern:
 ```bash
 REVIEW_JSON=$(bd create \
   "Conduct a thorough code review of ${PR_URL}" \
-  --description="Review PR ${PR_URL} thoroughly. Original implementation bead: ${ORIGINAL_ID}. Leave PR comments on notable issues, apply fixes if needed, and report merge readiness back to the coordinator." \
-  -t task -p 1 --json)
+  --description="Review PR ${PR_URL} thoroughly. Original implementation bead: ${ORIGINAL_ID}. Leave resolvable PR comments on notable issues, report corrections for the implementation lane, and attest merge readiness for the exact reviewed head." \
+  --design="Independent exact-head review. Classify risk before review; reviewer reports semantic corrections to the implementation lane and never merges an unreviewed moved head." \
+  --acceptance="1. Record reviewer identity and risk tier. 2. Bind findings and merge verdict to the exact PR head SHA. 3. Resolve or explicitly classify every review thread. 4. Run risk-scaled gates and merge only when readiness fails closed to safe." \
+  -t task -p 1 --validate --json)
 REVIEW_ID=$(echo "${REVIEW_JSON}" | jq -r '.id // .[0].id')
 bd dep add "${ORIGINAL_ID}" "${REVIEW_ID}"
 bd update "${REVIEW_ID}" \
@@ -197,6 +211,27 @@ bd ready --json
 
 If the list is empty, enter idle polling mode.
 
+### Dispatch readiness gate
+
+Before claiming a candidate, read its structured fields and require a complete
+dispatch packet: outcome/non-goals, governing spec or explicit maintenance
+authority, surface/trust-boundary map, relevant failure/concurrency/idempotence
+matrix, documentation impact, and behavior-executing verification. A blank
+structured `acceptance_criteria` field is not dispatch-ready. Return an
+incomplete bead to beads-writer/project-direction shaping; do not ask a worker
+to reconstruct planning context.
+
+Track readiness precisely: **packet-complete** means the structured content is
+complete; **runnable-now** additionally means dependencies/sign-off are clear,
+ownership does not overlap, and a suitable lane is available. Dispatch only
+runnable-now work.
+
+Run a **cohesion check** against ready/in-progress beads and active PRs. When a
+candidate shares two or more allocation signals (module/interface,
+tests/fixtures, migration/config/contract, review surface, micro size), bundle
+before work starts or serialize it behind the active owner. Do not dispatch
+overlapping siblings in parallel.
+
 ## Step 2: Select Next Issue
 
 Pick the issue with the lowest `priority` number, breaking ties by oldest
@@ -204,6 +239,12 @@ Pick the issue with the lowest `priority` number, breaking ties by oldest
 - is already assigned to a running worker
 - is assigned to another live actor (per `assignee`)
 - is blocked by a dispatchable review task that should run first
+
+Within equal priority and readiness, preserve **context affinity**: prefer the
+worker/recovery lane that already owns the same active subsystem or PR when it
+can be resumed safely. Prefer the same independent reviewer for exact-head
+rechecks. Rotate only for independence, risk-tier, availability, or stale-
+context reasons; affinity never overrides isolation or conflicting ownership.
 
 ## Step 3: Claim The Issue
 
@@ -244,6 +285,12 @@ bd worktree create .worktrees/parallel-agents/<id> --branch agent/<id>
 
 This creates an isolated code worktree for the worker branch. Beads metadata is
 shared across worktrees via a Dolt DB redirect file.
+
+PR-review worktrees are the exception to the generic `agent/<id>` branch
+invariant. Their path and initial branch are keyed by the review bead. The
+reviewer then switches that worktree to the canonical PR head during its
+preparation phase. Apply the two-stage attestation in Step 6a rather than
+requiring both branch states in one bootstrap check.
 
 ## Step 5: Build The Worker Prompt
 
@@ -288,6 +335,21 @@ Bootstrap contract:
 - `pwd` must equal `WORKTREE_PATH`
 - current branch must equal expected worker branch
 - `pwd` must not equal `REPO_ROOT`
+
+For a PR-review worker, branch attestation has two explicit stages:
+
+- **Stage 1 — dispatch bootstrap:** the initial branch is
+  `agent/<review-id>`, created by Step 4. This proves isolated dispatch context
+  before the reviewer runs any branch preparation.
+- **Stage 2 — prepared-head attestation:** after
+  `prepare_pr_branch.py` succeeds, require an interim acknowledgement that the
+  expected reviewer branch is `agent/<original-id>`, its reported
+  `head_commit` equals local `HEAD`, and the same SHA is the remote PR head.
+  Substantive review cannot begin until this attestation passes.
+
+Re-review hand-back starts at Stage 2 because Step 7 restores the now-idle
+worktree directly to `agent/<original-id>`. Do not reapply the Stage 1 branch
+expectation to a transferred re-review worktree.
 
 If the runtime supports interim updates, require a short bootstrap
 acknowledgement before continuing. If bootstrap never arrives, or if the worker
@@ -347,8 +409,8 @@ Report first, then verify the reported branch / PR state:
        `external_ref=gh-pr:<N>`
      - run the Step 0a dedupe check, then ensure exactly one dedicated
        `pr-review-task` bead exists (create only if the dedupe check finds none)
-     - create any discovered follow-up beads from
-       `Discovered-Follow-Ups-JSON`
+     - classify discovered items before creating any bead (see Discovery
+       classification below)
      - re-run Step 0 immediately so review/merge is prioritized
    - `completed-direct-merge-candidate`:
      - require `Branch-Pushed=yes` and no open PR
@@ -374,7 +436,7 @@ Report first, then verify the reported branch / PR state:
        into blocker beads and wire the original bead to depend on them;
        hard-gated decisions must use the escalation format from
        `decision-autonomy.md`
-     - convert `Discovered-Follow-Ups-JSON` entries into linked follow-up beads
+     - classify `Discovered-Follow-Ups-JSON` entries before creating linked work
      - set the original bead to `blocked`
      - preserve recovery state explicitly:
        - if `Recovery-State=branch-pushed`, keep the remote branch for the next
@@ -392,8 +454,24 @@ Report first, then verify the reported branch / PR state:
 4. Only treat the run as stalled if the worker disappears after bootstrap or
    the report remains unusable after the recovery probe.
 
-Ensure any discovered follow-up work from `Discovered-Follow-Ups-JSON` is
-converted into new beads by the coordinator using sequential creation:
+### Discovery classification
+
+Classify every worker or reviewer discovery before any `bd create`:
+
+| Class | Coordinator action |
+|---|---|
+| **current-PR correctness** required for accepted outcome | Keep it in the original bead/PR and return it to the implementation/recovery lane; no follow-up bead. |
+| **prerequisite blocker** with a different subsystem, trust boundary, architecture decision, or risk class | Create one linked blocker, return through the governing spec/design gate, and serialize the original behind it. |
+| **new behavior** or adjacent idea | Create or link spec-first work outside the active outcome; do not expand the PR. |
+| **duplicate** symptom/outcome | Link provenance to the existing bead/PR and close or suppress the duplicate. |
+
+Classification precedence: a new trust boundary, subsystem, architecture
+decision, or risk class wins over "current-PR correctness" even when required
+for the current outcome; it must become a prerequisite blocker.
+
+Search open/recently closed beads, active PRs, and concrete symbols/files before
+materializing the last three classes. Only genuinely new work is converted by
+the coordinator using sequential creation:
 
 ```bash
 NEW_JSON=$(bd create "<title>" --description="<details>" -t <type> -p <priority> --json)
@@ -414,26 +492,98 @@ echo "${BLOCKERS_JSON}" | jq -e 'type == "array"' >/dev/null
 Reviewer-worker report contract:
 - accepted `Status` values:
   - `merged-pr`
+  - `corrections-required`
   - `pushed-review-fixes`
   - `blocked-awaiting-coordinator`
   - `invalid-runtime-context`
 - `Review-Actions-JSON`, `Discovered-Follow-Ups-JSON`, and `Blockers-JSON`
   must be valid JSON arrays
+- `Head-Commit` and `Reviewed-Head-Commit` are both required; `merged-pr`
+  requires them to match the confirmed PR head
+- `Reviewer-Identity` and `Risk-Tier` are required so affinity/rotation policy
+  is auditable
 - `merged-pr` means GitHub merge is complete but Beads closure still belongs to
   the coordinator
-- `pushed-review-fixes` means the worker changed GitHub state or pushed code,
-  but the review bead should remain blocked for another pass
+- `corrections-required` means the independent reviewer left unresolved,
+  actionable threads for the implementation/recovery lane and did not author
+  semantic code
+- `pushed-review-fixes` means the worker pushed code under the exceptional
+  reviewer-as-fixer path; a fresh independent reviewer must assess the
+  resulting head
 
 When a reviewer worker completes:
 - if it reports `merged-pr`, confirm the PR is merged, then renew the heartbeat,
   close the review and original beads, and run the post-closure branch/worktree
-  cleanup in Step 0b (`git push origin --delete agent/<id>`, remove the worktree
-  and local branch) — the reviewer left the branch in place on purpose
+  cleanup in Step 0b (delete the `ORIGINAL_ID` PR branch, remove the
+  `REVIEW_ID` worktree, then delete the original and temporary review local
+  branches) — the reviewer left the PR branch in place on purpose
 - if it reports `blocked-awaiting-coordinator`, keep the review bead blocked
   and create any follow-up merge-blocker bead from the structured report if one
   does not already exist
+- if it reports `corrections-required`, keep the one canonical review bead
+  blocked, remove `review-running`, and return current-PR correctness to the
+  original author when resumable or a recovery worker on the same PR branch.
+  Do not create another review bead. Use this explicit sequential transition;
+  it temporarily detaches the original from the review gate so correction work
+  is runnable, then restores the same gate:
+
+  ```bash
+  # Reviewer agent has exited; its worktree may be transferred sequentially.
+  bd dep remove <original-id> <review-id>
+  bd update <original-id> --status in_progress
+
+  # Dispatch beads-worker in the now-idle PR worktree with:
+  REVIEW_CORRECTION_MODE=yes
+  EXISTING_PR_NUMBER=<pr-number>
+  REVIEW_BEAD_ID=<review-id>
+  CORRECTION_THREADS_JSON='<unresolved-current-correctness-threads>'
+
+  # After completed-pr-opened confirms the existing PR head was pushed:
+  bd update <original-id> --status blocked
+  bd dep add <original-id> <review-id>
+
+  # Correction-to-re-review hand-back; the correction agent has exited.
+  git -C <review-worktree> status --porcelain  # must be empty
+  git -C <review-worktree> fetch origin agent/<original-id>
+  git -C <review-worktree> checkout -B agent/<original-id> origin/agent/<original-id>
+  ```
+
+  The correction-mode handler takes precedence over generic
+  `completed-pr-opened` reconciliation: reuse the existing PR/review bead, do
+  not create either again. Never run reviewer and correction agents in the
+  transferred worktree concurrently. Before redispatching the reviewer, require
+  an empty worktree; the expected reviewer branch is `agent/<original-id>`.
+  Let the reviewer preparation helper verify and
+  push the exact prepared head. If the hand-back is dirty or the branch cannot
+  be restored, preserve the recovery state or remove and recreate a fresh
+  review worktree from the remote PR head. On correction failure, preserve
+  recovery state, restore the original→review dependency, and keep both beads
+  blocked before retrying.
+
+  After correction, prefer the same
+  independent reviewer for an exact-head recheck unless the risk tier requires
+  rotation. Track review state in one replace-in-place note on the original
+  bead (never append duplicate blocks):
+
+  ```text
+  [review-cycle]
+  substantive_reopenings=<integer>
+  reviewer_identity=<runtime-id-or-login>
+  risk_tier=<high|standard|low>
+  reviewed_head_sha=<sha>
+  [/review-cycle]
+  ```
+
+  At two
+  substantive reopenings, apply the allocation contract's two-correction
+  checkpoint: the coordinator updates the original bead's structured
+  acceptance criteria/failure matrix and reruns dispatch readiness for the same invariant, or
+  split and spec-gate a new subsystem/trust-boundary/risk-class prerequisite.
+  For a prerequisite split, keep the PR open and mark it draft when supported,
+  remove any partial boundary implementation from its diff, then rebase and
+  re-review only after the prerequisite lands.
 - if it reports `pushed-review-fixes`, keep the review bead blocked and rely on
-  the PR-review lane to revisit it later
+  the PR-review lane to dispatch a fresh independent reviewer for the new head
 - if it reports `invalid-runtime-context`, release the review bead back to
   `blocked`, remove `review-running`, and retry later after environment repair
 
@@ -448,8 +598,8 @@ If a worker fails bootstrap, or stalls after bootstrap:
 
 ## Step 8: Adaptive Polling And Loop
 
-Do not use frequent free-running polling by default. Prefer state-driven
-rechecks.
+Use an **event-driven** primary loop. The full cleanup pass runs at startup;
+afterward prefer targeted state refreshes caused by real events.
 
 Immediate recheck triggers:
 - worker completion
@@ -462,8 +612,9 @@ Polling modes:
 - active mode: 1-2 minute polls only when there is known near-term work waiting
   such as a dispatchable `pr-review-task`, a just-freed slot, or a PR cooldown
   about to expire
-- idle mode: 10-15 minute polls when no workers are active and no dispatchable
-  near-term review work exists
+- idle mode: wait for events when the runtime supports it. Regardless of event
+  delivery, run one **30-minute safety sweep** covering ready work, PR state,
+  released dependencies, stalled claims, and tracker health.
 
 Decision sweep: on every transition into idle mode — and at least once per
 session even if never idle — run the Coordinator Decision Sweep from

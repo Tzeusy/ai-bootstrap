@@ -7,7 +7,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-06-12"
+  last_reviewed: "2026-07-18"
 compatibility: Requires a Beads-backed repository with `bd` v1.0.4+, `git`, an authenticated `gh`, `jq`, git worktree support, and network access for `gh` PR operations.
 ---
 
@@ -93,15 +93,18 @@ auto-routing to the right DB — that fails across embedded-mode workspaces
 2. Create a coordinator session ID for this run (the stall-heartbeat owner).
 3. Loop the steps in `references/coordinator-loop.md`: normalize the PR-review
    lane (Step 0), then atomically `--claim` and dispatch ready work.
-4. Build a **compact** dispatch prompt carrying `ISSUE_ID`, `WORKTREE_PATH`,
+4. Enforce the dispatch-readiness and cohesion gates before claiming work;
+   malformed or overlapping beads return to planning rather than consuming a
+   worker slot.
+5. Build a **compact** dispatch prompt carrying `ISSUE_ID`, `WORKTREE_PATH`,
    `REPO_ROOT`, and a 2-4 line issue summary plus acceptance criteria. Do not
    inline full `bd show` JSON; the worker self-fetches if it needs more.
-5. Choose the worker skill by issue type:
+6. Choose the worker skill by issue type:
    - default implementation issue → `../beads-worker/SKILL.md`
    - `pr-review-task` issue → `../beads-pr-reviewer-worker/SKILL.md`
    - epic-complexity issue → Team Lead, see `references/epic-coordination.md`
-6. Pick the model per the assignment rules in `references/runtime-and-safety.md`.
-7. Require bootstrap proof (`pwd == WORKTREE_PATH`, expected branch, not
+7. Pick the model per the assignment rules in `references/runtime-and-safety.md`.
+8. Require bootstrap proof (`pwd == WORKTREE_PATH`, expected branch, not
    `REPO_ROOT`) before counting a worker as running.
 
 Worker skill paths (when a runtime needs the absolute location):

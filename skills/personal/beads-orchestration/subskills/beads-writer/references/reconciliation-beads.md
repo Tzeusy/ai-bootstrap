@@ -15,7 +15,10 @@ Every epic must end with one final child bead that performs spec-to-code reconci
   Claude), not the default coding tier. See "Reconciliation Floor" in the
   coordinator's `runtime-and-safety.md`.
 
-Purpose: verify that every requirement from the original epic or spec has a corresponding implementation bead and code change. If gaps exist, create missing child beads and, if needed, the next-generation reconciliation bead.
+Purpose: verify that every requirement from the original epic or spec has a
+corresponding implementation bead and code change. If gaps exist, report gap
+candidates and next-generation reconciliation needs to the coordinator; the
+dispatched reconciliation worker never mutates Beads lifecycle.
 
 ## Template
 
@@ -55,15 +58,17 @@ Workflow:
    bead and code evidence (file:line), classified
    implemented/partial/missing/deviates. For large epics, fan out
    independent per-spec-area skeptic subagents and merge their findings.
-7. For any requirement not covered or only partially covered:
-   a. Create a new child bead under this epic describing the missing work.
-   b. Set appropriate priority and link dependencies.
-8. If gap beads were created in step 7, create a follow-up reconciliation bead
-   for the next generation that depends on all new gap beads.
-9. Keep this reconciliation bead open or blocked until all new gap beads and
-   any follow-up reconciliation bead are closed.
-10. Re-run the requirement-to-bead checklist and close this bead only when all
-    requirements show full coverage.
+7. For every partial or missing requirement, report a cold-start-ready gap
+   candidate in `Discovered-Follow-Ups-JSON`, including priority, proposed
+   parent/dependencies, exact spec link, and acceptance evidence.
+8. When gaps remain, report the need for the next-generation reconciliation
+   candidate (up to gen-3) and return `blocked-awaiting-coordinator` with
+   "coverage gaps remain" as the unblock condition.
+9. The coordinator dedupes/materializes the reported gaps, wires dependencies,
+   and keeps this reconciliation bead blocked until the gap children and next
+   reconciliation generation close.
+10. A later reconciliation pass re-runs the checklist. Only the coordinator
+    closes lifecycle state after full coverage is reported and verified.
 11. If coverage is complete and the epic is managed via an OpenSpec change,
     run /opsx:sync to synchronize deltas into the authoritative application spec.
 ```
@@ -77,8 +82,8 @@ Workflow:
 3. Guardrail/scan tests were audited for blind spots (scan scope vs the
    spec-mandated surface), and every spec scenario has a behavior-executing
    test (not a source-grep).
-4. Any gaps found result in new child beads under the same epic.
-5. If gaps were found, a follow-up reconciliation bead for the next generation was created.
+4. Any gaps found are reported as dedupe-ready child-bead candidates under the same epic.
+5. If gaps were found, the handoff reports a next-generation reconciliation candidate.
 6. The close reason records the reconciliation summary.
 ```
 
@@ -113,4 +118,5 @@ Create the bead first, then add dependencies from the reconciliation bead to eve
 bd dep add <recon-id> <child-id>
 ```
 
-If new gap beads are created later, wire the next-generation reconciliation bead to those new gaps as well.
+When the coordinator creates new gap beads later, it wires the next-generation
+reconciliation bead to those gaps as well.

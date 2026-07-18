@@ -71,7 +71,13 @@ class BreadsPrReviewerWorkerPackageTests(unittest.TestCase):
 
     def test_skill_documents_terminal_statuses(self) -> None:
         contents = SKILL_MD.read_text(encoding="utf-8")
-        for status in ("merged-pr", "pushed-review-fixes", "blocked-awaiting-coordinator", "invalid-runtime-context"):
+        for status in (
+            "merged-pr",
+            "corrections-required",
+            "pushed-review-fixes",
+            "blocked-awaiting-coordinator",
+            "invalid-runtime-context",
+        ):
             self.assertIn(status, contents, f"SKILL.md should document status: {status}")
 
     def test_openai_yaml_exists_with_required_fields(self) -> None:
@@ -91,6 +97,29 @@ class BreadsPrReviewerWorkerPackageTests(unittest.TestCase):
         self.assertIn("Track 2", contents)
         self.assertIn("Track 3", contents)
         self.assertIn("Track 4", contents)
+
+    def test_review_cycle_preserves_independent_exact_head_review(self) -> None:
+        skill = SKILL_MD.read_text(encoding="utf-8").lower()
+        protocol = FAILURE_PROTOCOL_MD.read_text(encoding="utf-8").lower()
+        combined = skill + protocol
+        self.assertIn("original author", combined)
+        self.assertIn("recovery worker", combined)
+        self.assertIn("two-correction checkpoint", combined)
+        self.assertIn("exact head sha", combined)
+        self.assertIn("fresh independent reviewer", combined)
+
+    def test_report_exposes_risk_and_reviewer_identity(self) -> None:
+        contents = SKILL_MD.read_text(encoding="utf-8")
+        self.assertIn("Risk-Tier:", contents)
+        self.assertIn("Reviewer-Identity:", contents)
+
+    def test_semantic_corrections_are_not_line_count_exceptions(self) -> None:
+        contents = SKILL_MD.read_text(encoding="utf-8").lower()
+        self.assertIn("semantic regardless of line count", contents)
+
+    def test_beads_cleanup_is_classified_as_pre_review_hygiene(self) -> None:
+        contents = SKILL_MD.read_text(encoding="utf-8").lower()
+        self.assertIn(".beads branch-hygiene cleanup is non-semantic", contents)
 
     def test_all_scripts_compile(self) -> None:
         for script in SCRIPTS_DIR.glob("*.py"):
