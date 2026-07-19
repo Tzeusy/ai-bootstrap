@@ -43,8 +43,13 @@ Against [`quality-bar.md`](./quality-bar.md), answer:
 7. Does the skill define boundaries, prerequisites, and failure modes?
 8. Does any reference doc hold living state (error catalogs, project
    inventories, compatibility matrices)? If so, does it open with a
-   maintenance contract (quality-bar section 10), and does the skill's
+   maintenance contract (quality-bar section 11), and does the skill's
    workflow tell agents to write back when they surface new facts?
+9. Are the prescribed commands token-efficient at realistic scale
+   (quality-bar section 9)? Structured output projected to named fields,
+   verbose gates routed to log files with failure-tail readback, targeted
+   tests while iterating with one full gate before completion, polls batched,
+   catalogs consumed grep-first, subagent dispatches right-sized and compact?
 
 ## Step 3: Update Discipline
 
@@ -84,4 +89,8 @@ When changing an existing skill:
 - Stale references, dead scripts, or mismatched tool adapter files
 - Stateful catalogs without a write-back maintenance contract, so entries rot
   silently
+- Prescribed commands that dump unprojected structured output or full test
+  logs into the consuming agent's context
+- Workflows that re-run the full gate on every iteration, or tell agents to
+  load a whole catalog when a grep would answer
 - Session stories disguised as reusable guidance
