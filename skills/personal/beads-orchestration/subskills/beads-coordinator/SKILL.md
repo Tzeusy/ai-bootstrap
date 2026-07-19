@@ -69,6 +69,7 @@ State these hold for the entire run; the references elaborate, never override.
 | [`references/epic-coordination.md`](references/epic-coordination.md) | the bead is an epic or a worker hits a hard blocker | Epic classification, independent dispatch, Team Lead mode + prompt, blocker handling |
 | [`references/commands.md`](references/commands.md) | a quick command lookup | `bd` quick reference, claim/heartbeat checklist, session-completion checklist |
 | [`../../references/decision-autonomy.md`](../../references/decision-autonomy.md) | a worker reports a decision-shaped blocker, or blocked/human-flagged beads accumulate | Decision protocol, hard-gate list, decision record, escalation format, decision sweep |
+| [`../../references/token-efficiency.md`](../../references/token-efficiency.md) | once, before the first query loop | Output projection rules, gate-log routing, targeted-test policy, model right-sizing |
 
 
 Diagrams (load only when you need a visual of the flow): the full cycle is

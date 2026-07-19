@@ -13,8 +13,10 @@ Coordinator responsibilities:
 - claim atomically with `bd update <id> --claim` (sets `assignee` + `in_progress`)
 - check `assignee` (not a lease token) to decide whether a bead is yours
 - renew the stall heartbeat at least every 5 minutes while active
-- renew before every `bd create`, `bd update`, `bd dep add`, `bd close`
-- renew after long `gh`, test, rebase, or merge steps
+- renew at every mutation checkpoint (`bd create/update/dep add/close`) and
+  after long `gh`, test, rebase, or merge steps — but skip the renewal when the
+  heartbeat was already renewed within the last 5 minutes (one renewal can
+  cover a burst of consecutive mutations; the TTL is 20 minutes)
 - replace the canonical heartbeat block in notes; never append a second one
 
 ## Session Completion Checklist
@@ -40,13 +42,17 @@ Codex add-on:
 
 ## bd Quick Reference
 
+Pipe every listing through a `jq` field projection per
+`../../../references/token-efficiency.md`; the projections below are the
+default coordinator views.
+
 | Action | Command |
 |---|---|
-| Ready work | `bd ready --json` (prefix with `bd -C /path/to/rig` if outside target rig) |
-| All open | `bd list --status=open --json` (prefix with `bd -C /path/to/rig` if outside target rig) |
-| PR-review issues | `bd list --status=blocked --label pr-review --json` |
-| PR-review-task issues | `bd list --status=blocked --label pr-review-task --json` |
-| Issue detail | `bd show <id> --json` |
+| Ready work | `bd ready --json \| jq -c '[.[] \| {id, title, priority, type, labels, assignee, created_at}]'` (prefix with `bd -C /path/to/rig` if outside target rig) |
+| All open | `bd list --status=open --json \| jq -c '[.[] \| {id, title, priority, type, labels, assignee}]'` (prefix with `bd -C /path/to/rig` if outside target rig) |
+| PR-review issues | `bd list --status=blocked --label pr-review --json \| jq -c '[.[] \| {id, title, labels, assignee, external_ref}]'` |
+| PR-review-task issues | `bd list --status=blocked --label pr-review-task --json \| jq -c '[.[] \| {id, title, labels, assignee, external_ref}]'` |
+| Issue detail | `bd show <id> --json \| jq '{id, title, status, assignee, labels, external_ref}'` (workers add `description`, `acceptance_criteria`, `notes`, `design`) |
 | Check PR state | `gh pr view <number> --json state,mergedAt,createdAt` |
 | Find PR by worker branch | `gh pr list --state open --head "agent/<id>" --json number,url,createdAt` |
 | Create issue | `bd create "<title>" --description "<desc>" -t <type> -p <priority> --json` |

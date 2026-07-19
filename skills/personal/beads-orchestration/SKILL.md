@@ -67,13 +67,22 @@ rg -n "^name:|^description:" subskills/*/SKILL.md
   autonomously per [`references/decision-autonomy.md`](references/decision-autonomy.md);
   blocking on a human is reserved for its hard-gate list. Load that file before
   filing or reconciling any decision-shaped blocker.
+- **Spend tokens like money.** All subskills follow
+  [`references/token-efficiency.md`](references/token-efficiency.md): project
+  JSON output through `jq` to needed fields, route verbose gate output to files
+  and read only failures, iterate on targeted tests before the single full
+  gate, and right-size worker models. Load it once per session before the
+  first `bd`/`gh` query loop.
 
 ## When `bd` itself misbehaves
 
 On any unexpected `bd` error (connection failures, unknown flags, refused
-mutations, weird exit states), load
+mutations, weird exit states), consult
 [`references/known-errors.md`](references/known-errors.md) **before**
 debugging from scratch — it catalogs known errors, deprecations, and
-workarounds. If you hit a rough edge that is not listed, append an entry
-after resolving it: that file is this skill's persistent memory, and an
-unrecorded fix gets re-debugged by the next session.
+workarounds. Search it instead of reading it whole: run
+`rg -i -n '<distinctive error text>' references/known-errors.md`, then read
+only the matching section (fall back to skimming the headers via
+`rg -n '^##' …` if the search misses). If you hit a rough edge that is not
+listed, append an entry after resolving it: that file is this skill's
+persistent memory, and an unrecorded fix gets re-debugged by the next session.
