@@ -1,19 +1,17 @@
 ---
 name: th-tooling
 description: >
-  Use for hygiene of this machine's AI-tooling harness — the ~/.dotfiles repo,
-  the ai-bootstrap skills tree, and the installed tool homes (~/.claude,
-  ~/.codex, ~/.gemini). Covers auditing real skill usage from session
-  transcripts and recommending what to archive, reviewing dotfiles for
-  conflicting aliases/config and best practices, refreshing snapshot state
-  (skill symlinks, git submodules, mirrored assets), managing transcript
-  disk retention, compacting agent memory stores (AGENTS.md notes, bd
-  memories), and auditing MCP/permission/hook config against actual use.
-  Route to exactly one subskill per task. Triggers: "audit my skills",
-  "which skills are unused", "skill catalog is bloating my context",
-  "review my dotfiles", "clean up my zshrc/aliases", "refresh snapshots",
-  "update submodules and symlinks", "old transcripts eating disk", "compact
-  my notes to self", "audit my MCP servers", "harness hygiene".
+  Use for hygiene of this machine's AI-tooling harness — the ~/.dotfiles
+  repo, the ai-bootstrap skills tree, and the installed tool homes
+  (~/.claude, ~/.codex, ~/.gemini): auditing real skill usage from
+  transcripts, archiving unused skills, reviewing dotfiles for conflicting
+  aliases/config, refreshing snapshot state (skill symlinks, submodules,
+  mirrored assets), transcript disk retention, compacting agent memory
+  (AGENTS.md notes, bd memories), and auditing MCP/permission/hook config
+  against actual use. Route to exactly one subskill per task. Triggers:
+  "audit my skills", "which skills are unused", "review my dotfiles",
+  "clean up my zshrc", "refresh snapshots", "old transcripts eating disk",
+  "compact my notes to self", "audit my MCP servers", "harness hygiene".
 metadata:
   owner: tze
   authors:

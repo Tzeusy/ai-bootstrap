@@ -1,17 +1,17 @@
 ---
 name: th-engineering
 description: >
-  Use for engineering-quality work on any change or codebase — holding an implementation or
-  review to the engineering quality bar, judging code readability and maintainability,
-  assessing test-suite rigor, auditing module boundaries and dependency chains, diagnosing
-  hard bugs and flaky failures to a verified root cause, hunting compatibility cruft after
-  refactors/renames/migrations, creating or auditing codebase documentation (READMEs, docs
-  trees, doc sites, code-cited facts), creating or reviewing skills against the skill
-  quality bar, or producing Excalidraw diagrams. Route to exactly one subskill per
-  subdomain; fan out subagents when a task spans several. Triggers: "hold this to the
-  engineering bar", "is this code readable", "review these tests", "untangle these
-  dependencies", "diagnose this", "this test is flaky", "clean up this refactor",
-  "document this service", "audit the docs", "review this skill", "draw a diagram".
+  Use for engineering-quality work on any change or codebase — holding an
+  implementation or review to the engineering quality bar, code readability,
+  test-suite rigor, module boundaries and dependency chains, diagnosing hard
+  bugs and flaky failures to root cause, post-refactor cruft cleanup,
+  codebase documentation, creating or reviewing skills against the skill
+  quality bar, or Excalidraw diagrams. Route to exactly one subskill per
+  subdomain; fan out subagents when a task spans several. Triggers: "hold
+  this to the engineering bar", "is this code readable", "review these
+  tests", "untangle these dependencies", "diagnose this", "flaky test",
+  "clean up this refactor", "document this service", "audit the docs",
+  "review this skill", "draw a diagram".
 metadata:
   owner: tze
   authors:

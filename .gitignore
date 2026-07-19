@@ -92,3 +92,4 @@ scratch/
 .codex/*.sqlite
 .codex/*.sqlite-shm
 .codex/*.sqlite-wal
+!.beads/PRIME.md
