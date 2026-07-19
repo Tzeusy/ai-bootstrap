@@ -3,17 +3,17 @@ name: th-design
 description: >
   Use for UI/UX design work on anything with a user surface — web UI, TUI, CLI
   ergonomics, dashboards, editors, internal tools — holding a design, spec,
-  mockup, or implementation to the owner's design bar: seamless snappy UX,
-  accessible and consistent visuals, calibrated information density,
-  discoverable features with shortcut surfaces (command palettes, launchers),
-  perceived-performance engineering (preloading, optimistic rendering), and
-  motion restraint. This skill decides what "good" means and drives design
-  review; generic build/polish skills (impeccable, frontend-design) and chart
-  construction (dataviz) execute under this bar. Triggers: "design this UI",
-  "hold this to the design bar", "walk through the UX", "is this too dense",
-  "too sparse", "review this UX", "make this feel faster", "why does this feel
-  sluggish", "add a command palette", "audit accessibility", "is this
-  animation necessary", "pick colors for this UI".
+  mockup, or implementation to the owner's design bar, and building or
+  polishing distinctive production-grade frontends (websites, landing pages,
+  components, styling/beautifying any web UI). The bar: seamless snappy UX,
+  accessible consistent visuals, calibrated information density, discoverable
+  features with shortcut surfaces (command palettes), perceived-performance
+  engineering, motion restraint. Chart construction (dataviz) executes under
+  this bar. Triggers: "design this UI", "build/style this page or component",
+  "hold this to the design bar", "walk through the UX", "is this too
+  dense/sparse", "review this UX", "make this feel faster", "feels sluggish",
+  "add a command palette", "audit accessibility", "is this animation
+  necessary", "pick colors", "make this look less generic".
 metadata:
   owner: tze
   authors:
@@ -21,12 +21,12 @@ metadata:
     - Claude Fable 5
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-18"
+  last_reviewed: "2026-07-19"
 ---
 
 # TH Design
 
-Superskill router for the owner's design bar. Six subskills live under
+Superskill router for the owner's design bar. Seven subskills live under
 `subskills/`, each a complete skill package. **Not** in the global catalog —
 discover lazily, load **at most one** subskill body per subdomain, and fan
 out subagents only when scope warrants (see "Subagent dispatch").
@@ -37,9 +37,10 @@ re-read. This bar applies to *anything* a human uses — a button, a CLI flag, a
 config file, an error message — not just web frontends.
 
 `/th-engineering` governs how the code is built; this superskill governs how
-the product feels. Generic craft skills (`/impeccable`, `/frontend-design`,
-`/dataviz`) may execute the build or polish; when they conflict with this bar,
-this bar wins.
+the product feels. Execution craft lives in the `frontend-design` subskill
+(greenfield builds and styling), the external `impeccable` package (see
+"External craft skills"), and `/dataviz` (charts); when any of them conflicts
+with this bar, this bar wins.
 
 ## Routing table
 
@@ -51,6 +52,7 @@ this bar wins.
 | Perceived performance: latency budgets, preloading, caching, optimistic rendering, idempotent controls, interruption and toast policy. | [subskills/interaction-speed/SKILL.md](subskills/interaction-speed/SKILL.md) | "make this feel faster", "feels sluggish", "users double-click this" |
 | Feature discoverability and shortcut surfaces: command palettes, keyboard paths, CLI help/completions, contextual controls, empty states that teach. | [subskills/discoverability/SKILL.md](subskills/discoverability/SKILL.md) | "add a command palette", "nobody finds this feature", "keyboard-first" |
 | Accessibility: keyboard operability, focus, contrast, semantics, reduced motion. | [subskills/accessibility/SKILL.md](subskills/accessibility/SKILL.md) | "audit accessibility", "contrast check", "screen reader support" |
+| Execution: build or restyle distinctive production-grade web UI (pages, components, artifacts) with a committed aesthetic direction, avoiding generic-AI looks. Output obeys the bar subskills above. | [subskills/frontend-design/SKILL.md](subskills/frontend-design/SKILL.md) | "build this page/component", "style/beautify this UI", "make this look less generic" |
 
 ## Routing rules
 
@@ -60,9 +62,11 @@ this bar wins.
   quality of the implementation → `/th-engineering`. Chart palette and mark
   *construction* → `/dataviz`, under this bar's biases; a chart hue that
   contradicts the app's color semantics is a visual-language finding.
-- **Doctrine vs. execution**: `/impeccable` and `/frontend-design` are
-  execution craft; load them to produce or polish, load this package to decide
-  what "good" means. On conflict, design-bar's biases win.
+- **Doctrine vs. execution**: bar subskills decide what "good" means;
+  execution craft produces it. Web build/styling asks → the
+  `frontend-design` subskill; deep iterative polish of an existing frontend
+  in a project wired for it → external `impeccable` (below). On conflict,
+  design-bar's biases win.
 - **Speed symptoms vs. perf bugs**: "feels slow/janky" → interaction-speed
   first; it sets the behavioral bar. Escalate to `/th-engineering` diagnosis
   only once a previously met bar has demonstrably regressed and the cause is
@@ -84,6 +88,22 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 
 Resolve `PKG` from the base directory your skill loader reported when it
 loaded this file; never assume the current working directory is the package.
+
+## External craft skills
+
+`impeccable` is a deliberately external package (not in any tool's skill
+catalog — its triggers are covered by this router's). Load it by path when a
+project needs its deep iterative frontend-polish workflow:
+
+```text
+~/.agents/skills/impeccable/SKILL.md
+```
+
+Caveats: it expects a project-side `.agents/skills/impeccable/` install (its
+context loader runs `node .agents/skills/impeccable/scripts/load-context.mjs`
+from the project root) and PRODUCT.md/DESIGN.md conventions. If the target
+project lacks that wiring, prefer the `frontend-design` subskill instead of
+fighting impeccable's gates. Its output remains subject to this bar.
 
 ## Subagent dispatch
 

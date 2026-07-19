@@ -16,10 +16,14 @@ command, verification, and last-verified date.
   symlinks, generated from `ai-bootstrap/skills/` discovery.
 - **Source**: `~/.dotfiles/bootstrap.sh` ("Linking shared AI skills"
   section). Discovery prunes `subskills/` (superskills install as one
-  catalog entry) and `archive/` (retired skills stay cloned but unlinked).
-  Stale-removal only touches managed links — symlinks into
-  `ai-bootstrap/skills/` or broken links; manual links (e.g. `impeccable`
-  → `~/.agents/skills/`) are preserved.
+  catalog entry) and `archive/` (retired skills stay cloned but unlinked),
+  and skips names in the `skill_catalog_exclude` list (for skills inside
+  upstream submodules that cannot be archived by `git mv`; currently
+  `writing-skills`). Stale-removal only touches managed links — symlinks
+  into `ai-bootstrap/skills/` or broken links; manual links to other
+  locations are preserved (none currently: the former `impeccable` →
+  `~/.agents/skills/` link was retired 2026-07-19, routed via `th-design`'s
+  "External craft skills" section instead).
 - **Refresh**: `~/.dotfiles/bootstrap.sh` (full run is idempotent; the
   skills section alone can be extracted for a fast pass).
 - **Verify**: no broken links and no archived names linked:
@@ -30,7 +34,7 @@ command, verification, and last-verified date.
        -maxdepth 1 -xtype l
   ```
 
-- **Last verified**: 2026-06-12
+- **Last verified**: 2026-07-19
 
 ## 2. Git submodules
 
