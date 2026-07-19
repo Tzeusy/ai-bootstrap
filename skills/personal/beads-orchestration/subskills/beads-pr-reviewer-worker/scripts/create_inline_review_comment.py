@@ -23,6 +23,10 @@ def existing_comments(owner, repo, pr_number):
         payload = run_json([
             "gh",
             "api",
+            # --method GET is required: gh switches to POST whenever -f/-F
+            # params are present, which 422s this listing call (gh >= 2.95).
+            "--method",
+            "GET",
             f"repos/{owner}/{repo}/pulls/{pr_number}/comments",
             "-F",
             "per_page=100",
