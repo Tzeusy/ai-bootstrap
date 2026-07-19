@@ -19,7 +19,7 @@ metadata:
     - Claude Fable 5
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-18"
+  last_reviewed: "2026-07-19"
 compatibility: skill-standards auditing and excalidraw rendering require uv and Python 3.11+; excalidraw-diagram additionally requires Playwright Chromium setup on first render.
 ---
 
@@ -66,6 +66,10 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   Repo-wide audits, specs, prioritization, knowledge architecture →
   `/th-projects` (whose craft-and-care pillar adopts engineering-bar by
   reference).
+- **Build quality vs. product feel**: how the code is built → here; how the
+  product feels to use (UX contracts, perceived latency, copy,
+  discoverability, accessibility) → `/th-design`. A review that surfaces a
+  user-facing feel finding routes it there instead of absorbing it.
 - **Docs craft vs. knowledge architecture**: README/docs/doc-site quality →
   documentation (consumes excalidraw-diagram for its diagrams — an
   expected pairing); five-pillar shape work → `/th-projects`.

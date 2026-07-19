@@ -3,7 +3,8 @@ name: visual-language
 description: >
   Use when choosing or reviewing colors, typography, spacing, component styling,
   or motion/animation for a user surface — establishing consistent visual
-  semantics, judging whether an animation is justified, or auditing a UI for
+  semantics, bootstrapping a project design system (tokens, scales, recorded
+  meanings), judging whether an animation is justified, or auditing a UI for
   visual drift and inconsistency.
 metadata:
   owner: tze
@@ -11,7 +12,7 @@ metadata:
     - tze
     - Claude Fable 5
   status: active
-  last_reviewed: "2026-07-03"
+  last_reviewed: "2026-07-19"
 ---
 
 # Visual Language
@@ -27,9 +28,11 @@ exists only to communicate.
   style meaning different things
 - Judging whether an animation or transition should exist
 - Setting typography, spacing, radius, or elevation conventions
+- Bootstrapping a design system for a project that has none
 
 Example trigger phrasings: "pick colors for this", "is this consistent", "is
-this animation necessary", "this UI looks messy", "set up design tokens".
+this animation necessary", "this UI looks messy", "set up design tokens",
+"set up a design system".
 
 ## Do Not Use This Skill For
 
@@ -86,6 +89,30 @@ this animation necessary", "this UI looks messy", "set up design tokens".
   instant-state fallback loses no information.
 - When in doubt, no animation. The absence of an animation is never a defect;
   an unjustified one always is.
+
+## Establishing a Design System
+
+When design-bar's locate step finds no design system, don't apply defaults
+silently forever — establish the minimum viable system so the next change has
+something to cite. In order, stopping where the project's maturity stops:
+
+1. **Token file** — palette as named variables with semantic names
+   (`--color-danger`, not a bare hex), one spacing scale, one type scale,
+   radius/shadow vocabulary. Place it where the stack already looks
+   (`tokens.css`, `theme.ts`, Tailwind config). Seed from the de facto values
+   in use, not from scratch — record reality first, then correct drift.
+2. **Meanings** — each color's single meaning recorded next to its token; a
+   token without a stated meaning is future drift.
+3. **Doctrine, if the project keeps docs** — settled decisions (theme
+   commitment, accessibility floor, motion policy) in a DESIGN.md or
+   `about/` doc.
+4. **Spec form, if the project is spec-governed** — capture the language as a
+   normative design-language spec through the project's spec workflow
+   (`/th-projects` feature-request); tokens then implement the spec, and
+   later changes to the language go through spec gates, not ad-hoc edits.
+
+Keep it small: a system nobody exceeds is better than a complete one nobody
+reads. Every expectation in this skill applies to the system being authored.
 
 ## Review Method
 
