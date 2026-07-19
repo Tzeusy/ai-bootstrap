@@ -1,17 +1,17 @@
 ---
 name: th-projects
 description: >
-  Use for project-level engineering governance in any repository — establishing or auditing a
-  project's knowledge architecture (doctrine, design contracts, specs, topology, engineering
-  standards), deciding what to work on next via spec-driven planning, running a repo-wide
-  health audit, concretizing a feature request into a spec delta, amending a spec found wrong
-  mid-implementation, deriving the next milestone from the vision, or reconciling specs against
-  implementation. Route to exactly one subskill per task. Triggers: "project shape", "bootstrap
-  docs", "knowledge architecture", "what should we work on next", "prioritize features",
-  "does the code match the spec", "should we build this", "break this down into chunks",
-  "review this project", "audit the codebase", "assess project health", "I want to add X",
-  "spec this feature", "turn this idea into requirements", "reconcile spec vs implementation",
-  "the spec is wrong", "what's the next milestone".
+  Use for project-level engineering governance in any repository — bootstrap
+  or audit the knowledge architecture (doctrine, specs, topology,
+  standards), concretize a feature request into a spec delta, amend a spec
+  found wrong mid-implementation, reconcile specs against implementation,
+  run a repo-wide health audit, or decide what to work on next via
+  spec-driven planning and milestone synthesis. Route to exactly one
+  subskill per task. Triggers: "project shape", "bootstrap docs", "what
+  should we work on next", "should we build this", "I want to add X", "spec
+  this feature", "the spec is wrong", "break this down", "review this
+  project", "audit the codebase", "does the code match the spec", "what's
+  the next milestone".
 metadata:
   owner: tze
   authors:

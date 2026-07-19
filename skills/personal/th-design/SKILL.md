@@ -1,19 +1,18 @@
 ---
 name: th-design
 description: >
-  Use for UI/UX design work on anything with a user surface — web UI, TUI, CLI
-  ergonomics, dashboards, editors, internal tools — holding a design, spec,
-  mockup, or implementation to the owner's design bar, and building or
-  polishing distinctive production-grade frontends (websites, landing pages,
-  components, styling/beautifying any web UI). The bar: seamless snappy UX,
-  accessible consistent visuals, calibrated information density, discoverable
-  features with shortcut surfaces (command palettes), perceived-performance
-  engineering, motion restraint. Chart construction (dataviz) executes under
-  this bar. Triggers: "design this UI", "build/style this page or component",
-  "hold this to the design bar", "walk through the UX", "is this too
-  dense/sparse", "review this UX", "make this feel faster", "feels sluggish",
-  "add a command palette", "audit accessibility", "is this animation
-  necessary", "pick colors", "make this look less generic".
+  Use for UI/UX design work on anything with a user surface — web UI, TUI,
+  CLI ergonomics, dashboards, internal tools — holding a design, spec,
+  mockup, or implementation to the owner's design bar, or building/styling
+  distinctive production-grade frontends. The bar: seamless snappy UX,
+  accessible consistent visuals, calibrated density, discoverable features
+  with shortcut surfaces (command palettes), perceived-performance
+  engineering, motion restraint; chart construction (dataviz) executes
+  under it. Triggers: "design this UI", "build/style this page or
+  component", "review this UX", "walk through the UX", "is this too
+  dense/sparse", "make this feel faster", "add a command palette", "audit
+  accessibility", "pick colors", "set up a design system", "make this look
+  less generic".
 metadata:
   owner: tze
   authors:
