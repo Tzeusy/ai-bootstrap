@@ -31,6 +31,10 @@
 .codex/logs*
 .codex/*.lock
 .codex/memories/
+.codex/app-server-control/
+.codex/app-server-daemon/
+.codex/packages/
+.codex/session_index.jsonl
 
 # === Gemini ===
 .gemini/tmp

@@ -157,6 +157,13 @@ When a direct `bd update <id> --status <to>` is rejected:
   same-call `--claim --add-label X` will silently apply the label but skip the
   claim; verify `assignee` after. Observed 2026-06-13, bd 1.0.4 (the
   coordinator review-lane dispatch hits this every cycle).
+- **Claiming an already-`in_progress` bead with an empty assignee**:
+  `bd update <id> --claim` fails with `Error claiming <id>: issue not
+  claimable: status in_progress`. This occurs when older coordinator state
+  left the lifecycle status without an assignee. WORKAROUND: after confirming
+  no live worker owns the bead, route `in_progress -> open -> --claim`, verify
+  the new assignee, then apply the intended terminal status/metadata in a
+  separate update. Observed 2026-07-13, bd 1.0.4.
 - **Force-closing a bead with open logical deps**: `bd close <id>` fails with
   `cannot close <id>: blocked by open issues [<dep>] (use --force to override)`.
   When the deliverable is confirmed merged (PR MERGED) but a logical-ordering
@@ -259,3 +266,29 @@ mapping is unambiguous (observed 2026-07-05, review bead bu-mm41k). Workaround:
 reviewer falls back to the ORIGINAL_BEAD value in its dispatch prompt +
 `gh pr view`. Durable fix: coordinators should write
 `Original implementation bead: <id>` verbatim in review-bead descriptions.
+
+## create_inline_review_comment.py broken on gh 2.95.0 (2026-07-05, butlers PR #2996 review)
+
+`beads-pr-reviewer-worker/scripts/create_inline_review_comment.py`'s
+`existing_comments()` calls `gh api` without `--method GET`, so gh 2.95.0
+defaults to POST and always errors with a schema mismatch before the real
+create call runs. `list_review_threads.py` and `resolve_review_thread.py`
+are unaffected. Workaround: post the comment with raw
+`gh api repos/{owner}/{repo}/pulls/{n}/comments -X POST ...`.
+Fix when touching the script: add `--method GET` to the duplicate-check call.
+ROOT CAUSE CONFIRMED (PR #3004 review): gh auto-switches to POST whenever -f/-F flags
+are present, so the listing call with -F per_page=100 silently POSTs to the
+create endpoint and 422s every time.
+FIXED 2026-07-06: `--method GET` added to `existing_comments()` in the script
+itself. Entry retained in case the regression pattern (gh api + -f/-F without
+an explicit method) reappears in other scripts.
+
+## `bd sync` removed in bd 1.0.4
+
+- **Symptom**: `bd sync` fails with `Error: unknown command "sync" for "bd"`.
+- **Cause**: Beads version control is now exposed through `bd vc` and
+  `bd dolt`; the old aggregate `sync` command is absent.
+- **Fix**: use `bd dolt commit -m "<message>"` for pending Beads changes,
+  then `bd dolt push` when a Dolt remote is configured. `bd dolt push`
+  safely reports and skips when the local database has no remote.
+- Observed: 2026-07-10, bd 1.0.4.
