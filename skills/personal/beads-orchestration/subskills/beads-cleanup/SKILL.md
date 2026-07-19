@@ -69,6 +69,10 @@ become a competing doctrine.
 - Never touch `.beads/dolt/` manually.
 - Append notes for every bead mutation so later operators can see what cleanup
   changed and why.
+- Inspect token-efficiently (`../../references/token-efficiency.md`): project
+  every `bd`/`gh` listing through `jq` to the fields the pass needs, batch
+  related checks into one composite command, and keep the final report to
+  findings and mutations — not raw command output.
 
 ## Load Only The Reference You Need
 

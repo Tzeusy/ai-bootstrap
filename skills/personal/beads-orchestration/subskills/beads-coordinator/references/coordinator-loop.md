@@ -54,10 +54,13 @@ re-querying `gh pr view` for those same PRs. Re-verify with `gh` only in the
 moment right before an actual mutation, so a stale finding never drives an
 irreversible close/reopen.
 
-Before discovering new work, and whenever a worker frees a slot, check:
+Before discovering new work, and whenever a worker frees a slot, check
+(projected — never dump the unfiltered JSON into context; see
+`../../../references/token-efficiency.md`):
 
 ```bash
-bd list --status=blocked --label pr-review --json
+bd list --status=blocked --label pr-review --json \
+  | jq -c '[.[] | {id, title, labels, assignee, external_ref}]'
 ```
 
 This list may include:
@@ -206,8 +209,11 @@ Only run this step when Step 0 found no dispatchable `pr-review-task` issues
 for currently available slots.
 
 ```bash
-bd ready --json
+bd ready --json | jq -c '[.[] | {id, title, priority, type, labels, assignee, created_at}]'
 ```
+
+Selection needs only these fields. Do not `bd show` candidates you are not
+about to claim; fetch detail for the one selected bead only.
 
 If the list is empty, enter idle polling mode.
 
@@ -630,6 +636,18 @@ Prefer low-cost evidence over narrative heartbeats:
 - new commit
 - PR state changed
 
+Batch each poll into **one** composite command that emits a compact summary,
+instead of separate `bd`/`git`/`gh` invocations whose full output each lands in
+context:
+
+```bash
+{ bd list --status=in_progress --json | jq -c '[.[] | {id, assignee}]'
+  git for-each-ref --format='%(refname:short) %(objectname:short)' 'refs/remotes/origin/agent/*'
+  gh pr list --state open --json number,headRefName,mergeStateStatus \
+    --jq 'map({number, headRefName, mergeStateStatus})'
+} 2>&1
+```
+
 After each cycle, return to Step 0.
 
 ## Progress Report
@@ -640,10 +658,11 @@ filtered queries plus targeted checks of the ids dispatched this cycle.
 
 1. Query active work and the ids you dispatched or reconciled this cycle:
    ```bash
-   bd list --status=in_progress --json
+   bd list --status=in_progress --json | jq -c '[.[] | {id, title, status, assignee}]'
    ```
-   Then `bd show <id> --json` for each recently dispatched / reconciled id to
-   confirm closures, merges, or status moves.
+   Then `bd show <id> --json | jq '{id, status, assignee, external_ref}'` for
+   each recently dispatched / reconciled id to confirm closures, merges, or
+   status moves.
 2. If nothing changed, skip the report and proceed to Step 0.
 3. If something changed, print the table once. For each closed bead, confirm
    the merge route:

@@ -50,7 +50,10 @@ Repeat this rule during long runs:
 Before any `bd` mutation: confirm you are the bead's `assignee`, renew the stall
 heartbeat if near expiry, then mutate.
 
-Mandatory heartbeat-renewal points:
+Mandatory heartbeat-renewal checkpoints (a checkpoint may be **skipped** when
+the heartbeat was already renewed within the last 5 minutes — with a 20-minute
+TTL that is always safe, and it lets a burst of consecutive mutations share one
+renewal instead of paying one `bd update` per mutation):
 1. Immediately after claim.
 2. Before every `bd create`, `bd update`, `bd dep add`, or `bd close`.
 3. After any long external action such as `gh`, tests, rebase, or merge work.
@@ -89,8 +92,9 @@ work.
 | Epic / team-coordinated work | `EPIC_COMPLEXITY_MODEL` |
 | Reconciliation bead for a medium-or-higher epic | `EPIC_COMPLEXITY_MODEL` (floor — see below) |
 | Planning, research, architecting | `HIGH_COMPLEXITY_MODEL` |
-| Coding | `MEDIUM_COMPLEXITY_MODEL` unless trivial |
+| Coding | `MEDIUM_COMPLEXITY_MODEL` unless trivial (see LOW criteria below) |
 | Orchestration | `HIGH_COMPLEXITY_MODEL` |
+| PR review (`pr-review-task`) | `MEDIUM_COMPLEXITY_MODEL`; escalate to `HIGH_COMPLEXITY_MODEL` only for large (>400 changed lines) or risk-flagged (security/auth/schema/public-API) diffs |
 | Simple bugfixes | `MEDIUM_COMPLEXITY_MODEL` |
 | Formatting, linting | `LOW_COMPLEXITY_MODEL` |
 
@@ -110,6 +114,25 @@ actual change. Do not batch high-risk work or merge an unreviewed moved head.
 "Sequential convoy" never means one multi-PR reviewer worker: the one-bead,
 one-PR report contract remains intact, and the coordinator dispatches the next
 low-risk bead only after the prior verdict returns.
+
+Concrete `LOW_COMPLEXITY_MODEL` criteria — dispatch at LOW when **all** hold:
+- docs-only, config/dotfile-only, test-only, or single-file mechanical change
+- no API, schema, auth, or cross-module behavior change
+- acceptance criteria are fully mechanical (no design judgment required)
+
+**Complexity-label fast path.** If the bead carries a `complexity:<tier>` label
+(`low`/`medium`/`high`/`epic`, stamped by `beads-writer` at creation), map it
+directly to the matching `*_COMPLEXITY_MODEL` and skip re-deriving complexity
+from the description. Re-derive only when the label is obviously stale
+(e.g. scope grew via follow-ups). Apply the Reconciliation Floor below
+regardless of label.
+
+**Right-size deliberately.** Token spend scales with the dispatched model, and
+most backlog beads are not the hard case. Default to the lowest tier the
+criteria allow and escalate on evidence (a failed or shallow attempt), not on
+vibes: one redispatch after a too-weak attempt costs less than habitually
+over-provisioning every bead. On runtimes that expose a reasoning-effort knob,
+dispatch LOW/MEDIUM workers at reduced effort as well.
 
 ### Reconciliation Floor (mandatory)
 

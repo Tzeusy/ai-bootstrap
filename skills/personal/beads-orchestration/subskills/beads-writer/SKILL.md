@@ -41,6 +41,14 @@ Every bead must be a self-contained handoff for a future independent session. Su
 - End every epic with a terminal reconciliation bead that depends on all implementation children.
 - Use `bd create`, not `bd q`, when you need a real description.
 - Do not pass dependency flags to `bd create`; create first, then wire with `bd dep add`.
+- Stamp an execution-complexity label on every bead at creation:
+  `complexity:low`, `complexity:medium`, `complexity:high`, or
+  `complexity:epic`. The coordinator maps this label straight to a worker
+  model tier (see `../beads-coordinator/references/runtime-and-safety.md`)
+  instead of re-deriving complexity per dispatch. Calibrate honestly: `low` is
+  docs/config/test-only or single-file mechanical work with no design
+  judgment; when in doubt between two tiers, pick the lower — the coordinator
+  escalates on evidence.
 
 ## Read Order
 
