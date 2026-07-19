@@ -48,7 +48,7 @@ with this bar, this bar wins.
 |---|---|---|
 | Holistic design bar: default biases, the UX walkthrough ritual, definition of done for any user-facing change. | [subskills/design-bar/SKILL.md](subskills/design-bar/SKILL.md) | "hold this to the design bar", "walk through the UX", "is this UX done" |
 | Information density, hierarchy, succinct copy, layout organization, forms and validation timing: what a surface says and in what order. | [subskills/information-design/SKILL.md](subskills/information-design/SKILL.md) | "is this too dense/sparse", "organize this screen", "tighten this copy" |
-| Color semantics, visual consistency, typography/spacing scales, motion restraint. | [subskills/visual-language/SKILL.md](subskills/visual-language/SKILL.md) | "pick colors", "is this consistent", "is this animation necessary" |
+| Color semantics, visual consistency, typography/spacing scales, motion restraint; establishing a project design system (tokens, meanings, design-language spec). | [subskills/visual-language/SKILL.md](subskills/visual-language/SKILL.md) | "pick colors", "is this consistent", "is this animation necessary", "set up a design system" |
 | Perceived performance: latency budgets, preloading, caching, optimistic rendering, idempotent controls, interruption and toast policy. | [subskills/interaction-speed/SKILL.md](subskills/interaction-speed/SKILL.md) | "make this feel faster", "feels sluggish", "users double-click this" |
 | Feature discoverability and shortcut surfaces: command palettes, keyboard paths, CLI help/completions, contextual controls, empty states that teach. | [subskills/discoverability/SKILL.md](subskills/discoverability/SKILL.md) | "add a command palette", "nobody finds this feature", "keyboard-first" |
 | Accessibility: keyboard operability, focus, contrast, semantics, reduced motion. | [subskills/accessibility/SKILL.md](subskills/accessibility/SKILL.md) | "audit accessibility", "contrast check", "screen reader support" |
@@ -91,12 +91,13 @@ loaded this file; never assume the current working directory is the package.
 
 ## External craft skills
 
-`impeccable` is a deliberately external package (not in any tool's skill
-catalog — its triggers are covered by this router's). Load it by path when a
-project needs its deep iterative frontend-polish workflow:
+`impeccable` (upstream: `pbakaus/impeccable`) is deliberately kept outside
+every scanned skills directory — its broad triggers would collide with this
+router's in the catalog. Load it by path when a project needs its deep
+iterative frontend-polish workflow:
 
 ```text
-~/.agents/skills/impeccable/SKILL.md
+~/.agents/vendor/impeccable/SKILL.md
 ```
 
 Caveats: it expects a project-side `.agents/skills/impeccable/` install (its
@@ -137,9 +138,8 @@ but scale dispatch to scope:
   language as a normative spec (e.g. `openspec/specs/*design-language*/`) —
   changes to the language then go through the spec workflow, not ad-hoc edits.
 - Expectations apply to specs and mockups as much as built UI.
-- "Fix it now" means the current implementation owner corrects small findings
-  inside the approved outcome; it does not make an independent reviewer the
-  code owner. Consent/auth, trust-boundary, contract, or genuinely new behavior
-  discoveries return to `/th-projects` at the earliest affected spec gate.
+- Small in-scope findings fix now; consent/auth, trust-boundary, contract, or
+  genuinely new behavior discoveries return to `/th-projects` at the earliest
+  affected spec gate. Full finding classification lives in design-bar.
 - Subskills reference each other by relative path (`../design-bar/…`); those
   paths are package-internal and stable.

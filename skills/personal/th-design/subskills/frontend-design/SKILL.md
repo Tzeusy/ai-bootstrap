@@ -6,6 +6,8 @@ metadata:
   owner: tze
   authors:
     - Anthropic (upstream)
+    - tze
+    - Claude Fable 5
   status: active
   last_reviewed: "2026-07-19"
 ---
@@ -13,6 +15,43 @@ metadata:
 This skill guides creation of distinctive, production-grade frontend interfaces that avoid generic "AI slop" aesthetics. Implement real working code with exceptional attention to aesthetic details and creative choices.
 
 The user provides frontend requirements: a component, page, application, or interface to build. They may include context about the purpose, audience, or technical constraints.
+
+## Use This Skill When
+
+- Building a new web page, component, artifact, or app shell that needs a
+  committed aesthetic direction
+- Restyling or beautifying an existing web UI that reads as generic
+- The ask is execution ("build/style this"), not judgment ("review this")
+
+Example trigger phrasings: "build this page", "style this component", "make
+this look less generic", "design a landing page", "beautify this dashboard".
+
+## Do Not Use This Skill For
+
+- Judging whether a design is good — [design-bar](../design-bar/SKILL.md) and
+  the sibling bar subskills
+- Deep iterative polish in a project wired for `impeccable` — the router's
+  "External craft skills" section
+- Chart and data-graphic construction — `/dataviz`
+
+## Bar Precedence (Local Hard Stop)
+
+This subskill executes under the package's design bar; aesthetic ambition
+never overrides it. Wherever the exhortations below ("surprise", staggered
+reveals, custom cursors, grain overlays) conflict with these, the bar wins:
+
+- Motion communicates state or spatial continuity — decorative animation and
+  effects the user waits through are defects; transitions ~100–200ms,
+  ease-out, instant-state fallback loses nothing
+  ([visual-language](../visual-language/SKILL.md)).
+- Accessibility floor holds from the first draft: AA contrast in every theme,
+  keyboard operability, visible focus, `prefers-reduced-motion` honored
+  ([accessibility](../accessibility/SKILL.md)).
+- Input is never blocked; layout never shifts under a pending click; hot
+  paths stay inside latency budgets
+  ([interaction-speed](../interaction-speed/SKILL.md)).
+- Custom cursors, scroll-jacking, and autoplaying attention effects need a
+  communicative justification or they don't ship.
 
 ## Design Thinking
 

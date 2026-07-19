@@ -12,7 +12,7 @@ metadata:
     - Claude Fable 5
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-18"
+  last_reviewed: "2026-07-19"
 ---
 
 # Design Bar
@@ -65,7 +65,9 @@ wrong finding. Look for, in rough order of authority:
 
 When these disagree with each other, prefer spec over doctrine over de facto
 implementation, and flag the disagreement itself as a finding. When nothing is
-found, say so and apply the default biases in full.
+found, say so, apply the default biases in full, and offer to establish a
+system ([visual-language](../visual-language/SKILL.md), "Establishing a
+Design System") so the next review has one to cite.
 
 ## Default Design Biases
 
