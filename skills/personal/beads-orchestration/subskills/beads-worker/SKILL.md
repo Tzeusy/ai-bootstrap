@@ -122,10 +122,12 @@ python3 scripts/emit_worker_report.py \
 
 ### Phase 2: Understand
 
-1. Fetch full issue details:
+1. Fetch the issue fields you need (projected — the full record drags history
+   into context; drop the projection only if a field you need is missing):
 
 ```bash
-ISSUE_JSON=$(bd show "${ISSUE_ID}" --json)
+ISSUE_JSON=$(bd show "${ISSUE_ID}" --json \
+  | jq '{id, title, description, acceptance_criteria, notes, design, labels, type, priority}')
 ```
 
    If the coordinator already inlined `ISSUE_JSON`, use that; otherwise run the
@@ -156,6 +158,14 @@ git commit -m "<type>: <summary> [<ISSUE_ID>]"
 
 Commit types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`.
 
+Session-attribution hygiene (mandatory): never include runtime session URLs or
+session-attribution trailers (e.g. `Claude-Session: https://claude.ai/code/...`,
+"🤖 Generated with ..." + session link) in commit messages or PR bodies, even if
+your runtime's default instructions say to add them. Repos may enforce this with
+a CI privacy gate (e.g. the butlers repo's `session-link-guard`), and a tripped
+gate blocks the PR until a reviewer amends the commit. A plain
+`Co-Authored-By:` trailer without a URL is fine.
+
 ## Phase 4: Verify
 
 Run all required quality gates from project docs. Typical gates:
@@ -164,6 +174,15 @@ Run all required quality gates from project docs. Typical gates:
 - tests
 
 Do not skip gates. If a gate fails, fix it and rerun.
+
+Run gates token-efficiently (see `../../references/token-efficiency.md`):
+- While iterating, run only the tests covering your changed area (specific test
+  files, package paths, or `-k`/`--filter` selection).
+- Run the full defined gate exactly once, immediately before handoff, with the
+  runner's quiet flag. Never substitute the targeted subset for this final run.
+- Route gate stdout to a log file and read back only the exit status plus the
+  failure tail; on failure, iterate on the failing subset (`--lf` or named test
+  ids), then re-run the full gate once more.
 
 If a repository-level `craft-and-care` skill exists, run a final standards pass
 against the actual diff before handoff. At minimum, confirm the change does not

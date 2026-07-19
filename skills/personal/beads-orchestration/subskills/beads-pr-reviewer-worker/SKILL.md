@@ -271,6 +271,16 @@ git add <files>
 git commit -m "fix: <summary> [${ISSUE_ID}]"
 ```
 
+Session-attribution hygiene (mandatory): never include runtime session URLs or
+session-attribution trailers (e.g. `Claude-Session: https://claude.ai/code/...`)
+in commit messages or PR bodies. If the PR's existing commits or body carry such
+a trailer and the repo has a session-link CI gate (e.g. butlers'
+`session-link-guard`), amend the commit message / edit the PR body to strip the
+URL (keep plain `Co-Authored-By:`), force-push with lease, and note that a
+force-push replays a stale `pull_request` event payload — a body-only edit needs
+a fresh `synchronize` event (e.g. an empty retrigger commit) before the gate
+re-reads it.
+
 8. Push exceptional fixes with lease after verification:
 
 ```bash
@@ -299,6 +309,11 @@ python3 scripts/discover_quality_gates.py
 
 Treat discovered commands as candidates that still need judgment, not blind
 truth. Do not claim completion with failing gates.
+
+Run gates token-efficiently (see `../../references/token-efficiency.md`): route
+gate stdout to a log file and read back only the exit status plus the failure
+tail, and while iterating on a fix run only the tests covering it — the full
+defined gate runs once, immediately before the merge decision.
 
 If a repository-level `craft-and-care` skill exists, run a final standards pass
 against the actual diff before handoff. At minimum, confirm the change does not
