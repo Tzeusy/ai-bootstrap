@@ -8,7 +8,7 @@ metadata:
     - OpenAI Codex
     - Claude
   status: active
-  last_reviewed: "2026-06-12"
+  last_reviewed: "2026-07-19"
 compatibility: Requires uv to run scripts/audit_skill.py.
 ---
 
@@ -71,7 +71,9 @@ designed", "audit our skills for quality", "should this be a superskill",
 3. Judge what the script cannot, using
    [`references/quality-bar.md`](./references/quality-bar.md):
    trigger quality, scope sharpness, project grounding, progressive
-   discovery, script-vs-prose decisions, operational safety, and maintenance
+   discovery, script-vs-prose decisions, runtime token economics of
+   prescribed commands (projected output, log-tail readback, targeted
+   gates, grep-first catalogs), operational safety, and maintenance
    contracts on stateful reference docs (catalogs of errors, projects, or
    quirks must tell consuming agents when to write back).
 4. Use [`references/superskills.md`](./references/superskills.md) only when

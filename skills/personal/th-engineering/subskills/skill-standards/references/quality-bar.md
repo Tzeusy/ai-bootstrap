@@ -176,7 +176,40 @@ expensive to reconstruct.
   each script from `SKILL.md` (or the relevant reference) with a one-line
   statement of when to run it.
 
-## 9. Safe And Explicit Operational Boundaries
+## 9. Prescribed Commands Spend The Consumer's Tokens
+
+Sections 1 and 6 cap what a skill costs to *load*. This section caps what a
+skill costs to *follow*: every command a skill prescribes runs in the
+consuming agent's context window, and a workflow executed hundreds of times
+(orchestration loops, dispatched workers) multiplies every wasted byte.
+Exemplar doctrine: `beads-orchestration/references/token-efficiency.md`.
+
+- Write prescribed commands pre-projected. A command that emits structured
+  output names its fields (`--json <fields>`, `| jq '{...}'`) in the skill
+  text itself; never prescribe a bare `--json` dump and rely on the agent to
+  cope with the flood.
+- Prescribe log-file routing for verbose invocations (tests, builds,
+  installs): redirect to a file, read back exit status plus the failure tail,
+  never the full log.
+- Verification workflows prescribe targeted iteration: run the subset covering
+  the change while iterating, the full defined gate exactly once before
+  completion (quiet flags). The subset never substitutes for the gate.
+- Loop or polling workflows batch each cycle's checks into one composite
+  command emitting a compact summary, and gate any status report on actual
+  state change.
+- Skills that dispatch subagents state model right-sizing rules (default to
+  the lowest tier the task allows; escalate on evidence, not vibes) and keep
+  dispatch prompts compact — identifiers plus a short summary, with the
+  subagent self-fetching detail it needs.
+- Large catalogs and appendix docs are consumed grep-first: the skill tells
+  the agent to `rg` the symptom and read the matching section, not to load
+  the whole file (see section 11 for the write-back side).
+
+When reviewing, read each prescribed command and ask what its output looks
+like at realistic scale; a command that is fine on a toy repo may dump
+thousands of lines in a real one.
+
+## 10. Safe And Explicit Operational Boundaries
 
 - State prerequisites, destructive edges, and hard stops clearly.
 - Fail closed when the environment is missing required tools, auth, or context.
@@ -184,7 +217,7 @@ expensive to reconstruct.
 - Do not create misleading or surprise behavior relative to the skill's stated
   purpose.
 
-## 10. Stateful Reference Docs Carry A Maintenance Contract
+## 11. Stateful Reference Docs Carry A Maintenance Contract
 
 Some reference docs are living state, not static guidance: catalogs of known
 errors or quirks, inventories of projects or environments, compatibility
