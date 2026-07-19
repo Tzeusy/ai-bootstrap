@@ -292,3 +292,22 @@ an explicit method) reappears in other scripts.
   then `bd dolt push` when a Dolt remote is configured. `bd dolt push`
   safely reports and skips when the local database has no remote.
 - Observed: 2026-07-10, bd 1.0.4.
+
+## `bd dolt push` errors in external-server mode (no BEADS_DOLT_CLI_DIR)
+
+- **Symptom**: `bd dolt push` fails with `Error: dolt push requires a local
+  Dolt CLI database directory in external-server mode; set
+  BEADS_DOLT_CLI_DIR to the local Dolt database path or use a remote type
+  supported by SQL DOLT_PUSH/DOLT_PULL`. It does NOT "safely skip" as the
+  `bd sync` entry above suggests — that skip behavior predates the
+  shared-external-server migration.
+- **Cause**: post-3307-migration repos run against the shared external
+  server (`~/gt/.dolt-data`), where bd cannot drive a CLI push without an
+  explicit local Dolt database path, and no Dolt remote is configured for
+  the per-project DBs anyway.
+- **Disposition**: session-end "push beads" is currently a no-op for these
+  repos — durability rests on the shared server's data dir plus the jsonl
+  export where one exists. Do not chase BEADS_DOLT_CLI_DIR; setting up a
+  real Dolt remote is part of the same "needs human" external-server
+  repair tracked in the WRITE-path entry above.
+- Observed: 2026-07-19, bd 1.0.4, aib repo.
