@@ -3,7 +3,10 @@
 Load for the vision-generative focus mode: "what should we work on next" when
 no proposals, packets, or spec deltas are on hand — or after a milestone
 closes. Instead of aligning *proposed* work against doctrine (the reactive
-default), this mode makes doctrine *produce* the candidates.
+default), this mode makes doctrine *produce* the candidates. It is
+convergent — candidates close gaps doctrine already implies; for divergent
+generation of genuinely new candidates, load the sibling mode
+[`ideation.md`](ideation.md) instead.
 
 Proposes; never sequences. Output is a milestone brief the user selects from;
 selected candidates then flow through the normal machinery

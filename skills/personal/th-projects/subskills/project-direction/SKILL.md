@@ -1,6 +1,6 @@
 ---
 name: project-direction
-description: Use when deciding what a project should work on next, comparing competing priorities, deriving a milestone from VISION, sequencing an approved specification into an execution graph, or deciding what to do about already-confirmed spec drift. Triggers on "what should we work on next", "prioritize features", "is this roadmap aligned", "what's highest leverage", "what's the next milestone", "should we build this or Y", "break this approved spec down".
+description: Use when deciding what a project should work on next, comparing competing priorities, deriving a milestone from VISION, brainstorming new feature candidates that fit the project's doctrine, sequencing an approved specification into an execution graph, or deciding what to do about already-confirmed spec drift. Triggers on "what should we work on next", "prioritize features", "is this roadmap aligned", "what's highest leverage", "what's the next milestone", "should we build this or Y", "break this approved spec down", "brainstorm features", "what could we build".
 metadata:
   owner: tze
   authors:
@@ -8,7 +8,7 @@ metadata:
     - Claude Fable 5
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-18"
+  last_reviewed: "2026-07-26"
 ---
 
 # Project Direction
@@ -184,6 +184,7 @@ Focus modes change which phases do real work and which tier applies — the phas
 
 - **Full direction analysis** (default): all phases as written; change-tier wherever normative artifacts change.
 - **Milestone synthesis** (vision-generative: "what next" with no proposals on hand, or a milestone just closed): doctrine *produces* the candidates instead of judging proposed ones — mandate coverage matrix, ideas-ledger unparking, ranked milestone brief; user selects before anything enters Phases 2-3. Read [`references/milestone-synthesis.md`](references/milestone-synthesis.md).
+- **Ideation** (vision-generative, divergent: "brainstorm what we could build", "what features would fit this project"): milestone synthesis's divergent twin — doctrine *grounds* new candidates instead of gating proposed ones. Mandate citation relaxes to a fit trace; candidates classed mandate-grounded vs vision-extending; user triages the brief (pursue → feature-request funnel, park → ledger, discard). No Phases 2-3 from this mode — pursued candidates re-enter via the funnel. Read [`references/ideation.md`](references/ideation.md).
 - **Feature evaluation** ("should we build X?"): a *new, single* request routes to `../project-feature-request/SKILL.md` (its funnel returns a spec delta here). Run this mode only for portfolio questions (X vs competing priorities): Phase 1 verify-tier doctrine check on X, Phase 2 narrowed to the 8-dimension evaluation in `references/alignment-review.md`, Phase 3 only if X is approved. No commits unless specs changed.
 - **Spec-drift check** ("does code match spec?"): Phase 1 verify-tier (doctrine consumed). Phase 2 emphasizes B + C + D; produce a corrective changeset (change-tier) only for confirmed drift the user wants fixed — else deliver the drift inventory read-only. Phase 3 only when a changeset was produced.
 - **Work decomposition** ("break this down"): assumes an approved spec. Phase 1 skipped unless the spec lacks a doctrine link. Phase 2 = one verify-tier pass confirming implementability. Phase 3 is the primary artifact (mechanical validations + verify-tier pass).
@@ -213,6 +214,7 @@ Focus modes change which phases do real work and which tier applies — the phas
 | File | Read when | Content |
 |------|-----------|---------|
 | [`references/milestone-synthesis.md`](references/milestone-synthesis.md) | Milestone-synthesis focus mode | Deriving candidates from doctrine: mandate coverage matrix, ledger unparking, milestone brief format |
+| [`references/ideation.md`](references/ideation.md) | Ideation focus mode | Divergence lenses, fit-trace classing, mandate-grounded vs vision-extending routing, ideation brief format |
 | [`references/direction-model.md`](references/direction-model.md) | Phase 2 (agents A, B, C) | Analysis dimensions: project spirit, requirement classification, current-state assessment |
 | [`references/alignment-review.md`](references/alignment-review.md) | Phase 2 (agent D); feature evaluation | 8-dimension evaluation, classification buckets, push-back checklist, gap analysis |
 | [`references/openspec-changeset.md`](references/openspec-changeset.md) | Phase 2 step 3 | How to synthesize an OpenSpec changeset via the `openspec` CLI |
