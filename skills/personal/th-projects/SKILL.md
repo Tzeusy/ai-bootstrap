@@ -6,12 +6,12 @@ description: >
   standards), concretize a feature request into a spec delta, amend a spec
   found wrong mid-implementation, reconcile specs against implementation,
   run a repo-wide health audit, or decide what to work on next via
-  spec-driven planning and milestone synthesis. Route to exactly one
-  subskill per task. Triggers: "project shape", "bootstrap docs", "what
-  should we work on next", "should we build this", "I want to add X", "spec
-  this feature", "the spec is wrong", "break this down", "review this
-  project", "audit the codebase", "does the code match the spec", "what's
-  the next milestone".
+  spec-driven planning, milestone synthesis, and doctrine-grounded feature
+  ideation. Route to exactly one subskill per task. Triggers: "project
+  shape", "bootstrap docs", "what should we work on next", "should we build
+  this", "I want to add X", "spec this feature", "the spec is wrong",
+  "break this down", "review this project", "audit the codebase", "does the
+  code match the spec", "what's the next milestone", "brainstorm features".
 metadata:
   owner: tze
   authors:
@@ -19,7 +19,7 @@ metadata:
     - Claude Fable 5
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-18"
+  last_reviewed: "2026-07-26"
 compatibility: Subskill scripts require bash, git, grep, find. project-direction additionally assumes the bd (beads) CLI and an OpenSpec-capable environment for changeset synthesis.
 ---
 
@@ -64,7 +64,7 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 |---|---|---|
 | Bootstrap or audit the project's knowledge architecture (five pillars: heart-and-soul, legends-and-lore, openspec, lay-and-land, craft-and-care); decide where an idea should be documented; generate a layman overview. | [subskills/project-shape/SKILL.md](subskills/project-shape/SKILL.md) | "set up project structure", "bootstrap docs", "where should this go", "audit documentation health" |
 | Concretize ONE fuzzy feature/project request into a signed-off spec delta: motif, doctrine gate, topology placement, design sketch, WHEN/THEN scenarios. Also amendment mode: fix a spec found wrong/ambiguous mid-implementation. | [subskills/project-feature-request/SKILL.md](subskills/project-feature-request/SKILL.md) | "I want to add X", "spec this feature", "turn this idea into requirements", "what would it take to build X", "the spec is wrong" |
-| Decide what to work on next; evaluate competing priorities; check roadmap alignment; turn approved specs into a prioritized beads work plan. Also milestone synthesis: derive candidate work from doctrine when nothing is proposed. | [subskills/project-direction/SKILL.md](subskills/project-direction/SKILL.md) | "what's highest leverage", "what should we work on next", "break this down", "is this roadmap aligned", "what's the next milestone" |
+| Decide what to work on next; evaluate competing priorities; check roadmap alignment; turn approved specs into a prioritized beads work plan. Also the vision-generative modes when nothing is proposed: milestone synthesis (derive work doctrine already implies) and ideation (brainstorm new feature candidates grounded in doctrine). | [subskills/project-direction/SKILL.md](subskills/project-direction/SKILL.md) | "what's highest leverage", "what should we work on next", "break this down", "is this roadmap aligned", "what's the next milestone", "brainstorm features for this project" |
 | Repo-wide health audit: code quality, reliability, security, docs, maintainability — scored, evidence-based, with a planning handoff packet. Includes the exhaustive spec-reconciliation mode (bidirectional spec↔code gap audit + remediation). | [subskills/project-review/SKILL.md](subskills/project-review/SKILL.md) | "review this project", "audit the codebase", "assess project health", "reconcile spec vs implementation", "what's implemented but undocumented" |
 
 ## Routing rules
@@ -77,8 +77,10 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   → review. "What to do about it / next" → direction. Full review hands off to
   direction inside the subskills.
 - **Feature vs. direction**: one concrete proposal → feature-request; many
-  competing priorities or "what next" → direction. A feature request surviving
-  its funnel hands its spec delta to direction for sequencing.
+  competing priorities or "what next" → direction; no proposal at all and the
+  ask is to *invent* candidates → direction (ideation), whose pursued picks
+  feed the funnel. A feature request surviving its funnel hands its spec delta
+  to direction for sequencing.
 - **Scope guard**: single-PR/diff review → `/code-review`, not here.
   Change-level engineering-quality judgment (engineering bar, readability, test
   rigor, dependency hygiene, cruft cleanup, skill reviews, diagrams) →
