@@ -19,6 +19,9 @@ Do not use when:
 - One concrete new feature, idea → spec → `../project-feature-request/SKILL.md`.
 - Score repo health / confirm findings → `../project-review/SKILL.md` (hands its packet here).
 - Backlog mechanics only, no direction analysis → `/beads-orchestration` (beads-writer).
+- Recurring orchestrated pursuit loop (fan-out surface audits + ideation at
+  scale + gated work plan) → `../relentless-vision-pursuit/SKILL.md`;
+  ideation here is the inline single-brief mode it builds on.
 
 ## Core Rules
 

@@ -5,13 +5,15 @@ description: >
   or audit the knowledge architecture (doctrine, specs, topology,
   standards), concretize a feature request into a spec delta, amend a spec
   found wrong mid-implementation, reconcile specs against implementation,
-  run a repo-wide health audit, or decide what to work on next via
-  spec-driven planning, milestone synthesis, and doctrine-grounded feature
-  ideation. Route to exactly one subskill per task. Triggers: "project
+  run a repo-wide health audit, decide what to work on next via spec-driven
+  planning, milestone synthesis, and doctrine-grounded feature ideation, or
+  run a recurring vision-pursuit audit that generates the next best moves
+  toward the project's ideal. Route to exactly one subskill per task. Triggers: "project
   shape", "bootstrap docs", "what should we work on next", "should we build
   this", "I want to add X", "spec this feature", "the spec is wrong",
   "break this down", "review this project", "audit the codebase", "does the
-  code match the spec", "what's the next milestone", "brainstorm features".
+  code match the spec", "what's the next milestone", "brainstorm features",
+  "run the vision pursuit", "relentlessly improve this project".
 metadata:
   owner: tze
   authors:
@@ -19,20 +21,20 @@ metadata:
     - Claude Fable 5
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-26"
+  last_reviewed: "2026-07-27"
 compatibility: Subskill scripts require bash, git, grep, find. project-direction additionally assumes the bd (beads) CLI and an OpenSpec-capable environment for changeset synthesis.
 ---
 
 # TH Projects
 
-Superskill router for spec-driven project governance. Four subskills under
+Superskill router for spec-driven project governance. Five subskills under
 `subskills/`; each a complete standard package (own `SKILL.md`, `references/`,
 `scripts/`). Subskills **not** in global catalog — discover lazily here, load
 **at most one** subskill body per task. A subskill may route you to a sibling
 (e.g. project-review runs project-shape's scanner); follow that link from the
 subskill, not here.
 
-Four subskills, one lifecycle:
+Five subskills, one lifecycle:
 
 1. **Shape** — set normative baseline: what project believes, how designed,
    what must be built, where things live, engineering bar for changing it.
@@ -42,6 +44,9 @@ Four subskills, one lifecycle:
    (incl. exhaustive spec↔code reconciliation) → confirmed findings.
 4. **Direction** — baseline + spec deltas + findings → prioritized, spec-linked
    work plan; hand execution to beads.
+5. **Pursuit** — recurring generative loop against the baseline's ideal:
+   fan-out surface audits + ideation lenses → ranked moves, tier-board
+   movement, gated work plan; pursued moves re-enter via feature request.
 
 VISION is a **continuous constraint**, not a one-time gate: proposal, spec,
 allocation, implementation discovery, reconciliation, and milestone closeout
@@ -66,16 +71,19 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 | Concretize ONE fuzzy feature/project request into a signed-off spec delta: motif, doctrine gate, topology placement, design sketch, WHEN/THEN scenarios. Also amendment mode: fix a spec found wrong/ambiguous mid-implementation. | [subskills/project-feature-request/SKILL.md](subskills/project-feature-request/SKILL.md) | "I want to add X", "spec this feature", "turn this idea into requirements", "what would it take to build X", "the spec is wrong" |
 | Decide what to work on next; evaluate competing priorities; check roadmap alignment; turn approved specs into a prioritized beads work plan. Also the vision-generative modes when nothing is proposed: milestone synthesis (derive work doctrine already implies) and ideation (brainstorm new feature candidates grounded in doctrine). | [subskills/project-direction/SKILL.md](subskills/project-direction/SKILL.md) | "what's highest leverage", "what should we work on next", "break this down", "is this roadmap aligned", "what's the next milestone", "brainstorm features for this project" |
 | Repo-wide health audit: code quality, reliability, security, docs, maintainability — scored, evidence-based, with a planning handoff packet. Includes the exhaustive spec-reconciliation mode (bidirectional spec↔code gap audit + remediation). | [subskills/project-review/SKILL.md](subskills/project-review/SKILL.md) | "review this project", "audit the codebase", "assess project health", "reconcile spec vs implementation", "what's implemented but undocumented" |
+| Recurring generative pursuit of the project's ideal: fan-out audits of every surface against the applicable bar + vision-grounded ideation lenses → ranked move list, tier-board movement across runs, gated (never auto-released) work plan. | [subskills/relentless-vision-pursuit/SKILL.md](subskills/relentless-vision-pursuit/SKILL.md) | "run the vision pursuit", "what's the next best step toward the vision", "relentlessly improve this project", "audit the whole project against the ideal" |
 
 ## Routing rules
 
 - **Baseline before judgment**: review and direction both consume the shape
   baseline. No shape artifacts at all + real ask is "make this project legible"
   → project-shape, even if user said "review".
-- **Audit vs. plan**: review *classifies* (scores, risks, confirmed findings);
-  direction *decides* (sequencing, specs, beads). "What's wrong with this repo"
-  → review. "What to do about it / next" → direction. Full review hands off to
-  direction inside the subskills.
+- **Audit vs. plan vs. pursue**: review *classifies* (scores, risks, confirmed
+  findings); direction *decides* (sequencing, specs, beads); pursuit
+  *generates* (gap-to-ideal moves, recurring, orchestrated). "What's wrong
+  with this repo" → review. "What to do about it / next" → direction.
+  "Relentlessly push this toward its vision" → pursuit. Full review hands off
+  to direction inside the subskills.
 - **Feature vs. direction**: one concrete proposal → feature-request; many
   competing priorities or "what next" → direction; no proposal at all and the
   ask is to *invent* candidates → direction (ideation), whose pursued picks
