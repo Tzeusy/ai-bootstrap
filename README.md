@@ -56,7 +56,7 @@ In practice, that means:
 
 ### 1. Shared skills are canonical
 
-Each root skill lives in `skills/<name>/SKILL.md` or `skills/personal/<name>/SKILL.md`. The supported `~/.dotfiles/bootstrap.sh` installer discovers those roots while pruning `subskills/` and `archive/`:
+Each root skill lives in `skills/<name>/SKILL.md` or `skills/personal/<name>/SKILL.md`. The included `scripts/link-ai-skills.sh` installer discovers those roots while pruning `subskills/` and `archive/`; `~/.dotfiles/bootstrap.sh` calls that script on dotfiles-managed machines:
 
 - `~/.claude/skills/`, `~/.gemini/skills/`, and `~/.gemini/antigravity/skills/` receive direct source-directory symlinks.
 - `~/.codex/skills/` receives shallow, generated wrapper directories. The wrapper's `SKILL.md` is catalog metadata plus an instruction to read the canonical source; it deliberately contains no `subskills/` tree.
@@ -92,13 +92,17 @@ cd ~/.dotfiles
 ```
 
 To refresh only the skill views without the rest of bootstrap, run
-`~/.dotfiles/scripts/link-ai-skills.sh ~/.dotfiles/ai-bootstrap`. Do not
-replace Codex's generated wrappers with direct directory symlinks: that would
-reintroduce nested subskills into Codex's catalog.
+`~/.dotfiles/ai-bootstrap/scripts/link-ai-skills.sh ~/.dotfiles/ai-bootstrap`.
+Do not replace Codex's generated wrappers with direct directory symlinks: that
+would reintroduce nested subskills into Codex's catalog.
 
-If you prefer an explicit standalone mapping, the relevant targets are:
+For a standalone installation, clone this repository recursively, generate its
+skill views, then link the tool homes:
 
 ```bash
+git clone --recursive https://github.com/Tzeusy/ai-bootstrap.git
+cd ai-bootstrap
+./scripts/link-ai-skills.sh "$(pwd)"
 ln -sfn "$(pwd)/.claude" "$HOME/.claude"
 ln -sfn "$(pwd)/.codex" "$HOME/.codex"
 ln -sfn "$(pwd)/.gemini" "$HOME/.gemini"
