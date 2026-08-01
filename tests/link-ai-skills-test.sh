@@ -52,7 +52,9 @@ assert_shallow_codex_catalog() {
         [[ "$relative_path" == */SKILL.md ]] || fail "unexpected Codex skill path: $relative_path"
         skill_dir="${relative_path%/SKILL.md}"
         [[ "$skill_dir" != */* ]] || fail "nested Codex skill entered catalog: $relative_path"
-    done < <(find -L "$codex_skills_dir" -type f -name SKILL.md -print0)
+    done < <(find -L "$codex_skills_dir" \
+        -path "$codex_skills_dir/.system" -prune -o \
+        -type f -name SKILL.md -print0)
 }
 
 bootstrap_dir="$test_root/ai-bootstrap"
@@ -64,6 +66,7 @@ write_skill "$bootstrap_dir/skills/duplicate" "duplicate" "The shallow canonical
 write_skill "$bootstrap_dir/skills/vendor/skills/duplicate" "duplicate" "A deeper conflicting skill."
 write_skill "$bootstrap_dir/skills/writing-skills" "writing-skills" "Excluded from all catalogs."
 write_skill "$bootstrap_dir/.codex/skills/local" "local" "An unmanaged local skill."
+write_skill "$bootstrap_dir/.codex/skills/.system/internal" "internal" "A system-owned skill outside the shared projection."
 
 # Simulate the old direct-directory Codex installation. The first run must
 # migrate this managed symlink to a generated real wrapper.
