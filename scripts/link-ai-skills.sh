@@ -142,20 +142,13 @@ write_codex_wrapper() {
     local target_dir="$codex_skills_dir/$skill_name"
     local staging_dir
 
-    if [ -L "$target_dir" ]; then
-        if is_managed_skill_symlink "$target_dir"; then
-            rm -f -- "$target_dir"
-        else
-            report_unmanaged_collision "Codex" "$target_dir"
-            return 1
-        fi
-    elif [ -e "$target_dir" ]; then
-        if is_managed_codex_wrapper "$target_dir"; then
-            rm -rf -- "$target_dir"
-        else
-            report_unmanaged_collision "Codex" "$target_dir"
-            return 1
-        fi
+    if [ -L "$target_dir" ] && ! is_managed_skill_symlink "$target_dir"; then
+        report_unmanaged_collision "Codex" "$target_dir"
+        return 1
+    fi
+    if [ -e "$target_dir" ] && [ ! -L "$target_dir" ] && ! is_managed_codex_wrapper "$target_dir"; then
+        report_unmanaged_collision "Codex" "$target_dir"
+        return 1
     fi
 
     staging_dir="$(mktemp -d "$codex_dir/.skill-projection.$skill_name.XXXXXX")"
@@ -176,6 +169,22 @@ write_codex_wrapper() {
         'Treat that canonical file and its linked resources as the complete, authoritative instructions.' \
         'Do not infer missing instructions from this adapter.' >> "$staging_dir/SKILL.md"
     printf '%s\nsource=%s\n' "$projection_format" "$source_skill" > "$staging_dir/$projection_marker"
+
+    # Do not remove a working managed entry until the replacement has passed
+    # frontmatter validation and is fully written outside the catalog tree.
+    if [ -L "$target_dir" ]; then
+        if ! is_managed_skill_symlink "$target_dir"; then
+            report_unmanaged_collision "Codex" "$target_dir"
+            return 1
+        fi
+        rm -f -- "$target_dir"
+    elif [ -e "$target_dir" ]; then
+        if ! is_managed_codex_wrapper "$target_dir"; then
+            report_unmanaged_collision "Codex" "$target_dir"
+            return 1
+        fi
+        rm -rf -- "$target_dir"
+    fi
 
     mv -- "$staging_dir" "$target_dir"
 }
