@@ -55,7 +55,9 @@ command, verification, and last-verified date.
         ;;
       *) exit 1 ;;
     esac
-  done < <(find -L "$codex_skills" -type f -name SKILL.md -print0)
+  done < <(find -L "$codex_skills" \
+       -path "$codex_skills/.system" -prune -o \
+       -type f -name SKILL.md -print0)
   ```
 
 - **Last verified**: 2026-08-01
