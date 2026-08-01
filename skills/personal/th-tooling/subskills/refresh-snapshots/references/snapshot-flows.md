@@ -16,7 +16,7 @@ command, verification, and last-verified date.
   `ai-bootstrap/{.claude,.gemini,.gemini/antigravity}/skills/*`, plus a
   shallow generated wrapper directory at
   `ai-bootstrap/.codex/skills/<root-skill>/` for every Codex root entry.
-- **Source**: `~/.dotfiles/scripts/link-ai-skills.sh`, invoked by
+- **Source**: `ai-bootstrap/scripts/link-ai-skills.sh`, invoked by
   `~/.dotfiles/bootstrap.sh` ("Linking shared AI skills" section).
   Discovery prunes `subskills/` (superskills install as one catalog entry)
   and `archive/` (retired skills stay cloned but unlinked), and skips names
@@ -25,25 +25,37 @@ command, verification, and last-verified date.
   cannot use the direct directory symlinks because it follows them
   recursively during catalog discovery; its generated wrapper preserves the
   root frontmatter and directs Codex to read the canonical source. A
-  `.codex-skill-projection` marker identifies only those safe-to-refresh
-  directories. Stale-removal otherwise touches only managed/broken symlinks;
-  manual entries remain preserved.
+  format-and-source `.codex-skill-projection` marker plus the generated
+  wrapper comment identify only those safe-to-refresh directories.
+  Stale-removal otherwise touches only links into the canonical source tree;
+  a colliding manual entry is preserved and makes the focused refresh fail
+  explicitly rather than overwriting it.
 - **Refresh**: `~/.dotfiles/bootstrap.sh` (full run is idempotent), or the
   focused command:
 
   ```bash
-  ~/.dotfiles/scripts/link-ai-skills.sh ~/.dotfiles/ai-bootstrap
+  ~/.dotfiles/ai-bootstrap/scripts/link-ai-skills.sh ~/.dotfiles/ai-bootstrap
   ```
 
-- **Verify**: no broken direct links, and no nested Codex catalog entries:
+- **Verify**: no broken direct links, and every Codex `SKILL.md` is exactly
+  one directory below the catalog root:
 
   ```bash
   find ~/.dotfiles/ai-bootstrap/.claude/skills ~/.dotfiles/ai-bootstrap/.gemini/skills \
        ~/.dotfiles/ai-bootstrap/.gemini/antigravity/skills \
        -maxdepth 1 -xtype l
 
-  find -L ~/.dotfiles/ai-bootstrap/.codex/skills \
-       -path '*/subskills/*' -name SKILL.md -print
+  codex_skills="$HOME/.dotfiles/ai-bootstrap/.codex/skills"
+  while IFS= read -r -d '' skill_file; do
+    skill_path="${skill_file#"$codex_skills"/}"
+    case "$skill_path" in
+      */SKILL.md)
+        skill_dir="${skill_path%/SKILL.md}"
+        case "$skill_dir" in */*) exit 1 ;; esac
+        ;;
+      *) exit 1 ;;
+    esac
+  done < <(find -L "$codex_skills" -type f -name SKILL.md -print0)
   ```
 
 - **Last verified**: 2026-08-01
