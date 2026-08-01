@@ -50,22 +50,18 @@ In practice, that means:
 
 - If the workflow is specific to my operating model, it belongs in `skills/personal/`.
 - If a top-level skill came from upstream, prefer updating from upstream or forking intentionally instead of casually rewriting the vendored copy.
-- Tool-specific skill directories under `.claude/skills`, `.codex/skills`, and `.gemini/skills` are mirrors of this source tree, not the source of truth.
+- Tool-specific skill directories under `.claude/skills`, `.codex/skills`, and `.gemini/skills` are generated runtime views of this source tree, not the source of truth. Claude and Gemini use direct directory links. Codex uses a shallow generated wrapper per root skill because it recursively discovers `SKILL.md` files through directory symlinks; each wrapper keeps the root frontmatter and points back to the canonical source before use.
 
 ## Primary Workflow
 
 ### 1. Shared skills are canonical
 
-Each skill lives in `skills/<name>/SKILL.md` or `skills/personal/<name>/SKILL.md`. Those source directories are symlinked into:
+Each root skill lives in `skills/<name>/SKILL.md` or `skills/personal/<name>/SKILL.md`. The supported `~/.dotfiles/bootstrap.sh` installer discovers those roots while pruning `subskills/` and `archive/`:
 
-- `~/.claude/skills/`
-- `~/.codex/skills/`
-- `~/.gemini/skills/`
-- `~/.gemini/antigravity/skills/`
+- `~/.claude/skills/`, `~/.gemini/skills/`, and `~/.gemini/antigravity/skills/` receive direct source-directory symlinks.
+- `~/.codex/skills/` receives shallow, generated wrapper directories. The wrapper's `SKILL.md` is catalog metadata plus an instruction to read the canonical source; it deliberately contains no `subskills/` tree.
 
-The linked name is flattened, so `skills/personal/beads-orchestration/subskills/beads-worker/` becomes `beads-worker` in the tool-specific skills directory.
-
-Because the linked namespace is flattened by basename, the canonical source remains the `skills/` tree. Provenance and ownership should always be reasoned about from the source directory, not from the mirrored tool-specific link.
+The generated namespace is flattened by root directory basename. Provenance and ownership should always be reasoned about from the canonical `skills/` source directory, not from a tool runtime view.
 
 ### 2. Beads drives execution
 
@@ -88,37 +84,17 @@ Related personal workflow skills include:
 
 ## Quick Start
 
-Clone this repo and symlink its tool configs into the standard locations in your home directory:
+When this repository is managed as `~/.dotfiles/ai-bootstrap`, use the dotfiles bootstrap script. It links the tool homes and regenerates their skill views:
 
 ```bash
-git clone --recursive https://github.com/Tzeusy/ai-bootstrap.git
-cd ai-bootstrap
-
-ln -sfn "$(pwd)/.claude" ~/.claude
-ln -sfn "$(pwd)/.codex" ~/.codex
-ln -sfn "$(pwd)/.gemini" ~/.gemini
+cd ~/.dotfiles
+./bootstrap.sh
 ```
 
-Mirror the shared skills into each tool:
-
-```bash
-mkdir -p ~/.claude/skills ~/.codex/skills ~/.gemini/skills ~/.gemini/antigravity/skills
-
-declare -A skill_map
-while IFS= read -r -d '' skill; do
-  dir="$(dirname "$skill")"
-  name="$(basename "$dir")"
-  skill_map["$name"]="$(realpath "$dir")"
-done < <(find "$(pwd)/skills" -maxdepth 3 -type f -name SKILL.md -print0)
-
-for name in "${!skill_map[@]}"; do
-  dir="${skill_map[$name]}"
-  ln -sfn "$dir" ~/.claude/skills/"$name"
-  ln -sfn "$dir" ~/.codex/skills/"$name"
-  ln -sfn "$dir" ~/.gemini/skills/"$name"
-  ln -sfn "$dir" ~/.gemini/antigravity/skills/"$name"
-done
-```
+To refresh only the skill views without the rest of bootstrap, run
+`~/.dotfiles/scripts/link-ai-skills.sh ~/.dotfiles/ai-bootstrap`. Do not
+replace Codex's generated wrappers with direct directory symlinks: that would
+reintroduce nested subskills into Codex's catalog.
 
 If you prefer an explicit standalone mapping, the relevant targets are:
 
