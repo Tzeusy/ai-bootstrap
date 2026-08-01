@@ -10,31 +10,57 @@ flow is removed from the harness, note the removing commit and drop the
 entry one revision later. Each entry records: what is snapshotted, refresh
 command, verification, and last-verified date.
 
-## 1. Skill symlinks into tool homes
+## 1. Shared skill views into tool homes
 
-- **Snapshot**: `ai-bootstrap/{.claude,.codex,.gemini,.gemini/antigravity}/skills/*`
-  symlinks, generated from `ai-bootstrap/skills/` discovery.
-- **Source**: `~/.dotfiles/bootstrap.sh` ("Linking shared AI skills"
-  section). Discovery prunes `subskills/` (superskills install as one
-  catalog entry) and `archive/` (retired skills stay cloned but unlinked),
-  and skips names in the `skill_catalog_exclude` list (for skills inside
-  upstream submodules that cannot be archived by `git mv`; currently
-  `writing-skills`). Stale-removal only touches managed links — symlinks
-  into `ai-bootstrap/skills/` or broken links; manual links to other
-  locations are preserved (none currently: the former `impeccable` →
-  `~/.agents/skills/` link was retired 2026-07-19, routed via `th-design`'s
-  "External craft skills" section instead).
-- **Refresh**: `~/.dotfiles/bootstrap.sh` (full run is idempotent; the
-  skills section alone can be extracted for a fast pass).
-- **Verify**: no broken links and no archived names linked:
+- **Snapshot**: source-directory symlinks at
+  `ai-bootstrap/{.claude,.gemini,.gemini/antigravity}/skills/*`, plus a
+  shallow generated wrapper directory at
+  `ai-bootstrap/.codex/skills/<root-skill>/` for every Codex root entry.
+- **Source**: `ai-bootstrap/scripts/link-ai-skills.sh`, invoked by
+  `~/.dotfiles/bootstrap.sh` ("Linking shared AI skills" section).
+  Discovery prunes `subskills/` (superskills install as one catalog entry)
+  and `archive/` (retired skills stay cloned but unlinked), and skips names
+  in the `skill_catalog_exclude` list (for skills inside upstream submodules
+  that cannot be archived by `git mv`; currently `writing-skills`). Codex
+  cannot use the direct directory symlinks because it follows them
+  recursively during catalog discovery; its generated wrapper preserves the
+  root frontmatter and directs Codex to read the canonical source. A
+  format-and-source `.codex-skill-projection` marker plus the generated
+  wrapper comment identify only those safe-to-refresh directories.
+  Stale-removal otherwise touches only links into the canonical source tree;
+  a colliding manual entry is preserved and makes the focused refresh fail
+  explicitly rather than overwriting it.
+- **Refresh**: `~/.dotfiles/bootstrap.sh` (full run is idempotent), or the
+  focused command:
 
   ```bash
-  find ~/.dotfiles/ai-bootstrap/.codex/skills ~/.dotfiles/ai-bootstrap/.gemini/skills \
-       ~/.dotfiles/ai-bootstrap/.gemini/antigravity/skills ~/.dotfiles/ai-bootstrap/.claude/skills \
-       -maxdepth 1 -xtype l
+  ~/.dotfiles/ai-bootstrap/scripts/link-ai-skills.sh ~/.dotfiles/ai-bootstrap
   ```
 
-- **Last verified**: 2026-07-19
+- **Verify**: no broken direct links, and every Codex `SKILL.md` is exactly
+  one directory below the catalog root:
+
+  ```bash
+  find ~/.dotfiles/ai-bootstrap/.claude/skills ~/.dotfiles/ai-bootstrap/.gemini/skills \
+       ~/.dotfiles/ai-bootstrap/.gemini/antigravity/skills \
+       -maxdepth 1 -xtype l
+
+  codex_skills="$HOME/.dotfiles/ai-bootstrap/.codex/skills"
+  while IFS= read -r -d '' skill_file; do
+    skill_path="${skill_file#"$codex_skills"/}"
+    case "$skill_path" in
+      */SKILL.md)
+        skill_dir="${skill_path%/SKILL.md}"
+        case "$skill_dir" in */*) exit 1 ;; esac
+        ;;
+      *) exit 1 ;;
+    esac
+  done < <(find -L "$codex_skills" \
+       -path "$codex_skills/.system" -prune -o \
+       -type f -name SKILL.md -print0)
+  ```
+
+- **Last verified**: 2026-08-01
 
 ## 2. Git submodules
 
