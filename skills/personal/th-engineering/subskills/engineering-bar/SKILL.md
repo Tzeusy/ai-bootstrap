@@ -12,7 +12,7 @@ metadata:
     - Claude Fable 5
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-18"
+  last_reviewed: "2026-08-02"
 ---
 
 # Engineering Bar
@@ -105,6 +105,10 @@ A non-trivial change is complete when all of these hold:
   touches are updated in the same change (bias 7).
 - **Regression protected** — bugfixes ship with a test that fails on the old
   behavior (bias 8).
+- **Test delta accounted** — added tests pass the worth-adding bar (each
+  catches a bug no existing test catches) and net suite growth is stated;
+  adds-only growth in a mature area is reviewed, not waved through (bias 8;
+  [test-rigor](../test-rigor/SKILL.md) operationalizes).
 - **A reviewer can follow it** — naming, structure, and commit message let a
   reviewer reconstruct intent without the author present (bias 2).
 
