@@ -9,6 +9,16 @@
 #   about/craft-and-care/  (engineering standards / execution quality)
 #   openspec/             (capability specs — product, stays at root)
 #
+# Optional .syzygy canon (governance-plane repos may keep shape under .syzygy/
+# instead of about/; the two canons must not coexist for the same pillar):
+#   .syzygy/governance/doctrine/   (doctrine)
+#   .syzygy/governance/contracts/  (design contracts / RFCs)
+#   .syzygy/map/                   (topology / maps)
+#   .syzygy/governance/policies/   (engineering standards / policies)
+#   openspec/                      (unchanged — always at root)
+# Only the doctrine path is fixed by that canon's own doctrine; the other three
+# are detection candidates and may be refined by the project's schema RFCs.
+#
 # Also detects legacy layouts (heart-and-soul/ at root, docs/rfcs/, maps/, etc.)
 set -euo pipefail
 
@@ -83,6 +93,21 @@ count_numbered_list_items() {
     return
   }
   grep -Ec '^[[:space:]]*[0-9]+\.[[:space:]]+\S' "$file" || true
+}
+
+# Count namespaced doctrine rule definitions (e.g. Syzygy's `**VIS-1 — ...**`
+# / `**SEC-2 — ...**` bold-paragraph form) across every markdown file in a
+# doctrine directory. Counts unique rule IDs, so a rule cited in several
+# files is counted once. (Added 2026-08-02 for the syzygy-canon repo, whose
+# doctrine does not use numbered lists; recorded in that repo's rev7 rework
+# run report.)
+count_doctrine_rule_ids() {
+  local dir="$1"
+  [ -d "$dir" ] || {
+    echo 0
+    return
+  }
+  { grep -hoE '^\*\*[A-Z]{2,6}-[0-9]+' "$dir"/*.md 2>/dev/null || true; } | sort -u | wc -l | tr -d ' '
 }
 
 count_markdown_files() {
@@ -305,21 +330,33 @@ check_skill() {
   fi
 }
 
-# Resolve pillar directory: check canonical path first, then legacy fallback
+# Resolve pillar directory: first existing candidate wins (canonical about/,
+# then the optional .syzygy canon, then legacy fallbacks)
 resolve_pillar() {
-  local canonical="$1" legacy="$2"
-  if [ -d "$canonical" ]; then
-    echo "$canonical"
-  elif [ -d "$legacy" ]; then
-    echo "$legacy"
-  else
-    echo ""
+  local candidate
+  for candidate in "$@"; do
+    if [ -d "$candidate" ]; then
+      echo "$candidate"
+      return
+    fi
+  done
+  echo ""
+}
+
+# Warn when the same pillar exists in both the about/ and .syzygy canons —
+# dual homes for one pillar are a duplicate-truth smell in either canon.
+warn_dual_canon() {
+  local about_dir="$1" syzygy_dir="$2"
+  if [ -d "$about_dir" ] && [ -d "$syzygy_dir" ]; then
+    echo "    [DUAL-CANON] Both ${about_dir#$ROOT/}/ and ${syzygy_dir#$ROOT/}/ exist — one pillar must have one home; consolidate into a single canon"
   fi
 }
 
 resolve_design_contract_dir() {
   if [ -d "$ROOT/about/legends-and-lore" ]; then
     echo "$ROOT/about/legends-and-lore"
+  elif [ -d "$ROOT/.syzygy/governance/contracts" ]; then
+    echo "$ROOT/.syzygy/governance/contracts"
   elif [ -d "$ROOT/docs/rfcs" ] || [ -d "$ROOT/docs/adrs" ]; then
     echo "$ROOT/docs"
   elif [ -d "$ROOT/rfcs" ]; then
@@ -338,6 +375,8 @@ resolve_design_contract_dir() {
 resolve_topology_dir() {
   if [ -d "$ROOT/about/lay-and-land" ]; then
     echo "$ROOT/about/lay-and-land"
+  elif [ -d "$ROOT/.syzygy/map" ]; then
+    echo "$ROOT/.syzygy/map"
   elif [ -d "$ROOT/maps" ]; then
     echo "$ROOT/maps"
   elif [ -d "$ROOT/architecture" ]; then
@@ -354,6 +393,8 @@ resolve_topology_dir() {
 resolve_standards_dir() {
   if [ -d "$ROOT/about/craft-and-care" ]; then
     echo "$ROOT/about/craft-and-care"
+  elif [ -d "$ROOT/.syzygy/governance/policies" ]; then
+    echo "$ROOT/.syzygy/governance/policies"
   elif [ -d "$ROOT/docs/engineering" ]; then
     echo "$ROOT/docs/engineering"
   elif [ -d "$ROOT/docs/standards" ]; then
@@ -380,7 +421,7 @@ emit_traceability_summary() {
 
 # --- Pillar 1: Doctrine ---
 echo "## Pillar 1: Doctrine (WHY)"
-HAS_DIR=$(resolve_pillar "$ROOT/about/heart-and-soul" "$ROOT/heart-and-soul")
+HAS_DIR=$(resolve_pillar "$ROOT/about/heart-and-soul" "$ROOT/.syzygy/governance/doctrine" "$ROOT/heart-and-soul")
 if [ -n "$HAS_DIR" ]; then
   label="${HAS_DIR#$ROOT/}"
   total_md=$(find "$HAS_DIR" -name '*.md' -type f 2>/dev/null | wc -l)
@@ -389,9 +430,12 @@ if [ -n "$HAS_DIR" ]; then
   check_dir "$label/" "$HAS_DIR"
   emit_content_state "Doctrine" "$doctrine_state"
   [ "$HAS_DIR" = "$ROOT/heart-and-soul" ] && echo "    [LEGACY] Consider moving to about/heart-and-soul/"
+  [ "$HAS_DIR" = "$ROOT/.syzygy/governance/doctrine" ] && echo "    [SYZYGY-CANON] Doctrine maintained under .syzygy/governance/doctrine/"
+  warn_dual_canon "$ROOT/about/heart-and-soul" "$ROOT/.syzygy/governance/doctrine"
   check_file "vision.md" "$HAS_DIR/vision.md" || echo "    - [MISSING] vision.md (critical)"
   check_file "v1.md" "$HAS_DIR/v1.md" || true
   check_file "architecture.md" "$HAS_DIR/architecture.md" || true
+  check_file "trust-and-evidence.md" "$HAS_DIR/trust-and-evidence.md" || true
   check_file "security.md" "$HAS_DIR/security.md" || true
   check_file "failure.md" "$HAS_DIR/failure.md" || true
   check_file "development.md" "$HAS_DIR/development.md" || true
@@ -399,6 +443,19 @@ if [ -n "$HAS_DIR" ]; then
   check_file "README.md" "$HAS_DIR/README.md" || true
   echo "  Local skill:"
   check_skill "heart-and-soul"
+  # Adjacent decisions layer (owner decision records). Visibility only —
+  # never counted as a pillar. (Added 2026-08-02: the syzygy-canon repo keeps
+  # owner decisions at .syzygy/governance/decisions/ and the scan previously
+  # had no resolver for them; recorded in that repo's rev7 rework run report.)
+  DEC_DIR=""
+  [ -d "$ROOT/.syzygy/governance/decisions" ] && DEC_DIR="$ROOT/.syzygy/governance/decisions"
+  [ -z "$DEC_DIR" ] && [ -d "$ROOT/about/heart-and-soul/decisions" ] && DEC_DIR="$ROOT/about/heart-and-soul/decisions"
+  if [ -n "$DEC_DIR" ]; then
+    dec_docs=$(count_markdown_files "$DEC_DIR")
+    echo "  Decisions layer: [FOUND] ${DEC_DIR#$ROOT/}/ ($dec_docs markdown files)"
+  else
+    echo "  Decisions layer: [ABSENT] — no .syzygy/governance/decisions/ or about/heart-and-soul/decisions/"
+  fi
 else
   echo "  [ABSENT] about/heart-and-soul/"
   for f in PHILOSOPHY.md MANIFESTO.md VALUES.md VISION.md; do
@@ -417,6 +474,8 @@ if [ -n "$LAL_DIR" ]; then
   law_state=$(classify_content_state "$authored_md" "$total_md")
   check_dir "$label/" "$LAL_DIR"
   emit_content_state "Design Contracts" "$law_state"
+  [ "$LAL_DIR" = "$ROOT/.syzygy/governance/contracts" ] && echo "    [SYZYGY-CANON] Design contracts maintained under .syzygy/governance/contracts/"
+  warn_dual_canon "$ROOT/about/legends-and-lore" "$ROOT/.syzygy/governance/contracts"
   # Find rfcs — could be at about/legends-and-lore/rfcs/ or legacy docs/rfcs/
   RFC_DIR=""
   [ -d "$LAL_DIR/rfcs" ] && RFC_DIR="$LAL_DIR/rfcs"
@@ -492,6 +551,8 @@ if [ -n "$LAY_DIR" ]; then
   topology_state=$(classify_content_state "$authored_md" "$total_md")
   check_dir "$label/" "$LAY_DIR"
   emit_content_state "Topology" "$topology_state"
+  [ "$LAY_DIR" = "$ROOT/.syzygy/map" ] && echo "    [SYZYGY-CANON] Topology maintained under .syzygy/map/"
+  warn_dual_canon "$ROOT/about/lay-and-land" "$ROOT/.syzygy/map"
   [ "$LAY_DIR" = "$ROOT/maps" ] && echo "    [LEGACY] Consider moving to about/lay-and-land/"
   [ "$LAY_DIR" = "$ROOT/architecture" ] && echo "    [LEGACY] Consider consolidating architecture/ into about/lay-and-land/"
   [ "$LAY_DIR" = "$ROOT/diagrams" ] && echo "    [LEGACY] Consider consolidating diagrams/ into about/lay-and-land/"
@@ -542,6 +603,8 @@ if [ -n "$CRAFT_DIR" ]; then
   craft_state=$(classify_content_state "$authored_md" "$total_md")
   check_dir "$label/" "$CRAFT_DIR"
   emit_content_state "Engineering Standards" "$craft_state"
+  [ "$CRAFT_DIR" = "$ROOT/.syzygy/governance/policies" ] && echo "    [SYZYGY-CANON] Engineering standards maintained under .syzygy/governance/policies/"
+  warn_dual_canon "$ROOT/about/craft-and-care" "$ROOT/.syzygy/governance/policies"
   [ "$CRAFT_DIR" = "$ROOT/docs/engineering" ] && echo "    [LEGACY] Consider moving to about/craft-and-care/"
   [ "$CRAFT_DIR" = "$ROOT/docs/standards" ] && echo "    [LEGACY] Consider moving to about/craft-and-care/"
   [ "$CRAFT_DIR" = "$ROOT/engineering" ] && echo "    [LEGACY] Consider moving to about/craft-and-care/"
@@ -577,8 +640,18 @@ topology_cross_refs=0
 standards_docs=0
 standards_cross_refs=0
 
+doctrine_rules_display=""
 if [ -n "${HAS_DIR:-}" ] && [ -f "$HAS_DIR/vision.md" ] && ! is_placeholder_file "$HAS_DIR/vision.md"; then
   doctrine_rules=$(count_numbered_list_items "$HAS_DIR/vision.md")
+  # Fall back to namespaced rule IDs (e.g. VIS-n / SEC-n across the doctrine
+  # dir) before ever reporting zero: authored doctrine with an unrecognized
+  # rule format must render Unknown, never a false zero.
+  if [ "$doctrine_rules" -eq 0 ]; then
+    doctrine_rules=$(count_doctrine_rule_ids "$HAS_DIR")
+  fi
+  if [ "$doctrine_rules" -eq 0 ]; then
+    doctrine_rules_display="Unknown — authored doctrine present, but no numbered-list or namespaced (XXX-n) rule format recognized; do not read as zero rules"
+  fi
 fi
 
 if [ -n "${LAL_DIR:-}" ]; then
@@ -610,13 +683,13 @@ if [ -n "${CRAFT_DIR:-}" ] && [ -d "$CRAFT_DIR" ]; then
   standards_cross_refs=$(count_files_matching "$CRAFT_DIR" '*.md' 'heart-and-soul|legends-and-lore|openspec|spec-and-spine|lay-and-land|RFC|topology|doctrine|spec')
 fi
 
-emit_traceability_summary "$doctrine_rules" "$rfc_docs" "$rfc_doctrine_refs" "$spec_docs" "$spec_source_refs" "$spec_scenarios" "$topology_docs" "$topology_cross_refs" "$standards_docs" "$standards_cross_refs"
+emit_traceability_summary "${doctrine_rules_display:-$doctrine_rules}" "$rfc_docs" "$rfc_doctrine_refs" "$spec_docs" "$spec_source_refs" "$spec_scenarios" "$topology_docs" "$topology_cross_refs" "$standards_docs" "$standards_cross_refs"
 echo ""
 
 # --- Summary ---
 echo "## Shape Summary"
 pillars=0
-[ -n "$(resolve_pillar "$ROOT/about/heart-and-soul" "$ROOT/heart-and-soul")" ] && pillars=$((pillars + 1))
+[ -n "$(resolve_pillar "$ROOT/about/heart-and-soul" "$ROOT/.syzygy/governance/doctrine" "$ROOT/heart-and-soul")" ] && pillars=$((pillars + 1))
 [ -n "$(resolve_design_contract_dir)" ] && pillars=$((pillars + 1))
 [ -d "$ROOT/openspec" ] && pillars=$((pillars + 1))
 [ -n "$(resolve_topology_dir)" ] && pillars=$((pillars + 1))
