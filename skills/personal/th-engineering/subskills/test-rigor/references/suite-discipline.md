@@ -113,14 +113,19 @@ Schedule a recurring pass (monthly under heavy feature work); do not
 wait for crisis. Per pass:
 
 1. **Measure** — count per domain; compare to last pass.
-2. **Classify** — per-test coverage contexts
+2. **Classify** — walk each test through the keep/delete/rewrite decision
+   tree in
+   [condensation-classification](condensation-classification.md)
+   (load it only for this step). Per-test coverage contexts
    (`pytest --cov --cov-context=test`) surface tests whose covered lines
    are a strict subset of another's; provenance docstrings resolve
    intent.
 3. **Rewrite or delete** — each removed test either has its unique
    behavior re-pinned through the public interface or is shown
-   redundant. Mock-wiring assertions can encode real contracts
-   (idempotency, retry cadence, boundary bypass) — when in doubt, keep.
+   redundant. Mock-wiring assertions can encode real contracts — apply
+   the plumbing-vs-contract litmus
+   ([condensation-classification](condensation-classification.md) §1);
+   when in doubt, keep.
 4. **Verify** — scoped tiers green, `--collect-only` clean
    (shared-helper deletions fail there, not in scoped runs); commit
    message states the delta.
