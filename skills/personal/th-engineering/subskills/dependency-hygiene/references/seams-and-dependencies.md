@@ -12,7 +12,7 @@ Classify each dependency before deciding seam placement and test strategy:
 | **In-process** | Your own modules, same deployable | No seam; call directly | Test through the public interface; never mock (test-rigor bar 5) |
 | **Local-substitutable** | Owned infra with a faithful local stand-in (SQLite for Postgres, tmpdir for object store) | Thin constructor-level substitution, not an abstraction layer | Run tests against the local substitute |
 | **Remote-owned** | Services you own across a network boundary | Port owned by the caller; adapter per transport (ports & adapters) | Test the port with a fake; contract-test the adapter |
-| **True-external** | Third-party APIs you don't control | Owned interface at the boundary, shaped by *your* use, not their API surface | Mock the owned interface; one thin integration test against a sandbox if available |
+| **True-external** | Third-party APIs you don't control | Owned interface at the boundary, shaped by *your* use, not their API surface | Prefer component/integration tests against a live dev server or sandbox; mock the owned interface only in unit-tier hot paths ([mock ladder](../../test-rigor/references/suite-discipline.md)) |
 
 ## Seam Discipline
 
