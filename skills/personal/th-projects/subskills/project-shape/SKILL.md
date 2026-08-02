@@ -52,6 +52,8 @@ Five distinct knowledge layers, each answering a different question:
 
 Four pillars live under `about/` (project self-knowledge, poetic names). `openspec/` stays at root — a product with its own structure/conventions.
 
+**Optional `.syzygy` canon.** A governance-plane repo may instead keep its shape under `.syzygy/`: doctrine at `.syzygy/governance/doctrine/`, design contracts at `.syzygy/governance/contracts/`, engineering standards/policies at `.syzygy/governance/policies/`, topology at `.syzygy/map/`; `openspec/` is unchanged. `shape-scan.sh` detects either canon (labeling `[SYZYGY-CANON]`), warns `[DUAL-CANON]` if a pillar exists in both, and `shape-init.sh` refuses to scaffold an `about/` mirror of a pillar already living under `.syzygy/`. Only the doctrine path is fixed by that canon's own doctrine; the other three are detection candidates a project's schema RFCs may refine.
+
 Pillars form a **traceability chain** — Doctrine principle → RFC decision → Spec requirement → Code → Test. Topology cross-cuts all: *where* doctrine is embodied, contracts apply, specs are implemented, work lands. `craft-and-care` is the engineering-character cross-cut: who an engineer must be when changing this repo — explicit, careful, reviewable, observable, maintainable.
 
 ## Quick Start: Assess Shape

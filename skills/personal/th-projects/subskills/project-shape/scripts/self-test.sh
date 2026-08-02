@@ -150,6 +150,93 @@ EOF
   assert_not_contains "$out" "Assessment: MATURE" "four pillars without craft-and-care must never be mature"
 }
 
+case_syzygy_canon_detected() {
+  local repo="$TMP_ROOT/syzygy-canon"
+  local out
+  mkdir -p \
+    "$repo/.syzygy/governance/doctrine" \
+    "$repo/.syzygy/governance/contracts" \
+    "$repo/.syzygy/governance/policies" \
+    "$repo/.syzygy/map"
+
+  cat > "$repo/.syzygy/governance/doctrine/vision.md" <<'EOF'
+# Vision
+
+Real doctrine maintained under the optional .syzygy canon.
+
+## Non-Negotiable Rules
+1. Rule one.
+EOF
+
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "[FOUND] .syzygy/governance/doctrine/" ".syzygy doctrine home should be detected as pillar 1"
+  assert_contains "$out" "[SYZYGY-CANON] Doctrine maintained under .syzygy/governance/doctrine/" "syzygy canon should be labeled"
+  assert_not_contains "$out" "[ABSENT] about/heart-and-soul/" "doctrine must not be reported absent under the .syzygy canon"
+  assert_not_contains "$out" "[DUAL-CANON]" "single-canon repo must not warn about dual canon"
+
+  # shape-init must refuse to scaffold an about/ mirror of a .syzygy pillar
+  out="$(bash "$INIT_SCRIPT" "$repo" --pillars=1 --tools=claude)"
+  assert_contains "$out" "[SKIPPED] .syzygy/governance/doctrine/ exists" "init must not scaffold an about/ mirror over the .syzygy canon"
+  [ -d "$repo/about/heart-and-soul" ] && fail "init created a forbidden about/heart-and-soul mirror"
+
+  # Dual canon must warn
+  mkdir -p "$repo/about/heart-and-soul"
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "[DUAL-CANON]" "dual canon must be warned about"
+}
+
+# Added 2026-08-02 (syzygy rev7 rework): namespaced VIS-n/SEC-n doctrine
+# rules must be counted, the decisions layer must resolve, and an authored
+# doctrine with an unrecognized rule format must render Unknown, not zero.
+case_syzygy_doctrine_rules_and_decisions() {
+  local repo="$TMP_ROOT/syzygy-rules"
+  local out
+  mkdir -p \
+    "$repo/.syzygy/governance/doctrine" \
+    "$repo/.syzygy/governance/decisions"
+
+  cat > "$repo/.syzygy/governance/doctrine/vision.md" <<'EOF'
+# Vision
+
+Real doctrine using namespaced bold-paragraph rules.
+
+**VIS-1 — Comprehensible truth first.** Full rule text here.
+
+**VIS-2 — No evidence means Unknown.** Full rule text here.
+EOF
+
+  cat > "$repo/.syzygy/governance/doctrine/security.md" <<'EOF'
+# Security
+
+**SEC-1 — Authenticated by default.** Full rule text here.
+EOF
+
+  cat > "$repo/.syzygy/governance/decisions/SURFACE-DECISION-RECORD.md" <<'EOF'
+# Surface decision record
+
+SDR-1: an owner-ratified decision.
+EOF
+
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "Doctrine rules detected: 3" "namespaced VIS-n/SEC-n rules should be counted across doctrine files"
+  assert_contains "$out" "Decisions layer: [FOUND] .syzygy/governance/decisions/ (1 markdown files)" "the .syzygy decisions layer should resolve"
+
+  # Authored doctrine with an unrecognizable rule format renders Unknown,
+  # never a false zero.
+  local repo2="$TMP_ROOT/syzygy-rules-unknown"
+  mkdir -p "$repo2/.syzygy/governance/doctrine"
+  cat > "$repo2/.syzygy/governance/doctrine/vision.md" <<'EOF'
+# Vision
+
+Authored doctrine whose rules are stated in prose paragraphs with no
+numbered list and no namespaced identifiers at line starts.
+EOF
+  out="$(bash "$SCAN_SCRIPT" "$repo2")"
+  assert_contains "$out" "Doctrine rules detected: Unknown" "unrecognized rule format must render Unknown"
+  assert_not_contains "$out" "Doctrine rules detected: 0" "unrecognized rule format must never render a false zero"
+  assert_contains "$out" "Decisions layer: [ABSENT]" "missing decisions layer should be reported absent"
+}
+
 case_legacy_layout_detected() {
   local repo="$FIXTURES_DIR/legacy-layout"
   local out
@@ -336,6 +423,8 @@ run_case "fresh scaffold is not mature" case_fresh_scaffold_not_mature
 run_case "unsupported frontmatter keys are rejected" case_invalid_frontmatter_rejected
 run_case "fully authored repo is mature" case_authored_repo_can_be_mature
 run_case "four pillars without craft-and-care is not mature" case_four_pillars_without_craft_not_mature
+run_case "syzygy canon is detected and guarded" case_syzygy_canon_detected
+run_case "syzygy doctrine rules and decisions layer resolve" case_syzygy_doctrine_rules_and_decisions
 run_case "legacy layout is detected conservatively" case_legacy_layout_detected
 run_case "html comments do not trigger scaffold classification" case_html_comments_do_not_trigger_scaffold
 run_case "ARCHITECTURE.md does not double-count topology" case_architecture_file_does_not_double_count_topology

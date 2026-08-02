@@ -61,9 +61,23 @@ create_dir() {
   created=$((created + 1))
 }
 
+# Guard: repos on the optional .syzygy canon must not gain about/ mirrors of
+# a pillar that already lives under .syzygy/ (one pillar, one home).
+syzygy_canon_guard() {
+  local pillar_label="$1" syzygy_dir="$2"
+  if [ -d "$ROOT/$syzygy_dir" ]; then
+    echo ""
+    echo "## $pillar_label"
+    echo "  [SKIPPED] $syzygy_dir/ exists — this repo keeps the pillar under the .syzygy canon; not scaffolding an about/ mirror"
+    return 0
+  fi
+  return 1
+}
+
 # --- Pillar scaffolds ---
 scaffold_heart_and_soul() {
   if [ "$SKILLS_ONLY" = true ]; then return; fi
+  syzygy_canon_guard "Pillar 1: about/heart-and-soul/" ".syzygy/governance/doctrine" && return
   echo ""
   echo "## Pillar 1: about/heart-and-soul/"
   create_dir "$ROOT/about/heart-and-soul"
@@ -137,6 +151,7 @@ $SCAFFOLD_MARKER
 
 scaffold_law_and_lore() {
   if [ "$SKILLS_ONLY" = true ]; then return; fi
+  syzygy_canon_guard "Pillar 2: about/legends-and-lore/" ".syzygy/governance/contracts" && return
   echo ""
   echo "## Pillar 2: about/legends-and-lore/"
   create_dir "$ROOT/about/legends-and-lore"
@@ -210,6 +225,7 @@ specs_dir: changes"
 
 scaffold_lay_and_land() {
   if [ "$SKILLS_ONLY" = true ]; then return; fi
+  syzygy_canon_guard "Pillar 4: about/lay-and-land/" ".syzygy/map" && return
   echo ""
   echo "## Pillar 4: about/lay-and-land/"
   create_dir "$ROOT/about/lay-and-land"
@@ -288,6 +304,7 @@ $SCAFFOLD_MARKER
 
 scaffold_craft_and_care() {
   if [ "$SKILLS_ONLY" = true ]; then return; fi
+  syzygy_canon_guard "Pillar 5: about/craft-and-care/" ".syzygy/governance/policies" && return
   echo ""
   echo "## Pillar 5: about/craft-and-care/"
   create_dir "$ROOT/about/craft-and-care"
