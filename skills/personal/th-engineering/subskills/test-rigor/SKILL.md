@@ -111,8 +111,11 @@ Reviewable expectations — cite the one violated, with file:line evidence:
    when the guarded behavior is broken (revert the fix or inject the bug
    locally to check).
 5. Suite-level work only (structure, runtime, bloat, condensation): load
-   [suite-discipline](references/suite-discipline.md). Per-test judgment
-   needs only this file.
+   [suite-discipline](references/suite-discipline.md); a condensation
+   pass's classify step additionally loads
+   [condensation-classification](references/condensation-classification.md)
+   (keep/delete/rewrite tree, plumbing-vs-contract litmus). Per-test
+   judgment needs only this file.
 
 ## Trigger Sanity Check
 
