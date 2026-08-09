@@ -21,7 +21,7 @@ lower-layer document cannot make a higher-layer draft authoritative.
 | RFC 0001 | **Accepted** | Formal privacy, source, accounting, operations, and lifecycle review passed |
 | Lay-and-land topology | **Accepted** | Reconciled to adopted doctrine and accepted RFC; implementation remains absent |
 | Craft-and-care standards | **Adopted** | Governs specification and later implementation work |
-| OpenSpec capability specifications | **Absent** | Next gate: reviewed launch parameters and a `READY` launch-gate administration |
+| OpenSpec capability specifications | **Absent** | Launch parameters reviewed; next gate: a `READY` administration at a named commit |
 
 **Accepted shape anchor:** RFC
 `f2ad18746a60db8cc9435aabca6c81a62017e0fd7e86275bc564c57731d88526`;
@@ -33,6 +33,11 @@ provenance
 `dcfffe320712afbdcf805e05d30b277130e4bf81f9d718d4f4408bc077f482f0`.
 See [formal review](./legends-and-lore/reviews/0001/2026-08-10-formal-rfc-review.md)
 and [Owner Decision 0001](./heart-and-soul/decisions/0001-finalize-and-specify.md).
+The pre-specification instrument is bound in the reviewed
+[`parameters.md`](../docs/launch-gate/parameters.md); its
+[`parameter-review.md`](../docs/launch-gate/parameter-review.md) records the
+required fresh review and confirmation, and [`trend.md`](../docs/launch-gate/trend.md)
+will index immutable administrations.
 
 ## The Four `about/` Pillars
 
