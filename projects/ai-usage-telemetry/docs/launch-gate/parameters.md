@@ -81,7 +81,7 @@ packaging, remote sinks, and release remain blocked.
 | Accepted design contract for adapter/ledger/failure semantics | Satisfied through RFC 0001 formal review plus the launch-gate remediation review recorded in Owner Decision 0001 |
 | Content-safe source/bounds evidence and synthetic-vector inventory | Satisfied as specification inputs; executable release evidence remains downstream |
 | Defined specification form/home/change process | Satisfied by `SPEC_MEDIUM` |
-| Project-specific spec granularity and acceptance authority | Bound above and in E1 answers below; fresh v1.2 parameter review pending |
+| Project-specific spec granularity and acceptance authority | Bound above and in E1 answers below; fresh v1.3 parameter review pending |
 | OpenSpec directory | Explicitly waived by the launch-gate protocol and Owner Decision 0001: pre-gate absence is required, and the directory is created only after a `READY` verdict |
 
 ## D2 task-routing exercises
@@ -126,7 +126,7 @@ The reviewer must accept or reject each using only the adopted goal statement.
 The project answer and a random nonce are held outside the repository and the
 reviewer's materials until their classifications are fixed. This parameter
 block commits to the exact key bytes with SHA-256
-`1f51bc4217328f3e3dbe328cca37715c21f6a481700f65c9a7ab332068b3854b`. The gate record must reveal the nonce and answer key after
+`40ed0065edc87649cc3ba1dc0b604b6256ff85a44d3c6c760e297a956d4ff021`. The gate record must reveal the nonce and answer key after
 comparison so any reader can verify that the administrator did not change the
 answer after seeing the verdict.
 
@@ -186,7 +186,8 @@ answer after seeing the verdict.
 - **1.3 (2026-08-10):** Added a lived-use thesis falsifier, closed the shape
   corpus to an exact file allowlist, kept review history off the fixed entry
   materials, and added P6 for normalization fidelity. E4 candidates and their
-  sealed key are unchanged from the unadministered v1.2 draft.
+  routing are unchanged from the unadministered v1.2 draft; the key was sealed
+  again with a v1.3 nonce and digest.
 
 - **1.2 (2026-08-10):** Replaced all five E4 candidates and re-sealed a wholly
   unpublished answer key. Removed the direct no-inbound routing example, bound explicit
