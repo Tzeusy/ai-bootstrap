@@ -13,7 +13,8 @@ description: >
   this", "I want to add X", "spec this feature", "the spec is wrong",
   "break this down", "review this project", "audit the codebase", "does the
   code match the spec", "what's the next milestone", "brainstorm features",
-  "run the vision pursuit", "relentlessly improve this project".
+  "are we ready to write specs", "run the vision pursuit", "relentlessly
+  improve this project".
 metadata:
   owner: tze
   authors:
@@ -43,7 +44,9 @@ Five subskills, one lifecycle:
 3. **Review** — audit implementation vs baseline + generic health criteria
    (incl. exhaustive spec↔code reconciliation) → confirmed findings.
 4. **Direction** — baseline + spec deltas + findings → prioritized, spec-linked
-   work plan; hand execution to beads.
+   work plan; hand execution to beads. Before a project's *first* spec, its
+   launch gate judges whether goals and requirements are settled enough to
+   specify from.
 5. **Pursuit** — recurring generative loop against the baseline's ideal:
    fan-out surface audits + ideation lenses → ranked moves, tier-board
    movement, gated work plan; pursued moves re-enter via feature request.
@@ -69,7 +72,7 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 |---|---|---|
 | Bootstrap or audit the project's knowledge architecture (five pillars: heart-and-soul, legends-and-lore, openspec, lay-and-land, craft-and-care); decide where an idea should be documented; generate a layman overview. | [subskills/project-shape/SKILL.md](subskills/project-shape/SKILL.md) | "set up project structure", "bootstrap docs", "where should this go", "audit documentation health" |
 | Concretize ONE fuzzy feature/project request into a signed-off spec delta: motif, doctrine gate, topology placement, design sketch, WHEN/THEN scenarios. Also amendment mode: fix a spec found wrong/ambiguous mid-implementation. | [subskills/project-feature-request/SKILL.md](subskills/project-feature-request/SKILL.md) | "I want to add X", "spec this feature", "turn this idea into requirements", "what would it take to build X", "the spec is wrong" |
-| Decide what to work on next; evaluate competing priorities; check roadmap alignment; turn approved specs into a prioritized beads work plan. Also the vision-generative modes when nothing is proposed: milestone synthesis (derive work doctrine already implies) and ideation (brainstorm new feature candidates grounded in doctrine). | [subskills/project-direction/SKILL.md](subskills/project-direction/SKILL.md) | "what's highest leverage", "what should we work on next", "break this down", "is this roadmap aligned", "what's the next milestone", "brainstorm features for this project" |
+| Decide what to work on next; evaluate competing priorities; check roadmap alignment; turn approved specs into a prioritized beads work plan. Also the vision-generative modes when nothing is proposed: milestone synthesis (derive work doctrine already implies) and ideation (brainstorm new feature candidates grounded in doctrine); and the launch gate, which judges whether goals and requirements are settled enough to author a project's first specs. | [subskills/project-direction/SKILL.md](subskills/project-direction/SKILL.md) | "what's highest leverage", "what should we work on next", "break this down", "is this roadmap aligned", "what's the next milestone", "brainstorm features for this project", "are we ready to write specs" |
 | Repo-wide health audit: code quality, reliability, security, docs, maintainability — scored, evidence-based, with a planning handoff packet. Includes the exhaustive spec-reconciliation mode (bidirectional spec↔code gap audit + remediation). | [subskills/project-review/SKILL.md](subskills/project-review/SKILL.md) | "review this project", "audit the codebase", "assess project health", "reconcile spec vs implementation", "what's implemented but undocumented" |
 | Recurring generative pursuit of the project's ideal: fan-out audits of every surface against the applicable bar + vision-grounded ideation lenses → ranked move list, tier-board movement across runs, gated (never auto-released) work plan. | [subskills/relentless-vision-pursuit/SKILL.md](subskills/relentless-vision-pursuit/SKILL.md) | "run the vision pursuit", "what's the next best step toward the vision", "relentlessly improve this project", "audit the whole project against the ideal" |
 
@@ -77,7 +80,10 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 
 - **Baseline before judgment**: review and direction both consume the shape
   baseline. No shape artifacts at all + real ask is "make this project legible"
-  → project-shape, even if user said "review".
+  → project-shape, even if user said "review". Doctrine adopted but no specs
+  yet + the ask is "can we start specifying" → direction's **launch gate**;
+  project-shape *builds* the pillars, the gate judges whether what was built is
+  enough to specify from.
 - **Audit vs. plan vs. pursue**: review *classifies* (scores, risks, confirmed
   findings); direction *decides* (sequencing, specs, beads); pursuit
   *generates* (gap-to-ideal moves, recurring, orchestrated). "What's wrong

@@ -127,6 +127,44 @@ else
   fi
 fi
 
+# ── 3a-ii. project-direction launch-gate fixtures ─────────────────────────────
+echo ""
+echo "  -- project-direction/tests/fixtures/launch-gate/ --"
+
+shopt -s nullglob
+gate_dirs=("$DIRECTION_FIXTURES"/launch-gate/*/)
+shopt -u nullglob
+
+if [[ ${#gate_dirs[@]} -eq 0 ]]; then
+  _fail "no fixtures found under subskills/project-direction/tests/fixtures/launch-gate/"
+else
+  gate_routes=""
+  for fixture_dir in "${gate_dirs[@]}"; do
+    fixture="$fixture_dir/FIXTURE.md"
+    name="$(basename "$fixture_dir")"
+    if require_file "$fixture" "launch-gate/$name/FIXTURE.md exists"; then
+      check_pattern "$fixture" '^## Expected Outcome' \
+        "launch-gate/$name: declares ## Expected Outcome"
+      check_pattern "$fixture" '^\*\*Routing\*\*:' \
+        "launch-gate/$name: declares **Routing**:"
+      gate_routes+="$(grep '^\*\*Routing\*\*:' "$fixture" 2>/dev/null || true)"$'\n'
+    fi
+  done
+
+  # The gate's precondition seam must be covered from both sides: doctrine
+  # present ("can we specify yet?" → direction) and doctrine absent → shape.
+  if grep -q 'project-direction' <<<"$gate_routes"; then
+    _pass "launch-gate: fixtures include a project-direction (administer) case"
+  else
+    _fail "launch-gate: fixtures must include a case that administers the gate"
+  fi
+  if grep -q 'project-shape' <<<"$gate_routes"; then
+    _pass "launch-gate: fixtures include a project-shape (precondition unmet) case"
+  else
+    _fail "launch-gate: fixtures must include a case routed to project-shape"
+  fi
+fi
+
 # ── 3b. project-feature-request fixtures ──────────────────────────────────────
 echo ""
 echo "  -- project-feature-request/tests/fixtures/ --"
@@ -242,6 +280,7 @@ SPEC_FORMAT="$ROOT/references/spec-format.md"
 WORK_ALLOCATION="$ROOT/references/work-allocation.md"
 FEATURE_SKILL="$ROOT/subskills/project-feature-request/SKILL.md"
 DIRECTION_SKILL="$ROOT/subskills/project-direction/SKILL.md"
+LAUNCH_GATE="$ROOT/subskills/project-direction/references/launch-gate.md"
 RECONCILIATION="$ROOT/subskills/project-review/references/spec-reconciliation.md"
 
 check_pattern "$ROUTER" 'VISION.*continuous constraint' \
@@ -271,6 +310,22 @@ if require_file "$WORK_ALLOCATION" \
 fi
 check_pattern "$DIRECTION_SKILL" 'references/work-allocation.md' \
   "project-direction: allocation contract is progressively discoverable"
+check_pattern "$DIRECTION_SKILL" 'references/launch-gate.md' \
+  "project-direction: launch gate is progressively discoverable"
+if require_file "$LAUNCH_GATE" "project-direction/references/launch-gate.md exists"; then
+  check_pattern "$LAUNCH_GATE" 'Met.*Not met.*Unknown' \
+    "launch gate: verdict vocabulary is closed"
+  check_pattern "$LAUNCH_GATE" 'No question may be derived from the artifacts under judgment' \
+    "launch gate: questions stay independent of the corpus under judgment"
+  check_pattern "$LAUNCH_GATE" 'without this trace table' \
+    "launch gate: E3 empty reopen-list requires a trace table"
+  check_pattern "$LAUNCH_GATE" '^## 7\. Parameter block' \
+    "launch gate: project-specific bindings live in a parameter block"
+  check_pattern "$LAUNCH_GATE" 'NEAR_MISSES|E4_CANDIDATES' \
+    "launch gate: adversarial inputs are pre-written, not reviewer-chosen"
+  check_pattern "$LAUNCH_GATE" 'never by the reviewer or the administering session' \
+    "launch gate: no verdict performs an owner act"
+fi
 check_pattern "$RECONCILIATION" 'work-allocation.md' \
   "spec reconciliation: gaps use the shared allocation contract"
 

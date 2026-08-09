@@ -1,6 +1,6 @@
 ---
 name: project-direction
-description: Use when deciding what a project should work on next, comparing competing priorities, deriving a milestone from VISION, brainstorming new feature candidates that fit the project's doctrine, sequencing an approved specification into an execution graph, or deciding what to do about already-confirmed spec drift. Triggers on "what should we work on next", "prioritize features", "is this roadmap aligned", "what's highest leverage", "what's the next milestone", "should we build this or Y", "break this approved spec down", "brainstorm features", "what could we build".
+description: Use when deciding what a project should work on next, comparing competing priorities, deriving a milestone from VISION, brainstorming new feature candidates that fit the project's doctrine, judging whether a project's goals and requirements are settled enough to begin authoring specifications, sequencing an approved specification into an execution graph, or deciding what to do about already-confirmed spec drift. Triggers on "what should we work on next", "prioritize features", "is this roadmap aligned", "what's highest leverage", "what's the next milestone", "should we build this or Y", "are we ready to write specs", "break this approved spec down", "brainstorm features", "what could we build".
 metadata:
   owner: tze
   authors:
@@ -38,6 +38,10 @@ Do not use when:
    explicit investigation/spec-first work for real unknowns, and keep moving to
    the next unblocked spec outcome. Never hide work in TODOs or smuggle adjacent
    ideas into the active graph.
+9. **Readiness before authoring** — a project about to write its *first* specs
+   passes the launch gate ([`references/launch-gate.md`](references/launch-gate.md))
+   first. Readiness is a verdict with cited evidence, never a feeling; a
+   non-empty reopen-list means shape work, not spec work.
 
 ## Workflow
 
@@ -51,7 +55,7 @@ Ask user or infer from repo:
 | Primary user | developers, end users, internal team, enterprises | Infer |
 | Maturity | prototype, beta, production, mission-critical | Infer |
 | Spec location | openspec/, spec/, docs/design/, or none | Infer from scan |
-| Focus | full direction, feature evaluation, spec-drift check, work decomposition | Full |
+| Focus | full direction, launch gate, feature evaluation, spec-drift check, work decomposition | Full |
 | Inputs on hand | project-review packet, feature-request spec delta, cold start | Cold start |
 
 Then check for upstream inputs — they change how much of each phase runs (Receiver Protocol below).
@@ -186,6 +190,7 @@ Do not execute/deliver the beads plan here — hand off explicitly to the beads 
 Focus modes change which phases do real work and which tier applies — the phase *questions* are always answered, even if one line backed by a citation.
 
 - **Full direction analysis** (default): all phases as written; change-tier wherever normative artifacts change.
+- **Launch gate** (pre-specification readiness: "are we ready to write specs", "is the vision settled enough to specify from", or any run that would author a project's *first* spec): administer the readiness question series to a **fresh-context reviewer subagent** — closed verdict vocabulary, cited evidence, falsification first. Phase 1 supplies the doctrine baseline and the parameter block; the gate replaces Phase 2 until it returns READY. `NOT READY` → a remediation brief routed by finding class (doctrine → project-shape, design contract → feature-request), no Phase 3. Read [`references/launch-gate.md`](references/launch-gate.md).
 - **Milestone synthesis** (vision-generative: "what next" with no proposals on hand, or a milestone just closed): doctrine *produces* the candidates instead of judging proposed ones — mandate coverage matrix, ideas-ledger unparking, ranked milestone brief; user selects before anything enters Phases 2-3. Read [`references/milestone-synthesis.md`](references/milestone-synthesis.md).
 - **Ideation** (vision-generative, divergent: "brainstorm what we could build", "what features would fit this project"): milestone synthesis's divergent twin — doctrine *grounds* new candidates instead of gating proposed ones. Mandate citation relaxes to a fit trace; candidates classed mandate-grounded vs vision-extending; user triages the brief (pursue → feature-request funnel, park → ledger, discard). No Phases 2-3 from this mode — pursued candidates re-enter via the funnel. Read [`references/ideation.md`](references/ideation.md).
 - **Feature evaluation** ("should we build X?"): a *new, single* request routes to `../project-feature-request/SKILL.md` (its funnel returns a spec delta here). Run this mode only for portfolio questions (X vs competing priorities): Phase 1 verify-tier doctrine check on X, Phase 2 narrowed to the 8-dimension evaluation in `references/alignment-review.md`, Phase 3 only if X is approved. No commits unless specs changed.
@@ -196,7 +201,8 @@ Focus modes change which phases do real work and which tier applies — the phas
 
 | Situation | Handling |
 |-----------|----------|
-| No specs exist | Phase 2 creates the initial changeset via `references/openspec-changeset.md`; Phase 1 doctrine check still runs. |
+| No specs exist | Launch gate first (Core Rule 9) — Phase 1 doctrine check, then `references/launch-gate.md`. READY → Phase 2 creates the initial changeset via `references/openspec-changeset.md`. NOT READY → remediation brief, no changeset. |
+| No specs *and* no doctrine | The gate has nothing to administer against. Route to `../project-shape/` bootstrap; return here once doctrine is adopted. |
 | `openspec` CLI unavailable | Stop changeset synthesis, report it; deliver analysis + drift inventory, recommend installing the CLI. Do NOT hand-write changeset scaffolds. |
 | Specs outdated | Agent B catalogs drift; Phase 2 must produce a corrective changeset before Phase 3. |
 | No clear direction | State it directly. Recommend a direction-setting workshop or `../project-shape/` bootstrap before feature work. |
@@ -207,6 +213,7 @@ Focus modes change which phases do real work and which tier applies — the phas
 ## Sample Triggers
 
 - "What should we work on next in this repo?"
+- "Are we ready to start writing specifications?"
 - "Does the code actually match the spec?"
 - "Should we build X, or is it a distraction?"
 - "Break this approved spec into sequenced chunks."
@@ -216,6 +223,7 @@ Focus modes change which phases do real work and which tier applies — the phas
 
 | File | Read when | Content |
 |------|-----------|---------|
+| [`references/launch-gate.md`](references/launch-gate.md) | Launch-gate focus mode; before authoring a project's first spec | Pre-specification readiness question series, administration protocol, verdict rule, record + trend log, parameter block |
 | [`references/milestone-synthesis.md`](references/milestone-synthesis.md) | Milestone-synthesis focus mode | Deriving candidates from doctrine: mandate coverage matrix, ledger unparking, milestone brief format |
 | [`references/ideation.md`](references/ideation.md) | Ideation focus mode | Divergence lenses, fit-trace classing, mandate-grounded vs vision-extending routing, ideation brief format |
 | [`references/direction-model.md`](references/direction-model.md) | Phase 2 (agents A, B, C) | Analysis dimensions: project spirit, requirement classification, current-state assessment |
