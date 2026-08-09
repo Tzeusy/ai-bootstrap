@@ -14,7 +14,7 @@ details were not used to derive the questions or adversarial examples.
 | `GOAL_STATEMENT` | `about/heart-and-soul/vision.md` |
 | `ENTRY_DOCUMENT` | `about/README.md` |
 | `CURRENT_STATE` | `about/README.md#lifecycle-status` |
-| `SHAPE_CORPUS` | Accepted baseline plus explicitly pending launch remediation under `about/legends-and-lore/`, `about/lay-and-land/`, and `about/craft-and-care/`; administration is blocked until the remediation has independent review and recorded acceptance |
+| `SHAPE_CORPUS` | Accepted shape under `about/legends-and-lore/`, `about/lay-and-land/`, and `about/craft-and-care/`, including the launch remediation accepted through Owner Decision 0001 |
 | `SPEC_MEDIUM` | OpenSpec under `openspec/`: accepted capability requirements in `specs/<capability>/spec.md`; active proposal/design/delta/tasks in `changes/<change>/`; requirement form and change process follow `skills/personal/th-projects/references/spec-format.md` |
 | `HUMAN_DECIDER` | Tze, repository owner. Only an explicit owner directive or recorded owner decision performs an owner act. Agents may draft, review, and report gate verdicts; they cannot adopt doctrine, accept an RFC/spec, waive a gate, or expand irreversible scope. For the current task, Decision 0001 conditionally authorizes specification merge only after the recorded launch gate and required quality cycles pass. |
 | `EPISTEMIC_LABELS` | `[Observed]`, `[Inferred]`, `[Unknown]` |
@@ -51,7 +51,7 @@ packaging, remote sinks, and release remain blocked.
 | Prerequisite | State at binding |
 |---|---|
 | Adopted goal statement and data boundary | Satisfied through Owner Decision 0001; launch remediation does not amend doctrine |
-| Accepted design contract for adapter/ledger/failure semantics | Pending: accepted RFC 0001 baseline remains authoritative while clarification amendments receive independent review and recorded acceptance |
+| Accepted design contract for adapter/ledger/failure semantics | Satisfied through RFC 0001 formal review plus the launch-gate remediation review recorded in Owner Decision 0001 |
 | Content-safe source/bounds evidence and synthetic-vector inventory | Satisfied as specification inputs; executable release evidence remains downstream |
 | Defined specification form/home/change process | Satisfied by `SPEC_MEDIUM` |
 | Project-specific spec granularity and acceptance authority | Bound above and in E1 answers below; fresh v1.2 parameter review pending |
