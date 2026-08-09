@@ -1,6 +1,6 @@
 # Launch-Gate Parameters: AI Usage Telemetry
 
-**Version:** 1.1
+**Version:** 1.2
 **Status:** [Observed] Binding amended after the first administration; fresh review pending
 **Bound from:** adopted [`vision.md`](../../about/heart-and-soul/vision.md) and
 the th-projects universal/package-derived launch-gate instrument. Shape-corpus
@@ -14,10 +14,12 @@ details were not used to derive the questions or adversarial examples.
 | `GOAL_STATEMENT` | `about/heart-and-soul/vision.md` |
 | `ENTRY_DOCUMENT` | `about/README.md` |
 | `CURRENT_STATE` | `about/README.md#lifecycle-status` |
-| `SHAPE_CORPUS` | Accepted shape under `about/legends-and-lore/`, `about/lay-and-land/`, and `about/craft-and-care/` |
+| `SHAPE_CORPUS` | Accepted baseline plus explicitly pending launch remediation under `about/legends-and-lore/`, `about/lay-and-land/`, and `about/craft-and-care/`; administration is blocked until the remediation has independent review and recorded acceptance |
 | `SPEC_MEDIUM` | OpenSpec under `openspec/`: accepted capability requirements in `specs/<capability>/spec.md`; active proposal/design/delta/tasks in `changes/<change>/`; requirement form and change process follow `skills/personal/th-projects/references/spec-format.md` |
 | `HUMAN_DECIDER` | Tze, repository owner. Only an explicit owner directive or recorded owner decision performs an owner act. Agents may draft, review, and report gate verdicts; they cannot adopt doctrine, accept an RFC/spec, waive a gate, or expand irreversible scope. For the current task, Decision 0001 conditionally authorizes specification merge only after the recorded launch gate and required quality cycles pass. |
 | `EPISTEMIC_LABELS` | `[Observed]`, `[Inferred]`, `[Unknown]` |
+| `THESIS_CHECKPOINTS` | After the Synthetic-to-SQLite capability is accepted and before any sibling implementation, its disposable synthetic-only harness must produce one durable, content-free, locally queryable contribution and no second contribution on replay. Requiring content, credentials, a remote service, or weakened replay exactness falsifies the bounded thesis and reopens shape. Before release, native amd64/arm64 evidence must preserve equal normalized facts and privacy/ledger/health/projection contracts, and each optional projection must be repairable from the ledger alone; failure falsifies the portable-service thesis before release. |
+| `RESOURCE_ENVELOPE` | [Observed] One human decision-maker is named and current governance work is repository-agent assisted. [Unknown] No additional human staffing, weekly-hours allocation, delivery deadline, or paid hosted-service budget is committed. V1 may assume none of them: each capability must remain bounded and independently reviewable, and any plan that requires one must stop for a new owner resource decision. |
 
 ## First specification candidate
 
@@ -40,16 +42,19 @@ or release; excluding them from this one capability must not defer them beyond
 that changeset. Each capability is independently reviewable, acceptable, or
 rejectable. A rejected companion blocks implementation and release but does not
 invalidate an accepted sibling capability or the thesis evidence it produces.
+Once this spine is independently accepted, only its disposable, synthetic-only
+thesis-test harness may be built before siblings; real source mounts, production
+packaging, remote sinks, and release remain blocked.
 
 ### Prerequisites
 
 | Prerequisite | State at binding |
 |---|---|
-| Adopted goal statement and data boundary | Satisfied through Owner Decision 0001 |
-| Accepted design contract for adapter/ledger/failure semantics | Satisfied through RFC 0001 formal review |
+| Adopted goal statement and data boundary | Satisfied through Owner Decision 0001; launch remediation does not amend doctrine |
+| Accepted design contract for adapter/ledger/failure semantics | Pending: accepted RFC 0001 baseline remains authoritative while clarification amendments receive independent review and recorded acceptance |
 | Content-safe source/bounds evidence and synthetic-vector inventory | Satisfied as specification inputs; executable release evidence remains downstream |
 | Defined specification form/home/change process | Satisfied by `SPEC_MEDIUM` |
-| Project-specific spec granularity and acceptance authority | Bound above and in E1 answers below |
+| Project-specific spec granularity and acceptance authority | Bound above and in E1 answers below; fresh v1.2 parameter review pending |
 | OpenSpec directory | Explicitly waived by the launch-gate protocol and Owner Decision 0001: pre-gate absence is required, and the directory is created only after a `READY` verdict |
 
 ## D2 task-routing exercises
@@ -79,21 +84,22 @@ The reviewer must accept or reject each using only the adopted goal statement.
 
 ## E4 shape/spec classification candidates
 
-1. Accepted local facts remain in SQLite indefinitely; optional sinks never
-   become the history authority.
-2. Content and credentials may not be decoded, materialized, logged, retained,
-   or exported.
-3. Replaying an already accepted source event must not create another normalized
-   token or request contribution.
-4. An unknown or malformed complete record must quarantine only its affected
-   stream while healthy streams continue and aggregate health remains degraded.
-5. The no-inbound runtime boundary is satisfied only when startup verification
-   proves that no port is exposed, published, or listened on.
+1. An adapter remains unsupported when its native identity is only guessed from
+   collection order, even if sample records parse successfully.
+2. Enabling PostgreSQL cannot make it authoritative for retained history or
+   projection repair.
+3. When a Codex rate-limit-only record repeats unchanged usage counters, it
+   updates eligible quota state without adding a token or request contribution.
+4. When storage admission fails before a consumed-record transaction, cursor,
+   ledger sequence, facts, aggregates, and sink obligations all remain unchanged
+   while storage health is degraded.
+5. A quota value is current only while its source-observation time remains
+   within the active profile's freshness deadline.
 
 The project answer and a random nonce are held outside the repository and the
 reviewer's materials until their classifications are fixed. This parameter
 block commits to the exact key bytes with SHA-256
-`5fcf8ca872f7341bbacba54f1eb2323d9a31e89ebf1b40bba8901ae5b417f06e`. The gate record must reveal the nonce and answer key after
+`1f51bc4217328f3e3dbe328cca37715c21f6a481700f65c9a7ab332068b3854b`. The gate record must reveal the nonce and answer key after
 comparison so any reader can verify that the administrator did not change the
 answer after seeing the verdict.
 
@@ -104,7 +110,7 @@ answer after seeing the verdict.
 | Form | Normative MUST/SHALL requirements with stable ID, Source, Scope, and immediately adjacent WHEN/THEN scenarios per the shared spec format |
 | Home | Accepted specs in `openspec/specs/`; active deltas and rationale in `openspec/changes/` |
 | Granularity | One falsifiable vertical outcome with one primary acceptance boundary; Synthetic-to-SQLite Usage Spine is record → ledger → view, while every other lifecycle/source/sink/runtime outcome remains a separate capability in the same RFC-required initial changeset |
-| Acceptance authority | Tze accepts or rejects each capability delta independently. The initial changeset becomes accepted/archiveable only when every RFC-required capability is accepted; one rejection blocks implementation/release without invalidating accepted siblings. For this task, the recorded conditional direction activates only after a `READY` gate, mechanical trace checks, at least four sequential th-projects/th-engineering improvement cycles with fixes between, and no unresolved blocker |
+| Acceptance authority | Tze accepts or rejects each capability delta independently. An accepted Synthetic-to-SQLite spine may authorize only its disposable synthetic thesis-test harness. The initial changeset becomes accepted/archiveable, and non-synthetic implementation becomes eligible, only when every RFC-required capability is accepted; one rejection blocks that boundary without invalidating accepted siblings. For this task, the recorded conditional direction activates only after a `READY` gate, mechanical trace checks, at least four sequential th-projects/th-engineering improvement cycles with fixes between, and no unresolved blocker |
 | Change process | Amend through project-feature-request/spec delta; propagate accepted shape changes to affected specs in the same change and use project-review reconciliation as a backstop |
 
 ## Goal-derived questions
@@ -141,6 +147,13 @@ answer after seeing the verdict.
   *Doctrine basis:* `vision.md`, **6. The Runtime Boundary Is Portable and Narrow.**
 
 ## Changelog
+
+- **1.2 (2026-08-10):** Replaced all five E4 candidates and re-sealed a wholly
+  unpublished answer key after the v1.0 gate record made four old routes
+  discoverable. Removed the direct no-inbound routing example, bound explicit
+  thesis checkpoints and an honestly unknown resource envelope without
+  amending doctrine, and limited independent pre-companion implementation to a
+  disposable synthetic thesis-test harness. Questions remain unchanged.
 
 - **1.1 (2026-08-10):** After the first `NOT READY` administration, made
   per-capability partial acceptance explicit and replaced the compound runtime

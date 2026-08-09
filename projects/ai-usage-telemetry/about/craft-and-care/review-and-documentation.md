@@ -80,13 +80,13 @@ adding per-file ceremony:
 |---|---|---|
 | `about/heart-and-soul/` doctrine and decisions | Tze | Replace doctrine only through an owner decision; keep superseded decisions immutable and remove them from the default route. |
 | `about/legends-and-lore/rfcs/` | Tze | Supersede through an accepted successor or amendment with downstream reconciliation; banner and remove the old RFC from the default route, retaining its evidence trail. |
-| `about/legends-and-lore/evidence/` and `reviews/` | Project maintainer | Retain while they support an active contract; when superseded, keep immutable history off the default route and point the active RFC to replacement evidence. |
-| `about/lay-and-land/` docs and assets | Project maintainer | Update or delete in the same change that removes the mapped component, flow, trust boundary, or deployment; archive only useful history off the default route. |
-| `about/craft-and-care/` standards | Project maintainer under owner-adopted doctrine | Consolidate or delete when the project-specific constraint disappears or returns to the repository-wide default, updating every reading route in the same change. |
-| `about/README.md` and pillar READMEs | Project maintainer | Keep only as active routing/status surfaces; update with their sources, and remove when their routed surface is retired. |
-| `docs/launch-gate/parameters.md` and `trend.md` | Project maintainer; Tze owns any waiver or acceptance | Amend parameters with a changelog and fresh parameter review. Freeze the first-spec gate after `READY`; retain its trend as evidence off the ordinary implementation path. |
-| Immutable gate/review records | Project maintainer | Never rewrite; supersede with a new named-commit record and keep outside the default reading route once its decision is historical. |
-| OpenSpec capability and change artifacts | Tze accepts; project maintainer curates | Follow the OpenSpec change/archive process; replace or retire only through a traced delta that updates affected implementation and routes. |
+| `about/legends-and-lore/evidence/` and `reviews/` | Tze; maintenance may be delegated | Retain while they support an active contract; when superseded, keep immutable history off the default route and point the active RFC to replacement evidence. |
+| `about/lay-and-land/` docs and assets | Tze; maintenance may be delegated | Update or delete in the same change that removes the mapped component, flow, trust boundary, or deployment; archive only useful history off the default route. |
+| `about/craft-and-care/` standards | Tze; maintenance may be delegated under adopted doctrine | Consolidate or delete when the project-specific constraint disappears or returns to the repository-wide default, updating every reading route in the same change. |
+| `about/README.md` and pillar READMEs | Tze; maintenance may be delegated | Keep only as active routing/status surfaces; update with their sources, and remove when their routed surface is retired. |
+| `docs/launch-gate/parameters.md` and `trend.md` | Tze; maintenance may be delegated | Amend parameters with a changelog and fresh parameter review. Freeze the first-spec gate after `READY`; retain its trend as evidence off the ordinary implementation path. |
+| Immutable gate/review records | Tze; recording may be delegated | Never rewrite; supersede with a new named-commit record and keep outside the default reading route once its decision is historical. |
+| OpenSpec capability and change artifacts | Tze; curation may be delegated | Follow the OpenSpec change/archive process; replace or retire only through a traced delta that updates affected implementation and routes. |
 
 The default path remains the project overview plus one overview per pillar.
 Before adding a governance artifact, the author must name its class, reader,
