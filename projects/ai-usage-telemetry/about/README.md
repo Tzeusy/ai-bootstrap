@@ -40,9 +40,10 @@ See [Owner Decision 0001](./heart-and-soul/decisions/0001-finalize-and-specify.m
 for the human authority record.
 The pre-specification instrument is bound in
 [`parameters.md`](../docs/launch-gate/parameters.md); the current amendment is
-awaiting fresh review. Historical reviews and administrations are deliberately
-kept off this default reading path. The administrator supplies the trend only
-when the instrument reaches F1, where comparison with earlier runs is required.
+reviewed and ready for a fresh administration at a named commit. Historical
+reviews and administrations are deliberately kept off this default reading
+path. The administrator supplies the trend only when the instrument reaches F1,
+where comparison with earlier runs is required.
 
 ## The Four `about/` Pillars
 
