@@ -1,7 +1,7 @@
 # Launch-Gate Parameters: AI Usage Telemetry
 
-**Version:** 1.2
-**Status:** [Observed] Binding amended after the first administration; fresh review pending
+**Version:** 1.3
+**Status:** [Observed] Candidate binding; fresh v1.3 review pending
 **Bound from:** adopted [`vision.md`](../../about/heart-and-soul/vision.md) and
 the th-projects universal/package-derived launch-gate instrument. Shape-corpus
 details were not used to derive the questions or adversarial examples.
@@ -14,12 +14,39 @@ details were not used to derive the questions or adversarial examples.
 | `GOAL_STATEMENT` | `about/heart-and-soul/vision.md` |
 | `ENTRY_DOCUMENT` | `about/README.md` |
 | `CURRENT_STATE` | `about/README.md#lifecycle-status` |
-| `SHAPE_CORPUS` | Accepted shape under `about/legends-and-lore/`, `about/lay-and-land/`, and `about/craft-and-care/`, including the launch remediation accepted through Owner Decision 0001 |
+| `SHAPE_CORPUS` | The exact 17-file allowlist under **Fixed shape corpus** below; directory recursion and `reviews/**` are excluded |
 | `SPEC_MEDIUM` | OpenSpec under `openspec/`: accepted capability requirements in `specs/<capability>/spec.md`; active proposal/design/delta/tasks in `changes/<change>/`; requirement form and change process follow `skills/personal/th-projects/references/spec-format.md` |
 | `HUMAN_DECIDER` | Tze, repository owner. Only an explicit owner directive or recorded owner decision performs an owner act. Agents may draft, review, and report gate verdicts; they cannot adopt doctrine, accept an RFC/spec, waive a gate, or expand irreversible scope. For the current task, Decision 0001 conditionally authorizes specification merge only after the recorded launch gate and required quality cycles pass. |
 | `EPISTEMIC_LABELS` | `[Observed]`, `[Inferred]`, `[Unknown]` |
-| `THESIS_CHECKPOINTS` | After the Synthetic-to-SQLite capability is accepted and before any sibling implementation, its disposable synthetic-only harness must produce one durable, content-free, locally queryable contribution and no second contribution on replay. Requiring content, credentials, a remote service, or weakened replay exactness falsifies the bounded thesis and reopens shape. Before release, native amd64/arm64 evidence must preserve equal normalized facts and privacy/ledger/health/projection contracts, and each optional projection must be repairable from the ledger alone; failure falsifies the portable-service thesis before release. |
+| `THESIS_CHECKPOINTS` | After the Synthetic-to-SQLite capability is accepted and its disposable harness exists—but before any sibling implementation—Tze or another owner-designated developer receives only the local-view contract plus a seeded synthetic ledger and must correctly answer the prewritten source, time, token-category, and request-contribution questions in one 15-minute sitting, with the query transcript retained. Any wrong answer, raw-source/schema archaeology, content/credential access, remote-service dependency, or duplicate replay contribution falsifies the bounded legibility/queryability thesis and reopens shape. Before release, native amd64/arm64 evidence must preserve equal normalized facts and privacy/ledger/health/projection contracts, and each optional projection must be repairable from the ledger alone; failure falsifies the portable-service thesis before release. |
 | `RESOURCE_ENVELOPE` | [Observed] One human decision-maker is named and current governance work is repository-agent assisted. [Unknown] No additional human staffing, weekly-hours allocation, delivery deadline, or paid hosted-service budget is committed. V1 may assume none of them: each capability must remain bounded and independently reviewable, and any plan that requires one must stop for a new owner resource decision. |
+
+## Fixed shape corpus
+
+The reviewer receives exactly these files. The list is stable across
+administrations until a logged parameter amendment changes it:
+
+- `about/legends-and-lore/README.md`
+- `about/legends-and-lore/rfcs/0001-adapter-ledger-and-sink-contract.md`
+- `about/legends-and-lore/evidence/0001-provenance.md`
+- `about/legends-and-lore/evidence/0001-source-and-bounds.md`
+- `about/legends-and-lore/evidence/0001-synthetic-vectors.md`
+- `about/lay-and-land/README.md`
+- `about/lay-and-land/components.md`
+- `about/lay-and-land/data-flow.md`
+- `about/lay-and-land/deployment.md`
+- `about/lay-and-land/assets/README.md`
+- `about/craft-and-care/README.md`
+- `about/craft-and-care/engineering-bar.md`
+- `about/craft-and-care/testing-and-verification.md`
+- `about/craft-and-care/security-and-privacy.md`
+- `about/craft-and-care/review-and-documentation.md`
+- `about/craft-and-care/observability-and-operations.md`
+- `about/craft-and-care/interfaces-and-dependencies.md`
+
+Prior review records, gate records, parameter reviews/history, and repository
+paths outside this allowlist are not reviewer materials. The one exception is
+`trend.md`, supplied only when answering F1 as the instrument requires.
 
 ## First specification candidate
 
@@ -146,16 +173,28 @@ answer after seeing the verdict.
   scheduler, inbound API, elevated runtime, or architecture-specific semantics.  
   *Doctrine basis:* `vision.md`, **6. The Runtime Boundary Is Portable and Narrow.**
 
+- **P6 [G]** Does the candidate preserve evidence-backed source meaning through
+  normalization rather than merely persisting a stable but semantically wrong
+  record?
+  *Fails when:* it merges unlike token categories, guesses an unavailable
+  dimension, substitutes collection time for source observation time, or loses
+  the source identity needed to interpret the contribution.
+  *Doctrine basis:* `vision.md`, **5. Normalization Preserves Meaning.**
+
 ## Changelog
 
+- **1.3 (2026-08-10):** Added a lived-use thesis falsifier, closed the shape
+  corpus to an exact file allowlist, kept review history off the fixed entry
+  materials, and added P6 for normalization fidelity. E4 candidates and their
+  sealed key are unchanged from the unadministered v1.2 draft.
+
 - **1.2 (2026-08-10):** Replaced all five E4 candidates and re-sealed a wholly
-  unpublished answer key after the v1.0 gate record made four old routes
-  discoverable. Removed the direct no-inbound routing example, bound explicit
+  unpublished answer key. Removed the direct no-inbound routing example, bound explicit
   thesis checkpoints and an honestly unknown resource envelope without
   amending doctrine, and limited independent pre-companion implementation to a
   disposable synthetic thesis-test harness. Questions remain unchanged.
 
-- **1.1 (2026-08-10):** After the first `NOT READY` administration, made
+- **1.1 (2026-08-10):** Made
   per-capability partial acceptance explicit and replaced the compound runtime
   E4 candidate with one atomic shape/spec-boundary sentence. Re-sealed the E4
   key with a new nonce and digest. Universal, package-derived, and goal-derived

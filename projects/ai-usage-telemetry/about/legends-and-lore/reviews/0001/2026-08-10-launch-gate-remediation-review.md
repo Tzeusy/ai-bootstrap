@@ -48,7 +48,7 @@ ownership/retirement, doctrine non-amendment, and sealed-key non-disclosure.
 
 | Artifact | Reviewed candidate SHA-256 | Accepted SHA-256 |
 |---|---|---|
-| RFC 0001 | `dfdabb7f2481d4bf099c3257ad7f77a3b1544103e5216b0972e9740e0f0c8f99` | `9982a289e20555b8abaf668a1832ae378fa14d23f006bb27efcc25bb5c88e52e` |
+| RFC 0001 | `dfdabb7f2481d4bf099c3257ad7f77a3b1544103e5216b0972e9740e0f0c8f99` | `90f85ab1e5c50ee28ad51f6efeae3245f9908187985c2a12e1ba237db49f3f11` |
 | Craft review/lifecycle standard | `a825da14231c0863ca14b5bb2f5785c8c46cb6bc063120cced7d716dc053b2bc` | same |
 
 The RFC digest changes only because its status line moved from amendment-under-
