@@ -1,7 +1,7 @@
 # Launch-Gate Parameters: AI Usage Telemetry
 
 **Version:** 1.4
-**Status:** [Observed] Candidate binding; fresh v1.4 review pending
+**Status:** [Observed] Reviewed binding; fresh pass and confirmation completed at `383a690`
 **Bound from:** adopted [`vision.md`](../../about/heart-and-soul/vision.md) and
 the th-projects universal/package-derived launch-gate instrument. Shape-corpus
 details were not used to derive the questions or adversarial examples.
@@ -81,7 +81,7 @@ packaging, remote sinks, and release remain blocked.
 | Accepted design contract for adapter/ledger/failure semantics | Satisfied through RFC 0001 formal review plus the launch-gate remediation review recorded in Owner Decision 0001 |
 | Content-safe source/bounds evidence and synthetic-vector inventory | Satisfied as specification inputs; executable release evidence remains downstream |
 | Defined specification form/home/change process | Satisfied by `SPEC_MEDIUM` |
-| Project-specific spec granularity and acceptance authority | Bound above and in E1 answers below; fresh v1.4 parameter review pending |
+| Project-specific spec granularity and acceptance authority | Satisfied by the binding above and the recorded v1.4 review pass plus confirmation |
 | OpenSpec directory | Explicitly waived by the launch-gate protocol and Owner Decision 0001: pre-gate absence is required, and the directory is created only after a `READY` verdict |
 
 ## D2 task-routing exercises
