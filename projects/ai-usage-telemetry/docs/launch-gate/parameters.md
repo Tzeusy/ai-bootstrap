@@ -181,29 +181,7 @@ answer after seeing the verdict.
   the source identity needed to interpret the contribution.
   *Doctrine basis:* `vision.md`, **5. Normalization Preserves Meaning.**
 
-## Changelog
-
-- **1.3 (2026-08-10):** Added a lived-use thesis falsifier, closed the shape
-  corpus to an exact file allowlist, kept review history off the fixed entry
-  materials, and added P6 for normalization fidelity. E4 candidates and their
-  routing are unchanged from the unadministered v1.2 draft; the key was sealed
-  again with a v1.3 nonce and digest.
-
-- **1.2 (2026-08-10):** Replaced all five E4 candidates and re-sealed a wholly
-  unpublished answer key. Removed the direct no-inbound routing example, bound explicit
-  thesis checkpoints and an honestly unknown resource envelope without
-  amending doctrine, and limited independent pre-companion implementation to a
-  disposable synthetic thesis-test harness. Questions remain unchanged.
-
-- **1.1 (2026-08-10):** Made
-  per-capability partial acceptance explicit and replaced the compound runtime
-  E4 candidate with one atomic shape/spec-boundary sentence. Re-sealed the E4
-  key with a new nonce and digest. Universal, package-derived, and goal-derived
-  questions are unchanged; the trend records the parameter amendment.
-
-- **1.0 (2026-08-10):** Initial child-project binding before the first
-  administration. Review narrowed the first capability to one vertical outcome,
-  kept all RFC-required companion capabilities in the same initial changeset,
-  hardened A3, completed the shape corpus and prerequisite bindings, and moved
-  the nonce-bound E4 answer outside the reviewer-readable repository. No prior
-  administered parameter set exists.
+This file is the reviewer-safe current binding. Amendment history and parameter
+review results are retained outside the fixed administration materials under
+the governance-artifact lifecycle; the administrator records this version in
+every gate record.
