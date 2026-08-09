@@ -1,7 +1,7 @@
 # Launch-Gate Parameters: AI Usage Telemetry
 
-**Version:** 1.3
-**Status:** [Observed] Candidate binding; fresh v1.3 review pending
+**Version:** 1.4
+**Status:** [Observed] Candidate binding; fresh v1.4 review pending
 **Bound from:** adopted [`vision.md`](../../about/heart-and-soul/vision.md) and
 the th-projects universal/package-derived launch-gate instrument. Shape-corpus
 details were not used to derive the questions or adversarial examples.
@@ -81,7 +81,7 @@ packaging, remote sinks, and release remain blocked.
 | Accepted design contract for adapter/ledger/failure semantics | Satisfied through RFC 0001 formal review plus the launch-gate remediation review recorded in Owner Decision 0001 |
 | Content-safe source/bounds evidence and synthetic-vector inventory | Satisfied as specification inputs; executable release evidence remains downstream |
 | Defined specification form/home/change process | Satisfied by `SPEC_MEDIUM` |
-| Project-specific spec granularity and acceptance authority | Bound above and in E1 answers below; fresh v1.3 parameter review pending |
+| Project-specific spec granularity and acceptance authority | Bound above and in E1 answers below; fresh v1.4 parameter review pending |
 | OpenSpec directory | Explicitly waived by the launch-gate protocol and Owner Decision 0001: pre-gate absence is required, and the directory is created only after a `READY` verdict |
 
 ## D2 task-routing exercises
@@ -117,16 +117,15 @@ The reviewer must accept or reject each using only the adopted goal statement.
    projection repair.
 3. When a Codex rate-limit-only record repeats unchanged usage counters, it
    updates eligible quota state without adding a token or request contribution.
-4. When storage admission fails before a consumed-record transaction, cursor,
-   ledger sequence, facts, aggregates, and sink obligations all remain unchanged
-   while storage health is degraded.
+4. When a supported source has no registered local quota observation, its
+   read-only quota view reports unavailable rather than zero.
 5. A quota value is current only while its source-observation time remains
    within the active profile's freshness deadline.
 
 The project answer and a random nonce are held outside the repository and the
 reviewer's materials until their classifications are fixed. This parameter
 block commits to the exact key bytes with SHA-256
-`40ed0065edc87649cc3ba1dc0b604b6256ff85a44d3c6c760e297a956d4ff021`. The gate record must reveal the nonce and answer key after
+`0fff71d85d4d599989a704313bedd9996e52ae696edabfaa523a2d1967366f6b`. The gate record must reveal the nonce and answer key after
 comparison so any reader can verify that the administrator did not change the
 answer after seeing the verdict.
 
