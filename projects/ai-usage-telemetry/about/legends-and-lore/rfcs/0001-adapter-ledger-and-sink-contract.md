@@ -1,6 +1,6 @@
 # RFC 0001: Adapter, Ledger, and Sink Contract
 
-**Status:** Accepted through Owner Decision 0001 and launch-gate remediation review
+**Status:** Accepted through Owner Decision 0001
 **Author:** Codex
 **Date:** 2026-08-10
 

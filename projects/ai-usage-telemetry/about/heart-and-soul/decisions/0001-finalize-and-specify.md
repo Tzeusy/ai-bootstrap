@@ -79,7 +79,7 @@ did not amend doctrine. An initial repair was rejected, followed by a fresh
 [`../../legends-and-lore/reviews/0001/2026-08-10-launch-gate-remediation-review.md`](../../legends-and-lore/reviews/0001/2026-08-10-launch-gate-remediation-review.md).
 
 This decision accepts the clarified RFC 0001 at
-`9982a289e20555b8abaf668a1832ae378fa14d23f006bb27efcc25bb5c88e52e`
+`90f85ab1e5c50ee28ad51f6efeae3245f9908187985c2a12e1ba237db49f3f11`
 and adopts the governance-lifecycle standard at
 `a825da14231c0863ca14b5bb2f5785c8c46cb6bc063120cced7d716dc053b2bc`.
 It preserves the original privacy, retention, source, sink, and release gates.
