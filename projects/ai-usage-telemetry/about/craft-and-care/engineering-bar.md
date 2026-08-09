@@ -1,7 +1,7 @@
 # Engineering Bar
 
-**Status:** Proposed project-specific additions. They become authoritative only
-through the lifecycle recorded in [`../README.md`](../README.md#lifecycle-status).
+**Status:** Adopted project-specific additions through the lifecycle recorded
+in [`../README.md`](../README.md#lifecycle-status).
 
 ## Adopted default
 

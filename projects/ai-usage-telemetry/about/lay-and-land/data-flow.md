@@ -1,6 +1,6 @@
 # Data Flow
 
-**Status:** Proposed, **[Inferred]** target-state flow, grounded in the
+**Status:** Accepted, **[Inferred]** target-state flow, grounded in the
 **[Observed]** local record shapes described in
 [`RFC 0001`](../legends-and-lore/rfcs/0001-adapter-ledger-and-sink-contract.md).
 
@@ -8,8 +8,10 @@
 
 ```mermaid
 flowchart TD
-    A[Read next source-stream record] --> B{Complete record?}
-    B -->|No: incomplete tail| C[Hold stream cursor\nwait for later cycle]
+    A[Scan next source-stream record] --> Z{Raw byte cap crossed?}
+    Z -->|Yes, with or without newline| F[Quarantine stream\nhold cursor before record]
+    Z -->|No| B{Complete record?}
+    B -->|No: bounded incomplete tail| C[Hold stream cursor\nwait for later cycle]
     B -->|Yes| D{Record kind classification}
     D -->|Registered irrelevant| E[Cursor-only ledger transaction]
     D -->|Unknown| F[Quarantine stream\nhold cursor before record]
@@ -63,22 +65,25 @@ flowchart TD
 
 ## Source-Specific Context
 
-- **[Observed] Claude Code family:** one billable assistant response can appear
-  on several content-block records. Its streams deduplicate by stable
-  message/request identity instead of counting JSONL lines. Quota freshness
-  preserves source observation time separately from collection time.
-- **[Observed] Codex family:** usage deltas do not carry all attribution fields.
-  Each stream processes records sequentially and applies the latest preceding
-  turn context to token records. Parser context persists with that stream's
-  cursor and never crosses into another stream.
+- **[Observed/Inferred] Claude Code family:** one assistant usage observation
+  can appear on repeated physical records. The versioned adapter deduplicates by
+  an evidence-backed native identity instead of counting JSONL lines. Claude
+  quota remains `unknown/unavailable`; its credential-bearing global state is
+  not mounted.
+- **[Observed/Inferred] Codex family:** token-count state does not carry all
+  attribution fields and may repeat the previous contribution on a
+  rate-limit-only update. Each stream applies the latest preceding turn context
+  and emits usage only for validated cumulative advancement. Parser context
+  persists with that stream's cursor and never crosses into another stream.
 - **[Unknown] Future adapter:** admission requires a stable content-free event
   identity, source-time semantics, and quota capability decision. A cloud-only
   dashboard is not silently treated as a local adapter.
 
 ## Failure Paths
 
-- An incomplete final JSONL record waits for a later cycle with its stream cursor
-  held and is not yet quarantined.
+- An incomplete final JSONL record below the active byte cap waits for a later
+  cycle with its stream cursor held. Crossing the cap without a newline is an
+  immediate `record_limit` quarantine, not an indefinitely deferred tail.
 - Only an explicitly registered irrelevant record may advance a stream cursor
   without producing a fact.
 - An unknown kind or malformed/semantically inconsistent complete record

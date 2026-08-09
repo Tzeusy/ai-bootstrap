@@ -12,7 +12,7 @@ Current topology sources and governing crosslinks:
 - [`../deployment.md`](../deployment.md) defines the mount, network, runtime,
   persistence, and multi-architecture placement those diagrams assume.
 - [`../README.md`](../README.md) indexes the complete topology pillar and links
-  its Draft [doctrine](../../heart-and-soul/README.md) and
+  its adopted [doctrine](../../heart-and-soul/README.md) and accepted
   [RFC 0001](../../legends-and-lore/rfcs/0001-adapter-ledger-and-sink-contract.md)
   authorities.
 

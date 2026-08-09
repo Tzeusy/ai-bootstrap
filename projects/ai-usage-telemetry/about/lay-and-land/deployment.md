@@ -1,7 +1,7 @@
 # Deployment Topology
 
-**Status:** Proposed, **[Inferred]** target deployment derived from Draft
-doctrine and RFC 0001. Image construction and publication are outside this
+**Status:** Accepted, **[Inferred]** target deployment derived from adopted
+doctrine and accepted RFC 0001. Image construction and publication are outside this
 documentation-only bootstrap.
 
 ## Runtime Shape
@@ -26,7 +26,6 @@ PostgreSQL projection allowlist, or the OTLP attribute/vocabulary registry.
 | Container surface | Access | Purpose |
 |---|---|---|
 | Registered Claude session leaf/root | Read-only | Assistant usage records, split into independently cursor-bearing streams |
-| Claude quota-cache file | Read-only | Subscription-window snapshots and source freshness |
 | Registered Codex sessions leaf/root | Read-only | Token, turn-context, and rate-limit records, split into independently cursor-bearing streams |
 | TOML configuration | Read-only | Cadence, aliases, source selection, sink enablement/destinations, and registered projection subsets |
 | Durable `/data` volume | Read-write | SQLite ledger, lock, migrations, and delivery checkpoints |
@@ -38,6 +37,10 @@ so the container cannot wander into unrelated developer data. The container
 uses a read-only root filesystem and drops unnecessary privilege; `/data` is
 the deliberate persistent write boundary, with only bounded runtime scratch
 space if the chosen runtime requires it.
+
+Claude quota is `unknown/unavailable` in v1. The observed cache is embedded in
+credential-bearing global state, so it is deliberately absent from this mount
+contract rather than treated as a source that can be sanitized after mounting.
 
 ## Network Contract
 
@@ -56,11 +59,12 @@ space if the chosen runtime requires it.
 
 - The later implementation targets Python with `uv` and a reproducible
   multi-stage image.
-- One OCI multi-architecture image contract targets `linux/amd64` and
-  `linux/arm64`, runs without root privileges, and uses the same locked
-  dependency inputs on both. Native smoke tests must prove equivalent
-  normalization, ledger/view schema, replay safety, privacy behavior, and
-  local-only operation; architecture-specific substitutions require review.
+- One OCI image index must contain runnable `linux/amd64` and `linux/arm64`
+  manifests, run without root privileges, and use the same locked dependency
+  inputs on both. A v1 release remains blocked until native smoke tests on both
+  architectures prove equivalent canonical normalization, ledger/view schema,
+  replay safety, privacy behavior, and local-only operation;
+  architecture-specific substitutions require review.
 - Versioned project content documents a generic image reference. Personal
   builds may be published to a private registry through ignored local
   configuration; the registry is not a project dependency.

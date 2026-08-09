@@ -29,8 +29,11 @@ Adapters use a streaming parser that projects only exact registered paths and
 scalar types. Traversing encoded bytes is permitted, but a content-bearing or
 otherwise unregistered value is skip-only: it is never decoded, allocated into
 the application object graph, copied, hashed, logged, fingerprinted, persisted,
-or exported. Depth, record-size, scalar-length, and field-count limits are
-declared and enforced before unbounded allocation. A limit breach or malformed
+or exported. Every release embeds immutable parser-limit profiles with exact
+record-byte, container-depth, encoded-key, structural, and projected-path
+bounds. Guards apply during scanning—including before a trailing newline
+arrives—and application-owned memory remains bounded independently of record
+length. A limit breach or malformed
 complete record holds the stream cursor before that record and quarantines the
 affected stream with a safe diagnostic.
 
@@ -44,8 +47,9 @@ Four reviewed controls serve distinct purposes:
    identity/fingerprint participation;
 3. the PostgreSQL projection allowlist defines that sink's columns and extension
    fields; and
-4. the OTLP attribute/vocabulary registry defines finite dimensions, values,
-   and cardinality budgets.
+4. the OTLP projection-budget profile defines safe attributes, finite allowed
+   tuples, value-size limits, series identity, per-instrument/process series
+   caps, payload caps, and conservation behavior.
 
 Deployment configuration may narrow sink projections but cannot widen any
 registry. No configuration, alias, or export change may alter a fact's logical
