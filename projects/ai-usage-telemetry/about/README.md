@@ -13,15 +13,19 @@ service already exists or that its release evidence is complete.
 ## Lifecycle Status
 
 This matrix is the central status record for the project-shape artifacts. A
-lower-layer document cannot make a higher-layer draft authoritative.
+lower-layer document cannot make a higher-layer draft authoritative. Every
+state claim carries the project's epistemic label: `[Observed]` requires a
+named-commit tree sweep, accepted digest, or linked decision/review; when
+state-bearing bytes change without that evidence, the claim becomes `[Unknown]`
+until it is reswept.
 
 | Artifact | Status | Next authority gate |
 |---|---|---|
-| Heart-and-soul doctrine | **Adopted** | Owner Decision 0001 activated after evidence and formal review |
-| RFC 0001 | **Accepted** | Formal privacy, source, accounting, operations, and lifecycle review passed |
-| Lay-and-land topology | **Accepted** | Reconciled to adopted doctrine and accepted RFC; implementation remains absent |
-| Craft-and-care standards | **Adopted** | Governs specification and later implementation work |
-| OpenSpec capability specifications | **Absent** | Launch parameters reviewed; next gate: a `READY` administration at a named commit |
+| Heart-and-soul doctrine | **[Observed] Adopted baseline; remediation amendment in review** | Owner Decision 0001 remains authoritative until the amendment is independently reviewed and recorded |
+| RFC 0001 | **[Observed] Accepted baseline; clarification amendment in review** | Rebind its digest after independent documentation/boundary review |
+| Lay-and-land topology | **[Observed] Accepted** | Reconcile against the accepted remediation before the next gate |
+| Craft-and-care standards | **[Observed] Adopted baseline; lifecycle amendment in review** | Confirm the central ownership/retirement rules cover every artifact class |
+| OpenSpec capability specifications | **[Observed] Absent at `389c4aa`** | First administration was `NOT READY`; remediate and re-administer at a new named commit |
 
 **Accepted shape anchor:** RFC
 `f2ad18746a60db8cc9435aabca6c81a62017e0fd7e86275bc564c57731d88526`;
@@ -33,11 +37,15 @@ provenance
 `dcfffe320712afbdcf805e05d30b277130e4bf81f9d718d4f4408bc077f482f0`.
 See [formal review](./legends-and-lore/reviews/0001/2026-08-10-formal-rfc-review.md)
 and [Owner Decision 0001](./heart-and-soul/decisions/0001-finalize-and-specify.md).
-The pre-specification instrument is bound in the reviewed
-[`parameters.md`](../docs/launch-gate/parameters.md); its
+The pre-specification instrument is bound in
+[`parameters.md`](../docs/launch-gate/parameters.md). Its v1.0
 [`parameter-review.md`](../docs/launch-gate/parameter-review.md) records the
-required fresh review and confirmation, and [`trend.md`](../docs/launch-gate/trend.md)
-will index immutable administrations.
+original fresh review and confirmation; the v1.1 amendment is awaiting its own
+review. [`trend.md`](../docs/launch-gate/trend.md) indexes immutable
+administrations. The first full administration is preserved
+at [`2026-08-10-389c4aa.md`](../docs/launch-gate/2026-08-10-389c4aa.md); its
+commit-anchored corpus sweep observed no `openspec/` path and recorded
+`NOT READY` without waiver.
 
 ## The Four `about/` Pillars
 

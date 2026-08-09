@@ -1,7 +1,7 @@
 # Launch-Gate Parameters: AI Usage Telemetry
 
-**Version:** 1.0  
-**Status:** Reviewed binding; one review pass and one confirming pass completed  
+**Version:** 1.1
+**Status:** [Observed] Binding amended after the first administration; fresh review pending
 **Bound from:** adopted [`vision.md`](../../about/heart-and-soul/vision.md) and
 the th-projects universal/package-derived launch-gate instrument. Shape-corpus
 details were not used to derive the questions or adversarial examples.
@@ -37,7 +37,9 @@ packaging, OTLP/PostgreSQL, dashboards, billing/cost, OpenCode, or host
 schedulers. Companion capability specs in the **same initial OpenSpec
 changeset** own every in-v1 outcome that RFC 0001 requires before implementation
 or release; excluding them from this one capability must not defer them beyond
-that changeset.
+that changeset. Each capability is independently reviewable, acceptable, or
+rejectable. A rejected companion blocks implementation and release but does not
+invalidate an accepted sibling capability or the thesis evidence it produces.
 
 ### Prerequisites
 
@@ -85,13 +87,13 @@ The reviewer must accept or reject each using only the adopted goal statement.
    token or request contribution.
 4. An unknown or malformed complete record must quarantine only its affected
    stream while healthy streams continue and aggregate health remains degraded.
-5. The collector is one non-root long-running container with a five-minute
-   default poll and no inbound port.
+5. The no-inbound runtime boundary is satisfied only when startup verification
+   proves that no port is exposed, published, or listened on.
 
 The project answer and a random nonce are held outside the repository and the
 reviewer's materials until their classifications are fixed. This parameter
 block commits to the exact key bytes with SHA-256
-`4f38f814de67238ddc4d84518149ebcc7344b148a35c4e15ce9bb38fe36ac610`. The gate record must reveal the nonce and answer key after
+`5fcf8ca872f7341bbacba54f1eb2323d9a31e89ebf1b40bba8901ae5b417f06e`. The gate record must reveal the nonce and answer key after
 comparison so any reader can verify that the administrator did not change the
 answer after seeing the verdict.
 
@@ -102,7 +104,7 @@ answer after seeing the verdict.
 | Form | Normative MUST/SHALL requirements with stable ID, Source, Scope, and immediately adjacent WHEN/THEN scenarios per the shared spec format |
 | Home | Accepted specs in `openspec/specs/`; active deltas and rationale in `openspec/changes/` |
 | Granularity | One falsifiable vertical outcome with one primary acceptance boundary; Synthetic-to-SQLite Usage Spine is record → ledger → view, while every other lifecycle/source/sink/runtime outcome remains a separate capability in the same RFC-required initial changeset |
-| Acceptance authority | Tze accepts a changeset. For this task, the recorded conditional direction activates only after a `READY` gate, mechanical trace checks, at least four sequential th-projects/th-engineering improvement cycles with fixes between, and no unresolved blocker |
+| Acceptance authority | Tze accepts or rejects each capability delta independently. The initial changeset becomes accepted/archiveable only when every RFC-required capability is accepted; one rejection blocks implementation/release without invalidating accepted siblings. For this task, the recorded conditional direction activates only after a `READY` gate, mechanical trace checks, at least four sequential th-projects/th-engineering improvement cycles with fixes between, and no unresolved blocker |
 | Change process | Amend through project-feature-request/spec delta; propagate accepted shape changes to affected specs in the same change and use project-review reconciliation as a backstop |
 
 ## Goal-derived questions
@@ -139,6 +141,12 @@ answer after seeing the verdict.
   *Doctrine basis:* `vision.md`, **6. The Runtime Boundary Is Portable and Narrow.**
 
 ## Changelog
+
+- **1.1 (2026-08-10):** After the first `NOT READY` administration, made
+  per-capability partial acceptance explicit and replaced the compound runtime
+  E4 candidate with one atomic shape/spec-boundary sentence. Re-sealed the E4
+  key with a new nonce and digest. Universal, package-derived, and goal-derived
+  questions are unchanged; the trend records the parameter amendment.
 
 - **1.0 (2026-08-10):** Initial child-project binding before the first
   administration. Review narrowed the first capability to one vertical outcome,

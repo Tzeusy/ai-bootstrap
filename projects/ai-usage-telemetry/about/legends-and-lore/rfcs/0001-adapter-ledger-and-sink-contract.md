@@ -1,6 +1,6 @@
 # RFC 0001: Adapter, Ledger, and Sink Contract
 
-**Status:** Accepted through Owner Decision 0001 and formal review
+**Status:** Accepted baseline; launch-gate clarification amendment under review
 **Author:** Codex
 **Date:** 2026-08-10
 
@@ -49,6 +49,16 @@ across a previously discovered stream's unconsumed cursor. Exactness does not
 mean vendor billing accuracy or a mirror of files currently present, and a
 locally recorded rate-limit observation is not evidence of live vendor quota
 state.
+
+## Defined Terms
+
+**Release profile:** an immutable, code-owned contract embedded in every
+release. Its ID and content digest cover the supported source-build families,
+extraction manifests, identity and arithmetic rules, parser ceilings,
+reconciliation deadlines, storage-admission parameters, OTLP vocabularies and
+series budget, and the synthetic vectors that justify them. Operator
+configuration may select a supported capability or narrow an allowlist, but it
+cannot raise, replace, or patch release-profile values at runtime.
 
 ## Evidence Baseline
 
@@ -186,16 +196,10 @@ Configuration must not contain prompts, responses, auth tokens, or copied source
 records. Both remote sinks may be disabled for a local-ledger-only deployment;
 either remote sink may be enabled without the other.
 
-Every release embeds an immutable, code-owned **release profile**. Its ID and
-content digest cover the supported source-build families, extraction manifests,
-identity and arithmetic rules, parser ceilings, reconciliation deadlines,
-storage-admission parameters, OTLP vocabularies and series budget, and the
-synthetic vectors that justify them. The image, ledger, health document, and
-diagnostics expose that ID and digest. Operator configuration may select a
-supported source or sink and may narrow an allowlist, but it cannot raise,
-replace, or patch release-profile values at runtime. A profile change is a code
-change with a new ID, compatibility review, and migration/rescan consequences
-declared under this RFC.
+Every release embeds the **release profile** defined above. The image, ledger,
+health document, and diagnostics expose its ID and digest. A profile change is
+a code change with a new ID, compatibility review, and migration/rescan
+consequences declared under this RFC.
 
 Startup fails closed before scanning or exporting when the embedded profile is
 missing, its digest does not match, a selected adapter or projection schema is
@@ -1157,6 +1161,15 @@ The first OpenSpec changeset must freeze and test:
 - retention, source deletion/non-retraction, low-disk recovery, backup/
   migration behavior, and owner-authorized privacy-repair scenarios.
 
+Each bullet is allocated to a separately reviewable capability delta inside
+that initial changeset. The owner may accept or reject each capability
+independently; accepting one preserves its decision and trace even when a
+sibling is rejected. A rejected or still-unknown required capability keeps the
+overall changeset, implementation, and release blocked, but it does not erase
+the value or acceptance evidence of its siblings. The changeset becomes
+archiveable only after every RFC-required capability has an explicit owner
+acceptance.
+
 Implementation may not begin by filling these gaps ad hoc. In particular,
 Claude quota remains `unavailable` throughout v1, and source identity or token
 arithmetic may not advance from inferred candidate to accepted profile without
@@ -1172,6 +1185,13 @@ canonical targets, TLS material placement, sink secret names/mechanism, and
 endpoint-specific DNS/proxy wiring inside the egress allowlist. Those choices
 must remain reproducible, observable, and testable and may not alter identity,
 accounting, retention, privacy, or checkpoint semantics.
+
+Shape owns why an authority, trust, privacy, retention, or runtime boundary is
+load-bearing. OpenSpec owns the observable scenarios and exact accepted values
+that prove a build honors it. A compound sentence that states both is
+borderline and must be decomposed rather than assigned wholesale to either
+layer. For example, this RFC owns the no-inbound invariant; OpenSpec owns the
+startup scenario that proves no port is exposed, published, or listened on.
 
 ### Forbidden without an owner-adopted doctrine amendment
 
