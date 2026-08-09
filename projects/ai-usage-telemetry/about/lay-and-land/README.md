@@ -1,8 +1,8 @@
 # Lay and Land
 
-Topology for AI Usage Telemetry. These maps describe a **Proposed** target state
-derived from Draft doctrine and Draft RFC 0001. They remain **[Inferred]** and
-must be reconciled after owner adoption/acceptance and again when implementation
+Topology for AI Usage Telemetry. These maps describe the **Accepted** target
+state derived from adopted doctrine and accepted RFC 0001. They remain
+**[Inferred]** pre-implementation maps and must be reconciled when implementation
 evidence exists. See the central [lifecycle matrix](../README.md#lifecycle-status).
 
 | Map | Read when |

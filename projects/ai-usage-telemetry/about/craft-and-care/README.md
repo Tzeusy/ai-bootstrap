@@ -2,8 +2,8 @@
 
 Engineering standards for `ai-usage-telemetry`.
 
-**Status:** Proposed, pending doctrine adoption and RFC 0001 review/owner
-acceptance. See the central [lifecycle matrix](../README.md#lifecycle-status).
+**Status:** Adopted through Owner Decision 0001 with RFC 0001 acceptance. See
+the central [lifecycle matrix](../README.md#lifecycle-status).
 
 This pillar supplements the repository-wide
 [`ai-bootstrap` engineering bar](../../../../about/craft-and-care/engineering-bar.md).

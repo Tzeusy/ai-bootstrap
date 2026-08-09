@@ -1,7 +1,7 @@
 # Component Map
 
-**Status:** Proposed, **[Inferred]** target-state component ownership derived
-from Draft doctrine and RFC 0001. No application package or runtime image exists
+**Status:** Accepted, **[Inferred]** target-state component ownership derived
+from adopted doctrine and accepted RFC 0001. No application package or runtime image exists
 yet.
 
 ## System Context
@@ -71,9 +71,11 @@ flowchart LR
 ## External Dependencies
 
 - **[Observed] Claude Code** writes assistant usage records under its local
-  project session store and quota-cache data in separate local state.
-- **[Observed] Codex** writes token deltas, preceding turn context, and rate
-  limit snapshots in local session JSONL.
+  project session store. Its observed quota cache is embedded in
+  credential-bearing global state and is not an admissible source.
+- **[Observed] Codex** writes cumulative token state, preceding turn context,
+  the most recently stored contribution, and rate-limit snapshots in local
+  session JSONL. Non-usage updates may repeat that contribution.
 - **[Inferred] SQLite** is embedded inside the container and persists only on
   the mounted state volume.
 - **[Inferred] OTLP and PostgreSQL** are optional, independently enabled

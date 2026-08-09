@@ -1,18 +1,18 @@
 # RFC 0001: Adapter, Ledger, and Sink Contract
 
-**Status:** Draft
+**Status:** Accepted through Owner Decision 0001 and formal review
 **Author:** Codex
 **Date:** 2026-08-10
 
 ## Summary
 
-This RFC defines the v1 design contract for collecting normalized AI usage and
-quota facts from local Claude Code and Codex state, committing them to a durable
-SQLite ledger, and projecting them independently to optional OTLP Metrics and
-PostgreSQL sinks. The collector is a long-running, non-root Python process in a
-`uv`-managed container. It polls every five minutes by default, reads only
-explicit source mounts, writes only `/data`, and never mounts a tool's
-credential store.
+This RFC defines the v1 design contract for collecting normalized AI usage from
+local Claude Code and Codex state plus Codex rate-limit facts, committing them
+to a durable SQLite ledger, and projecting them independently to optional OTLP
+Metrics and PostgreSQL sinks. The collector is a long-running, non-root Python
+process in a `uv`-managed container. It polls every five minutes by default,
+reads only explicit source mounts, writes only `/data`, and never mounts a
+tool's credential store.
 
 The SQLite ledger is the accounting authority. Stable logical identities,
 payload fingerprints, atomic transactions, rescan-safe deduplication, explicit
@@ -25,7 +25,8 @@ accepted local facts to be discarded.
 ## Motivation
 
 Claude Code and Codex persist useful usage facts locally, but their record
-shapes, attribution context, duplication behavior, and quota freshness differ.
+shapes, attribution context, duplication behavior, and quota capabilities
+differ.
 A direct raw-record export would leak source-specific structure into every
 consumer, make schema drift difficult to diagnose, and risk forwarding content
 that the project has no reason to inspect. A metrics-only collector would lose
@@ -39,19 +40,47 @@ The contract therefore separates four responsibilities:
 3. the local ledger owns identity, deduplication, history, cursors, aggregates, and delivery state;
 4. optional sinks project that history for operational queries or durable relational analysis.
 
-"Eventually exact" means exact over every complete, supported observation the
-collector accepts from its mounted local sources. Reconciliation must discover
-late-readable supported observations, while later source deletion does not
-retract accepted history. It does not mean vendor billing accuracy or a mirror
-of files currently present, and a quota cache is not evidence of live quota
+"Eventually exact" means exact over every complete, supported observation that
+becomes observable to the collector. Reconciliation must discover late-readable
+supported observations, while later source deletion does not retract accepted
+history. Coverage before source discovery is `coverage_unknown`; a
+`retention_gap` requires positive evidence such as disappearance or truncation
+across a previously discovered stream's unconsumed cursor. Exactness does not
+mean vendor billing accuracy or a mirror of files currently present, and a
+locally recorded rate-limit observation is not evidence of live vendor quota
 state.
 
 ## Evidence Baseline
 
-- **[Observed] Claude Code duplicate assistant records:** a session stream can contain repeated assistant records for the same logical request. Repeated physical lines therefore cannot each be counted as a new usage event. V1 deduplicates them by stable logical event identity and fingerprint.
-- **[Observed] Codex preceding `turn_context` attribution:** a Codex usage record does not carry all attribution itself. V1 applies the latest applicable preceding `turn_context` from the same session stream; attribution never looks ahead or crosses into another stream. The adapter consumes the per-turn delta, not the cumulative total, as the usage fact.
-- **[Observed] Claude quota freshness caveat:** Claude quota information comes from a local cache that can lag the vendor's live state. A snapshot preserves its source time and freshness evidence and must never be presented as a live lookup.
-- **[Observed] OpenCode has locally structured usage records:** its current local usage format appears adaptable, but no validated credential-free local quota source has been established. OpenCode support is deferred so v1 proves the complete source contract with two adapters before expanding the source surface.
+- **[Observed, version-specific] Claude Code session usage:** a fully synthetic,
+  loopback-only client 2.1.226 capture proves the admitted assistant record paths,
+  types, and co-occurrence. The vendor documents `request-id` as globally unique
+  per API request. A deliberately non-conforming A/B/A header sequence proves
+  that reused identity with changed record time must be rejected as a collision,
+  not treated as a legitimate duplicate.
+- **[Observed structure; inferred semantics] Codex token-count context:** local token-count records expose per-update and cumulative usage plus rate-limit windows, while preceding `turn_context` supplies model and working-directory context. V1 never looks ahead or crosses a stream. Whether a particular counter is inclusive, exclusive, or repeated on a rate-limit-only update is frozen by the versioned release profile and arithmetic/replay vectors before the adapter can accept it.
+- **[Not established] Claude Code quota:** no credential-free, structurally validated local Claude quota source is admitted in v1. Claude quota reports `unavailable`; the collector does not add a speculative cache mount or authenticate to fill the gap.
+- **[Observed] OpenCode has locally structured usage records:** its current
+  local usage format appears adaptable, but identity, mutation/replay behavior,
+  privacy projection, and failure semantics have not been evidence-backed end
+  to end. OpenCode support is deferred while v1 proves that complete source
+  contract with two adapters; absence of quota alone is not disqualifying.
+
+The evidence-backed v1 capability matrix is therefore:
+
+| Source | Usage events | Quota/rate-limit snapshots | V1 behavior |
+|---|---|---|---|
+| Claude Code sessions | Yes | No validated source | Collect supported usage; report Claude quota `unavailable`. |
+| Codex rollouts | Yes | Yes, when registered `rate_limits` fields are present | Collect supported usage and snapshots; preserve absent or null rate-limit data as unavailable rather than zero. |
+
+This matrix is the v1 target, not permission to guess an adapter contract. Each
+source capability begins as `unsupported_profile`. A test-only harness may use
+synthetic fixtures under finite candidate bounds, but a real source mount is not
+opened and no fact is accepted until a separately reviewed adapter profile
+freezes the exact local paths/types, native identity, replay/mutation behavior,
+counter arithmetic, and error cases with pinned upstream and synthetic
+evidence. RFC acceptance accepts this activation rule; it does not silently
+accept a still-candidate adapter profile.
 
 ## Doctrine Trace
 
@@ -87,16 +116,15 @@ host paths backing them, but not different in-container paths:
 | Target | Kind | Required mode | Purpose |
 |---|---|---|---|
 | `/sources/claude/sessions` | directory | read-only | Claude Code project-session JSONL |
-| `/sources/claude/quota/cache.json` | single file | read-only when configured | registry-supported Claude quota-cache artifact |
 | `/sources/codex/sessions` | directory | read-only | Codex rollout JSONL |
 | `/data` | directory/volume | read-write | SQLite, migrations, and collector-owned state |
 
 Startup fails closed unless each enabled source target is a distinct mount at
 its canonical target, is read-only, and resolves without following a symlink.
 Deployment preflight inspects every host-side path component without following
-symlinks, requires the canonical leaf to equal the configured source root or
-file, and rejects a home directory, tool configuration root, or parent broader
-than the fixed `projects`/`sessions` tree or quota-cache file. In-container
+symlinks, requires the canonical leaf to equal the configured source root, and
+rejects a home directory, tool configuration root, or parent broader than the
+fixed `projects`/`sessions` tree. In-container
 discovery applies the same no-symlink and stay-beneath-target rule to every file
 it opens. A bind of `~`, `~/.claude`, `~/.codex`, or an equivalent broad parent
 is invalid even if a nested include filter would later narrow it.
@@ -158,6 +186,26 @@ Configuration must not contain prompts, responses, auth tokens, or copied source
 records. Both remote sinks may be disabled for a local-ledger-only deployment;
 either remote sink may be enabled without the other.
 
+Every release embeds an immutable, code-owned **release profile**. Its ID and
+content digest cover the supported source-build families, extraction manifests,
+identity and arithmetic rules, parser ceilings, reconciliation deadlines,
+storage-admission parameters, OTLP vocabularies and series budget, and the
+synthetic vectors that justify them. The image, ledger, health document, and
+diagnostics expose that ID and digest. Operator configuration may select a
+supported source or sink and may narrow an allowlist, but it cannot raise,
+replace, or patch release-profile values at runtime. A profile change is a code
+change with a new ID, compatibility review, and migration/rescan consequences
+declared under this RFC.
+
+Startup fails closed before scanning or exporting when the embedded profile is
+missing, its digest does not match, a selected adapter or projection schema is
+not covered, or persisted state names an incompatible profile without an
+approved migration. "Works on a local sample" is not profile evidence: each
+source identity and accounting rule must be supported by version-pinned
+structural fixtures, positive and negative canonical vectors, replay and
+mutation cases, and the corresponding release tests on both target
+architectures.
+
 **Doctrine trace:** **2. Content and Credentials Stay Outside**;
 **6. The Runtime Boundary Is Portable and Narrow**;
 **7. Simplicity Serves the Contract**.
@@ -187,20 +235,33 @@ escapes, nesting, and the end of the value is transport buffering, not
 permission to copy or retain it. Once the scanner advances, forbidden bytes
 have no application-owned representation.
 
-Draft-provisional safety ceilings are 256 MiB per complete JSONL record, 128 levels of JSON
-nesting, 256 UTF-8 bytes per decoded object key, 16 KiB per projected string,
-128 bytes per projected numeric lexeme, and 256 projected scalars per record.
-Configuration may lower but never raise them. An incomplete trailing record is
-handled separately. A complete record exceeding a ceiling holds the cursor and
-quarantines the stream as `record_limit`, even if it might otherwise have been
-irrelevant. Numbers are bounded exact integers or decimals; non-finite or
+The release profile fixes every parser ceiling and counting rule: raw bytes from
+record start excluding the JSONL delimiter; container depth with the root
+container counted as depth one; encoded object-key bytes; projected scalar
+occurrences; and each projected path's encoded bytes, decoded UTF-8 bytes,
+multiplicity, numeric range, precision, and scale. It also fixes the minimum
+supported container memory used to justify those ceilings. No parser default,
+environment variable, or operator configuration may widen them.
+
+Byte, key, depth, and structural guards apply while bytes are scanned. Crossing
+a ceiling is `record_limit` immediately, even when no terminating newline has
+arrived and even if the record might otherwise have been irrelevant. Skip-only
+values remain subject to raw-byte, key, depth, and structural bounds but are
+never decoded merely to enforce them. The scanner uses bounded chunks and
+linear work, with application-owned memory bounded independently of record
+length. Numbers are bounded exact integers or decimals; non-finite or
 implementation-specific numeric values are rejected.
 
-Before RFC acceptance, an evidence annex must justify or revise these numbers
-against the largest supported synthetic records, parser memory bounds, and the
-minimum documented container capacity. The limits become normative only in the
-accepted RFC and downstream OpenSpec; the mechanism and fail-closed behavior
-are already load-bearing.
+The first OpenSpec changeset freezes the profile schema and executable evidence
+gate. Each release profile then supplies exact values from measured worst-case
+parser memory and supported synthetic records before an adapter is enabled.
+Release tests exercise zero/minimum, exactly-at, and one-past each independently
+enforced ceiling; combinations that hit the declared memory bound; a record
+that crosses its byte cap without a newline; incomplete tails below that cap;
+and oversized irrelevant records. A missing bound, an unmeasured combination,
+arithmetic overflow while checking a bound, or inability to prove the active
+profile causes startup or the affected stream to fail closed; it never falls
+back to a library default.
 
 The privacy suite uses synthetic sentinels in every unregistered and
 content-bearing position, including escaped strings, nested arrays/objects,
@@ -290,16 +351,22 @@ The initial registry is:
 
 | Category | Meaning |
 |---|---|
+| `input_unclassified` | An inclusive input total whose cache relationship has not been safely decomposed; it is emitted instead of, never alongside, overlapping input categories. |
 | `input_uncached` | Input tokens the source identifies as neither cache reads nor cache writes. |
 | `input_cache_read` | Input tokens served from an existing cache. |
 | `input_cache_write` | Input tokens written to a cache. |
-| `output_visible` | Output tokens the source identifies as non-reasoning output. |
+| `output_unclassified` | An inclusive output total whose reasoning relationship is not separately classified; it is emitted instead of, never alongside, overlapping output categories. |
+| `output_non_reasoning` | Output tokens the source explicitly identifies as non-reasoning output. |
 | `output_reasoning` | Output tokens the source identifies separately as reasoning output. |
 
 An adapter may derive a category from an inclusive source total only when the
-source semantics make the subtraction unambiguous and non-negative. Missing
-source detail remains missing; it is not guessed or folded into a nearby
-category. Categories must not overlap inside an event.
+active release profile's official-source evidence and exact arithmetic vectors
+make the subset relationship, subtraction, zero case, and malformed case
+unambiguous. Until then it emits the applicable `*_unclassified` total alone or
+holds the record when even the total's meaning is ambiguous. Missing detail is
+not guessed or folded into a nearby category. Categories must not overlap
+inside an event, and cache or reasoning detail is never emitted alongside an
+inclusive total that contains it.
 
 Category extensions are reviewed and registered before emission. A new category
 must define a non-overlapping meaning, source mapping, and sink treatment. An
@@ -360,9 +427,10 @@ current state is `unknown`, not zero. Selection never uses `collected_at`, an
 alias, scan order, or sink arrival order. The view recomputes fresh/stale against
 current time while preserving the recorded evidence.
 
-Claude quota snapshots inherit the local cache's freshness limitation. Stale or
-unknown observations remain queryable and do not block independent usage
-events. V1 performs no credential-backed quota lookup.
+Codex rate-limit snapshots preserve the local record's freshness limitation.
+Stale, unknown, absent, or null observations remain queryable as state where
+applicable and do not block independent usage events. Claude quota is
+`unavailable` in v1. V1 performs no credential-backed quota lookup.
 
 **Doctrine trace:** **1. Local Facts Become User-Owned History**;
 **2. Content and Credentials Stay Outside**;
@@ -371,8 +439,15 @@ events. V1 performs no credential-backed quota lookup.
 
 ### Source-Specific V1 Attribution
 
-Each adapter ships a versioned extraction manifest. The paths below are the v1
-contract; any additional field is skipped, not opportunistically decoded.
+Each adapter ships a versioned extraction manifest inside the immutable release
+profile. The fields below are the evidence-backed v1 surface; any additional
+field is skipped, not opportunistically decoded. Native identities and counter
+relationships described here are inferred from local structure rather than a
+vendor compatibility promise. They become admissible only for source-build
+families covered by the profile's fixture digests, identity vectors, arithmetic
+vectors, replay cases, and mutation cases. An unrecognized build/shape or a
+missing identity premise holds the affected stream rather than reusing a rule
+that merely looks compatible.
 
 #### Claude Code sessions
 
@@ -388,41 +463,44 @@ contract; any additional field is skipped, not opportunistically decoded.
   `cache_read_input_tokens`, and `output_tokens` are non-negative integers.
   `/message/content` and all unregistered descendants are skipped values.
 - **Native usage identity:** `(sessionId, requestId)`. Both are required. The
+  official API defines `request-id` as globally unique for a request, and the
   logical request identity is the same source tuple. `/message/id` is a
-  consistency field, not a replacement when `requestId` is absent.
+  mandatory consistency field, not a replacement when `requestId` is absent;
+  any alternative requires a new evidence-backed adapter schema. Repeating an
+  identical fully synthetic record across lines, files, and rescans is the valid
+  replay vector; the deliberately invalid A/B/A server sequence is a collision
+  vector because it reuses a vendor-unique request ID across API exchanges.
 - **Accounting mapping:** `input_tokens` -> `input_uncached`,
   `cache_creation_input_tokens` -> `input_cache_write`,
   `cache_read_input_tokens` -> `input_cache_read`, and `output_tokens` ->
-  `output_visible`; absent optional categories remain absent.
-- **Timestamp and context:** `/timestamp` is the event's
-  `source_observed_at`. Model comes from `/message/model`. Project may be
-  normalized from the basename of `/cwd` or an exact configured alias; the
-  absolute path remains local sensitive context and is not a fingerprint
-  input. Claude records do not inherit context across JSONL records.
-- **Fingerprint:** adapter schema, fact kind, native identity, source-observed
-  time, source model, and sorted registered amounts. Metadata and export
-  configuration are excluded.
+  `output_unclassified`; absent optional categories remain absent. Claude's
+  `output_tokens` is treated as an inclusive/unclassified output total because
+  the admitted structure does not establish a separate reasoning subset; it is
+  not relabeled as visible/non-reasoning output.
+- **Timestamp and context:** `/timestamp` is the profile-admitted source-record
+  time and becomes `source_observed_at`. A valid replay repeats it exactly; same
+  native identity with a different timestamp is an identity inconsistency.
+  Model comes from `/message/model`. Project may be normalized from the basename
+  of `/cwd` or an exact configured alias; the absolute path remains local
+  sensitive context and is not a fingerprint input. Claude records do not
+  inherit context across JSONL records.
+- **Fingerprint:** adapter schema, fact kind, native identity, message ID,
+  source-observed time, source model, and sorted registered amounts. Metadata
+  and export configuration are excluded. Same identity with a different time,
+  message, model, or amount is an identity inconsistency and quarantines the
+  stream.
 
 Repeated assistant records with the same identity and fingerprint are duplicate
 observations. The same identity with a different accounting fingerprint holds
 and quarantines the stream.
 
-#### Claude Code quota cache
+#### Claude Code quota capability
 
-The only admitted file is `/sources/claude/quota/cache.json`, under schema
-`claude-code/quota-cache@1`. Before this Draft can enter Review, an RFC-local
-source-evidence annex and synthetic vectors must freeze the exact discriminator,
-identity, utilization, window/reset/scope, and source-observation timestamp
-paths and their types. Until that registry exists, the quota source reports
-`unknown/unavailable` and emits no snapshot; file modification time is freshness
-evidence only and must not be promoted to `source_observed_at`.
-
-When those paths are ratified, the native snapshot identity is
-`(native limit identity, native window identity, native scope identity,
-source_observed_at)` inside the globally scoped fact identity. The fingerprint contains the canonical
-limit/window/scope, utilization, reset, source-observed time, and evidence enum,
-but not collection time. This gate prevents the Draft from inventing a cache
-shape or silently treating an aggregate usage cache as live quota.
+V1 admits no Claude quota file, schema, identity, or snapshot mapping. The
+capability is explicitly `unavailable`; absence does not degrade Claude usage
+ingestion. Adding a credential-free local source later requires an RFC
+amendment, a new canonical mount review, and the same extraction, identity,
+freshness, privacy, and vector gates as any new source contract.
 
 #### Codex rollouts
 
@@ -436,8 +514,9 @@ shape or silently treating an aggregate usage cache as live quota.
   `/payload/id` on `session_meta`, and `/payload/model` plus `/payload/cwd` on
   `turn_context`.
 - **Permitted usage paths:** the non-negative integer fields `input_tokens`,
-  `cached_input_tokens`, `output_tokens`, `reasoning_output_tokens`, and
-  `total_tokens` beneath both `/payload/info/total_token_usage` and
+  `cached_input_tokens`, `cache_write_input_tokens`, `output_tokens`,
+  `reasoning_output_tokens`, and `total_tokens` beneath both
+  `/payload/info/total_token_usage` and
   `/payload/info/last_token_usage`.
 - **Permitted quota paths:** `/payload/rate_limits/limit_id` and the exact
   `used_percent`, `window_minutes`, and `resets_at` fields under registered
@@ -446,20 +525,28 @@ shape or silently treating an aggregate usage cache as live quota.
   same stream. The accepted context is its `/timestamp`, `/payload/model`, and
   `/payload/cwd`; it never looks ahead or crosses a stream. A rescan starts with
   empty context and reconstructs it from the beginning.
-- **Native usage identity:** `(session_meta.payload.id,
-  canonical total_token_usage vector)`. The vector is a native cumulative
-  landmark, not the emitted amount. It must be componentwise monotonic; a new
-  landmark's difference from the prior landmark must agree with
-  `last_token_usage`. An unchanged landmark is a duplicate usage observation,
-  even if a rate-limit-only record repeats the previous delta.
+- **Native usage identity:** the profile-versioned candidate is
+  `(session_meta.payload.id, canonical total_token_usage vector)`. The vector
+  is a native cumulative landmark, not the emitted amount. The release profile
+  must prove its componentwise monotonicity, reset behavior, and relationship
+  to `last_token_usage`; otherwise the adapter does not accept the candidate as
+  identity. An unchanged landmark is a duplicate usage observation, even when
+  a rate-limit-only record re-emits the previous `last_token_usage`.
 - **Logical request identity:** the native usage identity above. One accepted
   Codex delta represents one logical request for v1 request accounting; replay
   of the same landmark does not increment the request count.
-- **Accounting mapping:** `cached_input_tokens` -> `input_cache_read`;
-  `input_tokens - cached_input_tokens` -> `input_uncached`;
-  `reasoning_output_tokens` -> `output_reasoning`; and
-  `output_tokens - reasoning_output_tokens` -> `output_visible`. Every
-  subtraction must be non-negative. Codex exposes no cache-write amount here.
+- **Accounting mapping:** `cached_input_tokens` -> `input_cache_read` and
+  `cache_write_input_tokens` -> `input_cache_write`. The profile must freeze,
+  from official-source evidence plus exact synthetic arithmetic vectors,
+  whether `input_tokens` includes either cache counter and whether
+  `output_tokens` includes `reasoning_output_tokens`. This RFC does not itself
+  authorize either subtraction. A releasable profile must select and vector-test
+  one non-overlapping rule for each axis: direct mapping when a source counter
+  is exclusive, proved non-negative subtraction when a total is inclusive, or
+  the applicable `*_unclassified` total alone when detail cannot be safely
+  separated. An unresolved relationship makes the profile unreleasable and
+  holds the stream as `unsupported_accounting_profile`; it never guesses.
+  A missing cache-write field remains absent, not zero.
 - **Timestamp and fingerprint:** the applicable `turn_context` timestamp is the
   usage `source_observed_at`. The fingerprint contains the adapter schema,
   native identity, that timestamp, source model, and sorted emitted delta.
@@ -467,7 +554,9 @@ shape or silently treating an aggregate usage cache as live quota.
   separate snapshot with native identity `(session id, limit id, window name,
   record timestamp)`. Its source observation time is the record `/timestamp`;
   its fingerprint contains normalized utilization, window, reset, scope, and
-  evidence.
+  evidence. A usage duplicate caused by a re-emitted `last_token_usage` does
+  not suppress a new, identity-distinct rate-limit snapshot from the same
+  physical record.
 
 Missing required context, a cumulative decrease, a delta/cumulative mismatch,
 or ambiguous source identity is recognized malformed data and holds the stream.
@@ -543,13 +632,36 @@ view result. Logical pruning, sampling, TTL deletion, aggregate-only
 replacement, or checkpoint advancement that abandons retained work is not
 maintenance and is absent from v1.
 
-Before accepting a scan batch, the ledger enforces a pre-ship fixed minimum
-free-space reserve in addition to SQLite's atomic commit behavior. If the
-reserve cannot be proven or a write reports full/I/O failure, the transaction
-rolls back and all source cursors hold in `ledger_storage_hold`. Already
-committed sink delivery may continue only when doing so does not require a
-ledger write that could compromise consistency. Recovery never auto-prunes;
-the operator restores capacity and the same input is retried.
+Before accepting one consumed-record transaction, the ledger applies the release profile's storage
+admission guard in addition to SQLite's atomic commit behavior. The profile
+fixes a maximum encoded record/fact transaction, an overflow-safe method for computing the
+transaction's conservative encoded-row and index/WAL amplification charge, and a
+post-commit free-space reserve. Admission requires a successful filesystem
+capacity observation and `available_bytes >= charge_bytes + reserve_bytes`.
+Every add and multiply in that calculation is checked; overflow, an unavailable
+or nonsensical capacity result, an unpriced row/index/migration shape, or a
+transaction above the profiled maximum denies admission before any cursor advances.
+The calculation is a conservative gate, not a claim that free space cannot race
+after inspection.
+
+The first OpenSpec changeset freezes the storage-profile schema and executable
+evidence gate. Each release profile supplies exact values from measured
+worst-case transactions, WAL/journal behavior, checkpoints, migrations, and the
+minimum supported volume. Tests cover exactly sufficient space, one byte below
+the guard, maximum profiled record transaction, arithmetic overflow, capacity-inspection
+failure, concurrent capacity loss, and SQLite `FULL`/I/O failures at each write
+stage. Any denied or failed transaction rolls back facts, amounts, aggregates,
+sink obligations, and all source cursors together, then places ingestion in
+`ledger_storage_hold`. A `SQLITE_FULL`, `SQLITE_IOERR`, failed commit, or
+ambiguous connection state requires read-only reopen plus transaction and
+integrity verification before any write can resume. Already committed sink
+delivery may continue only when its durable acknowledgement can pass the same
+admission guard; it may not advance state in memory only. Backup, migration,
+checkpoint, and `VACUUM` use separate operation-specific headroom derived from
+current database and auxiliary-file size and never consume the normal ingestion
+reserve. Recovery never auto-prunes: the operator restores capacity, the
+profile's distinct resume threshold is met, verification succeeds, and the
+identical input is retried.
 
 If forbidden content or credentials are discovered in retained state, normal
 collection and affected exports stop. A privacy repair is a special,
@@ -582,7 +694,8 @@ Every source cursor is the indivisible tuple:
 - `next_byte_offset` points to the start of the next record and is never a fact
   identity.
 - `prefix_anchor` is a versioned SHA-256 digest over RFC 8785 canonical safe
-  descriptors for the last sixteen consumed records (or all records if fewer):
+  descriptors for the release-profile-fixed number of trailing consumed
+  records (or all records if fewer):
   registered kind ID, record end offset, native identity and accounting
   fingerprint when present, and normalized context changes. Raw record bytes
   and content values never enter the anchor. The anchor stores its window start.
@@ -600,7 +713,9 @@ reconstructing it; context never survives a generation or anchor failure.
 The reader obeys these rules:
 
 - only a complete JSONL record may be consumed;
-- an incomplete trailing record is deferred, with no cursor advance past its start, and retried on a later poll;
+- an incomplete trailing record below the active raw-byte cap is deferred, with
+  no cursor advance past its start, and retried on a later poll; crossing the cap
+  is an immediate `record_limit` even without a delimiter;
 - detected truncation, replacement, generation mismatch, or anchor mismatch
   resets the scan and parser context to the beginning of the affected stream;
 - a rescan relies on stable identity and fingerprint deduplication, not on remembered line positions;
@@ -617,14 +732,34 @@ dead-letter copy, or cursor-advance waiver for unknown or recognized malformed
 records. An operator may disable the whole source, but cannot mark the held
 record consumed.
 
-Every non-exempt stream performs a full reconciliation rescan after
-adapter-schema change and on a Draft-provisional maximum interval of 24 hours.
-Before RFC acceptance, source-mutation tests and scan-cost measurements must
-justify or revise that interval in the evidence annex. A source may earn an exemption only
-through a pre-ship, source-specific append-only proof that tests in-place
-rewrite, truncation, replacement, rotation, and resume validation on both
-architectures. No v1 source is presumed append-only merely because JSONL is
-normally appended.
+Every non-exempt stream performs a full reconciliation rescan after an
+adapter-schema or compatible release-profile change and no later than the
+maximum interval fixed by the active release profile. The deadline is measured
+from the last successfully committed complete rescan using durable elapsed-time
+evidence; restart, wall-clock rollback, scan failure, or incremental success
+never pushes it forward. Once overdue, affected stream, family, and global
+health become `reconciliation_overdue`. Safe incremental ingestion may continue,
+but health cannot claim current reconciliation.
+
+The first OpenSpec changeset freezes the reconciliation-profile schema and
+executable evidence gate. Each release profile supplies the exact deadline plus
+a supported envelope for stream count, aggregate bytes, maximum record size,
+and sustained append rate from mutation-detection and worst-case scan-cost
+measurements. Crossing any envelope dimension sets the affected stream, family,
+and global state to `source_envelope_exceeded`. Bounded incremental ingestion may
+continue while parser/storage profiles remain satisfied, but full-reconciliation
+currency cannot be claimed. Recovery requires the source to return within the
+same profile or a newly reviewed profile to cover it. Tests cover each envelope
+dimension independently at exactly `N` and `N+1`, the exact deadline, the
+smallest scheduler tick beyond it, process
+restart, forward/backward wall-clock changes, interrupted rescans, repeatedly
+changing files, continuous append without starvation, exactly-at/one-beyond the
+supported envelope, and a rescan that discovers late-readable facts. Missing or
+invalid profile timing marks reconciliation overdue; it never selects a library
+or operator default. A source may earn an exemption only through a pre-ship,
+source-specific append-only proof that tests in-place rewrite, truncation,
+replacement, rotation, and resume validation on both architectures. No v1
+source is presumed append-only merely because JSONL is normally appended.
 
 Diagnostics use only fixed keys and code-owned enums: technical source ID,
 adapter schema, stream generation, numeric offset, failure code, expected
@@ -632,8 +767,10 @@ registry path ID/type, capped observed size/depth, first/last-seen time, and
 repeat count. Unknown discriminator text, paths, raw exception messages, and
 record fragments are excluded. SQLite keeps one current diagnostic row per
 held source and updates its counter in place; logs emit state transitions and
-at most one bounded reminder per hour, so an unrepaired record cannot create
-unbounded diagnostic storage.
+reminders no more frequently than the release-profile-fixed interval, so an
+unrepaired record cannot create unbounded diagnostic storage. The profile also
+fixes and tests the anchor-window count and reminder interval; missing or
+invalid values fail closed.
 
 **Doctrine trace:** **2. Content and Credentials Stay Outside**;
 **3. Accounting Is Eventually Exact**;
@@ -644,13 +781,17 @@ unbounded diagnostic storage.
 
 | Condition | State and accounting behavior | Progress elsewhere |
 |---|---|---|
-| Incomplete trailing JSONL | Deferred, not quarantined; cursor remains before the fragment. | Other complete records, sources, and sinks continue. |
+| Incomplete trailing JSONL below the active record-byte cap | Deferred, not quarantined; cursor remains before the fragment. Crossing the cap without a delimiter is `record_limit`, not an indefinitely incomplete tail. | Other complete records, sources, and sinks continue. |
 | Same identity and fingerprint observed again | Idempotent duplicate; no new event, amount, aggregate, or sink work; cursor may advance. | Normal progress continues. |
 | Same identity with a different fingerprint | Affected source is quarantined; conflicting fact is not committed; cursor does not advance past it. | Other sources and sinks continue. |
 | Recognized malformed or schema-inconsistent record | Affected source is quarantined with explicit degraded state; cursor does not advance past it. | Other sources and sinks continue. |
 | Unknown record kind | Affected stream is quarantined with a sanitized `unknown_kind` diagnostic; cursor remains before the record and v1 has no skip waiver. | Other sources and sinks continue. |
 | File truncation or replacement | Source restarts from the beginning; stable identities deduplicate already committed facts. | Other sources and sinks continue. |
-| Stale or freshness-unknown quota cache | Snapshot retains source time and freshness caveat; no claim of live quota is made. | Usage ingestion and sinks continue. |
+| Coverage before source discovery | Coverage is `coverage_unknown`; no loss claim or exact historical coverage is fabricated. | Observable sources and sinks continue. |
+| Discovered source disappears or truncates across its unconsumed cursor | Source health records a proven `retention_gap`; accepted history is not retracted. | Other sources and sinks continue. |
+| Supported source envelope exceeded | Stream/family/global health is `source_envelope_exceeded`; bounded incremental ingestion may continue but reconciliation is not current. | Other sources and sinks continue. |
+| Claude quota requested | Capability is `unavailable`; no source is mounted and no snapshot is fabricated. | Claude usage, Codex usage/rate limits, and sinks continue. |
+| Codex rate limits absent, null, stale, or freshness-unknown | Availability/freshness is represented explicitly; no zero or live-quota claim is fabricated. | Usage ingestion and sinks continue. |
 | SQLite transaction or process interruption | Transaction rolls back; event, aggregate, cursor, and sink checkpoints remain mutually consistent and retry on restart. If the ledger is unavailable, no source may safely advance. | Previously committed sink work may resume only when ledger access is safe. |
 | Low disk or unprovable reserve | Accepting transaction rolls back; all source cursors hold in `ledger_storage_hold`; no automatic pruning occurs. | Read-only health remains available; committed delivery continues only when safe ledger state can still be recorded. |
 | OTLP delivery failure | OTLP checkpoint remains pending and retries; no local fact is lost. | PostgreSQL and all sources continue. |
@@ -665,7 +806,9 @@ Partial failure is discoverable state, not only a log line. SQLite and
 content-free diagnostics preserve, at minimum:
 
 - per source stream: technical identity, `healthy | trailing_deferred |
-  quarantined | storage_hold | disabled`, last successful scan, last accepted
+  quarantined | storage_hold | reconciliation_overdue |
+  source_envelope_exceeded | retention_gap | coverage_unknown |
+  disabled`, last successful scan, last accepted
   source time, durable cursor tuple, held failure code/position, and reconciliation
   due/last-completed times;
 - ledger: namespace/epoch/schema, migration and integrity state, free-space
@@ -682,6 +825,13 @@ for the life of v1; a later incompatible contract introduces separately named
 views rather than mutating them. Consumers never query private base tables as a
 stable contract. The exact column manifest and nullability are a required
 pre-ship schema artifact.
+
+Inspection recomputes the storage admission guard and database availability/
+verification state directly; it does not require a successful health write. If
+SQLite cannot persist a transition, the read-only command still exposes
+`storage_hold` or `ledger_unavailable` from current evidence and marks persisted
+health as stale. Restart repeats that computation before any source or sink
+write, so an unwritten hold cannot be forgotten.
 
 A non-networked, read-only inspection command renders the health views as a
 versioned JSON document with `overall_state`, `sources[]`, `ledger`, `sinks[]`,
@@ -718,6 +868,14 @@ PostgreSQL backfills retained facts, while OTLP emits the complete current
 cumulative projection. A later OTLP projection may satisfy older pending work
 only by covering the complete aggregate through that pending checkpoint.
 
+When that cumulative projection exceeds the serialized-request cap, OTLP splits
+it into deterministic, profile-ordered batches, each independently within the
+cap and identified by target `ledger_seq`, batch ordinal, and batch count. The
+sink checkpoint advances only after durable acknowledgement of every batch for
+the same target sequence. Failure or ambiguity after any batch retries the
+complete target projection from its deterministic batch set; no partial set is
+acknowledged as catch-up.
+
 **Doctrine trace:** **1. Local Facts Become User-Owned History**;
 **3. Accounting Is Eventually Exact**;
 **4. Partial Failure Is Explicit**;
@@ -740,6 +898,26 @@ the stable OTLP start time for every cumulative series derived from that ledger.
 Process restart, lease turnover, retry, endpoint outage, or checkpoint replay
 does not reset it.
 
+The release profile defines one total projection function for each instrument.
+For token sums, every retained amount at or below the projected `ledger_seq`
+maps to exactly one series tuple containing the projection schema/ledger epoch
+and the finite admitted values for collector, tool, vendor, model bucket,
+project bucket, and token category. For request sums, every first-seen logical
+request maps once to the corresponding tuple without category. Code-owned
+`unknown` and, where explicitly approved, `other` buckets are part of the finite
+vocabulary; an unknown source value is never silently omitted. At every
+checkpoint, summing the token series by category must equal the corresponding
+ledger aggregate, and summing request series must equal the ledger's
+deduplicated request count.
+
+Quota gauges use a profile-defined tuple whose finite dimensions include every
+field needed to distinguish admitted current-quota subjects, including window
+where the source distinguishes windows. The projection must be injective over
+the configured subjects or define an RFC-reviewed aggregation; v1 uses the
+injective form. A value that cannot map exactly once, a tuple collision, or a
+conservation mismatch blocks that OTLP checkpoint with sanitized health state.
+It never drops a fact, invents a label, or acknowledges a partial projection.
+
 Exactly one process may export a given checkpoint tuple at a time. A
 ledger-backed lease uses expiry plus a monotonically increasing fencing token;
 only the current fenced holder may send or acknowledge. Lease loss cancels its
@@ -750,24 +928,39 @@ The projection has a closed, deny-by-default attribute policy distinct from
 both extraction and PostgreSQL. Token and request series may distinguish
 configured collector, tool, vendor, model, and canonical project identity;
 token series may additionally distinguish registered category. Quota series
-may distinguish configured account alias, vendor, limit name, and scope. A
-value is admitted only from a finite declared vocabulary.
+may distinguish configured account alias, vendor, limit name, window, and scope.
+A value is admitted only from the finite release-profile vocabulary or its
+explicit bounded bucket.
 
-Draft-provisional cardinality ceilings are 4 collector values, 8 tool values, 8 vendor
-values, 64 model values, 128 project values, 16 token categories, 16 account
-values, 32 limit names, and 32 scopes. The potential cross-product is also
-bounded to 4096 token series, 1024 request series, 1024 quota/freshness series,
-and 6144 total series across all instruments. Startup computes the worst-case
-configured cross-product and rejects an over-budget projection before creating
-an exporter. Runtime values absent from the admitted vocabulary remain in the
-ledger and are omitted with a sanitized diagnostic; series are never admitted
-by eviction, first-seen order, or an unbounded fallback label.
+The release profile fixes the maximum UTF-8 size of every attribute value, the
+exact allowed tuple set for each instrument, per-instrument series ceilings, a
+process-total series ceiling, and a serialized-request size ceiling. A series is
+identified by Resource, instrumentation Scope, metric name, and the complete
+point-attribute set. Startup enumerates and counts the unique legal tuples,
+rather than multiplying dimensions that cannot coexist, and rejects a
+configuration whose possible tuple set exceeds any ceiling before creating an
+exporter. Runtime tuple creation is checked atomically against the same limits.
+Series are never admitted by eviction, first-seen order, omission, or an
+unbounded fallback label. Project enforcement occurs before the SDK/exporter,
+whose effective per-instrument cap must equal or exceed the project cap so a
+hidden lower SDK overflow cannot replace project semantics. Every sum has a
+mandatory accounting partition; token sums partition by registered category.
+Within each instrument/partition, at most one reserved bounded `other` tuple may
+conserve otherwise unprojectable values, and every reserved tuple counts inside
+all caps. For non-mergeable gauges, a new unprojectable tuple blocks and visibly
+degrades the sink checkpoint while the ledger retains it.
 
-Before RFC acceptance, the evidence annex must justify or revise those values
-against representative local deployments, metric-payload size, and collector/
-backend capacity. The accepted RFC and downstream OpenSpec freeze the numeric
-budget; deny-by-default vocabulary, startup cross-product validation, and a hard
-total-series bound remain mandatory regardless of the final values.
+The first OpenSpec changeset freezes the projection-profile schema and
+executable evidence gate. Each release profile supplies exact tuples and limits
+from representative deployments, encoded metric payloads, collector memory,
+and backend capacity. Release tests cover empty/minimum,
+exactly-at, and one-past every vocabulary and series ceiling; duplicate tuples;
+legal sparse combinations; attribute and request-size boundaries; effective
+SDK/exporter configuration; unknown/other mapping; quota-subject collisions;
+category-by-category token and request conservation through retry, deterministic
+multi-request catch-up, profile change, and checkpoint
+replay. A missing ceiling, count overflow, profile mismatch, or inability to
+enumerate the legal tuple set fails closed before export.
 
 Event identity, request identity, fingerprint, source filename or path, byte
 offset, source timestamp, reset timestamp, and arbitrary metadata are never OTLP
@@ -861,7 +1054,7 @@ contracts rather than by copying whatever a source happens to contain.
 
 | Surface | Allowed | Excluded |
 |---|---|---|
-| Source mounts | Fixed-target mixed-content Claude sessions, explicit Claude quota cache, and mixed-content Codex sessions, all read-only and parsed through field-projecting syntax traversal. | Broad home/config mounts, auth stores, browser state, shell credentials, and decoding, materializing, copying, hashing, logging, or retaining content-bearing values. |
+| Source mounts | Fixed-target mixed-content Claude sessions and mixed-content Codex sessions, both read-only and parsed through field-projecting syntax traversal. | Any speculative Claude quota/cache path, broad home/config mounts, auth stores, browser state, shell credentials, and decoding, materializing, copying, hashing, logging, or retaining content-bearing values. |
 | Adapter output and SQLite | Normalized identities, timestamps, registered amounts, quota fields, and explicitly allowlisted metadata. | Prompts, responses, tool arguments/results, raw records, credentials, unregistered token fields. |
 | PostgreSQL | The normalized conceptual tables and exact fields admitted by its sink-specific allowlist. | Raw source JSON and every unlisted descriptive or sensitive field. |
 | OTLP | Exact fields admitted by its sink-specific allowlist whose values also belong to finite admitted vocabularies. | Per-request/event/source-file attributes, paths, timestamps as labels, fingerprints, arbitrary metadata, and unadmitted values. |
@@ -915,8 +1108,9 @@ Topology documentation owns concrete component placement and deployment wiring.
 OpenSpec owns testable requirements derived from this RFC. Craft-and-care owns
 the implementation and verification bar. Once accepted, this RFC is
 authoritative for adapter semantics, ledger atomicity, failure isolation,
-privacy/cardinality boundaries, and sink behavior; while Draft, it is a
-proposal constrained by the doctrine lifecycle.
+privacy/cardinality boundaries, and sink behavior. Unmeasured adapter/resource
+profiles remain explicit activation and release gates rather than accepted
+implementation evidence.
 
 V1 builds and publishes the same container image contract for `linux/amd64` and
 `linux/arm64`. Architecture-specific builds must not diverge in their mount,
@@ -925,30 +1119,34 @@ privilege, write, network, adapter, ledger, or sink behavior.
 One OCI manifest list references immutable amd64 and arm64 image digests built
 from the same source revision, dependency lock, adapter schema IDs, ledger
 schema, and projection schemas. Before publishing the manifest, each image must
-run the same synthetic parser/privacy sentinels, identity/fingerprint vectors,
+run natively on its target architecture through the same synthetic
+parser/privacy sentinels, identity/fingerprint vectors,
 replay and migration corpus, cursor/rescan cases, stable-view/health assertions,
 OTLP descriptors/cardinality checks, PostgreSQL transaction/idempotency checks,
 and non-root/read-only-root/no-port/network-mode smoke tests. The two runs must
 produce equal normalized facts, fingerprints, view schemas, metric descriptors,
-and health schema. An architecture without this evidence is omitted from the
-manifest rather than presumed equivalent.
+and health schema. Emulation may add evidence but cannot replace either native
+gate. A v1 release requires both native-gated images in the manifest; if either
+architecture lacks passing evidence, no v1 manifest or single-architecture v1
+image is published.
 
 ## Specification and Doctrine Boundary
 
-This RFC is a Draft design contract. It gates downstream work as follows.
+This RFC is the accepted design contract. It gates downstream work as follows.
 
 ### Required before implementation or release OpenSpec
 
 The first OpenSpec changeset must freeze and test:
 
 - both extraction manifests, including exact paths/types, irrelevant-kind
-  registries, Claude quota-cache evidence, parser limits, and sentinel fixtures;
+  registries, explicit Claude-quota unavailability, Codex cache-write and
+  rate-limit fields, release-profile parser limits, and sentinel fixtures;
 - composite identity/native-identity documents, fingerprint documents and test
   vectors, timestamp/context mappings, cursor tuple/anchor validation, full
   reconciliation, and every hold/recovery transition;
 - ledger tables/constraints/migrations, `ledger_seq`, transaction boundaries,
-  free-space reserve, lossless maintenance, stable v1 views, and structured
-  health JSON;
+  release-profile storage admission guard and failure vectors, lossless
+  maintenance, stable v1 views, and structured health JSON;
 - quota freshness thresholds/evidence and deterministic current selection;
 - technical sink IDs, checkpoint and lease state machines, exact OTLP metric
   names/units/descriptors/vocabularies/budgets/schema evolution, and PostgreSQL
@@ -959,14 +1157,16 @@ The first OpenSpec changeset must freeze and test:
 - retention, source deletion/non-retraction, low-disk recovery, backup/
   migration behavior, and owner-authorized privacy-repair scenarios.
 
-Implementation may not begin by filling these gaps ad hoc. In particular, the
-Claude quota-cache registry must be evidence-backed before the RFC advances
-from Draft; `unknown/unavailable` is the only permitted behavior meanwhile.
+Implementation may not begin by filling these gaps ad hoc. In particular,
+Claude quota remains `unavailable` throughout v1, and source identity or token
+arithmetic may not advance from inferred candidate to accepted profile without
+the required version-pinned evidence and vectors.
 
 ### Safe deployment and implementation detail
 
 Within the fixed contract, downstream design may choose package/module layout,
-SQLite pragmas and index tuning, retry/backoff timings, batch sizes, the numeric
+SQLite pragmas and index tuning, retry/backoff timings, batch sizes at or below
+the profiled maximum, the numeric
 non-root UID/GID, `/tmp` size, image registry/name, host paths that map to the
 canonical targets, TLS material placement, sink secret names/mechanism, and
 endpoint-specific DNS/proxy wiring inside the egress allowlist. Those choices
@@ -1030,7 +1230,8 @@ and PostgreSQL preserve history.
 Rejected. It would require mounting or provisioning vendor credentials and
 would turn a local-facts collector into an authenticated vendor integration.
 V1 reads the local quota evidence already available and exposes its freshness
-limitations.
+limitations for Codex. It reports Claude quota unavailable rather than
+inventing a source.
 
 ### Mandatory OTLP and PostgreSQL
 
@@ -1049,9 +1250,13 @@ future sources can be added through reviewed code against the same contract.
 V1 ships:
 
 - one long-running, non-root Python/`uv` container with a configurable five-minute default polling loop, built and published for `linux/amd64` and `linux/arm64`;
-- explicit read-only Claude Code session and quota-cache mounts, an explicit read-only Codex sessions mount, no tool auth-store mount, and one writable `/data` volume;
-- built-in Claude Code and Codex `SourceAdapter` implementations yielding `UsageEvent` and `QuotaSnapshot` facts;
-- the five initial registered, non-overlapping token categories;
+- explicit read-only Claude Code and Codex session mounts, no Claude quota
+  mount, no tool auth-store mount, and one writable `/data` volume;
+- a built-in Claude Code adapter yielding `UsageEvent` facts and reporting quota
+  unavailable, plus a built-in Codex adapter yielding `UsageEvent` and
+  evidence-backed rate-limit `QuotaSnapshot` facts;
+- the seven initial registered, non-overlapping token categories, including
+  unclassified inclusive input/output totals;
 - a durable SQLite ledger with stable identity, fingerprinting, indefinite normalized history, atomic aggregates/cursors/sink state, rescan-safe deduplication, and source quarantine;
 - independently optional OTLP Metrics and PostgreSQL sinks with retryable pending delivery;
 - valid local-ledger-only, OTLP-only, PostgreSQL-only, and both-sinks deployment modes;
@@ -1063,7 +1268,9 @@ V1 ships:
 
 V1 deliberately defers:
 
-- OpenCode and any adapter beyond Claude Code and Codex, including any partial OpenCode adapter without a validated local quota boundary;
+- OpenCode and any adapter beyond Claude Code and Codex, including any partial
+  OpenCode adapter without reviewed end-to-end identity, replay/mutation,
+  privacy-projection, capability, and failure evidence;
 - dynamic third-party plugin loading;
 - Pushgateway as a primary delivery contract;
 - dashboards, alerting policy, cost or invoice reconciliation, and billing claims;

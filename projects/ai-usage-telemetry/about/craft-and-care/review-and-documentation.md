@@ -1,8 +1,7 @@
 # Review and Documentation
 
 Review is evidence-bearing design work, not a ceremonial approval. These
-standards remain Proposed until the project's doctrine and RFC are adopted and
-accepted through the lifecycle gate.
+standards are adopted through the project lifecycle gate.
 
 ## Author evidence
 

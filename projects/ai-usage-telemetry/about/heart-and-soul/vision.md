@@ -9,8 +9,11 @@ without surrendering private conversation content or account credentials.
 
 [Observed] Claude Code and Codex already write structured local events from
 which usage can be identified: Claude assistant events expose usage fields,
-while Codex token-count events expose per-event token deltas and quota-related
-rate-limit data. Their record shapes and semantics differ.
+while Codex token-count events expose cumulative usage state, the most recently
+stored usage contribution, and quota-related rate-limit data. Codex may re-emit
+that contribution for a rate-limit-only change, so cumulative advancement—not
+the physical record—is the candidate usage fact. Their record shapes and
+semantics differ.
 
 [Inferred] A self-contained, long-running local service can normalize those
 facts into a durable SQLite ledger and independently project registered subsets
@@ -64,8 +67,10 @@ account ID, or placing content or credentials in SQLite, OTLP, or PostgreSQL.
 
 ### 3. Accounting Is Eventually Exact.
 
-[Inferred] For identifiable, parseable records, repeated and overlapping polls
-must converge on exactly one normalized contribution per source fact. Identity
+[Inferred] For complete, supported records that become observable to the
+collector, repeated and overlapping polls must converge on exactly one
+normalized contribution per source fact. Coverage before a source is first
+discovered is unknown; proven loss after discovery remains explicit. Identity
 and its accounting fingerprint are stable ledger concerns: cursor position,
 export selection, sink configuration, and descriptive projection changes cannot
 alter either. A crash, restart, or sink retry may delay accounting but must
@@ -139,7 +144,7 @@ has a proposed, reviewed, and owner-accepted end-to-end contract.
 
 AI Usage Telemetry succeeds when a developer can leave one container running,
 query a durable and eventually exact history of supported local usage, compare
-fresh quota state without unit ambiguity, and opt into bounded exports—while
+available local quota state without unit ambiguity, and opt into bounded exports—while
 being able to demonstrate that conversation content and credentials never
 entered the system. Upstream format drift is visible as a scoped degradation,
 not as a quiet hole in the history.

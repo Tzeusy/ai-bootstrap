@@ -30,8 +30,11 @@ other user content. The maintained corpus must cover:
   may become complete;
 - source truncation and rotation, proving they are distinguished from ordinary
   append progress without loss or duplication;
-- a stale quota cache, proving stale data is labeled unavailable/stale rather
-  than presented as current;
+- Codex primary/secondary rate-limit windows plus the explicit Claude
+  `unknown/unavailable` capability, proving missing, stale, and current quota
+  states cannot be confused with zero utilization;
+- Codex rate-limit-only records that repeat a prior nonzero usage contribution,
+  plus cache-write/read and inclusive-output arithmetic boundary vectors;
 - replay and overlapping reads, proving accepted events remain exactly
   accounted;
 - registered irrelevant, unknown-kind, malformed complete, oversize, and
@@ -83,17 +86,21 @@ the previous drift case that proved the failure was visible.
 - Scan normalized facts, accounting fingerprints, SQLite tables and all five
   read-only views, safe diagnostics, logs, OTLP capture, and PostgreSQL capture;
   no sentinel bytes or derived values may appear.
-- Exercise declared record-size, nesting-depth, scalar-length, and field-count
-  limits. Each breach must produce a bounded safe error code, hold the affected
-  stream cursor before the record, and quarantine only that stream without
-  including raw values or exception payloads in diagnostics.
+- Exercise every declared parser-profile limit at `N-1`, `N`, and `N+1`,
+  including encoded versus decoded sizes and a non-terminated record that
+  crosses its byte cap. Each breach must immediately produce a bounded safe
+  error code, hold the affected stream cursor before the record, and quarantine
+  only that stream without decoding skipped values or including raw values in
+  diagnostics.
 - Prove a field absent from the code-owned extraction registry is never
   materialized; a field absent from stable ledger admission is never stored;
   and fields absent from the PostgreSQL projection allowlist or OTLP
   attribute/vocabulary registry never reach that destination. Configuration
   cannot widen any registry.
-- Exercise high-cardinality candidate values and prove OTLP attributes remain
-  within the declared bounded vocabulary and series budget.
+- Exhaustively enumerate each OTLP profile's realizable allowed tuples and test
+  its per-instrument, process-total, serialized-payload, and effective-SDK limits
+  at their boundary. Sum overflow must conserve the ledger total; a gauge that
+  cannot be represented safely must block and visibly degrade its projection.
 - Verify PostgreSQL's JSONB payload contains only allowlisted metadata and that
   stable normalized fields remain columns.
 - Verify quota snapshots preserve source observation time, collection time, and
@@ -110,11 +117,12 @@ the previous drift case that proved the failure was visible.
   prove no sink client, DNS lookup, or other network activity occurs while all
   stable SQLite query/health views remain usable.
 - Build from pinned dependency inputs in a clean environment.
-- Before release, publish or inspect one OCI manifest and natively smoke-test
-  `linux/amd64` and `linux/arm64` for equivalent normalization fixtures, ledger
-  and view schema, replay behavior, privacy checks, non-root/read-only runtime,
-  and local-only mode. An untested architecture is unsupported, not presumed
-  portable.
+- Before release, inspect one OCI image index and natively smoke-test both
+  `linux/amd64` and `linux/arm64` for equivalent canonical normalization facts,
+  ledger and view results, metric data, health schema, replay behavior, privacy
+  checks, non-root/read-only runtime, and local-only mode. Cross-emulation may
+  supplement but cannot replace either native gate; a missing gate blocks the
+  v1 release tag.
 
 ## Evidence before claims
 

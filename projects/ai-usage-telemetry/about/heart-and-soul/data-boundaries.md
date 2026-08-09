@@ -24,9 +24,11 @@ controls independently select which descriptive fields may accompany them.
 ## Source Boundary
 
 [Observed] Claude Code usage fields are present on usage-bearing assistant
-records in local JSONL session files. Codex emits token-count records whose
-`last_token_usage` is a per-event delta and whose rate-limit data can describe
-quota state. Codex's token-count payload does not itself establish model
+records in local JSONL session files. Codex emits token-count records containing
+cumulative totals, the most recently stored usage contribution, and rate-limit
+data that can describe quota state. A rate-limit-only update may repeat the
+prior contribution, so only validated cumulative advancement can identify a new
+usage contribution. Codex's token-count payload does not itself establish model
 identity.
 
 [Inferred] A **source family** is one tool-format domain such as Claude Code or
@@ -59,6 +61,12 @@ degraded while any member stream is quarantined.
 or guessing, it remains absent. For example, Codex model attribution must come
 from a registered non-content event in the same source context or be recorded as
 unknown; the collector must not infer it from conversation text.
+
+[Inferred] V1's source capability matrix is explicit: Claude Code contributes
+registered usage while its quota state is `unknown/unavailable`; Codex
+contributes registered usage and structurally present local rate-limit
+snapshots. The observed Claude quota cache is embedded in credential-bearing
+global state and is outside the mount and extraction boundary.
 
 ## Admission and Projection Registries
 
@@ -151,7 +159,7 @@ utilization" from "no registered quota data" and "fresh" from "last known";
 unknown source time must not be replaced with collection time.
 
 [Unknown] OpenCode and future tools do not yet have a proposed, reviewed, and
-owner-accepted end-to-end local
-usage-and-quota boundary. Their files must not be mounted or parsed merely
-because a partial local format exists; support begins only after the source,
-identity, quota, privacy, and failure contracts are resolved.
+owner-accepted end-to-end local boundary. Their files must not be mounted or
+parsed merely because a partial local format exists; support begins only after
+source identity, mutation/replay behavior, privacy projection, capability gaps,
+and failure contracts are resolved.

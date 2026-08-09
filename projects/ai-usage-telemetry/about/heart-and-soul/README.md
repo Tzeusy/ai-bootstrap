@@ -3,7 +3,7 @@
 Doctrine for **AI Usage Telemetry**, the `ai-usage-telemetry` project nested in
 `ai-bootstrap/`.
 
-**Status:** Draft, pending explicit human-owner adoption. See the central
+**Status:** Adopted through Owner Decision 0001. See the central
 [lifecycle matrix](../README.md#lifecycle-status).
 
 Read this pillar first when deciding what the product may observe, retain, or
@@ -18,14 +18,19 @@ purpose.
    between content, metadata, credentials, local history, and optional exports.
 3. [`v1.md`](./v1.md) — what the first release ships, defers, targets, and must
    prove before it is considered successful.
+4. [`decisions/0001-finalize-and-specify.md`](./decisions/0001-finalize-and-specify.md)
+   — the owner's conditional direction and the evidence gates that must activate
+   it before doctrine or RFC authority is claimed.
 
 ## Evidence Labels
 
-- **[Observed]** records a claim supported by formats inspected on a real local
-  installation. An observed format is evidence, not a promise that an upstream
+- **[Observed]** records a claim supported by a pinned client surface, official
+  documentation, or public source. Personal session and credential records are
+  not project evidence. An observed format is not a promise that an upstream
   tool will never change.
-- **[Inferred]** records a proposed product or design conclusion drawn from the
-  observed evidence and owner interview. It is not adopted doctrine.
+- **[Inferred]** records the evidentiary origin of a product/design conclusion.
+  Inside this adopted pillar it is authoritative unless a later owner decision
+  amends it; the label does not claim that implementation has proved it.
 - **[Unknown]** records behavior that remains unresolved, especially for
   deferred or future tools. Unknown behavior must not be disguised as a stable
   contract.
