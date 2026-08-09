@@ -20,31 +20,6 @@ facts into a durable SQLite ledger and independently project registered subsets
 to optional OTLP Metrics and PostgreSQL sinks. The ledger, not either sink, is
 the user's history.
 
-## Thesis Test and Delivery Envelope
-
-[Inferred] The first thesis checkpoint is the Synthetic-to-SQLite Usage Spine:
-one fully synthetic, qualified source record must become one durable,
-content-free, locally queryable contribution, and replay must not contribute it
-again. The checkpoint occurs before implementation is authorized beyond that
-spine. If it cannot meet that boundary without reading content, using
-credentials, depending on a remote service, or weakening exact replay, the v1
-thesis is falsified and the owner must reopen the product shape rather than
-narrate the plumbing as success.
-
-[Inferred] The second checkpoint is the pre-release native-architecture gate.
-If the complete v1 cannot preserve identical normalized facts and privacy,
-ledger, health, and projection contracts on both supported architectures, or
-cannot repair either optional projection from the local ledger alone, the
-portable local-service thesis is falsified before release.
-
-[Observed] The currently committed delivery capacity is one human owner working
-asynchronously with repository agents and existing local compute. No additional
-human team, weekly-hours allocation, delivery deadline, or paid hosted service
-is committed. V1 therefore advances as bounded, independently reviewable
-capabilities; any plan that requires parallel human staffing, a calendar
-promise, or paid infrastructure must return to the owner for a new resource
-decision rather than silently assuming it.
-
 ## What It Is Not
 
 [Inferred] The following exclusions are constitutional:

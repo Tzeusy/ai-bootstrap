@@ -7,8 +7,9 @@ AI coding tools into a durable, content-free history.
 The project is still pre-implementation. Statements about current tool file
 formats are marked **[Observed]**; proposed architectural conclusions are marked
 **[Inferred]**; unsupported future-tool behavior is marked **[Unknown]**. The
-documents describe an adopted pre-implementation shape, not a claim that the
-service already exists or that its release evidence is complete.
+documents distinguish the adopted pre-implementation baseline from any
+explicitly labeled amendment under review; neither is a claim that the service
+already exists or that its release evidence is complete.
 
 ## Lifecycle Status
 
@@ -21,9 +22,9 @@ until it is reswept.
 
 | Artifact | Status | Next authority gate |
 |---|---|---|
-| Heart-and-soul doctrine | **[Observed] Adopted baseline; remediation amendment in review** | Owner Decision 0001 remains authoritative until the amendment is independently reviewed and recorded |
+| Heart-and-soul doctrine | **[Observed] Adopted** | Owner Decision 0001 remains authoritative; the launch remediation does not amend doctrine |
 | RFC 0001 | **[Observed] Accepted baseline; clarification amendment in review** | Rebind its digest after independent documentation/boundary review |
-| Lay-and-land topology | **[Observed] Accepted** | Reconcile against the accepted remediation before the next gate |
+| Lay-and-land topology | **[Observed] Accepted** | Confirm the RFC clarification creates no placement or trust-boundary drift |
 | Craft-and-care standards | **[Observed] Adopted baseline; lifecycle amendment in review** | Confirm the central ownership/retirement rules cover every artifact class |
 | OpenSpec capability specifications | **[Observed] Absent at `389c4aa`** | First administration was `NOT READY`; remediate and re-administer at a new named commit |
 
@@ -40,7 +41,7 @@ and [Owner Decision 0001](./heart-and-soul/decisions/0001-finalize-and-specify.m
 The pre-specification instrument is bound in
 [`parameters.md`](../docs/launch-gate/parameters.md). Its v1.0
 [`parameter-review.md`](../docs/launch-gate/parameter-review.md) records the
-original fresh review and confirmation; the v1.1 amendment is awaiting its own
+original fresh review and confirmation; the v1.2 amendment is awaiting its own
 review. [`trend.md`](../docs/launch-gate/trend.md) indexes immutable
 administrations. The first full administration is preserved
 at [`2026-08-10-389c4aa.md`](../docs/launch-gate/2026-08-10-389c4aa.md); its
@@ -56,8 +57,8 @@ commit-anchored corpus sweep observed no `openspec/` path and recorded
 | [Legends and Lore](./legends-and-lore/README.md) | How do adapters, durable state, and sinks behave? | RFC 0001 |
 | [Lay and Land](./lay-and-land/README.md) | Where do components, data, and trust boundaries live? | `components.md`, then `data-flow.md` |
 
-Capability specifications are the fifth project-shape pillar and remain absent
-at this accepted-shape checkpoint. Observable requirements and WHEN/THEN
+[Observed at `389c4aa`] Capability specifications are the fifth project-shape
+pillar and remain absent at the last administered checkpoint. Observable requirements and WHEN/THEN
 scenarios may be authored under this project's `openspec/` only after the
 project-direction launch gate records `READY` at a named commit.
 

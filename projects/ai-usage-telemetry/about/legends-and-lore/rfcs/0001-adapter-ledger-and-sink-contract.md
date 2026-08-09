@@ -1170,6 +1170,14 @@ the value or acceptance evidence of its siblings. The changeset becomes
 archiveable only after every RFC-required capability has an explicit owner
 acceptance.
 
+One independently accepted Synthetic-to-SQLite Usage Spine may authorize a
+disposable, synthetic-only thesis-test harness before sibling capabilities are
+accepted. That harness reads no personal source mount, opens no network path,
+ships no production package, and creates no reusable production shortcut. It
+is implementation evidence for the accepted spine, not authorization for real
+collection, sink delivery, or release. Every non-synthetic implementation path
+remains blocked until the complete RFC-required capability set is accepted.
+
 Implementation may not begin by filling these gaps ad hoc. In particular,
 Claude quota remains `unavailable` throughout v1, and source identity or token
 arithmetic may not advance from inferred candidate to accepted profile without
@@ -1190,8 +1198,8 @@ Shape owns why an authority, trust, privacy, retention, or runtime boundary is
 load-bearing. OpenSpec owns the observable scenarios and exact accepted values
 that prove a build honors it. A compound sentence that states both is
 borderline and must be decomposed rather than assigned wholesale to either
-layer. For example, this RFC owns the no-inbound invariant; OpenSpec owns the
-startup scenario that proves no port is exposed, published, or listened on.
+layer. Mixed requirements must be split into their owning shape commitment and
+observable acceptance scenario before sign-off.
 
 ### Forbidden without an owner-adopted doctrine amendment
 
