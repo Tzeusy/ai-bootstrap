@@ -433,6 +433,8 @@ substitute the `.syzygy` canon paths where `../../project-shape/` detected it.
 | `FIRST_SPEC_CANDIDATE` | The first spec's charter at the administered commit | — |
 | `HUMAN_DECIDER` | Who performs owner acts, and the delegation rule | owner; router autonomy contract |
 | `EPISTEMIC_LABELS` | The project's evidence vocabulary | [Observed] / [Inferred] / [Unknown] |
+| `THESIS_CHECKPOINTS` | Evidence that would falsify the lived product thesis, and the lifecycle point when each judgment occurs (A2) | — |
+| `RESOURCE_ENVELOPE` | Actually committed people, attention, money, and calendar; unknowns stay explicit, with a stop condition before work assumes them (A6) | — |
 | `D2_ROUTINE_TASK` | A concrete low-authority task | — |
 | `D2_AUTHORITY_TASK` | A task that changes a normative definition | — |
 | `D2_SEAM_TASK` | A task crossing two chunks' boundary | — |
@@ -488,3 +490,7 @@ amend here and log it, never fork per project.
   (author / administer / trend) is deliberately collapsed into one focus mode:
   binding, administering, and reading the trend are phases of a single run, and
   three catalog entries would fragment one decision across three routing hops.
+- **v1.1** (2026-08-10) — added required `THESIS_CHECKPOINTS` and
+  `RESOURCE_ENVELOPE` bindings. A2 and A6 already required those facts, but the
+  v1.0 parameter template did not force projects to supply them. The question
+  series and verdict computation are unchanged.

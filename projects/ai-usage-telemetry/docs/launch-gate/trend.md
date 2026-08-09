@@ -10,3 +10,8 @@ routes and the v1.1 draft proved too directly answered by the judged corpus.
 Later E4 results use the wholly unpublished v1.2 candidates and newly sealed
 key; the amendment itself remains visible here rather than being narrated as
 convergence.
+
+Instrument comparability note: launch-gate v1.1 makes the already-existing A2
+and A6 evidence inputs mandatory parameters. It does not change any question or
+verdict rule, so later rows remain comparable while binding omissions become
+mechanically harder.

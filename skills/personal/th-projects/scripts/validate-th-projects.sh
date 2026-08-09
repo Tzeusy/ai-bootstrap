@@ -321,6 +321,10 @@ if require_file "$LAUNCH_GATE" "project-direction/references/launch-gate.md exis
     "launch gate: E3 empty reopen-list requires a trace table"
   check_pattern "$LAUNCH_GATE" '^## 7\. Parameter block' \
     "launch gate: project-specific bindings live in a parameter block"
+  check_pattern "$LAUNCH_GATE" '`THESIS_CHECKPOINTS`.*A2' \
+    "launch gate: A2 requires a project thesis-falsification binding"
+  check_pattern "$LAUNCH_GATE" '`RESOURCE_ENVELOPE`.*A6' \
+    "launch gate: A6 requires a project resource binding"
   check_pattern "$LAUNCH_GATE" 'NEAR_MISSES|E4_CANDIDATES' \
     "launch gate: adversarial inputs are pre-written, not reviewer-chosen"
   check_pattern "$LAUNCH_GATE" 'never by the reviewer or the administering session' \
