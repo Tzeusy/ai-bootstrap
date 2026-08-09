@@ -23,20 +23,21 @@ until it is reswept.
 | Artifact | Status | Next authority gate |
 |---|---|---|
 | Heart-and-soul doctrine | **[Observed] Adopted** | Owner Decision 0001 remains authoritative; the launch remediation does not amend doctrine |
-| RFC 0001 | **[Observed] Accepted baseline; clarification amendment in review** | Rebind its digest after independent documentation/boundary review |
-| Lay-and-land topology | **[Observed] Accepted** | Confirm the RFC clarification creates no placement or trust-boundary drift |
-| Craft-and-care standards | **[Observed] Adopted baseline; lifecycle amendment in review** | Confirm the central ownership/retirement rules cover every artifact class |
+| RFC 0001 | **[Observed] Accepted** | Launch-gate clarification passed fresh review and confirmation; implementation remains absent |
+| Lay-and-land topology | **[Observed] Accepted** | Remediation review confirmed no placement or trust-boundary drift |
+| Craft-and-care standards | **[Observed] Adopted** | Central ownership/retirement rules passed fresh review and confirmation |
 | OpenSpec capability specifications | **[Observed] Absent at `389c4aa`** | First administration was `NOT READY`; remediate and re-administer at a new named commit |
 
 **Accepted shape anchor:** RFC
-`f2ad18746a60db8cc9435aabca6c81a62017e0fd7e86275bc564c57731d88526`;
+`9982a289e20555b8abaf668a1832ae378fa14d23f006bb27efcc25bb5c88e52e`;
 source/bounds evidence
 `5401c9fb0e621af6f35385f89f9cc2cc1d260a3a2119c457ba9e27784e787a1e`;
 synthetic vectors
 `1b284a304d604fb01d83cb1faab57a5f33a9e62749913abd9c5e93ab3193918e`;
 provenance
 `dcfffe320712afbdcf805e05d30b277130e4bf81f9d718d4f4408bc077f482f0`.
-See [formal review](./legends-and-lore/reviews/0001/2026-08-10-formal-rfc-review.md)
+See [formal review](./legends-and-lore/reviews/0001/2026-08-10-formal-rfc-review.md),
+[launch remediation review](./legends-and-lore/reviews/0001/2026-08-10-launch-gate-remediation-review.md),
 and [Owner Decision 0001](./heart-and-soul/decisions/0001-finalize-and-specify.md).
 The pre-specification instrument is bound in
 [`parameters.md`](../docs/launch-gate/parameters.md). Its v1.0
