@@ -5,6 +5,12 @@ current reviewer-safe projection is `parameters.md`; this history exists to
 satisfy the instrument's durable amendment-log requirement without briefing a
 fresh administration on prior results.
 
+## v1.4 — 2026-08-10
+
+- Replaced the storage-internal E4 scenario with a vision-derived unavailable-
+  quota scenario so no adversarial input depends on corpus-internal structure.
+- Re-sealed the E4 key; all questions and other candidates are unchanged.
+
 ## v1.3 — 2026-08-10
 
 - Added a lived-use thesis falsifier and P6 normalization fidelity.
