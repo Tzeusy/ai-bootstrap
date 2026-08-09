@@ -99,7 +99,7 @@ Scope: v1-mandatory
 - **THEN** network policy blocks it and release validation fails
 
 ### Requirement: [TARGET-STATE] Disabled Sink Non-Instantiation
-MUST ensure a disabled sink imports or instantiates no dependency-specific client, exporter, worker, credential reader, environment-secret reader, DNS lookup, connection pool, checkpoint, lease, task, or runtime path, while permitting exactly one content-safe component-registration row for local health; a never-bound disabled sink MUST have no registration or checkpoint, disabling a previously bound sink MUST retain but not advance its durable registration/checkpoint and remove any lease, and re-enabling it MUST pass exact target/policy digest validation before resuming. Either sink may be enabled independently without enabling the other or adding inbound access.
+MUST ensure a disabled sink imports or instantiates no dependency-specific client, exporter, worker, credential reader, environment-secret reader, DNS lookup, connection pool, lease, task, or runtime path and creates no new sink registration or checkpoint, while permitting exactly one content-safe component-registration row for local health. A never-bound disabled sink MUST keep `selected_sink_registration=NULL` and have no registration or checkpoint. Disabling a previously bound sink MUST retain its immutable registration and inert checkpoint, retain that registration in `selected_sink_registration`, clear pending target/attempt/failure state, remove any lease, stop every live client/worker/task before the disabled state is observable, and never advance the checkpoint while disabled. Re-enabling it MUST pass exact target/policy digest validation before any dependency runtime, secret use, authentication, DNS, pool, or connection resumes. Either sink may be enabled independently without enabling the other or adding inbound access.
 
 ID: REQ-portable-runtime-and-release-007
 Source: RFC 0001 § Runtime and Trust Boundary; § Configuration Contract
@@ -109,9 +109,14 @@ Scope: v1-mandatory
 - **WHEN** exactly one optional sink is enabled
 - **THEN** only that sink's dependencies, secret surface, worker, checkpoint, and outbound destination exist
 
-#### Scenario: Both sinks disabled leave no sink footprint
-- **WHEN** both sinks are disabled
+#### Scenario: Both never-bound sinks disabled leave no delivery footprint
+- **WHEN** both sinks are disabled and neither has ever been bound
 - **THEN** process and network inspection finds no sink clients, credentials reads, DNS activity, checkpoints, leases, dependency imports, or sink tasks
+
+#### Scenario: Previously bound disabled sink retains only inert durable state
+- **WHEN** an enabled bound sink is disabled
+- **THEN** its component retains the selected registration and acknowledged checkpoint for deterministic health and later validation, while pending target, attempt, failure, lease, dependency, client, worker, task, credential, authentication, DNS, pool, and connection state is absent
+- **AND** no retained checkpoint progress changes until re-enable validates both registration digests
 
 ### Requirement: [TARGET-STATE] Immutable Build and Runtime Inputs
 MUST resolve Python and system dependencies from committed lockfiles, base images and fetched artifacts from immutable content digests, and generated artifacts from the bound source revision, and MUST reject floating image tags, mutable downloads, or unconstrained dependency resolution as release inputs.

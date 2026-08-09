@@ -16,7 +16,7 @@ Scope: v1-mandatory
 - **THEN** only that stream is quarantined while healthy Claude and Codex streams and committed sink work continue
 
 ### Requirement: [TARGET-STATE] Exact Durable Cursor Tuple
-MUST persist each source cursor as exactly `(stream_generation,next_byte_offset,prefix_anchor,parser_context)`, where `stream_generation` canonically combines adapter schema ID, native stream identity, and platform generation evidence; `next_byte_offset` is the unsigned start of the next record; `prefix_anchor` contains `algorithm="sha256"`, `schema_id`, profile-fixed `window_count`, `window_start_offset`, and the digest of RFC 8785 canonical arrays of registered kind ID, record-end offset, optional native identity and accounting fingerprint, and normalized context change; and `parser_context` is `{}` for Claude or exact Codex session ID plus latest preceding turn timestamp, model, project basename, and safe anchor, with no raw or content bytes.
+MUST persist each source cursor as exactly `(stream_generation,next_byte_offset,prefix_anchor,parser_context)`, where `stream_generation` canonically combines adapter schema ID, native stream identity, and platform generation evidence; `next_byte_offset` is the unsigned start of the next record; `prefix_anchor` contains `algorithm="sha256"`, `schema_id`, profile-fixed `window_count`, `window_start_offset`, and the digest of RFC 8785 canonical arrays of registered kind ID, record-end offset, optional native identity and accounting fingerprint, and normalized context change; and `parser_context` is `{}` for Claude and for a newly created Codex byte-zero cursor before context, otherwise exact Codex session ID plus latest preceding turn timestamp, model, canonical project basename, and safe anchor, with no raw or content bytes.
 
 ID: REQ-stream-reconciliation-and-health-002
 Source: RFC 0001 § Incremental Reads, Rescans, and Quarantine
@@ -133,7 +133,7 @@ Scope: v1-mandatory
 - **AND** bounded incremental ingestion may continue only where parser and ledger contracts still permit it
 
 ### Requirement: [TARGET-STATE] Coverage and Retention-Gap Semantics
-MUST register an enabled supported source at `state=coverage_unknown,failure_code=coverage_unknown` before first positive discovery with no invented stream/cursor/fact, recover that state only after discovery and one complete reconciliation establishes current coverage, report `state=retention_gap,failure_code=retention_gap` only when disappearance, truncation, or equivalent durable evidence crosses a previously discovered unconsumed cursor, retain every previously accepted fact and aggregate, and never fabricate exact historical coverage. A proven retention gap has no in-place healthy recovery for that ledger epoch: restored source may resume from the held boundary only where safe, but the gap and degraded upward health remain durable; a new technical namespace/epoch begins separately at `coverage_unknown` and does not erase the old gap.
+MUST register an enabled supported source component at `component_registrations.runtime_state=coverage_unknown,state_code=coverage_unknown` before first positive discovery with no invented stream/cursor/fact, recover that state only after discovery and one complete reconciliation establishes current coverage, report `state=retention_gap,failure_code=retention_gap` only when disappearance, truncation, or equivalent durable evidence crosses a previously discovered unconsumed cursor, retain every previously accepted fact and aggregate, and never fabricate exact historical coverage. A proven retention gap has no in-place healthy recovery for that ledger epoch: restored source may resume from the held boundary only where safe, but the gap and degraded upward health remain durable; a new technical namespace/epoch begins separately at `coverage_unknown` and does not erase the old gap.
 
 ID: REQ-stream-reconciliation-and-health-009
 Source: RFC 0001 § Motivation; § Failure-State Contract
@@ -141,7 +141,12 @@ Scope: v1-mandatory
 
 #### Scenario: Undiscovered history remains unknown
 - **WHEN** a configured source has not yet been discovered or observable
-- **THEN** coverage remains `coverage_unknown` without claiming loss or completeness
+- **THEN** its component remains `runtime_state=coverage_unknown,state_code=coverage_unknown` without a stream and without claiming loss or completeness
+
+#### Scenario: First discovered stream starts in one exact cursor transaction
+- **WHEN** canonical discovery first identifies a supported regular source stream
+- **THEN** one transaction creates its `source_streams` row with the profile-derived `stream_generation`, `next_byte_offset=0`, the REQ-stream-reconciliation-and-health-002 prefix-anchor object at `window_start_offset=0` with the SHA-256 digest of RFC 8785 canonical `[]`, `parser_context_json='{}'`, `state=coverage_unknown`, `coverage_state=coverage_unknown`, `failure_code=coverage_unknown`, null failure offset and observation/reconciliation times, and no fact, aggregate, sequence, quota transition, or sink obligation
+- **AND** the source component remains `runtime_state=coverage_unknown,state_code=coverage_unknown` until a complete reconciliation commits the cursor and atomically changes stream and component coverage to `healthy` with null failure/state code and `coverage_state=current`
 
 #### Scenario: Proven unconsumed loss records a gap
 - **WHEN** a discovered source disappears or truncates across its durable unconsumed cursor

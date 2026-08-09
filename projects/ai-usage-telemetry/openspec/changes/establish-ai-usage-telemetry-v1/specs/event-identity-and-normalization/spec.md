@@ -85,7 +85,8 @@ Scope: v1-mandatory
 
 #### Scenario: Structural attribution is preserved
 - **WHEN** an admitted record supplies source time, model, and a repository working directory under its source profile
-- **THEN** the event preserves source time, model, and repository basename or configured alias independently of collection time
+- **THEN** the event preserves source time, model, and the exact repository basename independently of collection time
+- **AND** any configured alias is applied only by presentation or a digest-bound sink policy and never enters the event
 
 #### Scenario: Unknown attribution stays unknown
 - **WHEN** model or project cannot be established from registered same-stream structural context
