@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: [TARGET-STATE] Explicit V1 Quota Capability Matrix
-MUST report Claude usage `supported` with Claude quota `unavailable`, and Codex usage plus registered rate-limit snapshots `supported` only when an active source profile admits their structure; `unavailable`, `absent`, `null`, `stale`, and `unknown` MUST remain distinct states and never be represented as numeric zero.
+MUST report Claude usage `supported` with Claude quota `unavailable`, and Codex usage plus registered rate-limit snapshots `supported` only when an active source profile admits their structure; persist the latest closed quota component outcome atomically as exactly `disabled`, `coverage_unknown`, `unavailable`, `absent`, `null`, `state_only`, or `observed`; define `coverage_unknown` as an enabled quota-capable source before its first eligible admitted record in the active coverage namespace, define Codex `absent` as no `/payload/rate_limits` member, `null` as an explicit JSON null member, `state_only` as an admitted non-null rate-limits object with identity/context but no registered window carrying a complete utilization, and `observed` as at least one committed snapshot from the record; and keep those availability states distinct from snapshot freshness `fresh|stale|unknown` and from numeric zero.
 
 ID: REQ-quota-snapshot-semantics-001
 Source: RFC 0001 § Evidence Baseline; § QuotaSnapshot
@@ -15,8 +15,16 @@ Scope: v1-mandatory
 - **WHEN** Claude quota is requested or Codex `rate_limits` is absent or null
 - **THEN** the result reports `unavailable`, `absent`, or `null` as applicable and emits no fabricated zero snapshot
 
+#### Scenario: State-only rate-limit object remains fact-free
+- **WHEN** a supported Codex record has an admitted non-null rate-limits object but no registered window with complete utilization
+- **THEN** quota component state becomes `state_only` in the same transaction as cursor progress and no quota fact, utilization, sequence, or sink obligation is created
+
+#### Scenario: Disabled and newly enabled quota registrations are explicit
+- **WHEN** a configured source is disabled, or a quota-capable source is enabled before its first eligible record in the active namespace
+- **THEN** the collector MUST persist quota availability `disabled` or `coverage_unknown` respectively, MUST emit no quota fact, and MUST transition from `disabled` through `coverage_unknown` to the exact first observed `absent|null|state_only|observed` outcome; `disabled` remains healthy-by-contract while `coverage_unknown` contributes unknown freshness wherever quota currency is required
+
 ### Requirement: [TARGET-STATE] Closed QuotaSnapshot and Fingerprint Shape
-MUST admit a `QuotaSnapshot` only with canonical fact identity, SHA-256 fingerprint, nullable registry-derived source-observed time, collected time, configured account alias, vendor, limit name, native limit, window, and scope identities, canonical utilization decimal in inclusive `0.0..1.0`, optional window minutes, reset time, and scope, recorded freshness state, one exact evidence enum, and empty v1 metadata; its fingerprint MUST be SHA-256 over `UTF-8("aiut-accounting-fingerprint-v1\n")` plus RFC 8785 canonical UTF-8 JSON of exactly `{"adapter_schema_id":string,"fact_kind":"quota_snapshot","native_identity":json,"source_observed_at":RFC3339-UTC-string-or-null,"quota":{"vendor":string,"native_limit_identity":string,"limit_name":string,"utilization":canonical-decimal-string,"native_window_identity":string,"window_minutes":non-negative-integer-or-null,"reset_at":RFC3339-UTC-string-or-null,"native_scope_identity":string,"scope":string-or-null,"freshness_evidence":enum}}`, excluding collected time, account alias, current freshness state, paths, metadata, and sinks.
+MUST admit a `QuotaSnapshot` only with canonical fact identity, SHA-256 fingerprint, nullable registry-derived source-observed time, collected time, nullable configured account alias, vendor, limit name, native limit, window, and scope identities, canonical utilization decimal in inclusive `0.0..1.0`, optional window minutes, reset time, and scope, recorded freshness state, one exact evidence enum, and empty v1 metadata; absent account alias MUST remain null without a default, is presentation-only, and is never a quota subject or fact-identity member; its fingerprint MUST be SHA-256 over `UTF-8("aiut-accounting-fingerprint-v1\n")` plus RFC 8785 canonical UTF-8 JSON of exactly `{"adapter_schema_id":string,"fact_kind":"quota_snapshot","native_identity":json,"source_observed_at":RFC3339-UTC-string-or-null,"quota":{"vendor":string,"native_limit_identity":string,"limit_name":string,"utilization":canonical-decimal-string,"native_window_identity":string,"window_minutes":non-negative-integer-or-null,"reset_at":RFC3339-UTC-string-or-null,"native_scope_identity":string,"scope":string-or-null,"freshness_evidence":enum}}`, excluding collected time, account alias, current freshness state, paths, metadata, and sinks.
 
 ID: REQ-quota-snapshot-semantics-002
 Source: RFC 0001 § QuotaSnapshot
@@ -79,7 +87,7 @@ Scope: v1-mandatory
 - **THEN** the lexicographically least fact identity wins the tie or current state is `unknown`, respectively
 
 ### Requirement: [TARGET-STATE] Query-Time Freshness Recalculation
-SHALL make the read-only current quota projection recompute `fresh` or `stale` against inspection time using the immutable source-and-limit threshold while preserving recorded evidence, source time, collection time, and observation state; stale, unknown, absent, and null states remain queryable without making a live-vendor-quota claim.
+SHALL make the read-only quota view emit one `component_state` row for each registered quota component and one `snapshot` row per retained fact, recompute current snapshot `fresh` or `stale` and `age_seconds` against inspection time using the immutable source-and-limit threshold while preserving recorded evidence, source time, collection time, and observation state, and keep `unavailable`, `absent`, `null`, `state_only`, stale, and unknown queryable under their exact fact/null rules without making a live-vendor-quota claim.
 
 ID: REQ-quota-snapshot-semantics-006
 Source: RFC 0001 § QuotaSnapshot; § Event Time and Projection Time
@@ -94,8 +102,12 @@ Scope: v1-mandatory
 - **WHEN** a snapshot lacks eligible source time
 - **THEN** inspection exposes its recorded values and `unknown` state without selecting it as current
 
+#### Scenario: Fact-free quota outcomes remain distinguishable
+- **WHEN** fixed-clock inspection covers Claude unavailable and Codex absent, null, and state-only component fixtures
+- **THEN** each emits a separate component-state row with null fact, subject, utilization, and freshness fields and its exact availability enum
+
 ### Requirement: [TARGET-STATE] Quota Failure Isolation
-MUST keep quota failure, malformed quota, stale evidence, and capability unavailability from blocking an independently valid usage event, another source stream, or either optional sink, while every capability and health summary exposes the affected quota state without masking it.
+MUST keep a previously committed independent usage event, another source stream, and either optional sink unaffected by later quota failure, stale evidence, or capability unavailability; a malformed quota candidate in the same complete record-set transaction MUST still roll back that record's otherwise-new usage candidate and hold before the record; and every quota component and health summary MUST expose the exact availability/freshness state without masking it. Quota semantics own only quota component transitions and snapshot selection; source quarantine and cursor recovery remain owned by the stream contract.
 
 ID: REQ-quota-snapshot-semantics-007
 Source: RFC 0001 § QuotaSnapshot; § Failure-State Contract
@@ -108,3 +120,7 @@ Scope: v1-mandatory
 #### Scenario: Malformed quota does not affect an independent usage record
 - **WHEN** one Codex rate-limit record is malformed after an independent supported usage record has committed
 - **THEN** the affected stream holds before the malformed record without fabricating quota or retracting the committed usage contribution
+
+#### Scenario: Same-record malformed quota rolls back the record set
+- **WHEN** one complete Codex record contains a new usage candidate and a malformed quota candidate
+- **THEN** neither candidate nor the component-state change or cursor commits, and stream reconciliation owns the exact held state and recovery

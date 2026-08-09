@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: [TARGET-STATE] Fail-Closed Source Profile Activation
-MUST initialize every Claude or Codex source capability as `unsupported_profile` and open no real source mount or accept any fact until one immutable release-profile member covers the exact source-build family, extraction manifest, native and logical identity, arithmetic, replay and mutation behavior, finite irrelevant-kind table, parser bounds, and positive and negative error vectors.
+MUST initialize every enabled Claude or Codex source component as `runtime_state=unsupported_profile,state_code=unsupported_profile`, open no real source mount, create no stream cursor, and accept no fact until one immutable release-profile member covers the exact source-build family, extraction manifest, native and logical identity, arithmetic, replay and mutation behavior, finite irrelevant-kind table, parser bounds, and positive and negative error vectors; recovery MUST require an accepted matching profile and transition the component to `coverage_unknown` before discovery, and enabled unsupported state MUST degrade family/global health while disabled sources remain excluded.
 
 ID: REQ-source-adapter-profiles-001
 Source: RFC 0001 § Evidence Baseline; § Configuration Contract
@@ -15,6 +15,10 @@ Scope: v1-mandatory
 - **WHEN** the configured source build or record shape is absent from the active profile
 - **THEN** startup or that source remains `unsupported_profile` before mount traversal
 - **AND** no fact is accepted and no similar-looking rule is substituted
+
+#### Scenario: Supported profile recovery begins without a cursor
+- **WHEN** a later accepted profile exactly covers an enabled unsupported source
+- **THEN** the source component transitions atomically to `coverage_unknown` before discovery and still has no invented stream, cursor, or accepted fact
 
 ### Requirement: [TARGET-STATE] Streaming Deny-by-Default Manifest
 MUST use a streaming syntax traverser with a compile-time manifest whose exact schema is `schema_id`, `build_families[]`, `discriminators[{path,type,admitted_value,disposition}]`, `projected_paths[{record_kind,path,type,requiredness,multiplicity,role}]`, `content_paths[]`, `irrelevant_kinds[{discriminator_path,value}]`, and `limits_ref`; every list is closed and digest-covered, every unlisted path is skip-only, every unlisted discriminator holds, and neither runtime configuration nor a general-purpose mixed-content deserializer may add or decode a value.
@@ -34,7 +38,7 @@ Scope: v1-mandatory
 - **AND** an unregistered discriminator holds the stream rather than being treated as irrelevant
 
 ### Requirement: [TARGET-STATE] Exact Parser-Limit Profile Schema
-MUST require every active adapter member to provide unsigned inclusive `max_record_bytes` measured from record start excluding the delimiter, `max_depth` with the root at one, `max_keys_per_record`, `max_encoded_key_bytes`, `max_projected_occurrences`, `max_application_memory_bytes`, and `max_structural_steps`, plus for every projected path inclusive `max_encoded_bytes`, `max_decoded_utf8_bytes`, `max_multiplicity`, integer `min_value` and `max_value` or decimal `min_value`, `max_value`, `max_precision`, and `max_scale`; all values, the minimum supported memory in bytes, counting algorithms, measurement evidence digests, and architecture results are immutable profile inputs, and every `N` is admitted while `N+1`, missing data, or checked-arithmetic overflow produces `record_limit` without a default.
+MUST require every active adapter member to provide unsigned inclusive `max_record_bytes` measured from record start excluding the delimiter, `max_depth` with the root at one, `max_keys_per_record`, `max_encoded_key_bytes`, `max_projected_occurrences`, `max_application_memory_bytes`, and `max_structural_steps`, plus for every projected path inclusive `max_encoded_bytes`, `max_decoded_utf8_bytes`, `max_multiplicity`, integer `min_value` and `max_value` or decimal `min_value`, `max_value`, `max_precision`, and `max_scale`; all values, the minimum supported memory in bytes, counting algorithms, measurement evidence digests, and architecture results are immutable profile inputs, and every `N` is admitted while `N+1`, missing data, or checked-arithmetic overflow yields the pre-ledger `record_limit` disposition whose stream state, cursor, recovery, and upward health are owned by stream reconciliation, without a default.
 
 ID: REQ-source-adapter-profiles-003
 Source: RFC 0001 § Mixed-Content Streaming Field Projection
@@ -114,7 +118,7 @@ Scope: v1-mandatory
 - **THEN** quota remains `unavailable`, the candidate path is not opened, and Claude usage collection continues independently
 
 ### Requirement: [TARGET-STATE] Exact Codex Extraction Manifest
-MUST define `codex/rollout-jsonl@1` discovery as regular non-symlink `rollout-*.jsonl` files strictly beneath `/sources/codex/sessions`; admit exact top-level discriminator values `session_meta`, `turn_context`, and `event_msg`; classify only `/type="event_msg"` plus `/payload/type="token_count"` as fact-bearing; project strings at `/timestamp`, `/type`, `/payload/type`, `/payload/id` for `session_meta`, and `/payload/model` and `/payload/cwd` for `turn_context`; project non-negative integers named `input_tokens`, `cached_input_tokens`, `cache_write_input_tokens`, `output_tokens`, `reasoning_output_tokens`, and `total_tokens` beneath both `/payload/info/total_token_usage` and `/payload/info/last_token_usage`; project `/payload/rate_limits/limit_id` as a bounded string and each registered `primary` or `secondary` window's `used_percent` as an exact decimal in `0..100` and optional `window_minutes` and `resets_at` as non-negative integers; and require each source-build member to digest-cover its complete finite non-wildcard irrelevant envelope and payload-value table before activation.
+MUST define `codex/rollout-jsonl@1` discovery as regular non-symlink `rollout-*.jsonl` files strictly beneath `/sources/codex/sessions`; admit exact top-level discriminator values `session_meta`, `turn_context`, and `event_msg`; classify only `/type="event_msg"` plus `/payload/type="token_count"` as fact-bearing; project strings at `/timestamp`, `/type`, `/payload/type`, `/payload/id` for `session_meta`, and `/payload/model` and `/payload/cwd` for `turn_context`; project non-negative integers named `input_tokens`, `cached_input_tokens`, `cache_write_input_tokens`, `output_tokens`, `reasoning_output_tokens`, and `total_tokens` beneath both `/payload/info/total_token_usage` and `/payload/info/last_token_usage`; register `/payload/rate_limits` itself as an optional `object|null` presence path, project its `/limit_id` as a bounded string and each registered `primary` or `secondary` window's `used_percent` as an exact decimal in `0..100` and optional `window_minutes` and `resets_at` as non-negative integers; classify missing member, explicit null, admitted object without a complete registered window, and at least one complete window as the quota outcomes `absent`, `null`, `state_only`, and `observed`; and require each source-build member to digest-cover its complete finite non-wildcard irrelevant envelope and payload-value table before activation.
 
 ID: REQ-source-adapter-profiles-008
 Source: RFC 0001 § Source-Specific V1 Attribution → Codex rollouts
@@ -127,6 +131,10 @@ Scope: v1-mandatory
 #### Scenario: Unknown advancing kind holds
 - **WHEN** a rollout contains an unprofiled envelope discriminator, an unprofiled `event_msg` payload kind, or an unregistered quota field
 - **THEN** the value is not opportunistically decoded or consumed and the stream holds before that record
+
+#### Scenario: Quota presence classes are structural
+- **WHEN** otherwise-equal supported records omit `rate_limits`, set it to JSON null, provide only its admitted identity/context, or provide a complete primary window
+- **THEN** their quota candidate outcomes are respectively `absent`, `null`, `state_only`, and `observed` without treating any as zero
 
 ### Requirement: [TARGET-STATE] Same-Stream Codex Context
 MUST interpret Codex usage using only the latest preceding `turn_context` from the same source stream, never look ahead or cross streams, begin every byte-zero scan with empty session and turn context, and hold the stream when required session, timestamp, model, or project context is missing.
@@ -144,7 +152,7 @@ Scope: v1-mandatory
 - **THEN** the adapter accepts no usage fact and quarantines the affected stream
 
 ### Requirement: [TARGET-STATE] Evidence-Gated Codex Accounting
-MUST require an accepted build member to declare and vector-prove the componentwise-monotonic cumulative landmark, reset disposition, relation to `last_token_usage`, cache-write presence, one of exactly `exclusive_direct`, `inclusive_subtract`, or `unclassified_total` for each input-cache and output-reasoning axis, exact non-negative delta calculation, and the mapping of one advancing landmark to one logical request; unresolved relationships produce `unsupported_accounting_profile`, while decreases, impossible subtraction, or declared-relation mismatches are malformed.
+MUST require an accepted build member to declare and vector-prove the componentwise-monotonic cumulative landmark, reset disposition, relation to `last_token_usage`, cache-write presence, one of exactly `exclusive_direct`, `inclusive_subtract`, or `unclassified_total` for each input-cache and output-reasoning axis, exact non-negative delta calculation, and the mapping of one advancing landmark to one logical request; an unresolved relationship MUST keep the enabled Codex source component at `runtime_state=unsupported_accounting_profile,state_code=unsupported_accounting_profile` before fact acceptance or cursor creation, degrade upward health, and recover only through an accepted accounting member into `coverage_unknown`; decreases, impossible subtraction, or declared-relation mismatches after activation are recognized malformed stream records.
 
 ID: REQ-source-adapter-profiles-010
 Source: RFC 0001 § Source-Specific V1 Attribution → Codex rollouts
@@ -160,7 +168,7 @@ Scope: v1-mandatory
 - **THEN** no usage fact is accepted and the stream reports `unsupported_accounting_profile` or the applicable malformed hold
 
 ### Requirement: [TARGET-STATE] Closed Record Outcome Set
-MUST classify each complete or partial input as exactly one pre-ledger record disposition with a deterministic ordered zero-or-more candidate-fact set and one parser-context transition: `incomplete_tail`, `context_only`, `registered_irrelevant`, `candidate_set`, `unknown_kind`, `recognized_malformed`, `schema_inconsistent`, or `record_limit`; order a Claude candidate set as its single usage event and a Codex token-count candidate set as usage first when present followed by `primary` then `secondary` quota windows when present; accept the ledger's later `duplicate_only`, `mixed_new_and_duplicate`, or `identity_collision` record-set outcome without reordering; and emit no raw-record passthrough, content, credentials, or unregistered categories or metadata.
+MUST classify each complete or partial input as exactly one pre-ledger record disposition with a deterministic ordered zero-or-more candidate-fact set, zero-or-one quota component-state transition, and one parser-context transition: `incomplete_tail`, `context_only`, `registered_irrelevant`, `candidate_set`, `unknown_kind`, `recognized_malformed`, `schema_inconsistent`, `unregistered_category`, or `record_limit`; order a Claude candidate set as its single usage event and a Codex token-count candidate set as usage first when present followed by `primary` then `secondary` quota windows when present; accept the ledger's later `duplicate_only`, `mixed_new_and_duplicate`, or `identity_collision` record-set outcome without reordering; leave exact stored stream state, failure code, cursor/fact effect, recovery, and upward-health propagation to stream reconciliation; and emit no raw-record passthrough, content, credentials, or unregistered categories or metadata.
 
 ID: REQ-source-adapter-profiles-011
 Source: RFC 0001 § Adapter Contract; § Failure-State Contract

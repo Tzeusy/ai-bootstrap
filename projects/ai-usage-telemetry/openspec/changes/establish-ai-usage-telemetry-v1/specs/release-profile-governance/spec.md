@@ -16,7 +16,7 @@ Scope: v1-mandatory
 - **THEN** startup fails before scanning, source mounting, credential access, client creation, or export
 
 ### Requirement: [TARGET-STATE] Exact Release-Profile Document and Digest
-MUST encode the profile as RFC 8785 canonical JSON with exact top-level keys `schema="aiut.release-profile/v1"`, `profile_id`, `source_revision`, `dependency_lock_digest`, `adapter_profiles`, `identity_and_fingerprint_profile`, `parser_profile`, `reconciliation_profile`, `storage_profile`, `quota_freshness_profile`, `ledger_schema_digest`, `query_schema_digest`, `otlp_projection_profile`, `postgresql_projection_profile`, `runtime_profile`, `synthetic_evidence_inventory`, `capability_acceptance`, and `architecture_evidence`, with no extra keys, and compute its digest as SHA-256 over `UTF-8("aiut-release-profile-v1\n")` plus those canonical bytes; every nested member MUST include its schema ID, immutable values, evidence digests, and compatibility identifiers.
+MUST encode the profile as RFC 8785 canonical JSON with exact top-level keys `schema="aiut.release-profile/v1"`, `profile_id`, `source_revision`, `dependency_lock_digest`, `adapter_profiles`, `identity_and_fingerprint_profile`, `parser_profile`, `reconciliation_profile`, `storage_profile`, `quota_freshness_profile`, `ledger_schema_digest`, `query_schema_digest`, `otlp_projection_profile`, `postgresql_projection_profile`, `runtime_profile`, `synthetic_evidence_inventory`, `capability_acceptance`, and `architecture_evidence`, with no extra keys, and compute its digest as SHA-256 over `UTF-8("aiut-release-profile-v1\n")` plus those canonical bytes; every nested member MUST include its schema ID, immutable values, evidence digests, and compatibility identifiers. `ledger_schema_digest` MUST cover component registrations, fact-free quota states, sink registrations and digest domains, pending target metadata, health counters, and tagged null aggregate buckets; `query_schema_digest` MUST cover all exact view/JSON columns, null rules, ordering, canonical encoding, and inspection-time exceptions; `otlp_projection_profile` MUST cover protocol, protobuf descriptor and encoder digests, deterministic/compression settings, encoded-size domain, and batch-vector schema; `postgresql_projection_profile` MUST cover exact request nullability and freshness checks; and `runtime_profile` MUST cover the complete TOML grammar and canonical sink-target algorithms.
 
 ID: REQ-release-profile-governance-002
 Source: RFC 0001 § Defined Terms; § Specification and Doctrine Boundary → Required before implementation or release OpenSpec
@@ -31,7 +31,7 @@ Scope: v1-mandatory
 - **THEN** the affected capability cannot activate and release fails closed
 
 ### Requirement: [TARGET-STATE] Runtime Configuration Can Only Select or Narrow
-MUST allow operator configuration only to select a profile-supported capability, choose configured aliases and technical namespaces, set polling interval where permitted, and narrow declared PostgreSQL or OTLP allowlists; configuration MUST NOT raise, replace, patch, or widen source-build membership, extraction paths, ledger admission, identity, fingerprint, arithmetic, freshness, parser, storage, reconciliation, vocabulary, or sink-budget values.
+MUST allow operator configuration only through the exact TOML grammar to select a profile-supported capability, choose distinct account and project presentation aliases and technical namespaces, set polling interval where permitted, and narrow declared PostgreSQL or OTLP allowlists; configuration MUST NOT raise, replace, patch, or widen source-build membership, extraction paths, ledger admission, identity, fingerprint, arithmetic, freshness, parser, storage, reconciliation, vocabulary, encoding, or sink-budget values, and every effective sink alias/allowlist selection MUST enter its persisted projection-policy digest.
 
 ID: REQ-release-profile-governance-003
 Source: RFC 0001 § Defined Terms; § Privacy and Cardinality Budget
@@ -91,7 +91,7 @@ Scope: v1-mandatory
 - **THEN** it remains `unsupported_accounting_profile` or `unsupported_profile` and accepts no fact
 
 ### Requirement: [TARGET-STATE] Profile Change and Migration Contract
-MUST give every changed profile new ID and digest, bind a compatibility review result, declare all schema migration, full-rescan, origin-backfill, identity, fingerprint, category, stable-view, and checkpoint consequences, preserve accepted facts and meanings, and trigger every required recovery operation without double counting or silently resetting state.
+MUST give every changed profile new ID and digest, bind a compatibility review result, declare all schema migration, full-rescan, origin-backfill, identity, fingerprint, category, component/quota state, stable-view, sink-registration, target/policy-digest, encoded-batch, and checkpoint consequences, preserve accepted facts and meanings, and trigger every required recovery operation without double counting or silently resetting state. A compatible upgrade may reuse a sink tuple only when its recomputed canonical target and effective projection-policy digests remain byte-equal; any changed digest requires a new tuple at ledger origin while the old registration/checkpoint remains durable.
 
 ID: REQ-release-profile-governance-007
 Source: RFC 0001 § Configuration Contract; § Compatibility and Evolution
@@ -104,6 +104,10 @@ Scope: v1-mandatory
 #### Scenario: Undeclared incompatible change fails
 - **WHEN** a new profile changes identity or fingerprint semantics without a migration or backfill plan and new schema or domain identifiers
 - **THEN** restart fails closed on existing state
+
+#### Scenario: Projection profile change cannot inherit a checkpoint silently
+- **WHEN** a new release changes OTLP encoding/schema policy or PostgreSQL projection policy so the effective registration digest changes
+- **THEN** the old tuple remains preserved and blocked from reuse, and only a newly bound tuple may start from ledger origin
 
 ### Requirement: [TARGET-STATE] Per-Capability Runtime Authorization
 MUST make `capability_acceptance` an exact map containing all eleven capability names, each with state `accepted`, `rejected`, or `unknown` and an immutable external decision-record digest; allow each domain's accepted state and trace to remain independent; authorize non-synthetic source mounting, fact acceptance, sink creation, production packaging, and release only when all eleven entries are `accepted` and every selected domain profile is active; and authorize only the restricted disposable synthetic harness when `synthetic-usage-spine` alone is accepted, leaving owner checklist, reviewer identity, decision procedure, and archival mechanics to the separate governance artifact referenced by each digest.
