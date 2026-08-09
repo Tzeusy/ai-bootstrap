@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: [TARGET-STATE] Fail-Closed Source Profile Activation
-MUST initialize every enabled Claude or Codex source component as `runtime_state=unsupported_profile,state_code=unsupported_profile`, open no real source mount, create no stream cursor, and accept no fact until one immutable release-profile member covers the exact source-build family, extraction manifest, native and logical identity, arithmetic, replay and mutation behavior, finite irrelevant-kind table, parser bounds, and positive and negative error vectors; recovery MUST require an accepted matching profile and transition the component to `coverage_unknown` before discovery, and enabled unsupported state MUST degrade family/global health while disabled sources remain excluded.
+MUST initialize every enabled Claude or Codex source component as `runtime_state=unsupported_profile,state_code=unsupported_profile`, open no real source mount, create no stream cursor, and accept no fact until one immutable release-profile member covers the exact source-build family, extraction manifest, native and logical identity, arithmetic, replay and mutation behavior, finite irrelevant-kind table, parser bounds, and positive and negative error vectors; recovery MUST require an accepted matching profile and transition the component to `runtime_state=coverage_unknown,state_code=coverage_unknown` before discovery, and enabled unsupported state MUST degrade family/global health while disabled sources remain excluded.
 
 ID: REQ-source-adapter-profiles-001
 Source: RFC 0001 § Evidence Baseline; § Configuration Contract
@@ -18,7 +18,7 @@ Scope: v1-mandatory
 
 #### Scenario: Supported profile recovery begins without a cursor
 - **WHEN** a later accepted profile exactly covers an enabled unsupported source
-- **THEN** the source component transitions atomically to `coverage_unknown` before discovery and still has no invented stream, cursor, or accepted fact
+- **THEN** the source component transitions atomically to `runtime_state=coverage_unknown,state_code=coverage_unknown` before discovery and still has no invented stream, cursor, or accepted fact
 
 ### Requirement: [TARGET-STATE] Streaming Deny-by-Default Manifest
 MUST use a streaming syntax traverser with a compile-time manifest whose exact schema is `schema_id`, `build_families[]`, `discriminators[{path,type,admitted_value,disposition}]`, `projected_paths[{record_kind,path,type,requiredness,multiplicity,role}]`, `content_paths[]`, `irrelevant_kinds[{discriminator_path,value}]`, and `limits_ref`; every list is closed and digest-covered, every unlisted path is skip-only, every unlisted discriminator holds, and neither runtime configuration nor a general-purpose mixed-content deserializer may add or decode a value.
@@ -86,7 +86,7 @@ Scope: v1-mandatory
 - **AND** no wildcard irrelevant-kind rule is applied
 
 ### Requirement: [TARGET-STATE] Claude Identity, Attribution, and Arithmetic
-MUST require Claude native and logical request identity `(sessionId,requestId)`, treat `message.id` as a mandatory consistency value, map `input_tokens` to `input_uncached`, `cache_creation_input_tokens` to `input_cache_write`, `cache_read_input_tokens` to `input_cache_read`, and `output_tokens` to `output_unclassified`, preserve absent optional amounts as absent, use the record's own timestamp, model, and `cwd` basename or exact configured alias without cross-record context, and quarantine same-identity changes in time, message identity, model, or amount.
+MUST require Claude native and logical request identity `(sessionId,requestId)`, treat `message.id` as a mandatory consistency value, map `input_tokens` to `input_uncached`, `cache_creation_input_tokens` to `input_cache_write`, `cache_read_input_tokens` to `input_cache_read`, and `output_tokens` to `output_unclassified`, preserve absent optional amounts as absent, use the record's own timestamp and model plus the canonical repository basename derived from that record's `cwd` without cross-record context, keep every project alias outside the normalized event, fact/request identity, accounting fingerprint, and aggregate keys, and expose aliases only through presentation and digest-bound sink policy, and quarantine same-identity changes in time, message identity, model, or amount.
 
 ID: REQ-source-adapter-profiles-006
 Source: RFC 0001 § Source-Specific V1 Attribution → Claude Code sessions
@@ -95,7 +95,7 @@ Scope: v1-mandatory
 #### Scenario: Claude record normalizes faithfully
 - **WHEN** a qualified assistant record has the required identity, timestamp, model, project context, and registered counters
 - **THEN** it yields the exact non-overlapping category mapping and one source-backed logical request identity
-- **AND** no neighboring record supplies context
+- **AND** its project is exactly the record's repository basename, no configured alias or neighboring record supplies event context, and aliases remain presentation/sink-policy only
 
 #### Scenario: Missing or mutated identity quarantines
 - **WHEN** `requestId` is missing or an identical identity arrives with a different timestamp, message ID, model, or amount
