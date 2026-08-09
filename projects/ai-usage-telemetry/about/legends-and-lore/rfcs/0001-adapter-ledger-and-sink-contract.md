@@ -120,14 +120,19 @@ five-minute default interval. The interval is configurable in TOML; five
 minutes is the v1 default because this is historical personal analytics, not a
 low-latency control loop.
 
-The image has four canonical filesystem targets. A deployment may choose the
-host paths backing them, but not different in-container paths:
+The image has three canonical source/state filesystem targets. A deployment may
+choose the host paths backing them, but not different in-container paths:
 
 | Target | Kind | Required mode | Purpose |
 |---|---|---|---|
 | `/sources/claude/sessions` | directory | read-only | Claude Code project-session JSONL |
 | `/sources/codex/sessions` | directory | read-only | Codex rollout JSONL |
 | `/data` | directory/volume | read-write | SQLite, migrations, and collector-owned state |
+
+The read-only TOML file is a separate configuration surface. Its fixed
+in-container path and mount-preflight behavior are owned by the
+`portable-runtime-and-release` capability. `/tmp` is ephemeral container
+scratch, not a canonical host-backed source/state target.
 
 Startup fails closed unless each enabled source target is a distinct mount at
 its canonical target, is read-only, and resolves without following a symlink.
