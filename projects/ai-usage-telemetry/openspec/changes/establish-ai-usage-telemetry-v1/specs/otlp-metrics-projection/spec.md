@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: [TARGET-STATE] Independent OTLP Checkpoint Identity
-MUST identify every enabled OTLP instance by exactly `(sink_id,destination_id,projection_schema_id,ledger_epoch)`, persist the endpoint and narrowed attribute-policy digest against that key, reject reuse for a changed destination, policy, schema, or ledger, and initialize a new key at acknowledged sequence zero so late enablement emits the complete current cumulative projection independently of PostgreSQL.
+MUST identify every enabled OTLP instance by exactly `(sink_id,destination_id,projection_schema_id,ledger_epoch)`, encode its content-safe canonical target document as exactly `{"kind":"otlp","protocol":"http/protobuf","endpoint":{"scheme":string,"host_ascii":string,"port":unsigned-integer,"path":string}}`, and encode its effective policy document as exactly `{"schema":"aiut.otlp-policy/v1","projection_schema_id":"aiut-otlp-metrics/v1","otlp_projection_profile_digest":lowercase-hex-sha256,"narrowed_vocabularies":{"models":sorted-string-array,"projects":sorted-string-array,"accounts":sorted-string-array,"limits":sorted-string-array,"windows":sorted-string-array,"scopes":sorted-string-array},"project_aliases":sorted-array,"account_alias":string-or-null}`. The final effective metrics endpoint MUST use standard OTLP metrics-over-base precedence, require `http|https`, lowercase scheme and IDNA ASCII host, materialize the default or explicit port, normalize percent-encoding and path, and reject userinfo, query, fragment, and multi-endpoint input. The ledger MUST persist SHA-256 over `UTF-8("aiut-sink-target-v1\n")` plus RFC 8785 target bytes and SHA-256 over `UTF-8("aiut-sink-policy-v1\n")` plus RFC 8785 policy bytes against the full key; first enable MUST bind registration and a zero checkpoint before exporter or lease creation, restart MUST byte-compare recomputed digests, any endpoint/policy/schema/ledger change under the key MUST block as `registration_mismatch`, a legitimate change MUST use a new key at origin, and migration MUST preserve both digests.
 
 ID: REQ-otlp-metrics-projection-001
 Source: RFC 0001 § Sink Independence
@@ -15,6 +15,10 @@ Scope: v1-mandatory
 #### Scenario: Reused identity with changed target is rejected
 - **WHEN** an endpoint or policy changes while reusing `destination_id` or a new sink is configured to start at the latest sequence
 - **THEN** configuration fails before client creation or export and no checkpoint advances
+
+#### Scenario: Restart revalidates the exact binding
+- **WHEN** restart resolves the same normalized endpoint and policy document under the same full tuple
+- **THEN** both digests compare byte-equal before exporter or lease creation and the retained checkpoint may resume
 
 ### Requirement: [TARGET-STATE] Exact OTLP V1 Descriptor Manifest
 MUST freeze `projection_schema_id="aiut-otlp-metrics/v1"` with one Resource having exact attributes `service.name="ai-usage-telemetry"`, `service.namespace="aiut"`, `service.instance.id=<collector_namespace>`, `aiut.ledger.namespace=<ledger_namespace>`, `aiut.ledger.epoch=<ledger_epoch>`, and `aiut.projection.schema_id="aiut-otlp-metrics/v1"`; one instrumentation Scope named `ai-usage-telemetry` with version `1` and no scope attributes; and exactly four metric descriptors: `ai.usage.tokens`, unit `{token}`, description `Cumulative number of normalized AI tokens accepted by the local ledger.`, monotonic cumulative integer Sum; `ai.usage.requests`, unit `{request}`, description `Cumulative number of first-seen logical AI requests accepted by the local ledger.`, monotonic cumulative integer Sum; `ai.quota.utilization`, unit `1`, description `Latest observed local quota utilization ratio from zero through one.`, double Gauge; and `ai.quota.age`, unit `s`, description `Age in seconds of the selected local quota observation at export time.`, non-negative integer Gauge.
@@ -93,7 +97,7 @@ Scope: v1-mandatory
 - **AND** a non-mergeable quota value blocks rather than entering `other`
 
 ### Requirement: [TARGET-STATE] Exact OTLP Budget Profile Schema
-MUST require immutable byte-valued `max_attribute_utf8_bytes` per attribute, explicit legal tuple arrays per instrument, unsigned `max_series` per instrument and `max_process_series`, unsigned `max_serialized_request_bytes`, named accounting partitions, an optional single reserved `other` tuple for each allowed Sum partition, and effective SDK/exporter caps and evidence digests; startup MUST enumerate realizable complete series identities and require every project cap at or below its SDK cap, while runtime atomically rejects `N+1`, invalid UTF-8, checked-arithmetic overflow, or an unlisted tuple without eviction, omission, or first-seen semantics.
+MUST require immutable byte-valued `max_attribute_utf8_bytes` per attribute, explicit legal tuple arrays per instrument, unsigned `max_series` per instrument and `max_process_series`, unsigned `max_serialized_request_bytes`, named accounting partitions, an optional single reserved `other` tuple for each allowed Sum partition, and effective SDK/exporter caps and evidence digests. The encoded-size domain MUST be exactly the uncompressed deterministic protobuf message bytes of `opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest` sent as the OTLP/HTTP `application/x-protobuf` body, with protocol `http/protobuf`, compression `none`, schema-descriptor digest, encoder artifact digest, deterministic serialization enabled, Resource/Scope/metric/data-point/attribute ordering fixed by this spec, and HTTP headers, HTTP framing, TLS, and transport compression excluded; these settings and digests MUST be members of `otlp_projection_profile_digest` and therefore of the persisted projection-policy digest. Startup MUST enumerate realizable complete series identities and require every project cap at or below its SDK cap, while runtime atomically rejects `N+1`, invalid UTF-8, checked-arithmetic overflow, or an unlisted tuple without eviction, omission, or first-seen semantics.
 
 ID: REQ-otlp-metrics-projection-007
 Source: RFC 0001 § OTLP Metrics Projection
@@ -107,6 +111,10 @@ Scope: v1-mandatory
 #### Scenario: One-past or hidden lower cap fails closed
 - **WHEN** legal tuple enumeration exceeds a ceiling, count arithmetic overflows, a value exceeds its UTF-8 cap, serialized output is one byte over, or the SDK cap is lower than the project cap
 - **THEN** exporter creation or tuple admission fails closed and no checkpoint advances
+
+#### Scenario: Size is counted in one frozen domain
+- **WHEN** the same semantic request is encoded with a different protocol, protobuf schema descriptor, encoder artifact, deterministic setting, or compression mode
+- **THEN** its OTLP profile and projection-policy digest differ and the existing registration cannot be reused
 
 ### Requirement: [TARGET-STATE] Fenced Single-Exporter Lease
 SHALL allow exactly one process to export a checkpoint tuple under the ledger-backed lease row, allocate a strictly increasing fencing token on each acquisition, require unexpired holder and matching token before every send and acknowledgement, and cancel an acknowledgement path immediately upon lease loss.
@@ -124,7 +132,7 @@ Scope: v1-mandatory
 - **THEN** fencing rejects it and the current holder's checkpoint remains authoritative
 
 ### Requirement: [TARGET-STATE] Deterministic Request-Bounded Batching
-MUST order a target projection by metric order `ai.usage.tokens`, `ai.usage.requests`, `ai.quota.utilization`, `ai.quota.age` and then lexicographically by the RFC 8785 canonical JSON array of its complete point attributes, greedily place the longest contiguous prefix whose encoded request is at or below the active byte cap, identify each batch by `(target_ledger_seq,batch_ordinal,batch_count)` with one-based ordinal, and advance the checkpoint only after durable acknowledgement of every batch for that target; any failed or ambiguous batch MUST retry the complete same batch set.
+MUST order a target projection by metric order `ai.usage.tokens`, `ai.usage.requests`, `ai.quota.utilization`, `ai.quota.age` and then lexicographically by the RFC 8785 canonical JSON array of its complete point attributes; in one ledger transaction before sending, persist the target sequence, one fixed `target_export_time_unix_nano` used as every point time, one-based batch count, and SHA-256 target-projection digest; greedily place the longest contiguous prefix whose exact encoded request body is at or below the active byte cap; identify each batch by `(target_ledger_seq,batch_ordinal,batch_count)`; and advance the checkpoint only after durable acknowledgement of every batch for that target. Every release vector MUST declare the fixed clock, ordered canonical point documents, exact per-batch point membership, exact encoded-body byte length and SHA-256 digest, and target projection digest; restart, lease turnover, failure, or ambiguity MUST reconstruct byte-identical bodies and retry the complete same batch set, while an individually oversized point blocks with `request_oversize`.
 
 ID: REQ-otlp-metrics-projection-009
 Source: RFC 0001 § Sink Independence
@@ -138,8 +146,12 @@ Scope: v1-mandatory
 - **WHEN** batch two of three is ambiguous
 - **THEN** no partial target is acknowledged and retry restarts the full same three-batch set
 
+#### Scenario: Restart preserves exact batch bytes
+- **WHEN** a process restarts after persisting a target and before its final acknowledgement
+- **THEN** the fixed-clock vector yields the same batch membership, byte lengths, body digests, projection digest, ordinals, and count
+
 ### Requirement: [TARGET-STATE] At-Least-Once OTLP Recovery and Isolation
-MUST leave OTLP work pending after delivery failure or ambiguity, retry at least once from the current cumulative ledger projection under a valid lease, preserve local facts, continue independent source and PostgreSQL progress, and make no exactly-once transport claim.
+MUST leave OTLP work pending after delivery failure as `state=retrying,failure_code=otlp_delivery_failure` and after ambiguous acknowledgement as `state=retrying,failure_code=otlp_ack_ambiguous`, retain the complete persisted target and retry it at least once under a valid lease, clear the code and return to `idle` only after every batch is durably acknowledged and the local checkpoint commits, preserve local facts, continue independent source and PostgreSQL progress, and make no exactly-once transport claim. Registration mismatch, descriptor/schema mismatch, tuple collision, conservation mismatch, request oversize, or failed projection migration MUST store `state=blocked` with respectively `registration_mismatch`, `schema_mismatch`, `tuple_collision`, `conservation_mismatch`, `request_oversize`, or `migration_failed`; recovery requires the exact cause to be repaired under the same immutable registration or a new tuple at origin, never a skipped target.
 
 ID: REQ-otlp-metrics-projection-010
 Source: RFC 0001 § Sink Independence; § Failure-State Contract

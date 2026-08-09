@@ -46,8 +46,13 @@ Scope: v1-mandatory
 - **THEN** the stream discards remembered context and rescans from byte zero
 - **AND** already committed facts are deduplicated without duplicate accounting
 
+#### Scenario: Safe invalidation has an exact recovery outcome
+- **WHEN** generation or anchor mismatch does not prove loss across an unconsumed cursor
+- **THEN** the stored cursor resets to byte zero with empty context, state remains `healthy` with null failure code during bounded rescan, and no fact is retracted
+- **AND** proven unconsumed loss instead follows the `retention_gap` transition
+
 ### Requirement: [TARGET-STATE] Complete-Record and Tail Boundary
-MUST consume only delimiter-terminated complete JSONL records, keep an incomplete tail below the inclusive raw-byte cap deferred with the cursor before its start, and transition immediately to `record_limit` when the fragment reaches one byte beyond the cap without waiting for a newline.
+MUST consume only delimiter-terminated complete JSONL records; an incomplete tail at or below the inclusive raw-byte cap MUST store `state=trailing_deferred,failure_code=incomplete_tail` at the fragment start with no fact, component-state, parser-context, or cursor advance and degrade enabled family/global health until a later poll completes and atomically consumes the record; one byte beyond the cap MUST store `state=quarantined,failure_code=record_limit` at the record start with the same zero-effect boundary, and recover only when corrected input or a newly accepted covering parser profile makes the identical record admissible.
 
 ID: REQ-stream-reconciliation-and-health-004
 Source: RFC 0001 § Incremental Reads, Rescans, and Quarantine; § Failure-State Contract
@@ -62,7 +67,7 @@ Scope: v1-mandatory
 - **THEN** the stream reports `record_limit`, quarantines at the record start, and does not buffer indefinitely
 
 ### Requirement: [TARGET-STATE] No-Skip Record State Machine
-MUST allow only `registered_irrelevant` to advance a cursor with an empty fact set; `unknown_kind`, `recognized_malformed`, `schema_inconsistent`, `unregistered_category`, and `identity_collision` MUST hold before the record and quarantine the stream, with no force-skip, ignore override, dead-letter copy, or consumption waiver.
+MUST allow only `registered_irrelevant` to advance a cursor with an empty fact set; `unknown_kind`, `recognized_malformed`, `schema_inconsistent`, `unregistered_category`, and `identity_collision` MUST each store `state=quarantined` with the identically named `failure_code`, failure offset at the record start, prior cursor/context unchanged, no candidate fact or quota-component transition committed, and enabled family/global health degraded. `unknown_kind`, `schema_inconsistent`, and `unregistered_category` recover only through a newly accepted supporting parser/profile or corrected source; `recognized_malformed` and `identity_collision` recover only when corrected source makes the held identity valid or an RFC-compatible schema/profile migration explicitly resolves it; successful retry atomically consumes the identical held record before later progress and clears the current diagnostic. No force-skip, ignore override, dead-letter copy, or consumption waiver exists.
 
 ID: REQ-stream-reconciliation-and-health-005
 Source: RFC 0001 § Incremental Reads, Rescans, and Quarantine
@@ -75,6 +80,10 @@ Scope: v1-mandatory
 #### Scenario: Unknown record cannot be waived
 - **WHEN** an operator attempts to force-skip an unknown or recognized malformed record
 - **THEN** the record remains unconsumed, the stream remains quarantined, and no raw dead-letter copy is created
+
+#### Scenario: Unregistered category has its own closed code
+- **WHEN** normalization produces a category outside the seven-name registry
+- **THEN** the stream stores `quarantined/unregistered_category`, commits no record-set or cursor effect, and remains degraded until a reviewed profile/schema change or corrected source admits the identical record
 
 ### Requirement: [TARGET-STATE] Bounded Sanitized Quarantine Diagnostics
 MUST restrict quarantine diagnostics to technical source ID, adapter schema ID, stream generation, numeric offset, code-owned failure code, expected registry path ID and type, capped observed size or depth, first-seen time, last-seen time, and repeat count; maintain one current row per held source; rate-limit transition reminders by an exact active-profile interval in seconds; and recover only after a supported parser or profile change or corrected source makes the held record valid.
@@ -93,7 +102,7 @@ Scope: v1-mandatory
 - **AND** recovery remains blocked until a supported change or corrected source is observed
 
 ### Requirement: [TARGET-STATE] Durable Full-Reconciliation Deadline
-MUST complete a byte-zero reconciliation for every non-exempt stream after an adapter-schema or compatible profile change and by the active profile's inclusive `max_reconciliation_interval_seconds`, measured from the last successfully committed complete rescan using a profile-declared durable monotonic-elapsed evidence method; restart, wall-clock rollback, failed scan, or incremental success MUST NOT postpone it, and the first scheduler tick afterward sets stream, family, and global health to `reconciliation_overdue`.
+MUST complete a byte-zero reconciliation for every non-exempt stream after an adapter-schema or compatible profile change and by the active profile's inclusive `max_reconciliation_interval_seconds`, measured from the last successfully committed complete rescan using a profile-declared durable monotonic-elapsed evidence method; restart, wall-clock rollback, failed scan, or incremental success MUST NOT postpone it; and the first scheduler tick afterward MUST store `state=reconciliation_overdue,failure_code=reconciliation_overdue` without moving the cursor or changing facts, degrade stream/family/global health while bounded incremental ingestion may continue, and recover to the applicable coverage state only after one complete byte-zero rescan commits.
 
 ID: REQ-stream-reconciliation-and-health-007
 Source: RFC 0001 § Incremental Reads, Rescans, and Quarantine
@@ -108,7 +117,7 @@ Scope: v1-mandatory
 - **THEN** health becomes `reconciliation_overdue` and cannot claim current reconciliation
 
 ### Requirement: [TARGET-STATE] Exact Reconciliation-Profile Schema
-MUST require every active source profile to provide inclusive unsigned `max_stream_count`, `max_aggregate_source_bytes`, `max_record_bytes`, `max_sustained_append_bytes_per_second`, `max_full_scan_structural_steps`, `anchor_window_record_count`, `max_reconciliation_interval_seconds`, and `diagnostic_reminder_interval_seconds`, plus the durable elapsed method, source-specific exemption flag and proof digest, minimum resource assumptions, native architecture measurements, and executable boundary evidence; exactly `N` is covered and `N+1`, missing timing, overflow, or an unproved exemption produces `source_envelope_exceeded` or `reconciliation_overdue` without a default.
+MUST require every active source profile to provide inclusive unsigned `max_stream_count`, `max_aggregate_source_bytes`, `max_record_bytes`, `max_sustained_append_bytes_per_second`, `max_full_scan_structural_steps`, `anchor_window_record_count`, `max_reconciliation_interval_seconds`, and `diagnostic_reminder_interval_seconds`, plus the durable elapsed method, source-specific exemption flag and proof digest, minimum resource assumptions, native architecture measurements, and executable boundary evidence; exactly `N` is covered, while any envelope `N+1` or checked overflow MUST store `state=source_envelope_exceeded,failure_code=source_envelope_exceeded` without changing facts or cursor, degrade stream/family/global health while independently bounded incremental ingestion may continue, and recover only after the source returns within the same measured profile or a newly accepted profile covers it; missing timing or an unproved exemption instead follows exact `reconciliation_overdue` semantics without a default.
 
 ID: REQ-stream-reconciliation-and-health-008
 Source: RFC 0001 § Incremental Reads, Rescans, and Quarantine
@@ -124,7 +133,7 @@ Scope: v1-mandatory
 - **AND** bounded incremental ingestion may continue only where parser and ledger contracts still permit it
 
 ### Requirement: [TARGET-STATE] Coverage and Retention-Gap Semantics
-MUST report `coverage_unknown` before first positive source discovery, report `retention_gap` only when disappearance, truncation, or equivalent durable evidence crosses a previously discovered unconsumed cursor, retain every previously accepted fact and aggregate, and never fabricate exact historical coverage.
+MUST register an enabled supported source at `state=coverage_unknown,failure_code=coverage_unknown` before first positive discovery with no invented stream/cursor/fact, recover that state only after discovery and one complete reconciliation establishes current coverage, report `state=retention_gap,failure_code=retention_gap` only when disappearance, truncation, or equivalent durable evidence crosses a previously discovered unconsumed cursor, retain every previously accepted fact and aggregate, and never fabricate exact historical coverage. A proven retention gap has no in-place healthy recovery for that ledger epoch: restored source may resume from the held boundary only where safe, but the gap and degraded upward health remain durable; a new technical namespace/epoch begins separately at `coverage_unknown` and does not erase the old gap.
 
 ID: REQ-stream-reconciliation-and-health-009
 Source: RFC 0001 § Motivation; § Failure-State Contract
@@ -139,7 +148,7 @@ Scope: v1-mandatory
 - **THEN** health records `retention_gap` and existing facts and aggregates are not retracted
 
 ### Requirement: [TARGET-STATE] Non-Masking Stream and Family Health
-MUST expose for every stream its technical identity, enumerated current and recovery state, last successful scan, last accepted source time, complete durable cursor, held failure code and position, reconciliation last-completed and due evidence, and coverage or retention state; family and global summaries MUST remain degraded whenever any enabled member is `trailing_deferred`, `quarantined`, `storage_hold`, `reconciliation_overdue`, `source_envelope_exceeded`, `retention_gap`, or `coverage_unknown`.
+MUST expose one source-component row before stream existence and one row for every stream with its technical identity, enumerated current and recovery state, last successful scan, last accepted source time, complete durable cursor, held failure code and position, reconciliation last-completed and due evidence, and coverage or retention state; family and global summaries MUST remain degraded whenever any enabled member is `unsupported_profile`, `unsupported_accounting_profile`, `trailing_deferred`, `quarantined`, `storage_hold`, `reconciliation_overdue`, `source_envelope_exceeded`, `retention_gap`, or `coverage_unknown`. Disabled source components MUST store `configured_state=disabled,runtime_state=disabled` with no stream/cursor/fact; enabling them re-enters source-profile activation and then `coverage_unknown`. Ledger storage interruption owns `storage_hold/ledger_storage_hold` and identical-input recovery; this capability only reflects it on every affected stream. Duplicate observations store `healthy` with null failure code after their atomic cursor/count commit. Quota capability states and sink retry/blocked states are owned by their respective capabilities and only composed upward by local query.
 
 ID: REQ-stream-reconciliation-and-health-010
 Source: RFC 0001 § Health and Freshness State; about/heart-and-soul/vision.md § Non-Negotiable Principles → 4. Partial Failure Is Explicit
@@ -153,3 +162,11 @@ Scope: v1-mandatory
 - **WHEN** one enabled stream is quarantined while others succeed
 - **THEN** family and global health remains degraded with that boundary identifiable
 - **AND** safe progress elsewhere continues only as its own state permits
+
+#### Scenario: Ledger hold and recovery remain globally coordinated
+- **WHEN** durable-ledger admission stores all source streams as `storage_hold/ledger_storage_hold`
+- **THEN** source health shows no cursor or fact effect and remains degraded until ledger-owned verification retries the identical input and clears the hold
+
+#### Scenario: Disabled source has no runtime artifacts
+- **WHEN** a configured source is disabled
+- **THEN** only its source component row reports `disabled`; no mount traversal, source stream, cursor, parser, fact, or diagnostic row is created

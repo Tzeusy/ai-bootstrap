@@ -16,7 +16,7 @@ Scope: v1-mandatory
 - **THEN** startup fails before source or sink activity and never substitutes an undocumented default
 
 ### Requirement: [TARGET-STATE] Exact Read-Only TOML Configuration Surface
-MUST read non-secret configuration only from the regular non-symlink read-only file `/etc/ai-usage-telemetry/config.toml`, whose allowed structure is exactly `[collector]` with `collector_namespace`, `ledger_namespace`, and optional `poll_interval_seconds`; `[sources.claude]` and `[sources.codex]` with `enabled`, `source_namespace`, and optional `alias`; and `[sinks.otlp]` and `[sinks.postgresql]` with `enabled`, `sink_id`, `destination_id`, `projection_schema_id`, and optional narrowed `allowlist`; OTLP transport MUST use standard OpenTelemetry environment variables, PostgreSQL MUST use a runtime-injected DSN only when enabled, and prompts, responses, raw records, auth tokens, DSNs, or unrecognized keys MUST NOT enter TOML, ledger, diagnostics, environment dumps, or image layers.
+MUST read non-secret configuration only from the regular non-symlink read-only file `/etc/ai-usage-telemetry/config.toml` under this exact grammar and no implicit type coercion: required `[collector]` has required string `collector_namespace`, required string `ledger_namespace`, and optional positive integer `poll_interval_seconds` defaulting to `300`; required `[sources.claude]` has required boolean `enabled` and required string `source_namespace`; required `[sources.codex]` has those keys plus optional string `account_alias`, whose absence is null and which is presentation-only; zero-or-more `[[project_aliases]]` entries each have exactly string `source` in `claude|codex`, string `source_project`, and string `alias`, with `(source,source_project)` and `(source,alias)` each unique; required `[sinks.otlp]` and `[sinks.postgresql]` each have required boolean `enabled`, require string `sink_id`, `destination_id`, and `projection_schema_id` only when enabled, and forbid them when disabled; enabled PostgreSQL additionally requires string `schema_name`; optional `[sinks.otlp.allowlist]` has only `models`, `projects`, `accounts`, `limits`, `windows`, and `scopes`, each an array of unique strings that defaults by omitted key to the complete profile vocabulary; optional `[sinks.postgresql.allowlist]` has only `fields`, a unique array drawn from `model|project|account_alias|native_request_identity_json` that defaults to empty. Allowlist tables are forbidden for disabled sinks. `collector_namespace`, `ledger_namespace`, every `source_namespace`, `sink_id`, and `destination_id` MUST match ASCII `^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`; each enabled sink's `projection_schema_id` MUST equal its capability's exact v1 constant; `schema_name` MUST match `^[a-z_][a-z0-9_]*$`; alias strings MUST be non-empty NFC Unicode without control characters or leading/trailing whitespace; and `source_project` MUST additionally contain no slash and not equal `.` or `..`. Project aliases map distinct canonical repository basenames to presentation only, never alter normalized project identity, fingerprint, or aggregate buckets, and become part of each affected sink's projection-policy digest; `account_alias` is separate, never a project alias or identity default, is null when absent, and becomes part of quota presentation and sink policy. Duplicate or unrecognized tables/keys, wrong types, invalid enums, duplicate mappings, and values outside the immutable profile subset MUST fail before component initialization. OTLP transport MUST use only the standard environment surface admitted by its fixed protocol profile, PostgreSQL MUST read a runtime-injected DSN only when enabled, and prompts, responses, raw records, auth tokens, DSNs, or secret environment values MUST NOT enter TOML, ledger, diagnostics, environment dumps, target/policy documents, or image layers.
 
 ID: REQ-portable-runtime-and-release-002
 Source: RFC 0001 § Configuration Contract; § Runtime and Trust Boundary
@@ -26,9 +26,17 @@ Scope: v1-mandatory
 - **WHEN** the exact read-only config file contains only declared tables and keys and every technical namespace matches persisted state
 - **THEN** startup validates selections and narrowed allowlists before initializing enabled components
 
+#### Scenario: Multiple project aliases remain non-identifying
+- **WHEN** Claude and Codex configure distinct aliases for multiple canonical repository basenames
+- **THEN** every mapping validates independently, canonical project identity and null-tagged aggregates remain unchanged, and only the affected sink policy digest and presentation change
+
 #### Scenario: Secret or namespace mutation fails safely
 - **WHEN** TOML contains a DSN, token, raw record, unknown key, or a required technical namespace changes on restart
 - **THEN** startup fails before scanning, credential access, export, or logging the value
+
+#### Scenario: Disabled sink grammar has no technical tuple
+- **WHEN** a sink has `enabled=false` and omits every tuple and allowlist key
+- **THEN** its component health registers as disabled without creating a sink registration, checkpoint, lease, client, secret read, or DNS lookup
 
 ### Requirement: [TARGET-STATE] Exactly Three Canonical Source and State Targets
 MUST recognize exactly `/sources/claude/sessions` and `/sources/codex/sessions` as separate optional read-only source-directory mounts and `/data` as the only persistent read-write state target, require every enabled source to be a distinct mount at its exact target, and reject any broad home, tool-configuration, auth-store, writable, overlapping, or symlink-expanded source; the TOML file is a separate read-only configuration surface and `/tmp` is ephemeral scratch, not a fourth source or state target.
@@ -91,7 +99,7 @@ Scope: v1-mandatory
 - **THEN** network policy blocks it and release validation fails
 
 ### Requirement: [TARGET-STATE] Disabled Sink Non-Instantiation
-MUST ensure a disabled sink imports or instantiates no dependency-specific client, exporter, worker, credential reader, environment-secret reader, DNS lookup, connection pool, checkpoint, lease, task, or runtime path, and allow either sink to be enabled independently without enabling the other or adding inbound access.
+MUST ensure a disabled sink imports or instantiates no dependency-specific client, exporter, worker, credential reader, environment-secret reader, DNS lookup, connection pool, checkpoint, lease, task, or runtime path, while permitting exactly one content-safe component-registration row for local health; a never-bound disabled sink MUST have no registration or checkpoint, disabling a previously bound sink MUST retain but not advance its durable registration/checkpoint and remove any lease, and re-enabling it MUST pass exact target/policy digest validation before resuming. Either sink may be enabled independently without enabling the other or adding inbound access.
 
 ID: REQ-portable-runtime-and-release-007
 Source: RFC 0001 § Runtime and Trust Boundary; § Configuration Contract

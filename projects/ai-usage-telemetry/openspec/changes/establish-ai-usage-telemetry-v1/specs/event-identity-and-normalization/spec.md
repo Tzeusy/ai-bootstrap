@@ -77,7 +77,7 @@ Scope: v1-mandatory
 - **THEN** it quarantines the stream and does not undercount, fabricate, or derive a request from path, offset, content, or collection order
 
 ### Requirement: [TARGET-STATE] Source-Faithful Time and Attribution
-SHALL preserve the source-observed meaning of event time and source-derived tool, vendor, model, and project attribution; unknown model or project MUST remain null, a project default MUST be the repository basename rather than an absolute path, an exact configured alias may replace only presentation, and no context may cross a source-stream boundary.
+SHALL preserve the source-observed meaning of event time and source-derived tool, vendor, model, and canonical project attribution; unknown model or project MUST remain null, canonical project identity MUST be the exact repository basename rather than an absolute path, and no context may cross a source-stream boundary. Zero-or-more configuration mappings MAY assign different presentation aliases to distinct `(source,canonical-project)` pairs, but aliases MUST remain outside `UsageEvent`, fact/request identity, fingerprint, and aggregate bucket keys and enter only the affected sink policy and presentation.
 
 ID: REQ-event-identity-and-normalization-006
 Source: RFC 0001 § UsageEvent; about/heart-and-soul/vision.md § Non-Negotiable Principles → 5. Normalization Preserves Meaning
@@ -90,6 +90,10 @@ Scope: v1-mandatory
 #### Scenario: Unknown attribution stays unknown
 - **WHEN** model or project cannot be established from registered same-stream structural context
 - **THEN** the field remains null instead of being inferred from content, absolute path, a neighboring stream, or a sink default
+
+#### Scenario: Project alias changes presentation only
+- **WHEN** two canonical repository basenames have distinct configured aliases or one alias changes
+- **THEN** retained events, fingerprints, request identity, and null-tagged aggregates remain unchanged while only the affected sink policy/presentation changes
 
 ### Requirement: [TARGET-STATE] Immutable V1 Token Registry
 MUST define the v1 category registry as exactly `input_unclassified` for an undecomposed inclusive input total, `input_uncached` for input identified as neither cache read nor write, `input_cache_read` for input served from an existing cache, `input_cache_write` for input written to a cache, `output_unclassified` for an undecomposed inclusive output total, `output_non_reasoning` for explicitly non-reasoning output, and `output_reasoning` for separately identified reasoning output, with no silent reassignment or broadening.
