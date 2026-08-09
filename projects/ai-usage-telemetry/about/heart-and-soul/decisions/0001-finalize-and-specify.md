@@ -85,3 +85,21 @@ and adopts the governance-lifecycle standard at
 It preserves the original privacy, retention, source, sink, and release gates.
 Parameters v1.2 still require their own review, and OpenSpec remains blocked
 until a later named-commit administration records `READY`.
+
+## Specification-Authoring Erratum Acceptance
+
+During first-spec authoring, the mount-contract crosswalk found that RFC 0001
+still said `four` canonical filesystem targets after the accepted privacy
+remediation had removed the rejected Claude quota-cache row. Repository history,
+the current three-row source/state table, V1 scope, and deployment topology make
+the intended contract unambiguous.
+
+The reviewed correction says `three canonical source/state` targets and
+clarifies that read-only TOML is a separate configuration surface while `/tmp`
+is ephemeral scratch. It does not add a mount, authorize Claude quota, change
+doctrine, or alter the READY decision. The durable review is
+[`../../legends-and-lore/reviews/0001/2026-08-10-specification-erratum-review.md`](../../legends-and-lore/reviews/0001/2026-08-10-specification-erratum-review.md).
+
+Under this decision's standing direction to apply reviewed quality-gate fixes
+before publication, the accepted RFC 0001 digest is now
+`126fc0214abb76f1a2f207bed1c3baf629757a3b281abf9d0e4a92b52b7e0117`.

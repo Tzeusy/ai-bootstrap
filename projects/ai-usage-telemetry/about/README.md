@@ -29,7 +29,7 @@ until it is reswept.
 | OpenSpec capability specifications | **[Observed] Absent** | Verify by tree sweep at the named administration commit; next authority gate is a fresh full administration |
 
 **Accepted shape anchor:** RFC
-`90f85ab1e5c50ee28ad51f6efeae3245f9908187985c2a12e1ba237db49f3f11`;
+`126fc0214abb76f1a2f207bed1c3baf629757a3b281abf9d0e4a92b52b7e0117`;
 source/bounds evidence
 `5401c9fb0e621af6f35385f89f9cc2cc1d260a3a2119c457ba9e27784e787a1e`;
 synthetic vectors
