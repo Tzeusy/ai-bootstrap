@@ -226,6 +226,194 @@ case_adversarial_yaml_frontmatter_cannot_satisfy_maturity() {
   done
 }
 
+write_frontmatter_rejection_skill() {
+  local skill_file="$1" scenario="$2" index
+
+  {
+    printf '%s\n' '---'
+    if [ "$scenario" = "tab-name" ]; then
+      printf 'name:\theart-and-soul\n'
+    else
+      printf '%s\n' 'name: heart-and-soul'
+    fi
+
+    case "$scenario" in
+      colon-at-eol)
+        printf '%s\n' 'description: Use:'
+        ;;
+      tab-description)
+        printf 'description:\tUse when reading project doctrine.\n'
+        ;;
+      inconsistent-block-indent)
+        printf '%s\n' 'description: >' '  Use when reading project doctrine.' ' misindented continuation'
+        ;;
+      inline-control)
+        printf 'description: Use when reading\001 project doctrine.\n'
+        ;;
+      block-control)
+        printf 'description: >\n  Use when reading\001 project doctrine.\n'
+        ;;
+      inline-lone-less)
+        printf '%s\n' 'description: Use when a value is < the project limit.'
+        ;;
+      inline-lone-greater)
+        printf '%s\n' 'description: Use when a value is > the project limit.'
+        ;;
+      inline-empty-angles)
+        printf '%s\n' 'description: Use when a value contains <> markers.'
+        ;;
+      block-lone-less)
+        printf '%s\n' 'description: >' '  Use when a value is < the project limit.'
+        ;;
+      block-lone-greater)
+        printf '%s\n' 'description: >' '  Use when a value is > the project limit.'
+        ;;
+      block-empty-angles)
+        printf '%s\n' 'description: >' '  Use when a value contains <> markers.'
+        ;;
+      inline-overlength-spaces)
+        printf 'description: Use'
+        index=0
+        while [ "$index" -lt 1100 ]; do
+          printf ' '
+          index=$((index + 1))
+        done
+        printf 'when reading project doctrine.\n'
+        ;;
+      block-overlength-spaces)
+        printf 'description: >\n  Use'
+        index=0
+        while [ "$index" -lt 1100 ]; do
+          printf ' '
+          index=$((index + 1))
+        done
+        printf 'when reading project doctrine.\n'
+        ;;
+      duplicate-same-name)
+        printf '%s\n' 'name: heart-and-soul' 'description: Use when reading project doctrine.'
+        ;;
+      quoted-unsupported-key)
+        printf '%s\n' 'description: Use when reading project doctrine.' '"metadata": not-supported'
+        ;;
+      tab-name)
+        printf '%s\n' 'description: Use when reading project doctrine.'
+        ;;
+      *)
+        fail "unknown canonical rejection scenario: $scenario"
+        ;;
+    esac
+
+    printf '%s\n' '---' '' '# Heart and Soul' '' 'Read doctrine before foundational work.'
+  } > "$skill_file"
+}
+
+case_invalid_frontmatter_cannot_satisfy_maturity() {
+  local scenario repo out skill_file
+
+  for scenario in \
+    colon-at-eol \
+    tab-name \
+    tab-description \
+    inconsistent-block-indent \
+    inline-control \
+    block-control \
+    inline-lone-less \
+    inline-lone-greater \
+    inline-empty-angles \
+    block-lone-less \
+    block-lone-greater \
+    block-empty-angles \
+    inline-overlength-spaces \
+    block-overlength-spaces \
+    duplicate-same-name \
+    quoted-unsupported-key; do
+    repo="$TMP_ROOT/canonical-rejection-$scenario"
+    cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+    skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+    write_frontmatter_rejection_skill "$skill_file" "$scenario"
+
+    out="$(bash "$SCAN_SCRIPT" "$repo")"
+    assert_contains "$out" "[INVALID]" "$scenario invalid or locally unsupported frontmatter should be rejected"
+    assert_contains "$out" "Local skills installed: 4/5" "$scenario rejected skill must not count toward maturity"
+    assert_contains "$out" "SHAPE_LEVEL=SHAPED" "$scenario rejected skill must prevent mature status"
+    assert_not_contains "$out" "SHAPE_LEVEL=MATURE" "$scenario rejected skill must not satisfy the local-skill gate"
+  done
+}
+
+case_yaml_validator_unavailable_cannot_satisfy_maturity() {
+  local repo="$TMP_ROOT/yaml-validator-unavailable"
+  local out
+
+  cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+  out="$(PATH=/usr/bin:/bin bash "$SCAN_SCRIPT" "$repo")"
+
+  assert_contains "$out" "[UNVERIFIED] YAML validator unavailable: uv is required" "missing validator runtime should be distinguished from invalid metadata"
+  assert_contains "$out" "Local skills installed: 0/5" "unverified local skills must not count toward maturity"
+  assert_contains "$out" "SHAPE_LEVEL=SHAPED" "unverified local skills must prevent mature status"
+  assert_not_contains "$out" "SHAPE_LEVEL=MATURE" "validator unavailability must fail the local-skill gate closed"
+}
+
+write_canonical_acceptance_skill() {
+  local skill_file="$1" scenario="$2"
+
+  {
+    printf '%s\n' '---'
+    if [ "$scenario" = "quoted-name" ]; then
+      printf '%s\n' 'name: "heart-and-soul"'
+    else
+      printf '%s\n' 'name: heart-and-soul'
+    fi
+
+    case "$scenario" in
+      quoted-name)
+        printf '%s\n' 'description: Use when reading project doctrine.'
+        ;;
+      quoted-date)
+        printf '%s\n' 'description: "2026-08-10"'
+        ;;
+      quoted-boolean)
+        printf '%s\n' 'description: "true"'
+        ;;
+      quoted-specials)
+        printf '%s\n' 'description: "Use: when reading # project doctrine."'
+        ;;
+      inline-comment)
+        printf '%s\n' 'description: Use when reading project doctrine. # authoring note'
+        ;;
+      explicit-block-indent)
+        printf '%s\n' 'description: >2-' '  Use when reading project doctrine.'
+        ;;
+      *)
+        fail "unknown canonical acceptance scenario: $scenario"
+        ;;
+    esac
+
+    printf '%s\n' '---' '' '# Heart and Soul' '' 'Read doctrine before foundational work.'
+  } > "$skill_file"
+}
+
+case_canonical_yaml_strings_can_satisfy_maturity() {
+  local scenario repo out skill_file
+
+  for scenario in \
+    quoted-name \
+    quoted-date \
+    quoted-boolean \
+    quoted-specials \
+    inline-comment \
+    explicit-block-indent; do
+    repo="$TMP_ROOT/canonical-acceptance-$scenario"
+    cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+    skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+    write_canonical_acceptance_skill "$skill_file" "$scenario"
+
+    out="$(bash "$SCAN_SCRIPT" "$repo")"
+    assert_not_contains "$out" ".claude/skills/heart-and-soul/ [INVALID]" "$scenario canonical string metadata should remain valid"
+    assert_contains "$out" "Local skills installed: 5/5" "$scenario valid skill should count toward maturity"
+    assert_contains "$out" "SHAPE_LEVEL=MATURE" "$scenario valid YAML string metadata should preserve maturity"
+  done
+}
+
 case_authored_repo_can_be_mature() {
   local repo="$FIXTURES_DIR/mature-layout"
   local out
@@ -632,6 +820,9 @@ run_case "duplicate skill names cannot satisfy maturity" case_duplicate_skill_na
 run_case "duplicate skill descriptions cannot satisfy maturity" case_duplicate_skill_description_cannot_satisfy_maturity
 run_case "non-scalar skill descriptions cannot satisfy maturity" case_nonscalar_skill_description_cannot_satisfy_maturity
 run_case "adversarial YAML frontmatter cannot satisfy maturity" case_adversarial_yaml_frontmatter_cannot_satisfy_maturity
+run_case "invalid YAML and unsupported metadata cannot satisfy maturity" case_invalid_frontmatter_cannot_satisfy_maturity
+run_case "unavailable YAML validation cannot satisfy maturity" case_yaml_validator_unavailable_cannot_satisfy_maturity
+run_case "canonical YAML string forms can satisfy maturity" case_canonical_yaml_strings_can_satisfy_maturity
 run_case "fully authored repo is mature" case_authored_repo_can_be_mature
 run_case "four pillars without craft-and-care is not mature" case_four_pillars_without_craft_not_mature
 run_case "syzygy canon is detected and guarded" case_syzygy_canon_detected

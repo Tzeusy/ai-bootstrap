@@ -23,7 +23,7 @@ metadata:
     - OpenAI Codex
   status: active
   last_reviewed: "2026-07-27"
-compatibility: Subskill scripts require bash, git, grep, find. project-direction additionally assumes the bd (beads) CLI and an OpenSpec-capable environment for changeset synthesis.
+compatibility: Subskill scripts require bash, git, grep, find, and uv; project-shape uses uv for fail-closed YAML validation. project-direction additionally assumes the bd (beads) CLI and an OpenSpec-capable environment for changeset synthesis.
 ---
 
 # TH Projects
