@@ -1,6 +1,7 @@
 # RFC 0001: Adapter, Ledger, and Sink Contract
 
-**Status:** Accepted through Owner Decision 0001
+**Status:** R5-accepted predecessor; current corrected bytes pending exact-head
+review and successor owner acceptance
 **Author:** Codex
 **Date:** 2026-08-10
 

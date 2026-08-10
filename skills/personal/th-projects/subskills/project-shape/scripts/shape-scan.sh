@@ -25,6 +25,8 @@ set -euo pipefail
 ROOT="${1:-.}"
 ROOT="$(cd "$ROOT" && pwd)"
 active_change_count=0
+valid_skill_names=""
+template_skill_names=""
 
 echo "=== Project Shape Scan ==="
 echo "Root: $ROOT"
@@ -86,22 +88,49 @@ count_authored_markdown_files() {
   echo "$authored"
 }
 
-count_numbered_list_items() {
+count_numbered_doctrine_items() {
   local file="$1"
   [ -f "$file" ] || {
     echo 0
     return
   }
-  grep -Ec '^[[:space:]]*[0-9]+\.[[:space:]]+\S' "$file" || true
-}
+  awk '
+    BEGIN {
+      in_rules = 0
+      rules_level = 0
+      count = 0
+    }
+    {
+      if (match($0, /^#+[[:space:]]+/)) {
+        prefix_length = RLENGTH
+        heading_marker = $0
+        sub(/[[:space:]].*$/, "", heading_marker)
+        level = length(heading_marker)
+        title = substr($0, prefix_length + 1)
+        gsub(/[[:space:]]+$/, "", title)
 
-count_numbered_heading_items() {
-  local file="$1"
-  [ -f "$file" ] || {
-    echo 0
-    return
-  }
-  grep -Ec '^#{1,6}[[:space:]]+[0-9]+\.[[:space:]]+\S' "$file" || true
+        if (level <= 6 && tolower(title) ~ /^non-negotiable (rules|principles)$/) {
+          in_rules = 1
+          rules_level = level
+          next
+        }
+
+        if (in_rules && level <= rules_level) {
+          in_rules = 0
+        }
+
+        if (in_rules && level <= 6 && $0 ~ /^#+[[:space:]]+[0-9]+\.[[:space:]]+[^[:space:]]/) {
+          count++
+        }
+        next
+      }
+
+      if (in_rules && $0 ~ /^[[:space:]]*[0-9]+\.[[:space:]]+[^[:space:]]/) {
+        count++
+      }
+    }
+    END { print count }
+  ' "$file"
 }
 
 # Count namespaced doctrine rule definitions (e.g. Syzygy's `**VIS-1 — ...**`
@@ -265,6 +294,15 @@ extract_description_text() {
   ' "$file" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//'
 }
 
+mark_skill_name() {
+  local name="$1" variable_name="$2" current_value
+  current_value="${!variable_name}"
+  case " $current_value " in
+    *" $name "*) return ;;
+  esac
+  printf -v "$variable_name" '%s%s ' "$current_value" "$name"
+}
+
 check_skill() {
   local name="$1"
   local found=0
@@ -328,9 +366,11 @@ check_skill() {
       fi
       if is_placeholder_file "$skill_path"; then
         echo "    - $tool_dir/skills/$name/ [VALID, TEMPLATE] customize before relying on agent navigation"
+        mark_skill_name "$name" template_skill_names
       else
         echo "    - $tool_dir/skills/$name/ [VALID]"
       fi
+      mark_skill_name "$name" valid_skill_names
       found=1
     fi
   done
@@ -651,10 +691,7 @@ standards_cross_refs=0
 
 doctrine_rules_display=""
 if [ -n "${HAS_DIR:-}" ] && [ -f "$HAS_DIR/vision.md" ] && ! is_placeholder_file "$HAS_DIR/vision.md"; then
-  doctrine_rules=$(count_numbered_list_items "$HAS_DIR/vision.md")
-  if [ "$doctrine_rules" -eq 0 ]; then
-    doctrine_rules=$(count_numbered_heading_items "$HAS_DIR/vision.md")
-  fi
+  doctrine_rules=$(count_numbered_doctrine_items "$HAS_DIR/vision.md")
   # Fall back to namespaced rule IDs (e.g. VIS-n / SEC-n across the doctrine
   # dir) before ever reporting zero: authored doctrine with an unrecognized
   # rule format must render Unknown, never a false zero.
@@ -662,7 +699,7 @@ if [ -n "${HAS_DIR:-}" ] && [ -f "$HAS_DIR/vision.md" ] && ! is_placeholder_file
     doctrine_rules=$(count_doctrine_rule_ids "$HAS_DIR")
   fi
   if [ "$doctrine_rules" -eq 0 ]; then
-    doctrine_rules_display="Unknown — authored doctrine present, but no numbered-list, numbered-heading, or namespaced (XXX-n) rule format recognized; do not read as zero rules"
+    doctrine_rules_display="Unknown — authored doctrine present, but no numbered list/heading inside a Non-Negotiable Rules or Principles section, or namespaced (XXX-n) rule format, was recognized; do not read as zero rules"
   fi
 fi
 
@@ -712,15 +749,12 @@ pillars=0
 [ "$topology_present_by_file" -eq 1 ] && pillars=$((pillars + 1))
 
 skills=0
+for name in $valid_skill_names; do
+  skills=$((skills + 1))
+done
 template_skills=0
-for name in heart-and-soul legends-and-lore spec-and-spine lay-and-land craft-and-care; do
-  for tool_dir in .claude .codex .gemini .opencode; do
-    if [ -f "$ROOT/$tool_dir/skills/$name/SKILL.md" ]; then
-      skills=$((skills + 1))
-      is_placeholder_file "$ROOT/$tool_dir/skills/$name/SKILL.md" && template_skills=$((template_skills + 1))
-      break
-    fi
-  done
+for name in $template_skill_names; do
+  template_skills=$((template_skills + 1))
 done
 
 scaffolded_pillars=0

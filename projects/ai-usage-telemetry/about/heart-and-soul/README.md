@@ -4,8 +4,10 @@ Doctrine for **AI Usage Telemetry**, the `ai-usage-telemetry` project nested in
 `ai-bootstrap/`.
 
 **Status:** Adopted through Owner Decision 0001. Decision 0002 independently
-accepts the eleven downstream v1 capability contracts without amending this
-doctrine. See the central [lifecycle matrix](../README.md#lifecycle-status).
+accepted the eleven R5 capability bytes without amending doctrine; seven
+current rows still match, while four corrected current rows await exact-head
+review and successor acceptance. See the central
+[lifecycle matrix](../README.md#lifecycle-status).
 
 Read this pillar first when deciding what the product may observe, retain, or
 export; what its first release promises; and which shortcuts would violate its

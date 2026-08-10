@@ -75,6 +75,23 @@ EOF
   assert_contains "$out" "[INVALID] unsupported frontmatter key(s): metadata" "unsupported frontmatter key should be rejected"
 }
 
+case_invalid_skill_cannot_satisfy_maturity() {
+  local repo="$TMP_ROOT/invalid-skill-maturity"
+  local out skill_file
+
+  cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+  skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+  awk '{ print; if ($0 ~ /^description:/) print "metadata: not-supported" }' \
+    "$skill_file" > "$skill_file.tmp"
+  mv "$skill_file.tmp" "$skill_file"
+
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "[INVALID] unsupported frontmatter key(s): metadata" "invalid mature-fixture skill should be reported"
+  assert_contains "$out" "Local skills installed: 4/5" "only valid local skills may count toward maturity"
+  assert_contains "$out" "SHAPE_LEVEL=SHAPED" "an invalid local skill must prevent mature status"
+  assert_not_contains "$out" "SHAPE_LEVEL=MATURE" "file presence alone must not satisfy the local-skill gate"
+}
+
 case_authored_repo_can_be_mature() {
   local repo="$FIXTURES_DIR/mature-layout"
   local out
@@ -264,6 +281,33 @@ EOF
   assert_contains "$out" "SHAPE_LEVEL=MATURE" "an otherwise mature project should remain mature with numbered principle headings"
 }
 
+case_numbered_heading_outside_doctrine_rules() {
+  local repo="$TMP_ROOT/numbered-heading-outside-rules"
+  local out
+
+  cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+  cat > "$repo/about/heart-and-soul/vision.md" <<'EOF'
+# Vision
+
+Authored doctrine whose only numbered headings are a roadmap, not rules.
+
+## Roadmap
+
+### 1. Prototype
+
+Build the first prototype.
+
+### 2. Release
+
+Publish after verification.
+EOF
+
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "Doctrine rules detected: Unknown" "numbered headings outside a non-negotiable section must not count as doctrine rules"
+  assert_contains "$out" "MATURE_TRACEABILITY_GATE=FAIL" "roadmap headings must not satisfy the mature doctrine threshold"
+  assert_not_contains "$out" "SHAPE_LEVEL=MATURE" "roadmap headings must not create a false mature result"
+}
+
 case_legacy_layout_detected() {
   local repo="$FIXTURES_DIR/legacy-layout"
   local out
@@ -448,11 +492,13 @@ EOF
 
 run_case "fresh scaffold is not mature" case_fresh_scaffold_not_mature
 run_case "unsupported frontmatter keys are rejected" case_invalid_frontmatter_rejected
+run_case "invalid local skills cannot satisfy maturity" case_invalid_skill_cannot_satisfy_maturity
 run_case "fully authored repo is mature" case_authored_repo_can_be_mature
 run_case "four pillars without craft-and-care is not mature" case_four_pillars_without_craft_not_mature
 run_case "syzygy canon is detected and guarded" case_syzygy_canon_detected
 run_case "syzygy doctrine rules and decisions layer resolve" case_syzygy_doctrine_rules_and_decisions
 run_case "numbered principle headings count as doctrine rules" case_numbered_heading_doctrine_rules
+run_case "numbered headings outside doctrine rules do not count" case_numbered_heading_outside_doctrine_rules
 run_case "legacy layout is detected conservatively" case_legacy_layout_detected
 run_case "html comments do not trigger scaffold classification" case_html_comments_do_not_trigger_scaffold
 run_case "ARCHITECTURE.md does not double-count topology" case_architecture_file_does_not_double_count_topology

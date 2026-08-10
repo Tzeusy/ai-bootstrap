@@ -2,9 +2,10 @@
 
 Engineering standards for `ai-usage-telemetry`.
 
-**Status:** Adopted through Owner Decision 0001. R5 promoted the exact current
-RFC/evidence bytes, and Decision 0002 independently accepts the eleven exact
-capability contracts. See the central
+**Status:** Adopted through Owner Decision 0001. R5 promoted predecessor
+RFC/evidence bytes, and Decision 0002 independently accepted the eleven exact
+R5 capability rows. Seven current rows still match; four corrected rows await
+exact-head review and successor acceptance. See the central
 [lifecycle matrix](../README.md#lifecycle-status). The OpenSpec change remains
 active, unimplemented, and unarchived; every later task and profile gate still
 applies.
@@ -36,7 +37,8 @@ checkpoint, metadata policy, sink, container boundary, or dependency:
 
 Detailed event identity, checkpoint, ledger, and delivery semantics belong in
 [`RFC 0001`](../legends-and-lore/rfcs/0001-adapter-ledger-and-sink-contract.md).
-The current accepted contract set follows the active change's
+The accepted/predecessor and current candidate contract set follows the active
+change's
 [`proposal`](../../openspec/changes/establish-ai-usage-telemetry-v1/proposal.md) →
 [`design`](../../openspec/changes/establish-ai-usage-telemetry-v1/design.md) →
 [`specifications`](../../openspec/changes/establish-ai-usage-telemetry-v1/specs/) →

@@ -57,9 +57,10 @@ HEAD=4238391c6e4ab276719a575c8ff9267b310abd6d
 
 Plain `git diff --check "$BASE" "$HEAD"` reports 195 added Markdown lines,
 all ending in exactly two ASCII spaces used as Markdown hard breaks. The
-full-range gate therefore checks non-Markdown files normally, checks all other
-Git whitespace classes in Markdown, and then permits only that exact two-space
-suffix:
+full-range gate therefore checks non-Markdown files normally, checks the
+remaining default-enabled Git whitespace classes in Markdown, and then permits
+only that exact two-space suffix. It does not claim to enable optional
+repository whitespace classes such as `indent-with-non-tab`:
 
 ```sh
 git diff --check "$BASE" "$HEAD" -- . ':(exclude,glob)**/*.md'
@@ -82,3 +83,32 @@ git diff --unified=0 "$BASE" "$HEAD" -- ':(glob)**/*.md' |
 All three Markdown-aware full-range commands exit zero for the exact range
 above. This clarification preserves the historical reconciliation result while
 making its mechanical whitespace evidence independently reproducible.
+
+## Current correction-range gate
+
+The post-acceptance correction commit that first adds the two exact-byte key
+artifacts is `ead6fa583002851456004f9fd24c9b700a407afb`. For the exact
+`4238391c6e4ab276719a575c8ff9267b310abd6d..ead6fa583002851456004f9fd24c9b700a407afb`
+range, the ordinary whitespace gate excludes only those two hash-bound blobs;
+their immutable final blank lines are then proved separately by exact size and
+SHA-256:
+
+```sh
+BASE=4238391c6e4ab276719a575c8ff9267b310abd6d
+HEAD=ead6fa583002851456004f9fd24c9b700a407afb
+
+git diff --check "$BASE" "$HEAD" -- . \
+  ':(exclude)projects/ai-usage-telemetry/docs/launch-gate/evidence/4f38f814de67238ddc4d84518149ebcc7344b148a35c4e15ce9bb38fe36ac610.md' \
+  ':(exclude)projects/ai-usage-telemetry/docs/launch-gate/evidence/0fff71d85d4d599989a704313bedd9996e52ae696edabfaa523a2d1967366f6b.md'
+
+test "$(wc -c < projects/ai-usage-telemetry/docs/launch-gate/evidence/4f38f814de67238ddc4d84518149ebcc7344b148a35c4e15ce9bb38fe36ac610.md)" -eq 1114
+test "$(sha256sum projects/ai-usage-telemetry/docs/launch-gate/evidence/4f38f814de67238ddc4d84518149ebcc7344b148a35c4e15ce9bb38fe36ac610.md | cut -d' ' -f1)" = \
+  4f38f814de67238ddc4d84518149ebcc7344b148a35c4e15ce9bb38fe36ac610
+test "$(wc -c < projects/ai-usage-telemetry/docs/launch-gate/evidence/0fff71d85d4d599989a704313bedd9996e52ae696edabfaa523a2d1967366f6b.md)" -eq 1122
+test "$(sha256sum projects/ai-usage-telemetry/docs/launch-gate/evidence/0fff71d85d4d599989a704313bedd9996e52ae696edabfaa523a2d1967366f6b.md | cut -d' ' -f1)" = \
+  0fff71d85d4d599989a704313bedd9996e52ae696edabfaa523a2d1967366f6b
+```
+
+All five commands exit zero for the named correction commit. Later governance
+commits do not modify either key artifact and use ordinary bounded
+`git diff --check` gates.
