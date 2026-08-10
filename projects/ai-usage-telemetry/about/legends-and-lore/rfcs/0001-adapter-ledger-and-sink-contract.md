@@ -1,7 +1,7 @@
 # RFC 0001: Adapter, Ledger, and Sink Contract
 
-**Status:** R5-accepted predecessor; current corrected bytes pending exact-head
-review and successor owner acceptance
+**Status:** Governed by the central lifecycle matrix and owner decisions; this
+file does not promote its own bytes
 **Author:** Codex
 **Date:** 2026-08-10
 

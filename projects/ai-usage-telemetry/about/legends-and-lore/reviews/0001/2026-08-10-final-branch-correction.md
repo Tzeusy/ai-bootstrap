@@ -76,7 +76,7 @@ key blobs, and over-broad wording about optional Git whitespace classes.
 
 | Artifact | Candidate SHA-256 | State |
 |---|---|---|
-| RFC 0001 | `4497a61f85b728c8ee31129392a81af40de717d9a1329cd8d8512bb83b8edce4` | Pending |
+| RFC 0001 | `5215ee07d79d24b9234c5c20850a561add999de796a9e3f274a86532ff02840b` | Pending |
 | Source/bounds evidence | `2ca7455f0c331c8d46774f9c72bb8c3f2d6b360255fab4663bfd5d32bc09cf7d` | Unchanged accepted predecessor |
 | Synthetic vectors | `22f30ac862e29662a0b17ad0047f463adebff97a4a3b70f4293a6346732656dc` | Pending |
 | Provenance | `dcfffe320712afbdcf805e05d30b277130e4bf81f9d718d4f4408bc077f482f0` | Unchanged accepted predecessor |
