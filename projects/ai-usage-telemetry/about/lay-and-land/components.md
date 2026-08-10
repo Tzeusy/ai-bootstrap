@@ -1,8 +1,10 @@
 # Component Map
 
-**Status:** Accepted, **[Inferred]** target-state component ownership derived
-from adopted doctrine and accepted RFC 0001. No application package or runtime image exists
-yet.
+**Status:** Independently accepted, **[Inferred]** target-state component
+ownership derived from adopted doctrine and the RFC 0001 design contract. Exact
+linked-RFC byte authority follows the central
+[lifecycle matrix](../README.md#lifecycle-status). No application package or
+runtime image exists yet.
 
 ## System Context
 

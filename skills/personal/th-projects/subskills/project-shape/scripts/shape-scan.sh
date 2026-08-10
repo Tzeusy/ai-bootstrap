@@ -344,6 +344,11 @@ check_skill() {
         found=1
         continue
       fi
+      if [ "$name_value" != "$name" ]; then
+        echo "    - $tool_dir/skills/$name/ [INVALID] name must match expected local skill '$name'"
+        found=1
+        continue
+      fi
       if [ "${#name_value}" -gt 64 ]; then
         echo "    - $tool_dir/skills/$name/ [INVALID] name exceeds 64 characters"
         found=1

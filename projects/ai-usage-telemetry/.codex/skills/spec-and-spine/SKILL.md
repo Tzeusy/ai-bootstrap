@@ -2,9 +2,9 @@
 name: spec-and-spine
 description: >
   Ground AI Usage Telemetry implementation, testing, planning, and behavior
-  changes in its accepted OpenSpec capability contracts. Use to locate an
-  owning requirement, check spec-code divergence, amend behavior, or trace work
-  through the active v1 change.
+  changes in its current OpenSpec capability contracts and authority state. Use
+  to locate an owning requirement, check spec-code divergence, amend behavior,
+  or trace work through the active v1 change.
 ---
 
 # AI Usage Telemetry Capability Specs

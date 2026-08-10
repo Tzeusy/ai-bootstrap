@@ -1,9 +1,12 @@
 ## Context
 
-This change translates the adopted product doctrine and accepted
+This change translates the adopted product doctrine and the design contract in
 [RFC 0001](../../../about/legends-and-lore/rfcs/0001-adapter-ledger-and-sink-contract.md)
 into the technical architecture that the capability specifications will make
-testable. The [launch gate](../../../docs/launch-gate/2026-08-10-96ba99d.md)
+testable. Exact-byte RFC and capability authority comes only from the central
+[lifecycle matrix](../../../about/README.md#lifecycle-status), its linked owner
+decisions, and the active acceptance projection; this design does not promote
+linked bytes. The [launch gate](../../../docs/launch-gate/2026-08-10-96ba99d.md)
 recorded READY against commit
 96ba99dda1503e2f278df9b76abd3c5872faa8fd, including an empty E3 list of
 shape-level questions that would need to be reopened before specification.

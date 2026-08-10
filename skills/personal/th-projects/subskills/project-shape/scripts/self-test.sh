@@ -92,6 +92,28 @@ case_invalid_skill_cannot_satisfy_maturity() {
   assert_not_contains "$out" "SHAPE_LEVEL=MATURE" "file presence alone must not satisfy the local-skill gate"
 }
 
+case_misnamed_skill_cannot_satisfy_maturity() {
+  local repo="$TMP_ROOT/misnamed-skill-maturity"
+  local out skill_file
+
+  cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+  skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+  awk '
+    /^name:[[:space:]]*heart-and-soul[[:space:]]*$/ {
+      print "name: wrong-valid-slug"
+      next
+    }
+    { print }
+  ' "$skill_file" > "$skill_file.tmp"
+  mv "$skill_file.tmp" "$skill_file"
+
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "[INVALID] name must match expected local skill 'heart-and-soul'" "valid-slug name mismatch should be rejected"
+  assert_contains "$out" "Local skills installed: 4/5" "a misnamed skill must not count toward maturity"
+  assert_contains "$out" "SHAPE_LEVEL=SHAPED" "a misnamed local skill must prevent mature status"
+  assert_not_contains "$out" "SHAPE_LEVEL=MATURE" "directory presence with the wrong skill name must not satisfy the local-skill gate"
+}
+
 case_authored_repo_can_be_mature() {
   local repo="$FIXTURES_DIR/mature-layout"
   local out
@@ -493,6 +515,7 @@ EOF
 run_case "fresh scaffold is not mature" case_fresh_scaffold_not_mature
 run_case "unsupported frontmatter keys are rejected" case_invalid_frontmatter_rejected
 run_case "invalid local skills cannot satisfy maturity" case_invalid_skill_cannot_satisfy_maturity
+run_case "misnamed local skills cannot satisfy maturity" case_misnamed_skill_cannot_satisfy_maturity
 run_case "fully authored repo is mature" case_authored_repo_can_be_mature
 run_case "four pillars without craft-and-care is not mature" case_four_pillars_without_craft_not_mature
 run_case "syzygy canon is detected and guarded" case_syzygy_canon_detected

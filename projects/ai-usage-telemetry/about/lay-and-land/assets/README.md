@@ -12,9 +12,11 @@ Current topology sources and governing crosslinks:
 - [`../deployment.md`](../deployment.md) defines the mount, network, runtime,
   persistence, and multi-architecture placement those diagrams assume.
 - [`../README.md`](../README.md) indexes the complete topology pillar and links
-  its adopted [doctrine](../../heart-and-soul/README.md) and accepted
+  its adopted [doctrine](../../heart-and-soul/README.md), the
   [RFC 0001](../../legends-and-lore/rfcs/0001-adapter-ledger-and-sink-contract.md)
-  authorities.
+  design contract, and the central
+  [lifecycle matrix](../../README.md#lifecycle-status) that owns exact-byte
+  authority.
 
 If a later diagram becomes too dense for Mermaid, store its editable
 `.excalidraw` source and rendered SVG here. Record the generating script or

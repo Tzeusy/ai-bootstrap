@@ -1,6 +1,7 @@
 # RFC 0001: Adapter, Ledger, and Sink Contract
 
-**Status:** Governed by the central lifecycle matrix and owner decisions; this
+**Status:** Governed by the central
+[lifecycle matrix](../../README.md#lifecycle-status) and owner decisions; this
 file does not promote its own bytes
 **Author:** Codex
 **Date:** 2026-08-10
@@ -1429,7 +1430,9 @@ count as evidence.
 
 ## Specification and Doctrine Boundary
 
-This RFC is the accepted design contract. It gates downstream work as follows.
+This file defines the design contract; whether its exact bytes are accepted,
+pending, or superseded is recorded externally in the lifecycle matrix and
+owner decisions. It gates downstream work as follows.
 
 ### Required before implementation or release OpenSpec
 
