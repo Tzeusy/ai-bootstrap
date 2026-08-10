@@ -30,8 +30,15 @@ A non-trivial change is complete only when its evidence shows that:
 - replay, overlap, restart, and sink retry cannot double-count an event or lose
   an accepted event;
 - source-family adapters keep cursor, quarantine, and health per source stream;
-  only registered irrelevant records advance without a fact, while unknown or
-  malformed complete records hold the stream cursor and quarantine that stream;
+  only exact code/profile dispositions `registered_irrelevant`, `context_only`,
+  and `quota_state_only` advance a complete record without a fact, and only with
+  their permitted transition and cursor in the same ledger transaction, while
+  unknown, unregistered, malformed, collided, or failed records hold before the
+  record and quarantine that stream;
+- missing profile members or bounds yield `unsupported_profile` before
+  traversal, missing or wrongly typed required projected record values yield
+  `recognized_malformed`, and only measured bound overflow yields
+  `record_limit`;
 - incomplete tails hold their stream cursor pending completion, while unrelated
   healthy streams and sinks continue and aggregate health never masks the held
   or quarantined stream;
@@ -46,6 +53,9 @@ A non-trivial change is complete only when its evidence shows that:
   normalized columns plus only projection-allowlisted metadata in JSONB;
 - OTLP and PostgreSQL projection, delivery, and destination-scoped checkpoints
   are independently retryable and observable;
+- PostgreSQL database constraints enforce one globally unique ledger sequence
+  across usage and quota and exactly one fact-kind-matching child for each
+  projected-fact envelope through retry and migration;
 - the stable read-only `usage_events`, `usage_event_amounts`, `quota_snapshots`,
   `source_health`, `sink_health`, and `ledger_health` views remain
   sink-independent and compatible;
@@ -68,6 +78,9 @@ The following are merge blockers, even if happy-path tests pass:
 - a parser accepts an unknown shape through a permissive fallback;
 - an unknown or malformed record is consumed or the stream cursor advances past
   it;
+- a zero-fact cursor commits separately from its permitted parser-context or
+  quota-component transition, or a duplicate success clears another active
+  health degradation;
 - source progress can commit separately from newly accepted events;
 - one unhealthy adapter or sink stops healthy, independent work without a
   contract reason;

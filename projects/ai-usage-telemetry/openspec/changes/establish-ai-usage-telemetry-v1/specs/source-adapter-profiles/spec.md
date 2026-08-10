@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: [TARGET-STATE] Fail-Closed Source Profile Activation
-MUST initialize every enabled Claude or Codex source component as `runtime_state=unsupported_profile,state_code=unsupported_profile`, open no real source mount, create no stream cursor, and accept no fact until one immutable release-profile member covers the exact source-build family, extraction manifest, native and logical identity, arithmetic, replay and mutation behavior, finite irrelevant-kind table, parser bounds, and positive and negative error vectors; recovery MUST require an accepted matching profile and transition the component to `runtime_state=coverage_unknown,state_code=coverage_unknown` before discovery, and enabled unsupported state MUST degrade family/global health while disabled sources remain excluded.
+MUST initialize every enabled Claude or Codex source component as `runtime_state=unsupported_profile,state_code=unsupported_profile`, open no real source mount, create no stream cursor, and accept no fact until one immutable release-profile member covers the exact source-build family, extraction manifest, native and logical identity, arithmetic, replay and mutation behavior, finite irrelevant-kind table, every required parser bound, and positive and negative error vectors; any missing member or bound MUST remain `unsupported_profile` before traversal, recovery MUST require an accepted matching complete profile and transition the component to `runtime_state=coverage_unknown,state_code=coverage_unknown` before discovery, and enabled unsupported state MUST degrade family/global health while disabled sources remain excluded.
 
 ID: REQ-source-adapter-profiles-001
 Source: RFC 0001 § Evidence Baseline; § Configuration Contract
@@ -12,7 +12,7 @@ Scope: v1-mandatory
 - **THEN** startup may open only that source's canonical mount and classify records under that member
 
 #### Scenario: Uncovered build fails before traversal
-- **WHEN** the configured source build or record shape is absent from the active profile
+- **WHEN** the configured source build, selected source member, or any required member bound is absent from the active profile
 - **THEN** startup or that source remains `unsupported_profile` before mount traversal
 - **AND** no fact is accepted and no similar-looking rule is substituted
 
@@ -38,7 +38,7 @@ Scope: v1-mandatory
 - **AND** an unregistered discriminator holds the stream rather than being treated as irrelevant
 
 ### Requirement: [TARGET-STATE] Exact Parser-Limit Profile Schema
-MUST require every active adapter member to provide unsigned inclusive `max_record_bytes` measured from record start excluding the delimiter, `max_depth` with the root at one, `max_keys_per_record`, `max_encoded_key_bytes`, `max_projected_occurrences`, `max_application_memory_bytes`, and `max_structural_steps`, plus for every projected path inclusive `max_encoded_bytes`, `max_decoded_utf8_bytes`, `max_multiplicity`, integer `min_value` and `max_value` or decimal `min_value`, `max_value`, `max_precision`, and `max_scale`; all values, the minimum supported memory in bytes, counting algorithms, measurement evidence digests, and architecture results are immutable profile inputs, and every `N` is admitted while `N+1`, missing data, or checked-arithmetic overflow yields the pre-ledger `record_limit` disposition whose stream state, cursor, recovery, and upward health are owned by stream reconciliation, without a default.
+MUST require every active adapter member to provide unsigned inclusive `max_record_bytes` measured from record start excluding the delimiter, `max_depth` with the root at one, `max_keys_per_record`, `max_encoded_key_bytes`, `max_projected_occurrences`, `max_application_memory_bytes`, and `max_structural_steps`, plus for every projected path inclusive `max_encoded_bytes`, `max_decoded_utf8_bytes`, `max_multiplicity`, integer `min_value` and `max_value` or decimal `min_value`, `max_value`, `max_precision`, and `max_scale`; all values, the minimum supported memory in bytes, counting algorithms, measurement evidence digests, and architecture results are immutable profile inputs. A missing required profile member, bound, counting rule, or evidence result MUST keep the source `unsupported_profile` before traversal; after activation, a missing or wrongly typed required projected record value MUST be `recognized_malformed`; and only an observed value, count, depth, size, structural-work total, application-memory total, or checked counter that exceeds its measured inclusive bound MUST yield the pre-ledger `record_limit` disposition whose stream state, cursor, recovery, and upward health are owned by stream reconciliation. Every exact `N` is admitted and no library or operator default is substituted.
 
 ID: REQ-source-adapter-profiles-003
 Source: RFC 0001 § Mixed-Content Streaming Field Projection
@@ -50,9 +50,17 @@ Scope: v1-mandatory
 - **AND** measured memory remains within the profile's minimum-resource claim
 
 #### Scenario: One-past unterminated record fails immediately
-- **WHEN** a record crosses its raw-byte cap without a JSONL delimiter, any other bound reaches `N+1`, a required value is absent, or arithmetic overflows during a bound check
+- **WHEN** a record crosses its raw-byte cap without a JSONL delimiter, any other measured bound reaches `N+1`, or a checked record counter exceeds its representable profiled bound
 - **THEN** the stream fails closed as `record_limit` at the offending record
 - **AND** its cursor remains before that record without falling back to library or operator defaults
+
+#### Scenario: Missing profile bound blocks before traversal
+- **WHEN** an enabled source's selected profile member omits any required bound, counting rule, measurement digest, architecture result, or minimum-resource claim
+- **THEN** the source remains `unsupported_profile` and no source byte is traversed
+
+#### Scenario: Missing projected record value is malformed
+- **WHEN** an activated recognized record omits a required projected value or supplies its wrong declared type
+- **THEN** the record is `recognized_malformed`, not `record_limit`, and the stream holds before it
 
 ### Requirement: [TARGET-STATE] Profile Fixture and Privacy Corpus
 SHALL require each supported profile member to include version-pinned zero or minimum, exactly-at, one-past, combined-memory-bound, incomplete-tail, oversized-irrelevant, malformed, replay, mutation, escaped and nested sentinel, and error-path fixtures with canonical expected classifications and content-free outputs on native amd64 and arm64.
@@ -83,7 +91,7 @@ Scope: v1-mandatory
 #### Scenario: Invalid discovery or type holds safely
 - **WHEN** discovery encounters a symlink, a file outside the canonical root, an unprofiled non-`assistant` kind, or a projected value with the wrong type
 - **THEN** it opens nothing outside the root and holds the affected stream before the record
-- **AND** no wildcard irrelevant-kind rule is applied
+- **AND** a wrong projected type is `recognized_malformed`, an unprofiled kind remains unregistered, and no wildcard irrelevant-kind rule is applied
 
 ### Requirement: [TARGET-STATE] Claude Identity, Attribution, and Arithmetic
 MUST require Claude native and logical request identity `(sessionId,requestId)`, treat `message.id` as a mandatory consistency value, map `input_tokens` to `input_uncached`, `cache_creation_input_tokens` to `input_cache_write`, `cache_read_input_tokens` to `input_cache_read`, and `output_tokens` to `output_unclassified`, preserve absent optional amounts as absent, use the record's own timestamp and model plus the canonical repository basename derived from that record's `cwd` without cross-record context, keep every project alias outside the normalized event, fact/request identity, accounting fingerprint, and aggregate keys, and expose aliases only through presentation and digest-bound sink policy, and quarantine same-identity changes in time, message identity, model, or amount.
@@ -168,7 +176,7 @@ Scope: v1-mandatory
 - **THEN** no usage fact is accepted and the stream reports `unsupported_accounting_profile` or the applicable malformed hold
 
 ### Requirement: [TARGET-STATE] Closed Record Outcome Set
-MUST classify each complete or partial input as exactly one pre-ledger record disposition with a deterministic ordered zero-or-more candidate-fact set, zero-or-one quota component-state transition, and one parser-context transition: `incomplete_tail`, `context_only`, `registered_irrelevant`, `candidate_set`, `unknown_kind`, `recognized_malformed`, `schema_inconsistent`, `unregistered_category`, or `record_limit`; order a Claude candidate set as its single usage event and a Codex token-count candidate set as usage first when present followed by `primary` then `secondary` quota windows when present; accept the ledger's later `duplicate_only`, `mixed_new_and_duplicate`, or `identity_collision` record-set outcome without reordering; leave exact stored stream state, failure code, cursor/fact effect, recovery, and upward-health propagation to stream reconciliation; and emit no raw-record passthrough, content, credentials, or unregistered categories or metadata.
+MUST classify each complete or partial input as exactly one pre-ledger record disposition with a deterministic ordered candidate-fact set, zero-or-one quota component-state transition, and one parser-context transition: `incomplete_tail`, `context_only`, `registered_irrelevant`, `quota_state_only`, `candidate_set`, `unknown_kind`, `recognized_malformed`, `schema_inconsistent`, `unregistered_category`, or `record_limit`; only `context_only`, `registered_irrelevant`, and `quota_state_only` are complete zero-fact advancing dispositions, each MUST be explicitly code/profile-registered and commit its permitted parser-context or quota-component transition atomically with the cursor in the later ledger transaction, and `candidate_set` MUST contain one or more facts. Order a Claude candidate set as its single usage event and a Codex token-count candidate set as usage first when present followed by `primary` then `secondary` quota windows when present; accept the ledger's later `duplicate_only`, `mixed_new_and_duplicate`, or `identity_collision` record-set outcome without reordering; unknown, unregistered, malformed, collided, or failed records MUST hold before the record; leave exact stored stream state, failure code, cursor/fact effect, recovery, and upward-health propagation to stream reconciliation; and emit no raw-record passthrough, content, credentials, or unregistered categories or metadata.
 
 ID: REQ-source-adapter-profiles-011
 Source: RFC 0001 § Adapter Contract; § Failure-State Contract
@@ -178,6 +186,11 @@ Scope: v1-mandatory
 - **WHEN** a complete Codex token-count record repeats its usage landmark but contains two new registered quota windows
 - **THEN** its record result contains no new usage fact, exactly two quota facts, and one atomic cursor outcome
 - **AND** retry produces the same fact set and classifications
+
+#### Scenario: Registered zero-fact dispositions advance atomically
+- **WHEN** complete records classify respectively as `registered_irrelevant`, `context_only`, and `quota_state_only`
+- **THEN** each advances only through one ledger transaction that also commits its permitted unchanged/context or quota-component transition
+- **AND** none creates a fact, amount, sequence, aggregate, request, or sink obligation
 
 #### Scenario: Malformed record advances nothing
 - **WHEN** a complete recognized record has malformed accounting data

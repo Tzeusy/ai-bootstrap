@@ -85,16 +85,21 @@ as a new delta without proving that semantic.
 
 [Inferred] A source family contains independently ordered source streams, and a
 stream contains records. Cursor, quarantine, freshness, and health are tracked
-per stream. Only an explicitly registered irrelevant record may advance a
-stream cursor without producing a fact; an unknown or malformed complete record
-holds that cursor and quarantines that stream. Other healthy streams and sinks
-continue, but family and global summaries must remain degraded rather than mask
-the blocked stream. Silence and a stale success signal are failures.
+per stream. Only a complete record with the exact code/profile-registered
+disposition `registered_irrelevant`, `context_only`, or `quota_state_only` may
+advance a stream cursor without producing a fact, and only when its permitted
+parser-context or quota-component transition and the cursor commit atomically in
+the same ledger transaction. Unknown, unregistered, malformed, collided, or
+failed records hold before the record and quarantine that stream. Other healthy
+streams and sinks continue, but family and global summaries must remain degraded
+rather than mask the blocked stream. Silence and a stale success signal are
+failures.
 
 **A violation is:** aborting the Claude family because a Codex stream changed
-format, consuming an unknown record to keep a cursor moving, reporting global
-health while one stream is stale, or withholding locally committed records
-because PostgreSQL or an OTLP endpoint is unavailable.
+format, consuming an unregistered or failed record to keep a cursor moving,
+committing a zero-fact cursor separately from its permitted context/state
+transition, reporting global health while one stream is stale, or withholding
+locally committed records because PostgreSQL or an OTLP endpoint is unavailable.
 
 ### 5. Normalization Preserves Meaning.
 
