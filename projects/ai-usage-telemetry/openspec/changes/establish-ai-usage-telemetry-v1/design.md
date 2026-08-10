@@ -19,6 +19,12 @@ exception: after its own owner acceptance, it may authorize a disposable
 synthetic-only thesis-test harness. That harness opens no real source mount,
 accepts no non-synthetic fact, opens no network or sink path, ships no
 production package, and creates no reusable production shortcut.
+Its human-legibility success boundary is the inclusive
+`elapsed_time <= 10 minutes`. This capability target deliberately tightens the
+immutable launch instrument's one 15-minute sitting ceiling; satisfying the
+former satisfies the time portion of the latter, so the contracts do not
+contradict and the launch-gate parameter/administration records remain
+unchanged.
 
 The architecture is constrained by the seven principles in
 [the vision](../../../about/heart-and-soul/vision.md):
@@ -222,6 +228,11 @@ fingerprint, or age behavior.
    `schema_inconsistent`, `unknown_kind`, `recognized_malformed`, and
    `unregistered_category`; only a parser-successful candidate set reaches
    collision detection.
+   For Codex quota, `state_only` is permitted only when the admitted non-null
+   `rate_limits` object has exact profile-allowed identity/context members and
+   no registered primary/secondary window object. Any present registered
+   window with missing, mistyped, or out-of-range required utilization is
+   `recognized_malformed` and holds the whole record-set transaction.
 6. The adapter supplies registered fields and evidence to the source-independent
    domain interfaces. Those interfaces alone normalize canonical instants and
    cwd basenames, construct `UsageEvent`/`QuotaSnapshot`, identities,
@@ -428,9 +439,12 @@ parses.
 Per-stream cursors accelerate ordinary polling, while generation and safe
 prefix-anchor validation decide whether resume is trustworthy. Failed
 validation resets the affected stream to byte zero with empty parser context;
-stable identities deduplicate accepted history. Full rescans run after relevant
-schema/profile changes and within the active profile's measured deadline and
-source envelope.
+stable identities deduplicate accepted history. That safe invalidation adds no
+new latch or degradation and clears no existing latch: the prior `LatchSet` and
+all sibling evidence remain unchanged, effective state remains the highest
+active latch, and `healthy` is possible only when no latch is active. Full
+rescans run after relevant schema/profile changes and within the active
+profile's measured deadline and source envelope.
 
 Alternative: trust offsets forever or rescan everything every poll. The former
 can miss mutation; the latter is needlessly expensive and still requires stable
@@ -518,6 +532,11 @@ overall `unavailable`. Clearing one row with its owning recovery evidence
 reveals any lower active row. All overlap permutations, process restart, clear
 orders, and duplicate-only success must produce that same result; no transition
 may delete or overwrite a sibling dimension.
+Cursor/anchor safe invalidation is not a `LatchSet` transition. Even while
+coverage, reconciliation, and storage are simultaneously latched, resetting
+the cursor/context preserves those rows and reports `storage_hold` until its
+own recovery clears it, then reveals the next active latch; it never reports
+healthy merely because the rescan itself is bounded and safe.
 
 Coverage is deliberately asymmetric:
 
@@ -534,9 +553,10 @@ Failure containment follows the narrowest safe boundary:
 | Missing required profile member or parser bound | Keep the enabled source `unsupported_profile` before traversal; create no stream, cursor, or fact |
 | Incomplete trailing record below the active byte cap | Defer at its start and retry later; other complete work continues |
 | Missing or wrongly typed required projected record value | Classify the recognized record `recognized_malformed` and hold before it; do not call it `record_limit` |
+| Codex quota registered window is present with missing, mistyped, or out-of-range utilization | Classify the whole record `recognized_malformed` and roll back its usage/quota/component/cursor effects; reserve `state_only` for an admitted non-null rate-limits object with no registered primary/secondary window object |
 | Observed record measure exceeds an active measured bound | Classify `record_limit` and hold before the record |
 | Unknown kind, recognized malformed record, unregistered category, or identity collision | Hold before the record and quarantine only that stream; recovery requires supported parser/profile change or corrected source |
-| Truncation, replacement, generation mismatch, or prefix-anchor mismatch | Reset that stream and parser context to the beginning; deduplicate by fact identity and fingerprint |
+| Truncation, replacement, generation mismatch, or prefix-anchor mismatch without proven loss | Reset that stream and parser context to the beginning; deduplicate by fact identity and fingerprint; add no new latch/degradation, preserve the prior `LatchSet`, derive the highest active state, and report healthy only when none is active |
 | Missing or incompatible release profile | Fail startup before source or sink activity |
 | Reconciliation deadline missed | Mark stream, family, and global state overdue; safe incremental ingestion may continue but current reconciliation cannot be claimed |
 | Supported source envelope exceeded | Degrade the stream, family, and global state; continue only work still bounded by parser and storage profiles |
@@ -687,9 +707,12 @@ and evidence sequence:
    all eleven capabilities.
 2. If the Synthetic-to-SQLite capability is separately accepted, optionally
    build only the disposable synthetic harness and run the bounded human
-   legibility exercise. It opens no real source mount, accepts no non-synthetic
-   fact, opens no network or sink path, ships no production package, and creates
-   no reusable production shortcut.
+   legibility exercise with passing `elapsed_time <= 10 minutes`. That
+   deliberately tighter inclusive bound fits within, and does not amend, the
+   immutable launch instrument's 15-minute sitting ceiling. The harness opens
+   no real source mount, accepts no non-synthetic fact, opens no network or sink
+   path, ships no production package, and creates no reusable production
+   shortcut.
 3. After the complete required capability set is accepted, implement against
    synthetic fixtures with every real adapter profile and sink disabled by
    default.

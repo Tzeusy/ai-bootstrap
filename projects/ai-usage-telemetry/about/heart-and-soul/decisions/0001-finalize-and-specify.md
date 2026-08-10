@@ -156,3 +156,40 @@ personal mounts or real destinations.
 
 The R3-reconciled RFC 0001 digest is
 `ca548d5cb5070c5e288e66d3fe97a3c0f662cd245bd7153ae640d2ed593dcbc2`.
+
+## R4 Quality-Evidence Re-sweep and Candidate Corrections
+
+Under this decision's explicit standing authorization for reviewed
+specification-authoring and quality-gate fixes, an independent full R4 re-sweep
+reviewed exact input HEAD
+`4de3697c1d61d4bc3404105c7771ae0ce2336bfd`. It re-accepted the then-current
+source/bounds evidence annex at
+`219531d0f87145c6722d66ccb5de7abdaf3306daecd2fdd717a32a76b2d701df`
+and synthetic-vector annex at
+`c10308d1bbb75f52d5000f51b23f3cd4733bc38fe6d429a2fb7580292e743372`
+as quality evidence for the reviewed R3 input. The initial formal-review hashes
+above remain historical records; the later annex bytes incorporate the R1/R2
+zero-fact, canary, parser, latch, timestamp, SQL, and traceability corrections,
+plus R3 dependency-ownership clarification.
+
+R4 found and bounded four corrections: safe cursor invalidation must preserve
+the prior `LatchSet` and derive its highest active state; Codex `state_only`
+requires no registered primary/secondary window while any malformed present
+window holds the whole record; the capability legibility boundary is inclusive
+`elapsed_time <= 10 minutes` and deliberately tighter than the immutable launch
+instrument's 15-minute sitting ceiling; and current-versus-historical evidence
+authority must remain explicit. The durable record is
+[`../../legends-and-lore/reviews/0001/2026-08-10-r4-quality-evidence-resweep.md`](../../legends-and-lore/reviews/0001/2026-08-10-r4-quality-evidence-resweep.md).
+
+Those corrections changed the reviewed bytes. Their current candidate digests
+are RFC 0001
+`36c062fa81bfadb5e9b90c0386ae7529579648acf04a165e923adca5e9e03163`,
+source/bounds evidence
+`2ca7455f0c331c8d46774f9c72bb8c3f2d6b360255fab4663bfd5d32bc09cf7d`,
+and synthetic vectors
+`8e5e512144e03d437aa0349b7d00b3600fae5dd24e2d613236d6c6e699953e8a`.
+They are **pending a fresh independent R5 confirmation and are not yet
+accepted**. Until R5 passes, the R3 RFC and R4-reviewed pre-fix annexes remain
+the latest accepted authorities. This record does not accept a capability,
+waive any improvement/evidence gate, authorize implementation, or permit real
+mounts, sinks, packaging, or release.

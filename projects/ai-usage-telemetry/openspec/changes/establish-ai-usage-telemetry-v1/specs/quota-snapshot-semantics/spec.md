@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: [TARGET-STATE] Explicit V1 Quota Capability Matrix
-MUST report Claude usage `supported` with Claude quota `unavailable`, and Codex usage plus registered rate-limit snapshots `supported` only when an active source profile admits their structure; persist the latest closed quota component outcome atomically as exactly `disabled`, `coverage_unknown`, `unavailable`, `absent`, `null`, `state_only`, or `observed`; define `coverage_unknown` as an enabled quota-capable source before its first eligible admitted record in the active coverage namespace, define Codex `absent` as no `/payload/rate_limits` member, `null` as an explicit JSON null member, `state_only` as an admitted non-null rate-limits object with identity/context but no registered window carrying a complete utilization, and `observed` as at least one committed snapshot from the record; and keep those availability states distinct from snapshot freshness `fresh|stale|unknown` and from numeric zero.
+MUST report Claude usage `supported` with Claude quota `unavailable`, and Codex usage plus registered rate-limit snapshots `supported` only when an active source profile admits their structure; persist the latest closed quota component outcome atomically as exactly `disabled`, `coverage_unknown`, `unavailable`, `absent`, `null`, `state_only`, or `observed`; define `coverage_unknown` as an enabled quota-capable source before its first eligible admitted record in the active coverage namespace, define Codex `absent` as no `/payload/rate_limits` member, `null` as an explicit JSON null member, `state_only` as an admitted non-null rate-limits object containing only exact profile-allowed identity/context members and no registered primary or secondary window object, and `observed` as at least one committed snapshot from the record; require any present registered primary or secondary window member to have its admitted object shape and required utilization with the correct decimal type in inclusive `0..100`, otherwise classify the whole record `recognized_malformed` and roll back every same-record usage, quota, component-state, and cursor effect; and keep those availability states distinct from snapshot freshness `fresh|stale|unknown` and from numeric zero.
 
 ID: REQ-quota-snapshot-semantics-001
 Source: RFC 0001 § Evidence Baseline; § QuotaSnapshot
@@ -15,9 +15,10 @@ Scope: v1-mandatory
 - **WHEN** Claude quota is requested or Codex `rate_limits` is absent or null
 - **THEN** the result reports `unavailable`, `absent`, or `null` as applicable and emits no fabricated zero snapshot
 
-#### Scenario: State-only rate-limit object remains fact-free
-- **WHEN** a supported Codex record has an admitted non-null rate-limits object but no registered window with complete utilization
-- **THEN** quota component state becomes `state_only` in the same transaction as cursor progress and no quota fact, utilization, sequence, or sink obligation is created
+#### Scenario: State-only rate-limit boundary is exact
+- **WHEN** otherwise-equal supported Codex records have an admitted non-null rate-limits object with only exact profile-allowed identity/context members and no registered window, or have a registered primary/secondary window with missing, mistyped, or out-of-range utilization
+- **THEN** only the no-window object becomes `state_only` in the same transaction as cursor progress and creates no quota fact, utilization, sequence, or sink obligation
+- **AND** every present malformed window makes the whole record `recognized_malformed`, rolls back same-record usage/quota/component/cursor effects, and is never state-only, clamped, zero-filled, or classified as a measured `record_limit`
 
 #### Scenario: Disabled and newly enabled quota registrations are explicit
 - **WHEN** a configured source is disabled, or a quota-capable source is enabled before its first eligible record in the active namespace
@@ -122,5 +123,5 @@ Scope: v1-mandatory
 - **THEN** the affected stream holds before the malformed record without fabricating quota or retracting the committed usage contribution
 
 #### Scenario: Same-record malformed quota rolls back the record set
-- **WHEN** one complete Codex record contains a new usage candidate and a malformed quota candidate
+- **WHEN** one complete Codex record contains a new usage candidate and a registered quota window whose required utilization is missing, mistyped, or outside inclusive `0..100`
 - **THEN** neither candidate nor the component-state change or cursor commits, and stream reconciliation owns the exact held state and recovery

@@ -31,7 +31,7 @@ Scope: v1-mandatory
 - **THEN** optimized resume is rejected and the cursor artifact fails privacy and validity checks
 
 ### Requirement: [TARGET-STATE] Validated Resume or Byte-Zero Rescan
-SHALL permit optimized resume only when a runtime-owned `ValidatedSourceHandle` exists and generic discovery's stay-beneath path check, generation, file length, stored anchor reprojection, and reconstructed context all match; any mismatch MUST atomically discard remembered context and reset only that stream to byte zero, relying on domain-owned fact identity and fingerprint deduplication. This capability MUST NOT implement canonical mount validation, and adapters MUST NOT implement resume/discovery traversal.
+SHALL permit optimized resume only when a runtime-owned `ValidatedSourceHandle` exists and generic discovery's stay-beneath path check, generation, file length, stored anchor reprojection, and reconstructed context all match; any mismatch MUST atomically discard remembered context and reset only that stream to byte zero, relying on domain-owned fact identity and fingerprint deduplication. When that mismatch does not prove loss across an unconsumed cursor, safe invalidation MUST add no latch or degradation, clear no latch, preserve the complete prior `LatchSet` and sibling evidence, and derive effective state as the highest active prior latch with `healthy` permitted only when none is active; proven loss instead follows the retention transition. This capability MUST NOT implement canonical mount validation, and adapters MUST NOT implement resume/discovery traversal.
 
 ID: REQ-stream-reconciliation-and-health-003
 Source: RFC 0001 § Incremental Reads, Rescans, and Quarantine
@@ -46,9 +46,10 @@ Scope: v1-mandatory
 - **THEN** the stream discards remembered context and rescans from byte zero
 - **AND** already committed facts are deduplicated without duplicate accounting
 
-#### Scenario: Safe invalidation has an exact recovery outcome
-- **WHEN** generation or anchor mismatch does not prove loss across an unconsumed cursor
-- **THEN** the stored cursor resets to byte zero with empty context, state remains `healthy` with null failure code during bounded rescan, and no fact is retracted
+#### Scenario: Safe invalidation preserves prior latches
+- **WHEN** generation or anchor mismatch does not prove loss across an unconsumed cursor while coverage, reconciliation, and storage are already latched
+- **THEN** the stored cursor resets to byte zero with empty context, no fact is retracted, no new latch or degradation is added, and no prior latch or evidence is cleared
+- **AND** effective state remains the highest active prior latch (`storage_hold` for this overlap), owning clears reveal reconciliation then coverage, and `healthy` is permitted only after every latch is clear
 - **AND** proven unconsumed loss instead follows the `retention_gap` transition
 
 ### Requirement: [TARGET-STATE] Complete-Record and Tail Boundary

@@ -111,7 +111,7 @@ The evidence-backed v1 capability matrix is therefore:
 | Source | Usage events | Quota/rate-limit snapshots | V1 behavior |
 |---|---|---|---|
 | Claude Code sessions | Yes | No validated source | Collect supported usage; report Claude quota `unavailable`. |
-| Codex rollouts | Yes | Yes, when registered `rate_limits` fields are present | Collect supported usage and snapshots; preserve absent or null rate-limit data as unavailable rather than zero. |
+| Codex rollouts | Yes | Yes, when registered `rate_limits` fields are present | Collect supported usage and snapshots; preserve absent, null, and exact state-only rate-limit outcomes rather than zero, while any malformed registered window holds the whole record. |
 
 This matrix is the v1 target, not permission to guess an adapter contract. Each
 source capability begins as `unsupported_profile`. A test-only harness may use
@@ -554,6 +554,14 @@ Stale, unknown, absent, or null observations remain queryable as state where
 applicable and do not block independent usage events. Claude quota is
 `unavailable` in v1. V1 performs no credential-backed quota lookup.
 
+Codex `state_only` is exact: the admitted non-null `rate_limits` object may
+contain only the profile-allowed identity/context members and no registered
+`primary` or `secondary` window object. Once either registered window member is
+present, its object shape and required `used_percent` utilization must be
+present, correctly typed, and within inclusive `0..100`; missing, mistyped, or
+out-of-range utilization is `recognized_malformed` for the whole record-set
+transaction, not `state_only`, zero, or `record_limit`.
+
 **Doctrine trace:** **1. Local Facts Become User-Owned History**;
 **2. Content and Credentials Stay Outside**;
 **4. Partial Failure Is Explicit**;
@@ -651,6 +659,13 @@ freshness, privacy, and vector gates as any new source contract.
 - **Permitted quota paths:** `/payload/rate_limits/limit_id` and the exact
   `used_percent`, `window_minutes`, and `resets_at` fields under registered
   primary/secondary window objects. All other payload descendants are skipped.
+  An omitted `rate_limits` member is `absent`; explicit null is `null`; an
+  admitted non-null object with only exact profile-allowed identity/context
+  members and no registered primary/secondary window object is `state_only`.
+  Any present registered window member must have its object shape and required
+  decimal `used_percent` in inclusive `0..100`; a missing, mistyped, or
+  out-of-range utilization is `recognized_malformed` and rolls back the whole
+  record-set transaction before its cursor.
 - **Context:** a usage record uses the latest preceding `turn_context` in the
   same stream. The accepted context is its `/timestamp`, `/payload/model`, and
   `/payload/cwd`; it never looks ahead or crosses a stream. A rescan starts with
@@ -879,6 +894,12 @@ reprojects to the stored digest, and reconstructed context agrees with the
 stored context. Otherwise the stream rescans from byte zero with empty parser
 context. In particular, every Codex rescan discards remembered context before
 reconstructing it; context never survives a generation or anchor failure.
+Safe invalidation adds no latch and clears no latch: it preserves the complete
+prior `LatchSet` and all sibling evidence while resetting only the cursor and
+parser context. During the bounded rescan, effective stream state remains the
+highest active prior latch and may be `healthy` only when no latch is active;
+coverage, reconciliation, and storage latches therefore remain respectively
+visible, including when all three overlap.
 
 The reader obeys these rules:
 
@@ -968,12 +989,12 @@ invalid values fail closed.
 | Recognized malformed or schema-inconsistent record | Affected source is quarantined with explicit degraded state; cursor does not advance past it. | Other sources and sinks continue. |
 | Unknown record kind | Affected stream is quarantined with a sanitized `unknown_kind` diagnostic; cursor remains before the record and v1 has no skip waiver. | Other sources and sinks continue. |
 | Unlisted descendant of a syntactically valid record | Syntax-scanned skip-only under the parser bounds; never decoded and never classified as an unknown kind solely for being unlisted. | The record's registered disposition governs progress. |
-| File truncation or replacement | Source restarts from the beginning; stable identities deduplicate already committed facts. | Other sources and sinks continue. |
+| File truncation, replacement, generation mismatch, or anchor mismatch without proven loss | Source restarts from the beginning; stable identities deduplicate already committed facts; safe invalidation adds no latch/degradation, clears no prior latch, and preserves the prior `LatchSet`, so effective state remains its highest active latch and is healthy only when none is active. | Other sources and sinks continue. |
 | Coverage before source discovery | Coverage is `coverage_unknown`; no loss claim or exact historical coverage is fabricated. | Observable sources and sinks continue. |
 | Discovered source disappears or truncates across its unconsumed cursor | Source health records a proven `retention_gap`; accepted history is not retracted. | Other sources and sinks continue. |
 | Supported source envelope exceeded | Stream/family/global health is `source_envelope_exceeded`; bounded incremental ingestion may continue but reconciliation is not current. | Other sources and sinks continue. |
 | Claude quota requested | Capability is `unavailable`; no source is mounted and no snapshot is fabricated. | Claude usage, Codex usage/rate limits, and sinks continue. |
-| Codex rate limits absent, null, stale, or freshness-unknown | Availability/freshness is represented explicitly; no zero or live-quota claim is fabricated. | Usage ingestion and sinks continue. |
+| Codex rate limits absent, null, exact state-only, stale, or freshness-unknown | Availability/freshness is represented explicitly; state-only requires no registered primary/secondary window object; any present registered window with missing, mistyped, or out-of-range utilization is `recognized_malformed` for the whole record; no zero or live-quota claim is fabricated. | Independent previously committed usage and sinks continue; a same-record usage candidate rolls back with malformed quota. |
 | SQLite transaction or process interruption | Transaction rolls back; event, aggregate, cursor, and sink checkpoints remain mutually consistent and retry on restart. If the ledger is unavailable, no source may safely advance. | Previously committed sink work may resume only when ledger access is safe. |
 | Low disk or unprovable reserve | Accepting transaction rolls back; all source cursors hold in `ledger_storage_hold`; no automatic pruning occurs. | Read-only health remains available; committed delivery continues only when safe ledger state can still be recorded. |
 | OTLP delivery failure | OTLP checkpoint remains pending and retries; no local fact is lost. | PostgreSQL and all sources continue. |
@@ -1438,6 +1459,11 @@ ships no production package, and creates no reusable production shortcut. It
 is implementation evidence for the accepted spine, not authorization for real
 collection, sink delivery, or release. Every non-synthetic implementation path
 remains blocked until the complete RFC-required capability set is accepted.
+Its capability success boundary deliberately tightens the immutable launch-
+instrument sitting ceiling: passing requires `elapsed_time <= 10 minutes`,
+which is stricter than the instrument's one 15-minute sitting. The two bounds
+are not contradictory, and the immutable launch-gate parameter and
+administration records are not rewritten.
 
 Implementation may not begin by filling these gaps ad hoc. In particular,
 Claude quota remains `unavailable` throughout v1, and source identity or token

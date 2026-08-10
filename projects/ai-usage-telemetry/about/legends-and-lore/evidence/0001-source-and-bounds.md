@@ -85,6 +85,14 @@ more paths inside credential-bearing state is not sufficient.
   [`protocol.rs`](https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/protocol/src/protocol.rs#L2064-L2209).
   `used_percent` is a `0..100` source value; normalization to `0..1` is a
   project inference.
+- **[Observed/inferred] Closed quota presence boundary.** The registered
+  primary/secondary structures make window presence distinguishable from an
+  identity/context-only `rate_limits` object. V1 therefore admits
+  `state_only` only when no registered primary or secondary window object is
+  present (the object may contain only exact profile-allowed identity/context
+  members). Once a registered window is present, missing, mistyped, or
+  out-of-range `used_percent` is `recognized_malformed` for the whole record;
+  it is not state-only, zero, or a measured resource-limit overflow.
 - **[Observed] Re-emission.** Token-count events may be emitted after a
   rate-limit-only update while retaining previous token info, as shown in
   [`session/mod.rs`](https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/session/mod.rs#L3764-L3893).

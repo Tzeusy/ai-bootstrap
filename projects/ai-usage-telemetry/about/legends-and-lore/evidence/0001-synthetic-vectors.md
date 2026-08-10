@@ -64,6 +64,11 @@ credential, identifier, or path.
 | `codex-delta-mismatch` | Cumulative difference disagrees with stored contribution | Hold until the adapter profile defines and validates the source case |
 | `codex-non-request-emission` | Context-window fill, recomputation, compaction, or rate update without request advancement | No request contribution |
 | `codex-quota-bounds` | Primary/secondary window at 0% and 100%, nullable reset/limit identity, repeated snapshot | Normalize `0..100` to `0..1`; preserve time/evidence; replay is idempotent |
+| `codex-quota-absent` | Supported token-count record omits `/payload/rate_limits` | Quota component becomes `absent`; no quota fact or zero utilization is fabricated |
+| `codex-quota-identity-only` | Admitted non-null rate-limits object contains only exact profile-allowed identity/context members and no registered primary/secondary window object | Exact `state_only` zero-fact quota transition and cursor commit atomically |
+| `codex-quota-window-missing-utilization` | A registered primary or secondary window object is present without required `used_percent` | Whole record is `recognized_malformed`; usage/quota/component/cursor effects all roll back |
+| `codex-quota-window-mistyped-utilization` | A registered window's `used_percent` has the wrong JSON type | Whole record is `recognized_malformed`; it is not `state_only` or `record_limit` |
+| `codex-quota-window-out-of-range-utilization` | A registered window's decimal `used_percent` is below 0 or above 100 | Whole record is `recognized_malformed`; no clamp, zero, snapshot, or cursor effect is permitted |
 
 ## Parser and privacy vectors
 
@@ -120,6 +125,12 @@ credential, identifier, or path.
   produce byte-identical ordered health JSON at a fixed clock across restart.
 - Mutate a record before the resume anchor while preserving file size and mtime;
   scheduled full reconciliation must detect the change.
+- With coverage, reconciliation, and storage already latched, trigger a
+  generation/anchor mismatch that proves no unconsumed loss. Safe invalidation
+  must reset only cursor/context to byte zero, add no latch or degradation,
+  preserve every prior latch and evidence byte, derive `storage_hold` as the
+  highest active state, reveal reconciliation then coverage as their owning
+  clears occur, and report `healthy` only after all latches are clear.
 - Restart midway through reconciliation; only a successful completion resets
   the durable deadline.
 - Exercise truncation, replacement, rotation, schema change, clock movement,
@@ -211,3 +222,15 @@ fingerprints, logical SQLite schema/view results, metric descriptors/data
 points, and health schema. Raw SQLite files, protobuf byte ordering, and runtime
 timestamps are not parity targets. The v1 image index and release tag remain
 blocked until both native gates pass.
+
+## Human-legibility vector
+
+Starting from the qualified empty harness after the one documented setup
+command, an eligible developer may use no more than six stable-view or health
+commands. The run passes the time boundary at exactly
+`elapsed_time <= 10 minutes`; exactly ten minutes is admitted and any greater
+elapsed time fails visibly. The oracle must also prove every required answer,
+replay-neutral counts, and no private-table query. This capability target
+deliberately tightens the immutable launch instrument's one 15-minute sitting
+ceiling; it does not contradict or rewrite that historical parameter or its
+administration record.
