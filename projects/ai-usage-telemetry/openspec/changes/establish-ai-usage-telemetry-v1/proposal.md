@@ -7,6 +7,15 @@ project shape is ready to become testable capability contracts: launch gate
 recorded `READY` against commit
 `96ba99dda1503e2f278df9b76abd3c5872faa8fd`, with an empty E3 reopen list.
 
+R1-R5 then converged on exact reviewed HEAD
+`e2bb9ea78984878c6e06a9e37946f923032150f9`; R5 returned
+`APPROVED_FOR_PROMOTION` with findings `0 / 0 / 0`. Owner
+[Decision 0002](../../../about/heart-and-soul/decisions/0002-accept-v1-capability-contracts.md)
+independently accepts all eleven exact contract rows. The
+[acceptance projection](./acceptance.md) records the active-change state: the
+contracts are accepted, but no capability is implemented and this change is
+neither archived nor release-authorized.
+
 ## What Changes
 
 - Define the first independently acceptable Synthetic-to-SQLite Usage Spine

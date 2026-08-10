@@ -193,3 +193,28 @@ accepted**. Until R5 passes, the R3 RFC and R4-reviewed pre-fix annexes remain
 the latest accepted authorities. This record does not accept a capability,
 waive any improvement/evidence gate, authorize implementation, or permit real
 mounts, sinks, packaging, or release.
+
+## R5 Confirmation and Promotion
+
+A fresh R5 pass reviewed exact HEAD
+`e2bb9ea78984878c6e06a9e37946f923032150f9`, re-ran the full semantic and
+mechanical gates against the R4-corrected bytes, and returned
+`APPROVED_FOR_PROMOTION` with findings `0 / 0 / 0`. Under this decision's
+standing explicit direction, the promoted accepted digests are now RFC 0001
+`36c062fa81bfadb5e9b90c0386ae7529579648acf04a165e923adca5e9e03163`,
+source/bounds evidence
+`2ca7455f0c331c8d46774f9c72bb8c3f2d6b360255fab4663bfd5d32bc09cf7d`,
+synthetic vectors
+`8e5e512144e03d437aa0349b7d00b3600fae5dd24e2d613236d6c6e699953e8a`,
+and unchanged provenance
+`dcfffe320712afbdcf805e05d30b277130e4bf81f9d718d4f4408bc077f482f0`.
+
+The durable R1-R5 trail is
+[`../../legends-and-lore/reviews/0001/2026-08-10-specification-reconciliation.md`](../../legends-and-lore/reviews/0001/2026-08-10-specification-reconciliation.md).
+The owner's independent acceptance of the eleven exact capability-contract
+rows is recorded separately in
+[Decision 0002](./0002-accept-v1-capability-contracts.md). Neither promotion
+nor contract acceptance supplies unmeasured profile values or runtime/release
+evidence, and neither authorizes real mounts, non-synthetic facts, real sinks,
+production packaging, archival, or release outside the later active-task and
+profile gates.
