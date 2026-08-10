@@ -76,9 +76,9 @@ key blobs, and over-broad wording about optional Git whitespace classes.
 
 | Artifact | Candidate SHA-256 | State |
 |---|---|---|
-| RFC 0001 | `5215ee07d79d24b9234c5c20850a561add999de796a9e3f274a86532ff02840b` | Pending |
+| RFC 0001 | `1ffe8e796372ff56bdd7e81be4c25fdbf726fb51585cf53041e027857b6a5593` | Pending |
 | Source/bounds evidence | `2ca7455f0c331c8d46774f9c72bb8c3f2d6b360255fab4663bfd5d32bc09cf7d` | Unchanged accepted predecessor |
-| Synthetic vectors | `22f30ac862e29662a0b17ad0047f463adebff97a4a3b70f4293a6346732656dc` | Pending |
+| Synthetic vectors | `f78ece2be675b40ea0b0ae7efe20add6c3ab5036e419fa2d5ccc656842a94871` | Pending |
 | Provenance | `dcfffe320712afbdcf805e05d30b277130e4bf81f9d718d4f4408bc077f482f0` | Unchanged accepted predecessor |
 | `source-adapter-profiles` | `e1d13becbc66431332d484409c0263efe6e08046c0726c0373126764022c6696` | Pending replacement row |
 | `event-identity-and-normalization` | `e788522cce1d7e676cc03acae923462ab80b13236d887c78d7444a862e07966f` | Pending replacement row |

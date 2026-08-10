@@ -1,8 +1,10 @@
 # Deployment Topology
 
-**Status:** Accepted, **[Inferred]** target deployment derived from adopted
-doctrine and accepted RFC 0001. Image construction and publication are outside this
-documentation-only bootstrap.
+**Status:** Independently accepted, **[Inferred]** target deployment derived
+from adopted doctrine and the RFC 0001 design contract. Exact linked-RFC byte
+authority follows the central
+[lifecycle matrix](../README.md#lifecycle-status). Image construction and
+publication are outside this documentation-only bootstrap.
 
 ## Runtime Shape
 

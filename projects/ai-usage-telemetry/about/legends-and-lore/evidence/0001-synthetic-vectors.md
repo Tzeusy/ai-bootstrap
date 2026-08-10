@@ -1,6 +1,8 @@
 # Evidence 0001: Synthetic Vector Contract
 
-**Status:** Normative pre-implementation inventory for RFC 0001  
+**Status:** Exact-byte authority is external to this normative
+pre-implementation inventory; see the central
+[lifecycle matrix](../../README.md#lifecycle-status)
 **Date:** 2026-08-10
 
 These vectors define evidence that the first OpenSpec and implementation must

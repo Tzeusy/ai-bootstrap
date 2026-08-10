@@ -89,8 +89,9 @@ None. This is the project's first capability changeset.
 
 - Adds the first `openspec/` capability pillar for
   `projects/ai-usage-telemetry`; no application package exists or is created.
-- Binds every requirement upward to adopted doctrine and accepted RFC 0001,
-  including its launch-remediation digest recorded in Owner Decision 0001.
+- Binds every requirement upward to adopted doctrine and the exact RFC/spec
+  bytes authorized by the central lifecycle matrix and owner decisions; no
+  linked artifact promotes itself.
 - Establishes the complete initial changeset required before non-synthetic
   implementation, real mounts, sinks, or release can be authorized.
 - The Synthetic-to-SQLite capability remains independently acceptable and may
