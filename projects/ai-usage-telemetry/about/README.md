@@ -89,6 +89,13 @@ authorize real mounts, sinks, packaging, or release. Historical reviews and
 administrations remain off the default reading path except for the R1-R5 ledger
 and final-branch correction record.
 
+The current implementation sequence and Tokscale comparative-evidence
+disposition are recorded in the
+[`2026-08-10 Tokscale-informed project direction`](../docs/direction/2026-08-10-tokscale-informed.md).
+That planning record changes no accepted RFC, evidence, decision, or capability
+bytes; its bounded source-semantics gate must return through the amendment and
+successor-decision route if producer evidence contradicts the current contract.
+
 ## The Four `about/` Pillars
 
 | Pillar | Question | Start here |
