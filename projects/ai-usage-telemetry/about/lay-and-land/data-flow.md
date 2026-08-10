@@ -8,7 +8,10 @@
 
 ```mermaid
 flowchart TD
-    A[Scan next source-stream record] --> Z{Raw byte cap crossed?}
+    AA[Authorize profile] --> AB[Runtime validation<br/>ValidatedSourceHandle]
+    AB --> AC[Storage preflight<br/>AdmissionDecision permitted]
+    AC --> AD[Generic stay-beneath discovery<br/>adapter filename predicate]
+    AD --> A[Scan next source-stream record]
     Z -->|Yes, with or without newline| F[Quarantine stream\nhold cursor before record]
     Z -->|No| B{Complete record?}
     B -->|No: bounded incomplete tail| C[Hold stream cursor\nwait for later cycle]
@@ -18,8 +21,8 @@ flowchart TD
     D -->|Registered usage or quota| G[Field-project with code-owned extraction registry]
     G --> H{Schema and arithmetic valid?}
     H -->|No: malformed| F
-    H -->|Yes| I[Build admitted content-free fact]
-    I --> J[Derive stable logical identity + accounting fingerprint]
+    H -->|Yes| I[Invoke source-independent domain<br/>instant + cwd + category + age]
+    I --> J[Build UsageEvent / QuotaSnapshot<br/>identity + fingerprint]
     J --> K{Ledger identity exists?}
     K -->|Same fingerprint| L[Validated replay]
     K -->|New identity| M[Transactional ledger insert]
@@ -30,8 +33,9 @@ flowchart TD
     O --> P[Commit SQLite transaction]
     N --> P
     P --> Q[Stable read-only SQLite views]
-    P --> R[Independent OTLP projection + delivery]
-    P --> S[Independent PostgreSQL projection + delivery]
+    P --> PR[LedgerProjectionReader]
+    PR --> R[Independent OTLP projection + delivery]
+    PR --> S[Independent PostgreSQL projection + delivery]
     R --> T{OTLP durable acknowledgement?}
     S --> U{PostgreSQL durable acknowledgement?}
     T -->|No| V[Retain OTLP pending state]
@@ -42,26 +46,32 @@ flowchart TD
 
 ## Trust-Boundary Transitions
 
-1. **Untrusted local format → stream validation.** A source family contains
-   independently ordered source streams, and streams contain records. Files are
-   read-only and may be active, incomplete, repeated, truncated, rotated, or
-   changed by a tool update. Complete records are not trusted merely because
-   they parse as JSON.
-2. **Adapter output → normalized record.** A field-projecting streaming parser
-   decodes only paths in the code-owned extraction registry. The stable ledger
-   admission/schema then decides what may become a fact. Prompt/response content
-   and credentials have no normalized representation and are skip-only.
+1. **Untrusted mount → validated stream entry.** Runtime returns
+   `ValidatedSourceHandle` only after canonical mount/path checks. Generic
+   discovery consumes the handle, performs regular-file/non-symlink
+   stay-beneath traversal and generation, and applies the adapter-owned filename
+   predicate. Adapters implement neither runtime validation nor discovery.
+2. **Validated entry → normalized record.** The parser requires an injected
+   ledger/storage `AdmissionDecision=permitted`, decodes only paths in the
+   adapter-owned extraction registry, and supplies registered source
+   fields/evidence to source-independent domain interfaces. Those interfaces
+   alone construct `UsageEvent`/`QuotaSnapshot`, identity, canonical instant,
+   cwd basename, categories, fingerprint, and age. Prompt/response content and
+   credentials have no normalized representation and are skip-only.
 3. **Normalized record → durable ledger.** Identity, record data, cursor,
    aggregates, and sink-pending state change in one SQLite transaction. Identity
    and the accounting fingerprint exclude cursor positions and export/config
    choices. A crash before commit changes nothing; a crash after commit is
    replayable.
-4. **Ledger → OTLP.** The projection deliberately drops event/session
+4. **Ledger → local query.** Stable public views branch directly from committed
+   ledger state for local users and structured health.
+5. **Ledger → OTLP.** `LedgerProjectionReader`, not a public view/private-table
+   query, supplies committed projection input. The projection deliberately drops event/session
    identifiers, raw paths, and unbounded metadata. Only dimensions and finite
    values in the OTLP attribute/vocabulary registry cross this boundary.
-5. **Ledger → PostgreSQL.** Stable normalized columns and metadata selected by
-   the PostgreSQL projection allowlist cross this boundary. Delivery and its
-   checkpoint are independent from OTLP.
+6. **Ledger → PostgreSQL.** `LedgerProjectionReader`, not a public view/private-
+   table query, supplies stable normalized columns and metadata selected by the
+   PostgreSQL allowlist. Delivery and its checkpoint are independent from OTLP.
 
 ## Source-Specific Context
 

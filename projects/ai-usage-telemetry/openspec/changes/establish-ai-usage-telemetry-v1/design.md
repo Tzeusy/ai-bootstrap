@@ -113,30 +113,37 @@ Logical components remain separate even though they share the process:
 
 | Component | Owns | Must not own |
 |---|---|---|
-| Startup and profile verifier | Configuration validation, persisted namespace checks, release-profile digest and compatibility checks, canonical mount and runtime preflight | Source interpretation or profile-value invention |
-| Source discovery | Regular-file discovery beneath one canonical read-only source target, stay-beneath and no-symlink enforcement, source-stream generation evidence | Fact identity or accounting |
-| Streaming field projector | JSON syntax traversal, registered path/type projection, bounded skip-only handling, parser ceilings | General object deserialization or content-value materialization |
-| Claude Code adapter | Claude discriminator, permitted fields, native identity, source time, attribution, and category mapping for an activated profile | Codex context or unregistered fields |
-| Codex adapter | Same-stream session/context reconstruction, cumulative-landmark interpretation, usage deltas, and rate-limit snapshots for an activated profile | Look-ahead, cross-stream context, or guessed arithmetic |
-| Normalization core | UsageEvent, QuotaSnapshot, token-category, request-identity, and accounting-fingerprint contracts | Source-specific raw extension maps |
-| SQLite ledger | Immutable history, amounts, request and token aggregates, ledger sequence, cursors, diagnostics, release/profile state, health state, and per-sink obligations | Raw source records or sink-defined schema |
+| Startup and profile verifier | Configuration validation, persisted namespace checks, release-profile digest and compatibility checks | Source interpretation, mount traversal, or profile-value invention |
+| Runtime source provider | Canonical mount/path validation and creation of an opaque read-only `ValidatedSourceHandle` only after every runtime check succeeds | File discovery, filename predicates, record parsing, or source semantics |
+| Generic source discovery | Stay-beneath regular-file traversal and source-stream generation from a `ValidatedSourceHandle`, using an adapter-supplied filename predicate | Mount validation, adapter manifests, fact identity, or accounting |
+| Streaming field projector | JSON syntax traversal from an injected validated handle after an injected permitted `AdmissionDecision`, registered path/type projection, bounded skip-only handling, and parser ceilings | Runtime/storage preflight implementation, general object deserialization, or content-value materialization |
+| Claude Code adapter | Claude discriminator, permitted source fields/evidence, filename predicate, and source-specific context/arithmetic mapping for an activated profile | Domain identity, canonical time/path primitives, ledger admission, Codex context, or unregistered fields |
+| Codex adapter | Codex filename predicate, permitted source fields/evidence, same-stream session/context reconstruction, and cumulative-landmark interpretation for an activated profile | Domain identity, canonical time/path primitives, ledger admission, look-ahead, cross-stream context, or guessed arithmetic |
+| Source-independent domain core | `UsageEvent`, `QuotaSnapshot`, canonical instant parsing/rendering, lexical cwd-basename normalization, identities, token categories, accounting fingerprints, and checked age/current-selection functions | Adapter imports, source traversal, source-specific manifests, or raw extension maps |
+| Stream reconciliation and health | Cursor/rescan transitions and the pure `LatchSet` transition, precedence, and recovery model | SQLite persistence, view SQL, or query rendering |
+| SQLite ledger and storage provider | `AdmissionDecision`, immutable history, amounts, request and token aggregates, ledger sequence, cursors, latch proposals and checked cache persistence, diagnostics, release/profile state, per-sink obligations, and the ledger-owned `LedgerProjectionReader` | Raw source records, `LatchSet` policy, stable public views, or sink-defined schema |
 | Local query and inspection surface | Stable read-only views and versioned content-free health JSON | Inbound networking, repair, migration, retry, or cursor advancement |
-| OTLP projector | Bounded cumulative operational metrics, deterministic batching, fenced lease, and its own checkpoint | Event-time history or ledger authority |
-| PostgreSQL projector | Idempotent event-time history, allowlisted metadata, transactional remote checkpoint, and its own local checkpoint | Ledger authority or OTLP progress |
+| OTLP projector | Bounded cumulative operational metrics from `LedgerProjectionReader`, deterministic batching, fenced lease, and its own checkpoint | Public-view imports/queries, event-time history, or ledger authority |
+| PostgreSQL projector | Idempotent event-time history from `LedgerProjectionReader`, allowlisted metadata, transactional remote checkpoint, and its own local checkpoint | Public-view imports/queries, ledger authority, or OTLP progress |
 
 Dependencies flow in one direction:
 
-    explicit read-only source
-      -> streaming field projection
-      -> source adapter
-      -> ordered normalized fact set plus parser-context transition
+    runtime source provider -> ValidatedSourceHandle
+      -> generic stay-beneath discovery + adapter filename predicate
+      -> streaming field projection after permitted AdmissionDecision
+      -> source adapter fields/evidence -> source-independent domain interfaces
+      -> ordered normalized fact set plus parser-context/LatchSet proposals
       -> atomic complete-record SQLite transaction
-      -> stable local views
-      -> independent OTLP and/or PostgreSQL projections
 
-Sinks never feed facts, identity, or success back into source ingestion. Local
-querying reads stable views rather than private tables. Health reads durable
-state plus current read-only evidence and does not mutate the system.
+    committed SQLite ledger -> stable local query views
+                            -> LedgerProjectionReader -> OTLP projector
+                                                      -> PostgreSQL projector
+
+Sinks never feed facts, identity, or success back into source ingestion and
+never import or query the public views. They consume only the ledger-owned
+`LedgerProjectionReader`; local querying alone reads stable views rather than
+private tables. Health reads durable state plus current read-only evidence and
+does not mutate the system.
 
 ### Capability ownership and composition
 
@@ -147,16 +154,16 @@ gain authority to redefine that contract.
 | Capability | Owns | Consumes | Composes / boundary |
 |---|---|---|---|
 | `synthetic-usage-spine` | The qualified synthetic-only fixture-to-SQLite thesis and bounded human-legibility checkpoint | Only its accepted disposable-harness boundary and synthetic evidence | Composes no production member and owns no production extraction, parser, normalized-fact, ledger, query/health, sink, runtime, or release-profile schema or value |
-| `source-adapter-profiles` | Claude and Codex extraction manifests, discriminator and irrelevant-kind registries, context transitions, deterministic per-record fact ordering, source-build activation evidence, and the parser-resource member schema and evidence gate | Canonical source targets from `portable-runtime-and-release` and normalized output contracts from `event-identity-and-normalization` and `quota-snapshot-semantics` | Composes projected fields and parser-context transitions into an ordered zero-or-more candidate-fact set; it does not accept or persist facts |
-| `event-identity-and-normalization` | `UsageEvent`, composite and request identities, the exact accounting-fingerprint document, source-time and attribution rules, token-category semantics, and non-overlapping arithmetic requirements | Registry-admitted source fields and source-specific evidence from `source-adapter-profiles` | Composes source-faithful usage candidates; it owns no cursor, storage, view, or sink schema |
-| `stream-reconciliation-and-health` | Discovery, stream generation, cursor/anchor/parser-context contract, resume and full-rescan rules, closed independent per-stream health-latch dimensions and precedence, quarantine and coverage/retention states, reconciliation profile member, and source-health semantics | Adapter context transitions and the ledger's atomic record-commit result | Composes active persistent latches into effective stream then source-family/global health for `local-query-contract`; it cannot advance a cursor independently |
-| `durable-local-ledger` | Private SQLite `STRICT` base schema, tables and constraints, the closed stream-health-latch relation, migrations, record-set transaction, ledger sequence, persisted cursors/context and sink obligations, storage admission, retention, maintenance, backup, ledger health, and privacy-repair boundary | Ordered candidate facts and request identities, proposed cursor/context/latch transitions, and enabled sink identities | Atomically composes accepted facts and source progress into durable authority; it does not own stable query-view manifests or health JSON |
-| `quota-snapshot-semantics` | `QuotaSnapshot`, quota fact/subject identity, canonical utilization, availability, source/collection-time distinction, freshness evidence, and deterministic current selection | Registered Codex quota fields and common fingerprint rules | Composes admitted snapshots and current-quota semantics; it owns neither source extraction nor their query rendering |
-| `local-query-contract` | Exact stable read-only view names, columns, nullability and compatibility, plus the versioned non-networked structured-health JSON schema and inspection behavior | Ledger rows and ledger health, source health, sink health, and quota current-selection semantics | Composes the public local read model and non-masking overall health; it owns no private SQLite storage schema, migration, retry, repair, or write path |
-| `otlp-metrics-projection` | Metric names, units, descriptors, finite tuples and vocabularies, budgets, conservation, batching, lease/checkpoint state machine, retry, and projection-schema evolution | Committed ledger aggregates/current quota, ledger sequence, and its independent sink obligation | Composes bounded cumulative operational metrics only; it never becomes accounting authority or historical storage |
-| `postgresql-history-projection` | Shared projected-fact sequence envelope, SQL-certain non-null selected-child checks, exact deferred fact-kind one-to-one child constraints, remote event/amount/quota tables, types, nullability, keys and constraints, allowlisted metadata, event-time mapping, transactional remote checkpoint, retry, and projection-schema evolution | Committed ledger facts in ledger-sequence order and its independent sink obligation | Composes idempotent remote history with commit-time rejection of both-null, both-set, wrong-kind, orphan, and cross-kind sequence states; it does not own local ledger or OTLP state |
+| `source-adapter-profiles` | Claude and Codex extraction manifests, filename predicates, discriminator and irrelevant-kind registries, source-specific context/arithmetic mappings, deterministic per-record fact ordering, source-build activation evidence, and the parser-resource member schema and evidence gate | `ValidatedSourceHandle`, `AdmissionDecision`, generic discovery, and source-independent domain interfaces from identity/quota capabilities | Supplies projected source fields and evidence to domain interfaces and composes their results with parser-context transitions into an ordered zero-or-more candidate-fact set; it neither implements preflight/domain primitives nor accepts or persists facts |
+| `event-identity-and-normalization` | Source-independent `UsageEvent`, composite and request identities, canonical instant parser/renderer, lexical cwd-basename normalizer, exact accounting-fingerprint document, source-time and attribution contracts, token-category semantics, and non-overlapping arithmetic | No adapter module; adapters supply only registered fields and evidence at the public domain boundary | Composes source-faithful usage candidates without importing source adapters; it owns no traversal, cursor, storage, view, or sink schema |
+| `stream-reconciliation-and-health` | Generic stay-beneath discovery and stream generation, cursor/anchor/parser-context contract, resume and full-rescan rules, the pure `LatchSet` transition/precedence/recovery model, quarantine and coverage/retention states, reconciliation profile member, and source-health semantics | `ValidatedSourceHandle`, adapter filename predicates/context proposals, and the ledger's atomic record-commit result | Proposes cursor and latch transitions and derives effective stream then source-family/global health for persistence/query consumption; it does not persist rows or advance a cursor independently |
+| `durable-local-ledger` | Private SQLite `STRICT` base schema, tables and constraints, latch-row and checked-cache persistence, migrations, record-set transaction, ledger sequence, persisted cursors/context and sink obligations, `AdmissionDecision`, `LedgerProjectionReader`, retention, maintenance, backup, ledger health, and privacy-repair boundary | Ordered domain facts/request identities, proposed cursor/context/`LatchSet` transitions, and enabled sink identities | Atomically composes accepted facts and source progress into durable authority and exposes committed projection input; it owns neither latch policy nor stable query-view manifests/health JSON |
+| `quota-snapshot-semantics` | Source-independent `QuotaSnapshot`, quota fact/subject identity and fingerprint, canonical utilization, availability, source/collection-time distinction, checked age/freshness, and deterministic current selection | The canonical instant primitive from `event-identity-and-normalization`, never an adapter module | Composes admitted snapshot candidates and current-quota semantics from supplied registered fields/evidence; it owns neither source extraction nor query rendering |
+| `local-query-contract` | Exact stable read-only view names, columns, nullability and compatibility, plus the versioned non-networked structured-health JSON schema and inspection behavior | Ledger rows/checked health cache, the stream-owned `LatchSet` validator, sink health, and quota current-selection/age functions | Composes the public local read model and validates rather than reimplements domain/latch functions; it owns no private SQLite storage schema, migration, retry, repair, or write path |
+| `otlp-metrics-projection` | Metric names, units, descriptors, finite tuples and vocabularies, budgets, conservation, batching, lease/checkpoint state machine, retry, and projection-schema evolution | Only `LedgerProjectionReader`, ledger sequence/obligation, and domain-owned checked age | Composes bounded cumulative operational metrics only; it never imports/queries public views or becomes accounting authority/historical storage |
+| `postgresql-history-projection` | Shared projected-fact sequence envelope, SQL-certain non-null selected-child checks, exact deferred fact-kind one-to-one child constraints, remote event/amount/quota tables, types, nullability, keys and constraints, allowlisted metadata, event-time mapping, transactional remote checkpoint, retry, and projection-schema evolution | Only committed ledger facts in sequence order through `LedgerProjectionReader` and its independent sink obligation | Composes idempotent remote history with commit-time rejection of both-null, both-set, wrong-kind, orphan, and cross-kind sequence states; it never imports/queries public views or owns local ledger/OTLP state |
 | `release-profile-governance` | The immutable release-profile envelope, member identity, ID/digest, compatibility rules, activation authorization, and fail-closed behavior | Explicitly owner-accepted capability contracts plus each owning domain's exact measured values and executable evidence | Composes accepted domain members into one immutable profile; it cannot invent, override, or become a second owner of a domain schema or value |
-| `portable-runtime-and-release` | The three canonical host-backed source/state targets, the separate read-only TOML configuration surface and its fixed in-container path/preflight, secret boundary, privilege/filesystem/network isolation, disabled-sink non-instantiation, locked inputs, native architecture gates, and publish decision | An activatable immutable release profile, including parser minimum-memory evidence, plus the enabled capabilities' parity tests | Composes the native amd64/arm64 images and manifest only after all applicable gates pass; it does not choose adapter, accounting, ledger, query, or sink semantics |
+| `portable-runtime-and-release` | The three canonical host-backed source/state targets, the separate read-only TOML configuration surface, canonical mount/path validation and `ValidatedSourceHandle` provider, secret boundary, privilege/filesystem/network isolation, disabled-sink non-instantiation, locked inputs, native architecture gates, and publish decision | An activatable immutable release profile, including parser minimum-memory evidence, plus the enabled capabilities' parity tests | Supplies opaque validated source handles and composes native images/manifest only after all applicable gates pass; it does not discover files or choose adapter, accounting, ledger, query, or sink semantics |
 
 In particular, SQLite location does not collapse ownership: the durable-ledger
 capability owns private storage and persistence, while `local-query-contract`
@@ -165,24 +172,37 @@ resource ceilings and their measurement gate belong to
 `source-adapter-profiles`; runtime/release consumes their minimum-memory and
 native-parity evidence but cannot set it.
 
+The source-independent domain packages have no import edge to either adapter.
+Every 3.x domain task therefore precedes and is consumed by the applicable 4.x
+adapter task; adapters supply source fields/evidence and invoke those interfaces
+without reimplementing canonical instant, cwd basename, identity, category,
+fingerprint, or age behavior.
+
 ### Source-to-ledger flow
 
 1. Startup validates the embedded release-profile digest, selected capability
-   membership, persisted technical namespaces, schema compatibility, mount
-   boundary, non-root runtime, source non-writability, and data-volume
-   writability. Claude and Codex source namespaces must be globally distinct,
-   including disabled sources. A failed prerequisite stops component
-   registration, scanning, health serialization, and exporting.
+   membership, persisted technical namespaces, and schema compatibility.
+   Claude and Codex source namespaces must be globally distinct, including
+   disabled sources. For each authorized source, the runtime provider performs
+   canonical mount/path, non-root, source-non-writability, and volume checks and
+   returns `ValidatedSourceHandle` only on success. A failed prerequisite stops
+   scanning, health serialization, and exporting.
 2. Each enabled adapter begins as unsupported until its exact source-build
    family, extraction manifest, identity rule, arithmetic rule, limits, and
    fixtures have passed the profile evidence gate. Synthetic fixtures may be
    exercised under candidate test bounds without opening a real mount.
-3. Discovery enumerates only regular non-symlink JSONL files beneath the
-   adapter's canonical target. Relative-path byte order makes discovery and
-   rescan reproducible, but a path is never a fact identity.
-4. Before traversal, a missing required profile member or parser bound leaves
-   the enabled source `unsupported_profile`. Under a complete activated profile,
-   the streaming projector syntax-scans each complete record. It decodes only
+3. Generic discovery consumes `ValidatedSourceHandle`, applies the adapter's
+   filename predicate, and enumerates only regular non-symlink files through
+   stay-beneath traversal. Relative-path byte order makes discovery and rescan
+   reproducible, but a path is never a fact identity.
+4. Before record traversal, a missing required profile member or parser bound
+   leaves the enabled source `unsupported_profile`; the ledger/storage provider
+   must also return `AdmissionDecision=permitted`. The projector and adapters
+   consume injected provider interfaces and remain independently testable with
+   fake permitted/denied decisions and fake validated handles; they neither
+   import nor implement runtime/storage preflight. Under a complete activated
+   profile and permit, the streaming projector syntax-scans each complete
+   record. It decodes only
    the discriminator, context, accounting, and identity values named by the
    activated compile-time registry. Content-bearing and unlisted descendant
    values are skipped without decoding, copying, hashing, logging, or retaining
@@ -202,11 +222,13 @@ native-parity evidence but cannot set it.
    `schema_inconsistent`, `unknown_kind`, `recognized_malformed`, and
    `unregistered_category`; only a parser-successful candidate set reaches
    collision detection.
-6. Every candidate is normalized before commit to a stable composite identity
-   and the canonical accounting fingerprint. Unknown attribution remains
-   unknown. Token amounts use registered non-overlapping categories; quota
-   remains a distinct snapshot type.
-7. The ledger resolves every candidate in the ordered set as new,
+6. The adapter supplies registered fields and evidence to the source-independent
+   domain interfaces. Those interfaces alone normalize canonical instants and
+   cwd basenames, construct `UsageEvent`/`QuotaSnapshot`, identities,
+   categories, fingerprints, and checked age semantics. Unknown attribution
+   remains unknown; quota remains a distinct snapshot type.
+7. The ledger revalidates/consumes the storage permit before commit, then
+   resolves every candidate in the ordered set as new,
    same-identity/same-fingerprint duplicate, or
    same-identity/different-fingerprint collision, then commits the complete
    record outcome in one SQLite transaction. New facts receive ledger sequences
@@ -217,9 +239,10 @@ native-parity evidence but cannot set it.
    denial, write failure, or ambiguous commit rolls back every new contribution,
    parser-context change, and cursor advance for that record; the affected
    stream holds before it.
-8. Stable local views expose committed history and health. Optional sink workers
-   independently project committed sequences and advance only their own
-   checkpoints after durable destination acknowledgement.
+8. Stable local views expose committed history and health for local users.
+   Optional sink workers never import or query those views: they independently
+   consume committed sequences through `LedgerProjectionReader` and advance
+   only their own checkpoints after durable destination acknowledgement.
 
 The two v1 adapter projections are intentionally asymmetric:
 
@@ -279,13 +302,16 @@ repository-root claim. Timestamp comparison, freshness, and OTLP age use
 checked integer nanoseconds, clamp tolerated future age to zero, and floor only
 the final nonnegative nanosecond age to whole seconds.
 
-### Ledger and sink flow
+### Ledger, query, and sink flow
 
 SQLite under /data is the accounting authority and the only component permitted
 to coordinate complete-record acceptance with source progress. It retains
 normalized facts, amounts, source evidence, identities, sequences, cursors,
 aggregates, diagnostics, and sink obligations indefinitely. Aggregates are
-rebuildable optimizations; accepted facts are not.
+rebuildable optimizations; accepted facts are not. The local query surface
+builds its stable views over this authority. Sinks do not depend on those views:
+the ledger-owned `LedgerProjectionReader` gives each projector only committed
+projection inputs and checkpoint operations.
 
 Each enabled sink instance is identified by sink ID, destination ID, projection
 schema ID, and ledger epoch. Its checkpoint is independent:
@@ -361,8 +387,10 @@ boundary.
 
 ### 4. Normalized immutable facts, not raw passthrough
 
-Adapters emit only UsageEvent and QuotaSnapshot values admitted by the closed
-ledger schema. Token categories are registered and non-overlapping. Source
+Source-independent domain interfaces emit only `UsageEvent` and
+`QuotaSnapshot` values admitted by the closed ledger schema. Adapters supply
+registered source fields/evidence and invoke those interfaces; the domain never
+imports adapters. Token categories are registered and non-overlapping. Source
 unknowns remain unknown, and quota is never converted into a token event.
 
 Alternative: retain raw records and normalize in each sink. Rejected because it
@@ -471,6 +499,13 @@ retention gap, coverage unknown, and disabled states. Family and global health
 must reflect the most severe enabled child state; they cannot mask a degraded
 stream because a sibling advanced.
 
+`stream-reconciliation-and-health` owns one pure `LatchSet` model that accepts a
+prior closed set plus one dimension-owned transition and returns the next set,
+effective state, winning failure, and recovery result. It alone owns transition
+legality, precedence, sibling preservation, and recovery. The ledger persists
+proposed transitions and a checked derived cache atomically; query code projects
+and validates that cache by invoking `LatchSet`, never by reimplementing it.
+
 Each degradation dimension has one persistent row keyed by stream and the
 closed dimension `storage|quarantine|retention|envelope|reconciliation|tail|
 coverage`. Each row has `clear|latched` state, its dimension-matched failure
@@ -561,6 +596,11 @@ only code-owned failure enums, opaque technical IDs, numeric positions, capped
 measurements, and state-transition counters. They exclude raw paths, unknown
 discriminator text, exception text, source fragments, fingerprints of forbidden
 values, and credentials.
+
+Projection permission does not make the public query contract a sink
+dependency. OTLP and PostgreSQL consume only `LedgerProjectionReader`; stable
+views remain a local user/query surface and are never imported or queried by a
+sink.
 
 The future container has exactly three canonical host-backed source/state
 targets: the read-only Claude and Codex session targets and writable `/data`.

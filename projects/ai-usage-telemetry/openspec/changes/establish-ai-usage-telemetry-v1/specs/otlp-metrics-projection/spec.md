@@ -36,7 +36,7 @@ Scope: v1-mandatory
 - **THEN** export fails closed before client creation or checkpoint progress
 
 ### Requirement: [TARGET-STATE] Stable Cumulative Sum Semantics
-MUST derive token and request Sums only from committed ledger facts through the target `ledger_seq`, use the immutable ledger creation timestamp as every cumulative series start and export time as point time, and retain cumulative monotonic values across restart, lease turnover, retry, outage, replay, and source deletion.
+MUST derive token and request Sums only from committed ledger facts through the target `ledger_seq` obtained from the ledger-owned `LedgerProjectionReader`, use the immutable ledger creation timestamp as every cumulative series start and export time as point time, and retain cumulative monotonic values across restart, lease turnover, retry, outage, replay, and source deletion. OTLP code MUST NOT import or query public stable views or private ledger tables.
 
 ID: REQ-otlp-metrics-projection-003
 Source: RFC 0001 § OTLP Metrics Projection
@@ -66,7 +66,7 @@ Scope: v1-mandatory
 - **THEN** the target checkpoint is blocked with sanitized health and no batch or partial target is acknowledged
 
 ### Requirement: [TARGET-STATE] Exact Quota Gauge Tuples
-MUST give both quota gauges exactly point attributes `ai.account`, `ai.vendor`, `ai.quota.limit`, `ai.quota.window`, `ai.quota.scope`, and `ai.quota.freshness`; emit utilization for every selected current subject with an admitted value; emit age only when source time is non-null as the non-negative integer `floor(max(0,target_export_time_unix_nano-source_unix_nano)/1_000_000_000)` using checked signed-64-bit nanosecond subtraction; distinguish every subject injectively without aggregation; and block a target for any unrepresentable subject, arithmetic overflow, or tuple collision.
+MUST give both quota gauges exactly point attributes `ai.account`, `ai.vendor`, `ai.quota.limit`, `ai.quota.window`, `ai.quota.scope`, and `ai.quota.freshness`; emit utilization for every selected current subject with an admitted value; and emit age only when source time is non-null by invoking the quota-domain age function for the non-negative integer `floor(max(0,target_export_time_unix_nano-source_unix_nano)/1_000_000_000)`. OTLP MUST NOT duplicate checked time arithmetic and its tests MUST use an independently implemented integer oracle. It MUST distinguish every subject injectively without aggregation and block a target for any unrepresentable subject, arithmetic overflow, or tuple collision.
 
 ID: REQ-otlp-metrics-projection-005
 Source: RFC 0001 § OTLP Metrics Projection

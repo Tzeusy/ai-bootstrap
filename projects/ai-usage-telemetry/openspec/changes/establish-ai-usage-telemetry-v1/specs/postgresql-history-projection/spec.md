@@ -67,7 +67,7 @@ Scope: v1-mandatory
 - **AND** selecting the native field instead requires its non-null canonical source value
 
 ### Requirement: [TARGET-STATE] Transactional Sequence-Batch Delivery
-MUST use one PostgreSQL transaction for a contiguous ascending ledger-sequence batch, insert each shared `projected_facts` envelope with its exactly one fact-kind-matching usage or quota child, insert every usage event before all its amount rows, compare any pre-existing envelope, child, and amount idempotency rows, and advance `projection_checkpoints` only after every sequence in the batch is present and equal; the local checkpoint MUST wait for durable PostgreSQL commit acknowledgement.
+MUST obtain each contiguous ascending ledger-sequence batch only through the ledger-owned `LedgerProjectionReader`, never by importing/querying public stable views or private ledger tables, and use one PostgreSQL transaction to insert each shared `projected_facts` envelope with its exactly one fact-kind-matching usage or quota child, insert every usage event before all its amount rows, compare any pre-existing envelope, child, and amount idempotency rows, and advance `projection_checkpoints` only after every sequence in the batch is present and equal; the local checkpoint MUST wait for durable PostgreSQL commit acknowledgement through the same ledger-owned boundary.
 
 ID: REQ-postgresql-history-projection-004
 Source: RFC 0001 § PostgreSQL Historical Projection

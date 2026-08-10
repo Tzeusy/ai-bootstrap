@@ -135,3 +135,24 @@ evidence gate, or authorizing personal mounts or real destinations.
 
 The R2-reconciled RFC 0001 digest is
 `d865e6971c5ab56af5791007cefc73f53cb4d15d57ff898f61745e4f479c7b30`.
+
+## R3 Dependency-Hygiene Clarification
+
+Under the same standing authorization, R3 reconciliation makes the accepted
+dependency direction explicit without changing behavior. Source-independent
+domain interfaces own normalized facts, identity, canonical instant and cwd-
+basename primitives, categories, fingerprints, and age; adapters supply source
+fields/evidence and depend on those interfaces. Runtime alone yields
+`ValidatedSourceHandle`, storage alone yields `AdmissionDecision`, generic
+stream discovery owns stay-beneath traversal/generation, stream health alone
+owns pure `LatchSet`, and the ledger persists state and exposes
+`LedgerProjectionReader` directly to sinks while public views remain a separate
+local-query branch. The task graph now orders domain before adapters and stream-
+health policy before ledger persistence, with fake lower-provider interfaces
+keeping adapters testable before concrete providers. These corrections preserve
+R2 privacy, SQL, latch, timestamp, canary, traceability, and zero-fact evidence
+semantics; they do not accept a capability, waive an evidence gate, or authorize
+personal mounts or real destinations.
+
+The R3-reconciled RFC 0001 digest is
+`ca548d5cb5070c5e288e66d3fe97a3c0f662cd245bd7153ae640d2ed593dcbc2`.

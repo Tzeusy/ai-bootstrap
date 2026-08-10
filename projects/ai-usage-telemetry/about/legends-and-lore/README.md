@@ -41,7 +41,7 @@ Relationship to the other pillars:
 - [`craft-and-care`](../craft-and-care/README.md) governs implementation quality, verification, observability, and maintenance.
 
 RFC 0001 is accepted project law at current artifact digest
-`d865e6971c5ab56af5791007cefc73f53cb4d15d57ff898f61745e4f479c7b30`,
+`ca548d5cb5070c5e288e66d3fe97a3c0f662cd245bd7153ae640d2ed593dcbc2`,
 recorded by Owner Decision 0001. The formal review and prior reconciliation
 entries preserve the historical digest trail. Source/resource profiles still
 require their downstream evidence gates before real mounts, ingestion,

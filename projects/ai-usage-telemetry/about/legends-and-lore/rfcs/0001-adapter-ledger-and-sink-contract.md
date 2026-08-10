@@ -33,12 +33,21 @@ that the project has no reason to inspect. A metrics-only collector would lose
 the durable event history needed to repair projections after failure or schema
 change.
 
-The contract therefore separates four responsibilities:
+The contract therefore separates five responsibilities with one-way
+dependencies:
 
-1. adapters interpret a supported local source without crossing its read-only boundary;
-2. normalization preserves source meaning in registered, non-overlapping categories;
-3. the local ledger owns identity, deduplication, history, cursors, aggregates, and delivery state;
-4. optional sinks project that history for operational queries or durable relational analysis.
+1. runtime validates the canonical mount/path boundary and returns an opaque
+   read-only `ValidatedSourceHandle`; generic stream discovery consumes it for
+   stay-beneath traversal and generation using adapter-owned filename predicates;
+2. adapters interpret registered source fields/evidence and invoke
+   source-independent domain interfaces without implementing runtime/storage
+   preflight or domain primitives;
+3. the domain owns `UsageEvent`, `QuotaSnapshot`, identities, canonical instant,
+   cwd basename, categories, fingerprints, and checked age semantics;
+4. the local ledger owns admission, deduplication, persistence, history,
+   cursors, aggregates, and delivery state; and
+5. optional sinks project committed history through a ledger-owned interface,
+   never through the public query views.
 
 "Eventually exact" means exact over every complete, supported observation that
 becomes observable to the collector. Reconciliation must discover late-readable
@@ -59,6 +68,27 @@ reconciliation deadlines, storage-admission parameters, OTLP vocabularies and
 series budget, and the synthetic vectors that justify them. Operator
 configuration may select a supported capability or narrow an allowlist, but it
 cannot raise, replace, or patch release-profile values at runtime.
+
+**`ValidatedSourceHandle`:** the exact opaque runtime-provider result returned
+only after canonical source mount/path validation. It grants generic discovery
+the narrow read-only operations needed for stay-beneath traversal; it contains
+no adapter semantics, filename predicate, parser, or storage permission.
+
+**`AdmissionDecision`:** the exact ledger/storage-provider result with closed
+outcome `permitted | denied` plus content-free capacity/profile evidence. A
+permitted decision must exist before record traversal and be revalidated/
+consumed before commit. Parser and adapter tests may inject fakes; those modules
+never implement or import the concrete provider.
+
+**`LedgerProjectionReader`:** the ledger-owned read/checkpoint interface over
+committed normalized facts, aggregates, selected quota, sequence targets, and
+guarded acknowledgements. OTLP and PostgreSQL consume only this interface and
+never import or query the public stable views or private tables.
+
+**`LatchSet`:** the pure stream-health model that owns one-dimension transition
+legality, fixed precedence, sibling preservation, and recovery. The ledger
+persists proposed sets and a checked cache; query projects and validates them.
+Neither persistence nor query reimplements the model.
 
 ## Evidence Baseline
 
@@ -134,15 +164,17 @@ in-container path and mount-preflight behavior are owned by the
 `portable-runtime-and-release` capability. `/tmp` is ephemeral container
 scratch, not a canonical host-backed source/state target.
 
-Startup fails closed unless each enabled source target is a distinct mount at
-its canonical target, is read-only, and resolves without following a symlink.
-Deployment preflight inspects every host-side path component without following
-symlinks, requires the canonical leaf to equal the configured source root, and
-rejects a home directory, tool configuration root, or parent broader than the
-fixed `projects`/`sessions` tree. In-container
-discovery applies the same no-symlink and stay-beneath-target rule to every file
-it opens. A bind of `~`, `~/.claude`, `~/.codex`, or an equivalent broad parent
-is invalid even if a nested include filter would later narrow it.
+The runtime source provider fails closed unless each enabled source target is a
+distinct mount at its canonical target, is read-only, and resolves without
+following a symlink. It inspects every host-side path component without
+following symlinks, requires the canonical leaf to equal the configured source
+root, rejects a home directory, tool configuration root, or parent broader than
+the fixed `projects`/`sessions` tree, and returns `ValidatedSourceHandle` only
+after every check succeeds. A bind of `~`, `~/.claude`, `~/.codex`, or an
+equivalent broad parent is invalid even if a nested include filter would later
+narrow it. Generic stream discovery, not runtime or either adapter, consumes
+the handle and owns regular-file, no-symlink, stay-beneath traversal and stream
+generation while applying the adapter-owned filename predicate.
 
 The release image declares a non-zero UID and GID. A deployment may map them to
 different non-zero numeric IDs, but provisions `/data` for those IDs in
@@ -268,9 +300,12 @@ implementation-specific numeric values are rejected.
 
 Classification is a total phase order, not the first exception raised by a
 particular JSON member or transport chunk. Startup first validates the embedded
-profile and source membership; canonical mount/runtime resource preflight and
-ledger availability/storage admission follow before source traversal. Once a
-record is traversed, its order-independent failure precedence is
+profile and source membership; the parser then requires an injected runtime-
+owned `ValidatedSourceHandle` and ledger/storage-owned
+`AdmissionDecision=permitted` before source traversal. Parser and adapter
+modules remain usable with fake permitted/denied decisions and fake handles,
+and never implement or import concrete runtime/storage preflight. Once a record
+is traversed, its order-independent failure precedence is
 `record_limit` for any measured ceiling or checked-counter overflow, then
 `schema_inconsistent` for invalid UTF-8 or invalid JSON structure, then
 `unknown_kind` for a syntactically valid unregistered discriminator, then
@@ -320,23 +355,37 @@ or otherwise sensitive value.
 
 ### Adapter Contract
 
-A `SourceAdapter` interprets one configured source family and yields zero or
-more normalized `UsageEvent` and `QuotaSnapshot` facts. This is a conceptual
-contract, not a plugin ABI or a prescribed Python method signature.
+A `SourceAdapter` interprets one configured source family, supplies registered
+source fields/evidence to source-independent domain interfaces, and yields zero
+or more domain-built `UsageEvent` and `QuotaSnapshot` facts. This is a
+conceptual contract, not a plugin ABI or a prescribed Python method signature.
 
 Every adapter must:
 
-- read only its explicit source mount;
+- consume generic discovery results from an injected `ValidatedSourceHandle`
+  and own only its canonical filename predicate/manifest, not mount validation,
+  stay-beneath traversal, or stream generation;
+- require an injected permitted `AdmissionDecision` before record traversal;
 - use the field-projecting streaming reader and its code-owned path/type registry;
 - distinguish complete records, incomplete trailing data, exact registered
   `registered_irrelevant`, `context_only`, and `quota_state_only` dispositions,
   unknown or unregistered record kinds, and recognized malformed or
   schema-inconsistent records;
-- assign stable logical event identities that survive rescans and file relocation where the source provides stable identity;
-- normalize source timestamps and attribution without manufacturing unsupported semantics;
-- emit only registered token categories and ledger-schema-admitted metadata;
+- invoke domain-owned logical identity/fingerprint functions with source
+  evidence that survives rescans and relocation;
+- invoke domain-owned canonical instant and lexical cwd-basename functions
+  without manufacturing unsupported semantics;
+- invoke the domain-owned category/quota/age contracts and emit only
+  ledger-schema-admitted metadata;
 - produce no raw-record passthrough and no prompt, response, tool-call, or credential fields;
 - report enough source position state for an optimized resume while remaining correct after a full rescan.
+
+The domain packages import no adapter modules. Adapters do not implement
+`UsageEvent`, `QuotaSnapshot`, composite/request/subject identity, canonical
+instant rendering, cwd-basename normalization, token-category arithmetic,
+accounting fingerprints, or checked age. Those primitives can therefore be
+built and tested before either adapter; adapters consume them with separately
+implemented fixture oracles.
 
 V1 contains built-in Claude Code and Codex adapters. New adapters require code
 review against this RFC; runtime loading of arbitrary third-party plugins is not
@@ -348,7 +397,11 @@ part of the v1 contract.
 
 ### `UsageEvent`
 
-`UsageEvent` is the normalized unit of token accounting. It contains:
+`UsageEvent` is the source-independent normalized unit of token accounting. The
+domain owns its model, identities, canonical instant/cwd/category/fingerprint
+functions, duplicate/collision classification, and public construction
+interface. Adapters supply registered fields/evidence and invoke that interface;
+the domain imports no adapter module. It contains:
 
 | Field group | Contract |
 |---|---|
@@ -430,8 +483,11 @@ may stop receiving new values but remain interpretable indefinitely.
 
 ### `QuotaSnapshot`
 
-Quota is a point-in-time observation, not a token event. `QuotaSnapshot`
-contains:
+Quota is a point-in-time observation, not a token event. `QuotaSnapshot` is a
+source-independent domain interface. The quota domain owns its model,
+fact/subject identity and fingerprint, utilization, checked age/freshness, and
+current-selection functions; adapters supply registered fields/evidence and
+invoke them without a reverse import. It contains:
 
 - the same immutable composite fact identity and versioned accounting
   fingerprint contract as `UsageEvent`;
@@ -460,7 +516,8 @@ representation, but it may not weaken the complete logical identity or its
 mandatory uniqueness constraints.
 
 `collected_at` is provenance, never a substitute for `source_observed_at` and
-never a fingerprint input. Every accepted RFC 3339 input must have an explicit
+never a fingerprint input. The one domain-owned canonical-instant parser and
+renderer is shared by usage and quota. Every accepted RFC 3339 input must have an explicit
 offset, year `0001..9999`, no leap second, and an instant representable as a
 non-negative signed-64-bit UTC Unix-nanosecond integer. Checked conversion
 normalizes it to that integer and the sole fingerprint/storage text form
@@ -476,6 +533,10 @@ Absent source time is `unknown`; a future instant beyond the inclusive skew or
 any parse/multiply/subtract overflow is malformed. Exact
 source/limit maximum ages and skew bounds are fixed in the pre-ship source
 schema, not operator-tunable claims.
+
+The one quota-domain checked age function owns all nanosecond multiplication,
+subtraction, future clamp, and final whole-second floor. Query and OTLP invoke
+it and use independently implemented oracles; neither duplicates the arithmetic.
 
 The immutable quota-subject key is `(collector_namespace, ledger_namespace,
 adapter_schema_id, source_namespace, vendor, native_limit_identity,
@@ -514,9 +575,11 @@ type is `recognized_malformed` and holds before that record.
 
 #### Claude Code sessions
 
-- **Discovery:** regular, non-symlink `*.jsonl` files beneath
-  `/sources/claude/sessions`; directory entries are processed in canonical
-  relative-path byte order, but the relative path is never a fact identity.
+- **Filename predicate:** `*.jsonl` beneath the canonical
+  `/sources/claude/sessions` handle. The adapter owns this predicate and
+  manifest only; generic stream discovery owns regular-file/non-symlink
+  stay-beneath traversal, generation, and canonical relative-path byte order.
+  The relative path is never a fact identity.
 - **Schema:** `claude-code/session-jsonl@1`. The discriminator is `/type`.
   Usage-bearing records have the registered value `assistant`; every other
   advancing value must appear in the adapter's finite irrelevant-kind registry.
@@ -569,8 +632,10 @@ freshness, privacy, and vector gates as any new source contract.
 
 #### Codex rollouts
 
-- **Discovery:** regular, non-symlink `rollout-*.jsonl` files beneath
-  `/sources/codex/sessions`, in canonical relative-path byte order.
+- **Filename predicate:** `rollout-*.jsonl` beneath the canonical
+  `/sources/codex/sessions` handle. The adapter owns this predicate and manifest
+  only; generic stream discovery owns regular-file/non-symlink stay-beneath
+  traversal, generation, and canonical relative-path byte order.
 - **Schema:** `codex/rollout-jsonl@1`. `/type` admits `session_meta`,
   `turn_context`, and `event_msg`; `/payload/type` further identifies
   `token_count`. Other advancing values require an exact irrelevant-kind
@@ -668,9 +733,13 @@ recovery evidence. A latched row has failure evidence and no recovery evidence;
 a cleared row has exact recovery evidence and no active failure. Initial clear
 rows carry a code-owned initialization recovery marker. The corresponding
 `source_streams.state`, failure code, and offset are a transactionally checked
-derived cache of the highest active latch, not the owner of independent state.
+cache of the stream-owned `LatchSet` result, not the owner of independent state.
+The ledger persists proposed transitions and validates cache agreement; it does
+not implement transition legality, precedence, sibling preservation, or
+recovery.
 
-For each consumed record, one SQLite transaction coordinates:
+For each consumed record, one SQLite transaction coordinates after a permitted
+`AdmissionDecision` is revalidated and consumed:
 
 1. insertion or same-fingerprint recognition of the normalized event or snapshot;
 2. for a new fact, allocation of `ledger_seq` and insertion of all registered
@@ -701,6 +770,11 @@ acknowledgement advances only that sink's checkpoint in its own SQLite
 transaction after durable destination acknowledgement; an ambiguous
 acknowledgement retries at least once.
 
+The ledger also owns `LedgerProjectionReader`, the only sink-facing source of
+committed normalized facts, aggregates, selected quota, target sequences, and
+guarded checkpoint operations. Public stable views belong to local query users;
+OTLP and PostgreSQL never import or query them or private base tables.
+
 **Doctrine trace:** **1. Local Facts Become User-Owned History**;
 **3. Accounting Is Eventually Exact**;
 **4. Partial Failure Is Explicit**.
@@ -720,15 +794,19 @@ view result. Logical pruning, sampling, TTL deletion, aggregate-only
 replacement, or checkpoint advancement that abandons retained work is not
 maintenance and is absent from v1.
 
-Before accepting one consumed-record transaction, the ledger applies the release profile's storage
-admission guard in addition to SQLite's atomic commit behavior. The profile
+Before traversing one candidate record, the ledger/storage provider returns the
+exact `AdmissionDecision` after applying the release profile's conservative
+maximum-record storage-admission guard. A permitted decision is revalidated and
+consumed before commit in addition to SQLite's atomic behavior. The profile
 fixes a maximum encoded record/fact transaction, an overflow-safe method for computing the
 transaction's conservative encoded-row and index/WAL amplification charge, and a
 post-commit free-space reserve. Admission requires a successful filesystem
 capacity observation and `available_bytes >= charge_bytes + reserve_bytes`.
 Every add and multiply in that calculation is checked; overflow, an unavailable
 or nonsensical capacity result, an unpriced row/index/migration shape, or a
-transaction above the profiled maximum denies admission before any cursor advances.
+transaction above the profiled maximum returns `denied` before any record byte
+is parsed or cursor advances. Parser/adapters consume the injected decision and
+may use fakes in their tests, but do not implement or import the provider.
 The calculation is a conservative gate, not a claim that free space cannot race
 after inspection.
 
@@ -769,8 +847,12 @@ waiver.
 
 The cursor and quarantine unit is a **source stream**: one independently
 ordered, cursor-bearing session file or equivalent configured input object.
-An adapter is a source family and may own many source streams. A failure in one
-stream does not quarantine its siblings.
+An adapter is a source family and may own many source streams. Generic stream
+discovery consumes `ValidatedSourceHandle`, applies the adapter's filename
+predicate, and alone owns regular-file/non-symlink stay-beneath traversal and
+`stream_generation` derivation. Runtime owns handle validation; adapters own
+predicates/manifests only. A failure in one stream does not quarantine its
+siblings.
 
 Every source cursor is the indivisible tuple:
 
@@ -933,10 +1015,14 @@ SQLite cannot persist a transition, the read-only command still exposes
 health as stale. Restart repeats that computation before any source or sink
 write, so an unwritten hold cannot be forgotten.
 
-Health dimensions are independently and persistently latched in the closed
-per-stream relation until their owning recovery condition clears that one row
-with content-free recovery evidence. Effective stream state is derived from
-active rows by the exact precedence, highest first: `storage` ->
+The stream-health domain owns one pure `LatchSet` model. Given the prior closed
+seven-dimension set and one dimension-owned latch/clear proposal, it validates
+transition/evidence legality, preserves every sibling, and returns the next set,
+effective state, winning failure, and recovery result. Health dimensions are
+persisted from that result in the closed per-stream relation until their owning
+recovery condition clears that one row with content-free recovery evidence.
+Effective stream state is derived by `LatchSet` from active rows in exact
+precedence, highest first: `storage` ->
 `storage_hold`, `quarantine` -> `quarantined`, `retention` -> `retention_gap`,
 `envelope` -> `source_envelope_exceeded`, `reconciliation` ->
 `reconciliation_overdue`, `tail` -> `trailing_deferred`, `coverage` ->
@@ -946,6 +1032,11 @@ restart, duplicate success, and clear order cannot change that result. Ledger
 unreadability composes above the ordering as overall `unavailable`. A
 duplicate-only commit may set the derived stream state to `healthy` only when
 no latch remains and never overwrites another dimension's evidence.
+
+The ledger owns latch-row and checked-cache persistence only. Query projects the
+checked cache and invokes `LatchSet` to validate it. Neither ledger nor query
+owns a second transition, precedence, or recovery implementation; query tests
+use an independently implemented expected-row oracle.
 
 A non-networked, read-only inspection command renders a readable compatible
 ledger's health views as a versioned JSON document with exact top-level keys
@@ -970,7 +1061,8 @@ network activity. There is no inbound health server in v1.
 ### Sink Independence
 
 OTLP Metrics and PostgreSQL are separate, independently optional consumers of
-the ledger. Every enabled instance has the mandatory checkpoint key
+the ledger through `LedgerProjectionReader`. Neither sink imports or queries
+the public stable views or private tables. Every enabled instance has the mandatory checkpoint key
 `(sink_id, destination_id, projection_schema_id, ledger_epoch)` and value
 `acknowledged_ledger_seq`. Enabling, disabling, failing, or catching up one key
 does not alter another. Reusing a key for a different endpoint, database,
@@ -1015,7 +1107,8 @@ The OTLP sink exports:
 
 Token and request instruments are OTLP `Sum` instruments with cumulative
 temporality and `is_monotonic=true`. They come from committed ledger aggregates
-through an acknowledged `ledger_seq`, never an uncommitted scan batch. Each
+through `LedgerProjectionReader` and an acknowledged `ledger_seq`, never an
+uncommitted scan batch or public-view query. Each
 ledger has an immutable `ledger_epoch` and creation timestamp; the timestamp is
 the stable OTLP start time for every cumulative series derived from that ledger.
 Process restart, lease turnover, retry, endpoint outage, or checkpoint replay
@@ -1127,7 +1220,7 @@ metadata. Allowlisted extension metadata is stored as JSONB; unlisted fields are
 dropped before the sink boundary. An idempotency conflict disagreeing with the
 local fingerprint or normalized values is delivery failure, never overwrite.
 
-For every delivered sequence batch, one PostgreSQL transaction inserts one
+For every delivered sequence batch obtained from `LedgerProjectionReader`, one PostgreSQL transaction inserts one
 `projected_facts` envelope and exactly one matching usage or quota child per
 sequence, inserts every usage row before all of its `usage_event_amounts`, and
 only then advances `projection_checkpoints`. The envelope primary key prevents
@@ -1163,11 +1256,12 @@ OTLP cumulative sums and gauges represent the operational state at export time.
 They may catch up after an outage, but they are not a substitute for event-time
 queries. Consumers needing event chronology use SQLite or PostgreSQL.
 
-Every source, collection, inspection, and export instant uses the same checked
-UTC Unix-nanosecond normalization and fixed-nine-digit RFC 3339 `Z` rendering
-defined by `QuotaSnapshot`. OTLP quota age uses
-`floor(max(0,export_unix_nano-source_unix_nano)/1_000_000_000)` with checked
-subtraction. Exact-zero, tolerated-future, one-nanosecond-before/after zero,
+Every source, collection, inspection, and export instant invokes the one domain-
+owned checked UTC Unix-nanosecond normalization and fixed-nine-digit RFC 3339
+`Z` renderer. Query and OTLP invoke the quota-domain age function
+`floor(max(0,export_unix_nano-source_unix_nano)/1_000_000_000)` rather than
+duplicating checked subtraction, and validate it with independent oracles.
+Exact-zero, tolerated-future, one-nanosecond-before/after zero,
 freshness-deadline, and whole-export-second vectors are canonical release
 evidence; floating-point or host datetime rounding is forbidden.
 
@@ -1246,6 +1340,14 @@ The collector consumes read-only host data from Claude Code and Codex, persists
 its authority under `/data`, and initiates outbound delivery to zero, one, or
 both optional sinks. It has no inbound API and does not mutate source files.
 
+Runtime composition follows one exact dependency order: side-effect-free
+profile authorization; runtime validation yielding `ValidatedSourceHandle`;
+storage validation yielding `AdmissionDecision=permitted`; generic discovery;
+adapter projection that invokes source-independent domain interfaces; atomic
+ledger commit; then optional sinks through `LedgerProjectionReader`. Each stage
+fails before the next stage's side effects. Concrete runtime/storage providers
+are late-bound so parser/adapter tests can use fakes without reversing imports.
+
 Topology documentation owns concrete component placement and deployment wiring.
 OpenSpec owns testable requirements derived from this RFC. Craft-and-care owns
 the implementation and verification bar. Once accepted, this RFC is
@@ -1292,6 +1394,10 @@ The first OpenSpec changeset must freeze and test:
 - composite identity/native-identity documents, fingerprint documents and test
   vectors, timestamp/context mappings, cursor tuple/anchor validation, full
   reconciliation, and every hold/recovery transition;
+- the source-independent domain interface direction, exact
+  `ValidatedSourceHandle`, `AdmissionDecision`, `LedgerProjectionReader`, and
+  pure `LatchSet` seams, including fake-provider adapter tests and dependency-
+  ordered composition;
 - ledger tables/constraints/migrations, `ledger_seq`, transaction boundaries,
   release-profile storage admission guard and failure vectors, lossless
   maintenance, stable v1 views, readable-ledger and exact out-of-band
