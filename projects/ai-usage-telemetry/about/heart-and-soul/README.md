@@ -3,8 +3,9 @@
 Doctrine for **AI Usage Telemetry**, the `ai-usage-telemetry` project nested in
 `ai-bootstrap/`.
 
-**Status:** Adopted through Owner Decision 0001. See the central
-[lifecycle matrix](../README.md#lifecycle-status).
+**Status:** Adopted through Owner Decision 0001. Decision 0002 independently
+accepts the eleven downstream v1 capability contracts without amending this
+doctrine. See the central [lifecycle matrix](../README.md#lifecycle-status).
 
 Read this pillar first when deciding what the product may observe, retain, or
 export; what its first release promises; and which shortcuts would violate its
@@ -21,6 +22,9 @@ purpose.
 4. [`decisions/0001-finalize-and-specify.md`](./decisions/0001-finalize-and-specify.md)
    — the owner's conditional direction and the evidence gates that must activate
    it before doctrine or RFC authority is claimed.
+5. [`decisions/0002-accept-v1-capability-contracts.md`](./decisions/0002-accept-v1-capability-contracts.md)
+   — the eleven independent exact contract decisions and the profile, runtime,
+   archive, and release boundaries that remain.
 
 ## Evidence Labels
 

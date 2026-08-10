@@ -61,3 +61,30 @@ lifecycle anchor may promote the candidate hashes to accepted. Until then the
 R3 RFC remains the last accepted RFC anchor, the R4-reviewed pre-fix annexes
 remain the last accepted evidence bytes, and current corrected bytes are
 explicitly pending.
+
+## R5 confirmation and promotion
+
+A fresh R5 pass reviewed exact HEAD
+`e2bb9ea78984878c6e06a9e37946f923032150f9`, including the exact corrected RFC,
+evidence annexes, design, eleven capability specifications, and task graph. It
+re-ran the semantic and mechanical gates and returned
+`APPROVED_FOR_PROMOTION` with findings `0 / 0 / 0`.
+
+The R4-corrected candidate row above is therefore promoted without rewriting
+its pre-R5 history: RFC 0001
+`36c062fa81bfadb5e9b90c0386ae7529579648acf04a165e923adca5e9e03163`,
+source/bounds evidence
+`2ca7455f0c331c8d46774f9c72bb8c3f2d6b360255fab4663bfd5d32bc09cf7d`,
+synthetic vectors
+`8e5e512144e03d437aa0349b7d00b3600fae5dd24e2d613236d6c6e699953e8a`,
+and unchanged provenance
+`dcfffe320712afbdcf805e05d30b277130e4bf81f9d718d4f4408bc077f482f0`
+are the current accepted review anchors. The complete cycle ledger is
+[`2026-08-10-specification-reconciliation.md`](./2026-08-10-specification-reconciliation.md),
+and the eleven independent capability-contract decisions are recorded in
+[Owner Decision 0002](../../../heart-and-soul/decisions/0002-accept-v1-capability-contracts.md).
+
+This confirmation changes only the authority state of the exact reviewed
+bytes. It does not implement a capability, activate or invent a release-profile
+member, permit a real mount or destination, archive the active change, or
+authorize packaging, publication, or release.
