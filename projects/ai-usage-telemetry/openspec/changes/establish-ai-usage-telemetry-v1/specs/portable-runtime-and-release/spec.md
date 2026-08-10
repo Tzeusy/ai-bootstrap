@@ -39,7 +39,7 @@ Scope: v1-mandatory
 - **THEN** its component health registers as disabled without creating a sink registration, checkpoint, lease, client, secret read, or DNS lookup
 
 ### Requirement: [TARGET-STATE] Exactly Three Canonical Source and State Targets
-MUST recognize exactly `/sources/claude/sessions` and `/sources/codex/sessions` as separate optional read-only source-directory mounts and `/data` as the only persistent read-write state target, require every enabled source to be a distinct mount at its exact target, and reject any broad home, tool-configuration, auth-store, writable, overlapping, or symlink-expanded source; the TOML file is a separate read-only configuration surface and `/tmp` is ephemeral scratch, not a fourth source or state target.
+MUST recognize exactly `/sources/claude/sessions` and `/sources/codex/sessions` as separate optional read-only source-directory mounts and `/data` as the only persistent read-write state target, require every enabled source to be a distinct mount at its exact target, and reject any broad home, tool-configuration, auth-store, writable, overlapping, or symlink-expanded source; the TOML file is a separate read-only configuration surface and `/tmp` is ephemeral scratch, not a fourth source or state target. The runtime provider MUST return the exact opaque result type `ValidatedSourceHandle` for a source only after these canonical mount/path checks succeed, and MUST return no handle on failure. It owns validation and handle creation, not filename predicates, file discovery/traversal/generation, parsing, or source semantics.
 
 ID: REQ-portable-runtime-and-release-003
 Source: RFC 0001 § Runtime and Trust Boundary; § V1 Scope
@@ -47,14 +47,14 @@ Scope: v1-mandatory
 
 #### Scenario: Canonical three-target deployment passes
 - **WHEN** each enabled source is mounted distinctly and read-only at its exact canonical target and `/data` is the sole persistent writable volume
-- **THEN** filesystem target validation passes without treating config or `/tmp` as source or state storage
+- **THEN** filesystem target validation returns one `ValidatedSourceHandle` per enabled source without treating config or `/tmp` as source or state storage
 
 #### Scenario: Broad or writable source fails before opening
 - **WHEN** a deployment binds home, `.claude`, `.codex`, a broad parent, auth store, overlapping mount, writable source, or symlinked leaf
 - **THEN** preflight fails before the collector opens source data
 
 ### Requirement: [TARGET-STATE] Host and Container Path Preflight
-MUST inspect every host-side source and config path component without following symlinks, require each canonical source leaf to equal the configured source root, require the config path to be one regular read-only file mounted exactly at `/etc/ai-usage-telemetry/config.toml`, reject roots broader than the fixed projects or sessions tree, and enforce no-symlink and stay-beneath-target checks for every in-container source file open.
+MUST inspect every host-side source and config path component without following symlinks, require each canonical source leaf to equal the configured source root, require the config path to be one regular read-only file mounted exactly at `/etc/ai-usage-telemetry/config.toml`, reject roots broader than the fixed projects or sessions tree, and produce `ValidatedSourceHandle` only after those checks. Generic stream discovery MUST consume the handle and alone enforce regular-file, no-symlink, and stay-beneath-target behavior for each in-container file open; the runtime provider MUST NOT implement discovery or adapter filename predicates.
 
 ID: REQ-portable-runtime-and-release-004
 Source: RFC 0001 § Runtime and Trust Boundary
@@ -62,11 +62,11 @@ Scope: v1-mandatory
 
 #### Scenario: Exact host and container paths pass
 - **WHEN** every component is non-symlinked, each source root is the fixed narrow tree, the config is one exact regular file, and every discovered file stays beneath its target
-- **THEN** preflight permits later profile and parser checks
+- **THEN** preflight returns `ValidatedSourceHandle`, which permits later generic discovery, profile, and parser checks
 
 #### Scenario: Symlink escape or include filter cannot narrow a broad bind
 - **WHEN** a nested symlink escapes a canonical target or a host include filter attempts to narrow a broad bind
-- **THEN** startup or discovery rejects it and opens no escaped file
+- **THEN** runtime validation or generic discovery rejects it, returns no escaped-file result, and opens no escaped file
 
 ### Requirement: [TARGET-STATE] Non-Root Read-Only-Root Runtime
 MUST declare non-zero UID and GID, never start as root to change `/data` ownership, prove both source mounts and config non-writable and `/data` writable, run with read-only root, use only ephemeral `tmpfs` at `/tmp`, drop every Linux capability, set `no-new-privileges`, and expose, publish, bind, or listen on no port.

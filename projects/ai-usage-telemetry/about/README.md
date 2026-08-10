@@ -29,7 +29,7 @@ until it is reswept.
 | OpenSpec capability specifications | **[Observed] Active authored candidate** | `READY` is recorded and the active change is complete for authoring; four improvement cycles and conditional owner acceptance remain |
 
 **Accepted shape anchor:** RFC
-`d865e6971c5ab56af5791007cefc73f53cb4d15d57ff898f61745e4f479c7b30`;
+`ca548d5cb5070c5e288e66d3fe97a3c0f662cd245bd7153ae640d2ed593dcbc2`;
 source/bounds evidence
 `5401c9fb0e621af6f35385f89f9cc2cc1d260a3a2119c457ba9e27784e787a1e`;
 synthetic vectors

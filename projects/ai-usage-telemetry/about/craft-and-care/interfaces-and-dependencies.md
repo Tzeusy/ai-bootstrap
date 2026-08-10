@@ -12,13 +12,20 @@ This file defines how changes to those contracts must be engineered.
 
 ## Adapter interface
 
-A source family adapter interprets one tool-format domain. It owns one or more
-independently ordered source streams, each with its own cursor, parser context,
-quarantine, freshness, and health. An adapter change must preserve these
-reviewable properties:
+A source family adapter interprets one tool-format domain. Runtime owns
+canonical mount validation and returns `ValidatedSourceHandle`; generic stream
+discovery owns stay-beneath traversal/generation; the adapter owns its filename
+predicate, extraction manifest, source fields/evidence, and parser context.
+Source-independent domain interfaces own `UsageEvent`, `QuotaSnapshot`,
+identity, canonical instant, cwd basename, categories, fingerprints, and age.
+An adapter change must preserve these reviewable properties:
 
-- it reads each source stream through an explicit, resolved read-only mount;
-- it emits normalized usage events with stable identities, never raw records;
+- it consumes an injected `ValidatedSourceHandle`, generic discovery results,
+  and ledger/storage-owned `AdmissionDecision=permitted`; tests use fakes and
+  adapter code imports no concrete runtime/storage preflight;
+- it supplies registered fields/evidence to domain interfaces and emits their
+  normalized values, never raw records or adapter-local identity/time/path/
+  category/fingerprint/age implementations;
 - it distinguishes admitted records, the exact zero-fact dispositions
   `registered_irrelevant`, `context_only`, and `quota_state_only`, incomplete
   tails, duplicates, unknown kinds, unregistered kinds, and malformed complete
@@ -53,13 +60,20 @@ cursor position and export/configuration choices. Sink state is durable and
 independent per destination. The local ledger is retained indefinitely; source
 rotation/deletion does not retract admitted facts.
 
+The ledger/storage provider alone returns `AdmissionDecision`; the stream-health
+domain alone owns pure `LatchSet` transition/precedence/recovery. SQLite stores
+proposed latch rows and a checked cache without recreating that policy. The
+ledger also owns `LedgerProjectionReader`, the only sink-facing read/checkpoint
+seam.
+
 - Schema changes require versioned, transactional, restart-safe migrations and
   representative migration fixtures.
 - Migration failure leaves existing history intact and visibly blocks the
   affected operation.
 - No compatibility shim may reinterpret old counters silently. Preserve their
   meaning or migrate them explicitly.
-- The stable read-only `usage_events`, `usage_event_amounts`, `quota_snapshots`,
+- The local-query-owned stable read-only `usage_events`,
+  `usage_event_amounts`, `quota_snapshots`,
   `source_health`, `sink_health`, and `ledger_health` views are part of the v1
   local interface;
   migrations preserve their documented meaning without requiring an inbound API.
@@ -70,7 +84,8 @@ rotation/deletion does not retract admitted facts.
 ## Sink interface
 
 OTLP and PostgreSQL projection/delivery are separate consumers of committed
-ledger facts.
+ledger facts through `LedgerProjectionReader`. They never import or query the
+public stable views or private ledger tables.
 
 - Each destination records its own attempt, durable acknowledgement, ledger-order
   checkpoint, and retry state; a destination change cannot silently inherit a

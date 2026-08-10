@@ -29,14 +29,16 @@ IS NULL OR failure_code='reconciliation_overdue')) OR (dimension='tail' AND
 'coverage' AND (failure_code IS NULL OR failure_code='coverage_unknown'))))`.
 Every table declared by this requirement, including
 `stream_health_latches`, MUST be created with SQLite `STRICT`; no affinity-only
-exception exists. Every new stream MUST receive all seven clear latch rows in
-its creation transaction with code-owned initialization recovery evidence.
+exception exists. Every new stream MUST receive the exact stream-owned
+`LatchSet` initialization proposal as all seven latch rows in its creation
+transaction with code-owned initialization recovery evidence.
 `source_streams.state`, `failure_code`, and `failure_offset` MUST be a
-transactionally maintained derived cache of the highest active latch under
-`storage`, `quarantine`, `retention`, `envelope`, `reconciliation`, `tail`,
-`coverage`, then `healthy`, and MUST NOT replace or delete another dimension's
-row. Extraction and projection registries cannot add any table beyond this
-corrected exact set.
+transactionally maintained cache checked against that same proposed `LatchSet`
+result and MUST NOT replace or delete another dimension's row. The ledger owns
+table shape, persistence, and cache agreement; it MUST NOT implement latch
+transition legality, precedence, sibling preservation, or recovery policy.
+Extraction and projection registries cannot add any table beyond this corrected
+exact set.
 
 ID: REQ-durable-local-ledger-001
 Source: RFC 0001 § SQLite Ledger and Atomicity; § Privacy and Cardinality Budget
@@ -55,7 +57,7 @@ Scope: v1-mandatory
 - **WHEN** startup registers an enabled or disabled source, quota capability, or sink
 - **THEN** exactly one canonical component row records only its technical key, closed state, safe code, timestamps, and nullable presentation alias
 - **AND** quota `unavailable`, `absent`, `null`, and `state_only` remain distinct without creating a fact or numeric utilization
-- **AND** overlapping source degradation writes update only their own latch rows and the derived cache exposes the fixed highest active state across restart and every clear order
+- **AND** overlapping source degradation writes persist only the stream-owned `LatchSet` proposal and matching checked cache, which expose the fixed highest active state across restart and every clear order without ledger-owned precedence logic
 
 #### Scenario: Administrative fields have closed provenance
 - **WHEN** a ledger, release, migration, component, request, diagnostic, sink binding, attempt, or approved privacy repair row is committed
@@ -88,7 +90,7 @@ Scope: v1-mandatory
 - **AND** after that transaction no exporter, pool, client, credential reader, worker, task, DNS, authentication, or connection exists; re-enable MUST validate the retained registration before any such runtime object is created
 
 ### Requirement: [TARGET-STATE] Atomic Consumed-Record Transaction
-MUST use one SQLite transaction per consumed complete record to classify and deduplicate its deterministic zero-or-more fact set, allocate sequences and insert all new facts and amounts, update usage aggregates and first-seen request rows only for new contributions, persist every permitted quota/component-state transition plus the complete cursor and parser context exactly once, update `last_transaction_at` and the exact counters, and expose every new sequence to each enabled sink's backlog through the same authoritative sequence domain. A zero-fact complete record may commit only with the exact code/profile-registered disposition `registered_irrelevant`, `context_only`, or `quota_state_only`, and its permitted unchanged/context or quota-component transition MUST commit atomically with its cursor; unknown, unregistered, malformed, collided, or failed records MUST hold before the record with none of those effects. `accepted_count` counts newly committed facts, `duplicate_count` counts duplicate fact candidates in committed record outcomes, and `held_count` counts a new `(source_namespace,native_stream_identity,failure_code,failure_offset)` hold episode once rather than reminder retries. `model_bucket_json` and `project_bucket_json` MUST be RFC 8785 canonical JSON exactly `["null"]` for a null dimension or `["value",value]` for a known string, so null cannot collide with any literal value including `unknown`.
+MUST use one SQLite transaction per consumed complete record, only after a ledger/storage-owned `AdmissionDecision=permitted` is revalidated and consumed, to classify and deduplicate its deterministic zero-or-more domain-fact set, allocate sequences and insert all new facts and amounts, update usage aggregates and first-seen request rows only for new contributions, persist every permitted quota/component-state transition plus the complete cursor/parser context and any stream-owned `LatchSet` proposal with its matching checked cache exactly once, update `last_transaction_at` and the exact counters, and expose every new sequence to each enabled sink's backlog through the same authoritative sequence domain. The ledger MUST validate/persist but MUST NOT recreate domain identity/fingerprint/category/age or `LatchSet` policy. A zero-fact complete record may commit only with the exact code/profile-registered disposition `registered_irrelevant`, `context_only`, or `quota_state_only`, and its permitted unchanged/context or quota-component transition MUST commit atomically with its cursor; unknown, unregistered, malformed, collided, or failed records MUST hold before the record with none of those effects. `accepted_count` counts newly committed facts, `duplicate_count` counts duplicate fact candidates in committed record outcomes, and `held_count` counts a new `(source_namespace,native_stream_identity,failure_code,failure_offset)` hold episode once rather than reminder retries. `model_bucket_json` and `project_bucket_json` MUST be RFC 8785 canonical JSON exactly `["null"]` for a null dimension or `["value",value]` for a known string, so null cannot collide with any literal value including `unknown`.
 
 ID: REQ-durable-local-ledger-003
 Source: RFC 0001 § SQLite Ledger and Atomicity
@@ -127,7 +129,7 @@ Scope: v1-mandatory
 - **THEN** restart reprocesses the same record without duplicate accounting or cursor outrun
 
 ### Requirement: [TARGET-STATE] Independent Durable Sink Acknowledgement
-MUST advance only one registered complete sink tuple's `acknowledged_ledger_seq` in its own guarded SQLite transaction after durable destination acknowledgement, require its canonical target and projection-policy digests still to match, keep target sequence, persisted OTLP export time, batch count, projection digest, and attempt state pending for failed or ambiguous acknowledgement, and never satisfy another sink, erase a retained fact, or advance state solely in memory.
+MUST expose one ledger-owned `LedgerProjectionReader` over committed normalized facts, aggregates, selected quota, sequence targets, and guarded checkpoint operations, and MUST advance only one registered complete sink tuple's `acknowledged_ledger_seq` in its own guarded SQLite transaction after durable destination acknowledgement. OTLP and PostgreSQL MUST consume only this interface and MUST NOT import or query the stable public views or private tables. The ledger MUST require canonical target and projection-policy digests still to match, keep target sequence, persisted OTLP export time, batch count, projection digest, and attempt state pending for failed or ambiguous acknowledgement, and never satisfy another sink, erase a retained fact, or advance state solely in memory.
 
 ID: REQ-durable-local-ledger-005
 Source: RFC 0001 § SQLite Ledger and Atomicity; § Sink Independence
@@ -181,7 +183,7 @@ Scope: v1-mandatory
 - **THEN** the post-migration oracle preserves every binding digest, keeps the never-bound sink checkpoint-free, preserves every `STRICT` declaration and per-column storage-class rejection, and returns byte-equal component, latch, aggregate, health, and view semantics
 
 ### Requirement: [TARGET-STATE] Exact Storage-Admission Profile Schema
-MUST require the active storage profile to provide byte-valued unsigned `minimum_volume_bytes`, `max_consumed_record_transaction_bytes`, `fixed_transaction_charge_bytes`, per-table `row_charge_bytes`, per-index `entry_charge_bytes`, `wal_page_bytes`, `max_wal_pages_per_transaction`, `post_commit_reserve_bytes`, and a strictly greater `resume_available_bytes`, with evidence digests and native results; compute `charge_bytes=fixed_transaction_charge_bytes+Σ(new_rows×row_charge_bytes)+Σ(new_index_entries×entry_charge_bytes)+(max_wal_pages_per_transaction×wal_page_bytes)` using checked arithmetic; and admit every state-changing transaction only when capacity is valid, input is within the profiled maximum, and `available_bytes>=charge_bytes+post_commit_reserve_bytes`.
+MUST own the storage-admission provider and exact result type `AdmissionDecision`, whose closed outcome is `permitted|denied` plus content-free capacity/profile evidence. The active storage profile MUST provide byte-valued unsigned `minimum_volume_bytes`, `max_consumed_record_transaction_bytes`, `fixed_transaction_charge_bytes`, per-table `row_charge_bytes`, per-index `entry_charge_bytes`, `wal_page_bytes`, `max_wal_pages_per_transaction`, `post_commit_reserve_bytes`, and a strictly greater `resume_available_bytes`, with evidence digests and native results; the provider MUST compute `charge_bytes=fixed_transaction_charge_bytes+Σ(new_rows×row_charge_bytes)+Σ(new_index_entries×entry_charge_bytes)+(max_wal_pages_per_transaction×wal_page_bytes)` using checked arithmetic. A permitted decision covering the maximum admitted record transaction MUST exist before record traversal, and the ledger MUST revalidate/consume a permitted decision before commit; denial at either gate has no parser/application value or record-set effect. Parser/adapters consume the injected decision and may use fakes in their own tests, but MUST NOT implement or import this provider.
 
 ID: REQ-durable-local-ledger-008
 Source: RFC 0001 § Retention, Maintenance, and Storage Pressure
@@ -189,11 +191,11 @@ Scope: v1-mandatory
 
 #### Scenario: Exact guard boundary admits
 - **WHEN** the transaction is within its immutable profiled shape and available bytes exactly equal charge plus post-commit reserve
-- **THEN** storage admission permits the transaction to attempt atomically
+- **THEN** the provider returns `AdmissionDecision=permitted`, traversal may begin, and revalidation permits the transaction to attempt atomically
 
 #### Scenario: Unprovable capacity denies before cursor advance
 - **WHEN** free space is one byte below the guard, capacity cannot be inspected, a coefficient is absent, transaction size exceeds its maximum, or charge arithmetic overflows
-- **THEN** admission is denied, all source cursors hold in `ledger_storage_hold`, and no partial write remains
+- **THEN** the provider returns `AdmissionDecision=denied`, no record byte is parsed at the pre-traversal gate, all source cursors hold in `ledger_storage_hold`, and no partial write remains
 
 ### Requirement: [TARGET-STATE] Storage-Failure Hold and Recovery
 MUST roll back coordinated state after process interruption, `SQLITE_FULL`, `SQLITE_IOERR`, failed or ambiguous commit, or concurrent capacity loss; when read-only reopen cannot immediately prove a clean rollback and declared integrity, ledger health MUST report `availability_state=storage_hold`, every source stream MUST report `state=storage_hold,failure_code=ledger_storage_hold` at its prior cursor, no fact/checkpoint may advance, and overall health MUST be `degraded` while readable or `unavailable` when the ledger cannot be read. Writes may resume only after read-only reopen, transaction and declared integrity verification, valid capacity at or above `resume_available_bytes`, and retry of the identical input, without automatic pruning; a cleanly verified ordinary interruption may retry directly from the prior cursor without fabricating a hold episode.
