@@ -104,7 +104,7 @@ exactly so downstream specs can trace back without interpretation.
 | D3 | Use one narrow `SourceAdapter` contract and ship only Claude Code and Codex adapters in v1. | **5. Normalization Preserves Meaning**; **6. The Runtime Boundary Is Portable and Narrow**; **7. Simplicity Serves the Contract** |
 | D4 | Represent token usage as registered, non-overlapping category amounts and quota as a distinct snapshot type. | **2. Content and Credentials Stay Outside**; **5. Normalization Preserves Meaning** |
 | D5 | Identify facts by an immutable composite namespace and native identity plus a versioned canonical accounting fingerprint; treat byte offsets only as a validated scan optimization. | **3. Accounting Is Eventually Exact**; **5. Normalization Preserves Meaning** |
-| D6 | Atomically commit facts, amounts, aggregates, `ledger_seq`, source cursors, and sink obligations in SQLite; unknown kinds and recognized malformed records hold and quarantine only the affected source. | **3. Accounting Is Eventually Exact**; **4. Partial Failure Is Explicit** |
+| D6 | Atomically commit facts, amounts, aggregates, `ledger_seq`, source cursors, and sink obligations in SQLite. Only `registered_irrelevant`, `context_only`, and `quota_state_only` may advance a complete zero-fact record, with their permitted transitions and cursor in that same transaction; unknown, unregistered, malformed, collided, or failed records hold before the record and quarantine only the affected source. | **3. Accounting Is Eventually Exact**; **4. Partial Failure Is Explicit** |
 | D7 | Make OTLP Metrics and PostgreSQL independently optional, with failed delivery remaining pending for retry. | **1. Local Facts Become User-Owned History**; **4. Partial Failure Is Explicit**; **7. Simplicity Serves the Contract** |
 | D8 | Export bounded monotonic cumulative OTLP sums from a stable ledger epoch, with a single leased exporter and explicit schema-reset rules; preserve event time only in historical stores. | **4. Partial Failure Is Explicit**; **5. Normalization Preserves Meaning**; **7. Simplicity Serves the Contract** |
 | D9 | Store relational history in separate idempotent event, amount, and quota-snapshot tables with mandatory unique constraints and transactional projection checkpoints. | **1. Local Facts Become User-Owned History**; **3. Accounting Is Eventually Exact**; **5. Normalization Preserves Meaning** |
@@ -267,10 +267,13 @@ parser memory and supported synthetic records before an adapter is enabled.
 Release tests exercise zero/minimum, exactly-at, and one-past each independently
 enforced ceiling; combinations that hit the declared memory bound; a record
 that crosses its byte cap without a newline; incomplete tails below that cap;
-and oversized irrelevant records. A missing bound, an unmeasured combination,
-arithmetic overflow while checking a bound, or inability to prove the active
-profile causes startup or the affected stream to fail closed; it never falls
-back to a library default.
+and oversized irrelevant records. A missing required profile member, bound,
+counting rule, measurement digest, or architecture result is
+`unsupported_profile` before source traversal. After activation, a missing or
+wrongly typed required projected record value is `recognized_malformed`. Only
+an observed record value, count, depth, size, structural-work total,
+application-memory total, or checked counter exceeding its measured inclusive
+bound is `record_limit`; it never falls back to a library or operator default.
 
 The privacy suite uses synthetic sentinels in every unregistered and
 content-bearing position, including escaped strings, nested arrays/objects,
@@ -295,7 +298,10 @@ Every adapter must:
 
 - read only its explicit source mount;
 - use the field-projecting streaming reader and its code-owned path/type registry;
-- distinguish complete records, incomplete trailing data, registered irrelevant records, unknown record kinds, and recognized malformed or schema-inconsistent records;
+- distinguish complete records, incomplete trailing data, exact registered
+  `registered_irrelevant`, `context_only`, and `quota_state_only` dispositions,
+  unknown or unregistered record kinds, and recognized malformed or
+  schema-inconsistent records;
 - assign stable logical event identities that survive rescans and file relocation where the source provides stable identity;
 - normalize source timestamps and attribution without manufacturing unsupported semantics;
 - emit only registered token categories and ledger-schema-admitted metadata;
@@ -454,9 +460,11 @@ field is skipped, not opportunistically decoded. Native identities and counter
 relationships described here are inferred from local structure rather than a
 vendor compatibility promise. They become admissible only for source-build
 families covered by the profile's fixture digests, identity vectors, arithmetic
-vectors, replay cases, and mutation cases. An unrecognized build/shape or a
-missing identity premise holds the affected stream rather than reusing a rule
-that merely looks compatible.
+vectors, replay cases, and mutation cases. A missing required profile member or
+bound leaves the source `unsupported_profile` before traversal rather than
+reusing a rule that merely looks compatible; once an exact profile is active, a
+recognized record missing a required projected identity or carrying its wrong
+type is `recognized_malformed` and holds before that record.
 
 #### Claude Code sessions
 
@@ -609,6 +617,13 @@ For each consumed record, one SQLite transaction coordinates:
    through the consumed record; and
 5. exposure of the new sequence to each enabled sink's independent backlog.
 
+A complete zero-fact record may advance only with the exact code/profile-
+registered disposition `registered_irrelevant`, `context_only`, or
+`quota_state_only`. The same transaction commits its permitted unchanged or
+updated parser context, quota-component state where applicable, counters, and
+cursor. Unknown, unregistered, malformed, collided, or failed records commit
+none of those effects and hold before the record.
+
 A same-identity, same-fingerprint duplicate advances the source cursor without
 changing history, aggregates, or sink obligations. A crash or database error
 rolls the whole transaction back, so the cursor can never outrun the facts and
@@ -728,7 +743,11 @@ The reader obeys these rules:
 - detected truncation, replacement, generation mismatch, or anchor mismatch
   resets the scan and parser context to the beginning of the affected stream;
 - a rescan relies on stable identity and fingerprint deduplication, not on remembered line positions;
-- an explicitly adapter-registered irrelevant record kind may be consumed without emitting a fact;
+- only a complete record with exact code/profile disposition
+  `registered_irrelevant`, `context_only`, or `quota_state_only` may be consumed
+  without emitting a fact, and only when its permitted parser-context or
+  quota-component transition and cursor commit atomically in one ledger
+  transaction;
 - a genuinely unknown record kind holds the cursor at the record and
   quarantines the stream; it is never consumed under a compatibility waiver;
 - a complete record of a recognized kind that is malformed, violates the supported schema, uses an unregistered category, or conflicts with an existing fingerprint quarantines the affected source and does not advance its cursor past that record.
@@ -790,7 +809,11 @@ invalid values fail closed.
 
 | Condition | State and accounting behavior | Progress elsewhere |
 |---|---|---|
+| Missing required profile member or parser bound | Enabled source remains `unsupported_profile` before source traversal; no stream, cursor, or fact is created. | Covered sources and sinks continue. |
 | Incomplete trailing JSONL below the active record-byte cap | Deferred, not quarantined; cursor remains before the fragment. Crossing the cap without a delimiter is `record_limit`, not an indefinitely incomplete tail. | Other complete records, sources, and sinks continue. |
+| Recognized record omits or mistypes a required projected value | `recognized_malformed`; the affected stream is quarantined before the record. This is not `record_limit`. | Other sources and sinks continue. |
+| Observed record measure exceeds an active measured bound | `record_limit`; the affected stream is quarantined before the record. | Other sources and sinks continue. |
+| Exact registered zero-fact disposition | `registered_irrelevant`, `context_only`, or `quota_state_only` may advance only in one ledger transaction with its permitted unchanged/context or quota-component transition and cursor; no fact, sequence, amount, aggregate, request, or sink obligation is created. | Normal progress continues after atomic commit. |
 | Same identity and fingerprint observed again | Idempotent duplicate; no new event, amount, aggregate, or sink work; cursor may advance. | Normal progress continues. |
 | Same identity with a different fingerprint | Affected source is quarantined; conflicting fact is not committed; cursor does not advance past it. | Other sources and sinks continue. |
 | Recognized malformed or schema-inconsistent record | Affected source is quarantined with explicit degraded state; cursor does not advance past it. | Other sources and sinks continue. |
@@ -842,12 +865,32 @@ SQLite cannot persist a transition, the read-only command still exposes
 health as stale. Restart repeats that computation before any source or sink
 write, so an unwritten hold cannot be forgotten.
 
-A non-networked, read-only inspection command renders the health views as a
-versioned JSON document with `overall_state`, `sources[]`, `ledger`, `sinks[]`,
-and `quota[]`. `overall_state=healthy` only when every enabled component is
-healthy/current under its own contract; it cannot mask a degraded source or
-sink. The command performs no migration, retry, cursor advance, or repair.
-There is no inbound health server in v1.
+Health dimensions are independently latched until their owning recovery
+condition clears. The exact persisted source-stream precedence, highest first,
+is `storage_hold`, `quarantined`, `retention_gap`,
+`source_envelope_exceeded`, `reconciliation_overdue`, `trailing_deferred`,
+`coverage_unknown`, then `healthy`; clearing a higher state reveals any
+uncleared lower state rather than erasing it. Ledger unreadability composes
+above that ordering as overall `unavailable`. A duplicate-only commit may set
+the stream to `healthy` only when no latch remains: duplicate success never
+overwrites storage/unavailable, quarantine/hold, retention-gap, envelope,
+overdue, trailing-tail, or coverage-unknown evidence.
+
+A non-networked, read-only inspection command renders a readable compatible
+ledger's health views as a versioned JSON document with exact top-level keys
+`schema`, `generated_at`, `overall_state`, `profile`, `sources`, `ledger`,
+`sinks`, and `quota`. If the ledger cannot be opened or read, it instead emits
+the byte-deterministic out-of-band `aiut.health/v1` unavailable-ledger variant:
+`overall_state="unavailable"`; empty source, sink, and quota arrays; profile ID
+and digest from the independently validated embedded profile or null; and a
+ledger object containing exactly `availability_state="ledger_unavailable"`,
+validated configured ledger namespace or null, `failure_code="ledger_unavailable"`,
+null epoch, `persisted_health_stale=1`, and null schema version. That variant
+does not claim any value came from a SQLite view. `overall_state=healthy` only
+when every enabled component is healthy/current under its own contract; it
+cannot mask a degraded source or sink. The command performs no write,
+migration, retry, cursor advance, repair, DNS lookup, listener creation, or
+network activity. There is no inbound health server in v1.
 
 **Doctrine trace:** **2. Content and Credentials Stay Outside**;
 **4. Partial Failure Is Explicit**;
@@ -996,13 +1039,14 @@ the collector does not make Pushgateway a primary store.
 
 ### PostgreSQL Historical Projection
 
-The PostgreSQL sink uses three separate conceptual tables:
+The PostgreSQL sink uses five conceptual relations:
 
 | Table | Contract |
 |---|---|
-| `usage_events` | One row per composite usage identity with mandatory technical namespaces, adapter schema, native identity, fingerprint, ledger sequence, and source time. A unique constraint covers the full composite identity and a second unique constraint covers `(ledger_namespace, ledger_seq)`. |
+| `projected_facts` | One shared envelope per projected ledger fact. Primary key `(ledger_namespace, ledger_epoch, ledger_seq)` is global across usage and quota; `fact_identity` is unique; `fact_kind` is exactly `usage_event | quota_snapshot`; mutually exclusive usage/quota child pointers equal the envelope identity and use deferred foreign keys so transaction commit enforces exactly one matching child. |
+| `usage_events` | One row per composite usage identity with mandatory technical namespaces, adapter schema, native identity, fingerprint, ledger sequence, and source time. A deferred composite foreign key binds its sequence, identity, and exact `usage_event` kind to the shared envelope. |
 | `usage_event_amounts` | One row per usage identity/category, with a foreign key to `usage_events` and a unique constraint over the complete event identity plus category. |
-| `quota_snapshots` | One row per composite snapshot identity with a full-identity unique constraint, fingerprint, source/collection times, canonical utilization, freshness evidence/state, and allowed quota fields. |
+| `quota_snapshots` | One row per composite snapshot identity with a full-identity unique constraint, fingerprint, source/collection times, canonical utilization, freshness evidence/state, and allowed quota fields. A deferred composite foreign key binds its sequence, identity, and exact `quota_snapshot` kind to the shared envelope. |
 | `projection_checkpoints` | One row per `(sink_id, destination_id, projection_schema_id, ledger_epoch)` with that tuple unique and a monotonic acknowledged `ledger_seq`. |
 
 The technical identity/checkpoint envelope is mandatory when PostgreSQL is
@@ -1012,17 +1056,24 @@ metadata. Allowlisted extension metadata is stored as JSONB; unlisted fields are
 dropped before the sink boundary. An idempotency conflict disagreeing with the
 local fingerprint or normalized values is delivery failure, never overwrite.
 
-For every delivered sequence batch, one PostgreSQL transaction inserts each
-`usage_events` row and all of its `usage_event_amounts`, inserts quota rows, and
-only then advances `projection_checkpoints`. No checkpoint may make a partially
-inserted event visible as delivered. The local checkpoint advances only after
-durable PostgreSQL commit acknowledgement. If PostgreSQL commits but the
-acknowledgement is lost, at-least-once retry meets the mandatory unique
-constraints and revalidates equality before advancing locally.
+For every delivered sequence batch, one PostgreSQL transaction inserts one
+`projected_facts` envelope and exactly one matching usage or quota child per
+sequence, inserts every usage row before all of its `usage_event_amounts`, and
+only then advances `projection_checkpoints`. The envelope primary key prevents
+cross-kind sequence reuse; the deferred bidirectional constraints reject an
+orphan, mismatched kind, or multiply linked child at transaction commit. No
+checkpoint may make a partially inserted fact visible as delivered. The local
+checkpoint advances only after durable PostgreSQL commit acknowledgement. If
+PostgreSQL commits but the acknowledgement is lost, at-least-once retry compares
+the envelope, exact child link, child row, and complete amount set before
+advancing locally; unequal pre-existing state is never overwritten.
 
 Column types, nullability, foreign keys, conflict comparisons, and migration
-vectors are required pre-ship schema artifacts. Index tuning and migration tool
-choice remain implementation details and cannot weaken the constraints.
+vectors are required pre-ship schema artifacts. Migration vectors populate the
+shared envelope without renumbering, preserve cross-kind sequence uniqueness
+and one-to-one child linkage, and fail all-old-or-all-new on any prior collision
+or orphan. Index tuning and migration tool choice remain implementation details
+and cannot weaken the constraints.
 
 **Doctrine trace:** **1. Local Facts Become User-Owned History**;
 **3. Accounting Is Eventually Exact**;
@@ -1091,7 +1142,7 @@ The following rules apply across collector versions:
 3. Existing token category meanings are immutable. Extensions are reviewed and registered; category names are never reused for different semantics.
 4. Additive optional source fields may be ignored. A recognized record whose required fields, types, or accounting semantics drift is quarantined rather than coerced or silently skipped.
 5. Additive allowlisted metadata does not change token or request identity, category meaning, or aggregates. Removing a key stops future export but does not rewrite retained history automatically.
-6. SQLite and PostgreSQL schema changes use explicit migrations and preserve idempotency, event time, and category separation.
+6. SQLite and PostgreSQL schema changes use explicit migrations and preserve idempotency, event time, category separation, globally unique ledger sequence across fact kinds, and one matching PostgreSQL child per projected-fact envelope.
 7. The OTLP attribute set and admitted value vocabularies are closed. Adding an attribute or value source requires privacy and cardinality review; removing or renaming one is a telemetry compatibility change.
 8. A newly recognized formerly-unknown record kind triggers a full affected-stream rescan from the held record or byte zero; the old version never consumed it.
 9. A new source adapter, including future OpenCode support, must satisfy the same rescan, identity, normalization, quarantine, and privacy contracts before it enters v1 or a later accepted scope.
@@ -1155,10 +1206,12 @@ The first OpenSpec changeset must freeze and test:
   reconciliation, and every hold/recovery transition;
 - ledger tables/constraints/migrations, `ledger_seq`, transaction boundaries,
   release-profile storage admission guard and failure vectors, lossless
-  maintenance, stable v1 views, and structured health JSON;
+  maintenance, stable v1 views, readable-ledger and exact out-of-band
+  unavailable-ledger structured health JSON;
 - quota freshness thresholds/evidence and deterministic current selection;
 - technical sink IDs, checkpoint and lease state machines, exact OTLP metric
   names/units/descriptors/vocabularies/budgets/schema evolution, and PostgreSQL
+  shared sequence envelope, one-to-one fact-kind child constraints,
   columns/constraints/transactional checkpoint behavior;
 - canonical mount and path preflight failures, UID/GID and filesystem checks,
   network modes/egress policy, disabled-sink non-instantiation, locked build

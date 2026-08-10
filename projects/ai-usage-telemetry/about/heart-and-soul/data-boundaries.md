@@ -46,16 +46,22 @@ credential-bearing auth-store mount.
 decode only paths registered in code for usage, quota, source identity, and
 safe metadata. Reading bytes to traverse a record is permitted; content-bearing
 values are skip-only and must never be decoded, allocated into an application
-object, copied, hashed, logged, fingerprinted, or retained. Records exceeding
-declared depth or size limits are malformed. Raw records are never a diagnostic
-or dead-letter format; diagnostics contain only a source-family name, safe
-stream alias, bounded field-path class, record position, and error code.
+object, copied, hashed, logged, fingerprinted, or retained. A missing required
+profile member or parser bound leaves the source `unsupported_profile` before
+traversal; a missing or wrongly typed required projected value in a recognized
+record is `recognized_malformed`; only a measured bound overflow is
+`record_limit`. Raw records are never a diagnostic or dead-letter format;
+diagnostics contain only a source-family name, safe stream alias, bounded
+field-path class, record position, and error code.
 
-[Inferred] Only an explicitly registered irrelevant record may advance a stream
-cursor without producing a fact. An unknown record kind or malformed complete
-record holds the cursor before that record and quarantines the affected stream.
-Other streams may continue, but family and global health summaries remain
-degraded while any member stream is quarantined.
+[Inferred] Only a complete record with the exact code/profile-registered
+disposition `registered_irrelevant`, `context_only`, or `quota_state_only` may
+advance a stream cursor without producing a fact, and only when its permitted
+parser-context or quota-component transition and cursor commit atomically in
+the same ledger transaction. An unknown, unregistered, malformed, collided, or
+failed record holds the cursor before that record and quarantines the affected
+stream. Other streams may continue, but family and global health summaries
+remain degraded while any member stream is quarantined.
 
 [Inferred] If a dimension cannot be established without content, credentials,
 or guessing, it remains absent. For example, Codex model attribution must come

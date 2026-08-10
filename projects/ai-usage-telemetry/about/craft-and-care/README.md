@@ -3,7 +3,10 @@
 Engineering standards for `ai-usage-telemetry`.
 
 **Status:** Adopted through Owner Decision 0001 with RFC 0001 acceptance. See
-the central [lifecycle matrix](../README.md#lifecycle-status).
+the central [lifecycle matrix](../README.md#lifecycle-status). The launch gate
+has recorded `READY`; the active OpenSpec change is a complete authored
+candidate awaiting four improvement cycles and conditional owner acceptance,
+not an owner-accepted capability set.
 
 This pillar supplements the repository-wide
 [`ai-bootstrap` engineering bar](../../../../about/craft-and-care/engineering-bar.md).
@@ -32,10 +35,14 @@ checkpoint, metadata policy, sink, container boundary, or dependency:
 
 Detailed event identity, checkpoint, ledger, and delivery semantics belong in
 [`RFC 0001`](../legends-and-lore/rfcs/0001-adapter-ledger-and-sink-contract.md).
-OpenSpec is currently absent; normative feature behavior belongs there only
-after doctrine adoption and RFC acceptance. Deployment topology belongs in
-`about/lay-and-land/`. These files define the proposed evidence and engineering
-posture required to implement those contracts safely.
+The current normative candidate follows the active change's
+[`proposal`](../../openspec/changes/establish-ai-usage-telemetry-v1/proposal.md) →
+[`design`](../../openspec/changes/establish-ai-usage-telemetry-v1/design.md) →
+[`specifications`](../../openspec/changes/establish-ai-usage-telemetry-v1/specs/) →
+[`tasks`](../../openspec/changes/establish-ai-usage-telemetry-v1/tasks.md) route.
+Deployment topology belongs in `about/lay-and-land/`. These files define the
+evidence and engineering posture required to implement the contracts safely
+after the remaining review and acceptance gates.
 
 ## Doctrine trace
 

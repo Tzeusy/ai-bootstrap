@@ -5,7 +5,10 @@ Design contracts for AI Usage Telemetry.
 **Status:** RFC 0001 is accepted through Owner Decision 0001 after RFC-local
 evidence and formal review. See the central
 [lifecycle matrix](../README.md#lifecycle-status) and the
-[`reviews/0001/`](./reviews/0001/) record.
+[`reviews/0001/`](./reviews/0001/) record. The launch gate has recorded `READY`;
+the active OpenSpec change is a complete authored candidate awaiting four
+improvement cycles and conditional owner acceptance, not an owner-accepted
+capability set.
 
 This pillar answers how local usage facts cross tool-specific session formats,
 the durable normalized ledger, and optional telemetry sinks without exposing
@@ -27,8 +30,13 @@ Relationship to the other pillars:
 
 - [`heart-and-soul`](../heart-and-soul/README.md) defines why local facts must become user-owned history while content and credentials stay outside the collector.
 - Legends-and-lore defines the load-bearing runtime, adapter, ledger, and sink contracts that preserve those principles.
-- OpenSpec is currently absent and may turn the contract into testable
-  capability requirements only after a `READY` launch-gate administration.
+- The `READY` launch-gate administration is recorded, and the active OpenSpec
+  candidate turns this contract into testable capability requirements. Follow
+  its [`proposal`](../../openspec/changes/establish-ai-usage-telemetry-v1/proposal.md)
+  → [`design`](../../openspec/changes/establish-ai-usage-telemetry-v1/design.md)
+  → [`specifications`](../../openspec/changes/establish-ai-usage-telemetry-v1/specs/)
+  → [`tasks`](../../openspec/changes/establish-ai-usage-telemetry-v1/tasks.md)
+  route; four improvement cycles and conditional owner acceptance still remain.
 - [`lay-and-land`](../lay-and-land/README.md) maps the components, mounts, data flow, and deployment boundary.
 - [`craft-and-care`](../craft-and-care/README.md) governs implementation quality, verification, observability, and maintenance.
 

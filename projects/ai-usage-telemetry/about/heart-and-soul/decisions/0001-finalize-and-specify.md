@@ -103,3 +103,20 @@ doctrine, or alter the READY decision. The durable review is
 Under this decision's standing direction to apply reviewed quality-gate fixes
 before publication, the accepted RFC 0001 digest is now
 `126fc0214abb76f1a2f207bed1c3baf629757a3b281abf9d0e4a92b52b7e0117`.
+
+## R1 Reconciliation Clarification
+
+Under this decision's standing authorization for specification authoring and
+quality-gate fixes, R1 reconciliation makes the existing atomic/no-skip rule
+exact: only the code/profile-registered dispositions `registered_irrelevant`,
+`context_only`, and `quota_state_only` may advance a complete record with zero
+usage or quota facts, and only when their permitted parser-context or
+quota-component transition and cursor commit atomically in the same ledger
+transaction. Unknown, unregistered, malformed, collided, or failed records
+still hold before the record. This clarification preserves the adopted thesis,
+privacy and retention boundaries, and no-skip rule; it does not owner-accept any
+capability, waive the four required improvement cycles, or authorize
+implementation before the active change's conditional acceptance gates pass.
+
+The reconciled RFC 0001 digest is
+`4523cdc1fbc9cd3e80b04f4c08c098312dfd6cac2a4f472cd95cb8aeb496daef`.

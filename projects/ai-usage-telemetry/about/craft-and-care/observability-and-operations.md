@@ -23,10 +23,13 @@ Expose independently inspectable state for:
 - optional cached observations such as quota state: separate source observation
   and collection time plus explicit fresh/stale/unknown/unavailable status.
 
-These states remain inspectable without either remote sink through the stable
-read-only SQLite views `usage_events`, `usage_event_amounts`, `quota_snapshots`,
-`source_health`, `sink_health`, and `ledger_health`. V1 does not add an inbound
-health API.
+With a readable compatible ledger, these states remain inspectable without
+either remote sink through the stable read-only SQLite views `usage_events`,
+`usage_event_amounts`, `quota_snapshots`, `source_health`, `sink_health`, and
+`ledger_health`. When the ledger cannot be opened or read, the non-networked
+inspection command instead emits the exact out-of-band `aiut.health/v1`
+unavailable-ledger variant without claiming any SQLite-view result, performing a
+write, or opening a network path. V1 does not add an inbound health API.
 
 Metric and log labels come only from their code-owned safe registries; they do
 not inherit PostgreSQL projection permission. OTLP attributes and values remain
@@ -36,13 +39,20 @@ unbounded event identities into metric labels.
 
 ## Failure behavior
 
-- Only a registered irrelevant record may advance a stream cursor without a
-  fact. An unknown kind, malformed complete data, or ambiguous normalization
-  quarantines only the affected stream and holds its cursor before the record.
+- Only exact dispositions `registered_irrelevant`, `context_only`, and
+  `quota_state_only` may advance a complete record without a fact, and only when
+  their permitted parser-context or quota-component transition and cursor commit
+  atomically in the same ledger transaction. Unknown, unregistered, malformed,
+  collided, or failed records quarantine only the affected stream and hold its
+  cursor before the record.
 - An incomplete JSONL tail remains pending rather than becoming a parse success
   or a discarded error.
 - Healthy streams continue committing facts when another stream is degraded,
   but family and global summaries do not report healthy overall.
+- Storage hold, quarantine, retention gap, envelope excess, reconciliation
+  overdue, trailing tail, and coverage-unknown dimensions remain independently
+  latched in their specified precedence until the owning recovery clears; a
+  duplicate success cannot overwrite any of them.
 - OTLP and PostgreSQL have independent delivery progress and retry. Failure of
   one does not suppress the other or roll back already accepted ledger events.
 - A durable sink acknowledgement advances only that destination's ledger-order

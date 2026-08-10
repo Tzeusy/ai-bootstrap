@@ -37,9 +37,12 @@ other user content. The maintained corpus must cover:
   plus cache-write/read and inclusive-output arithmetic boundary vectors;
 - replay and overlapping reads, proving accepted events remain exactly
   accounted;
-- registered irrelevant, unknown-kind, malformed complete, oversize, and
-  over-depth records, proving only the registered irrelevant record advances
-  without a fact while the others hold and quarantine their stream; and
+- `registered_irrelevant`, `context_only`, and `quota_state_only` complete
+  records, proving only those exact registered dispositions advance with zero
+  facts and only with their permitted transition in the same cursor transaction;
+  plus unknown-kind, unregistered, malformed complete, oversize, and over-depth
+  records, proving every other zero-fact outcome holds and quarantines its
+  stream; and
 - independent sink retry, proving one sink's failure and recovery neither
   duplicates its delivery nor blocks the other sink.
 
@@ -57,6 +60,10 @@ the previous drift case that proved the failure was visible.
   none of it.
 - Prove an affected source does not advance on unknown schema, ambiguous
   attribution, malformed complete records, or incomplete tails.
+- Prove a missing required profile member or parser bound yields
+  `unsupported_profile` before traversal, a missing or wrongly typed required
+  projected record value yields `recognized_malformed`, and only an observed
+  measured-bound overflow yields `record_limit`.
 - Prove configuration, alias, PostgreSQL projection, and OTLP attribute changes
   cannot change a committed fact's logical identity or accounting fingerprint.
 - Test ledger migrations from every supported prior schema with representative
@@ -83,9 +90,11 @@ the previous drift case that proved the failure was visible.
   decoder/projector must prove those sentinel scalars are never decoded,
   allocated into the application object graph, copied, or hashed; output scans
   alone do not prove non-materialization.
-- Scan normalized facts, accounting fingerprints, SQLite tables and all five
-  read-only views, safe diagnostics, logs, OTLP capture, and PostgreSQL capture;
-  no sentinel bytes or derived values may appear.
+- Scan normalized facts, accounting fingerprints, SQLite tables and all six
+  read-only views—`usage_events`, `usage_event_amounts`, `quota_snapshots`,
+  `source_health`, `sink_health`, and `ledger_health`—plus safe diagnostics,
+  logs, OTLP capture, and PostgreSQL capture; no sentinel bytes or derived
+  values may appear.
 - Exercise every declared parser-profile limit at `N-1`, `N`, and `N+1`,
   including encoded versus decoded sizes and a non-terminated record that
   crosses its byte cap. Each breach must immediately produce a bounded safe
@@ -103,6 +112,10 @@ the previous drift case that proved the failure was visible.
   cannot be represented safely must block and visibly degrade its projection.
 - Verify PostgreSQL's JSONB payload contains only allowlisted metadata and that
   stable normalized fields remain columns.
+- Verify PostgreSQL rejects any usage/quota cross-kind reuse of
+  `(ledger_namespace,ledger_epoch,ledger_seq)`, enforces exactly one
+  fact-kind-matching child per projected-fact envelope, and preserves those
+  constraints across idempotent retry and every supported migration.
 - Verify quota snapshots preserve source observation time, collection time, and
   fresh/stale/unknown state separately; missing source time never becomes a
   fabricated age.

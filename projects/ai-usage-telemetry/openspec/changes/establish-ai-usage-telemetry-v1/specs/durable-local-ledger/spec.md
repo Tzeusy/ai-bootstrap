@@ -52,19 +52,19 @@ Scope: v1-mandatory
 - **AND** after that transaction no exporter, pool, client, credential reader, worker, task, DNS, authentication, or connection exists; re-enable MUST validate the retained registration before any such runtime object is created
 
 ### Requirement: [TARGET-STATE] Atomic Consumed-Record Transaction
-MUST use one SQLite transaction per consumed complete record to classify and deduplicate its deterministic zero-or-more fact set, allocate sequences and insert all new facts and amounts, update usage aggregates and first-seen request rows only for new contributions, persist every quota/component-state transition plus the complete cursor and parser context exactly once, update `last_transaction_at` and the exact counters, and expose every new sequence to each enabled sink's backlog through the same authoritative sequence domain. `accepted_count` counts newly committed facts, `duplicate_count` counts duplicate fact candidates in committed record outcomes, and `held_count` counts a new `(source_namespace,native_stream_identity,failure_code,failure_offset)` hold episode once rather than reminder retries. `model_bucket_json` and `project_bucket_json` MUST be RFC 8785 canonical JSON exactly `["null"]` for a null dimension or `["value",value]` for a known string, so null cannot collide with any literal value including `unknown`.
+MUST use one SQLite transaction per consumed complete record to classify and deduplicate its deterministic zero-or-more fact set, allocate sequences and insert all new facts and amounts, update usage aggregates and first-seen request rows only for new contributions, persist every permitted quota/component-state transition plus the complete cursor and parser context exactly once, update `last_transaction_at` and the exact counters, and expose every new sequence to each enabled sink's backlog through the same authoritative sequence domain. A zero-fact complete record may commit only with the exact code/profile-registered disposition `registered_irrelevant`, `context_only`, or `quota_state_only`, and its permitted unchanged/context or quota-component transition MUST commit atomically with its cursor; unknown, unregistered, malformed, collided, or failed records MUST hold before the record with none of those effects. `accepted_count` counts newly committed facts, `duplicate_count` counts duplicate fact candidates in committed record outcomes, and `held_count` counts a new `(source_namespace,native_stream_identity,failure_code,failure_offset)` hold episode once rather than reminder retries. `model_bucket_json` and `project_bucket_json` MUST be RFC 8785 canonical JSON exactly `["null"]` for a null dimension or `["value",value]` for a known string, so null cannot collide with any literal value including `unknown`.
 
 ID: REQ-durable-local-ledger-003
 Source: RFC 0001 § SQLite Ledger and Atomicity
 Scope: v1-mandatory
 
-#### Scenario: Context-only record commits cursor only
-- **WHEN** a complete registered context-setting or irrelevant record yields no facts
-- **THEN** one transaction commits its complete cursor, parser-context, applicable component state, transaction time, and counters
+#### Scenario: Registered irrelevant or context-only record commits atomically
+- **WHEN** a complete record has disposition `registered_irrelevant` or `context_only` and yields no facts
+- **THEN** one transaction commits its complete cursor, permitted unchanged or changed parser context, applicable component state, transaction time, and counters
 - **AND** no sequence, aggregate, request, or sink work is created
 
 #### Scenario: Quota state-only record advances atomically
-- **WHEN** a complete supported record yields no quota fact because the registered quota member is absent, explicitly null, or state-only
+- **WHEN** a complete supported record has disposition `quota_state_only` because the registered quota member is absent, explicitly null, or state-only
 - **THEN** the matching distinct quota component state and the cursor commit in one transaction with no fact, sequence, amount, aggregate, or sink obligation
 
 #### Scenario: Null aggregate buckets cannot collide
@@ -177,6 +177,11 @@ Scope: v1-mandatory
 #### Scenario: Process interruption has one evidence-based branch
 - **WHEN** restart follows an interrupted SQLite transaction
 - **THEN** verified clean rollback retries from the prior cursor, while ambiguous or failed verification stores `storage_hold/ledger_storage_hold` and exposes degraded or unavailable health until every recovery gate passes
+
+#### Scenario: Unreadable ledger uses out-of-band health only
+- **WHEN** the ledger cannot be opened or read
+- **THEN** no SQLite view result is claimed and the local inspection command emits only REQ-local-query-contract-006's exact out-of-band `aiut.health/v1` unavailable-ledger variant
+- **AND** the inspection performs no write, migration, repair, retry, DNS lookup, listener creation, or other network activity
 
 ### Requirement: [TARGET-STATE] Operation-Specific Maintenance Headroom
 MUST require each `backup`, `migration`, `checkpoint`, and `vacuum` profile member to supply byte-valued unsigned `base_headroom_bytes` and rational `size_multiplier_numerator/size_multiplier_denominator` with a nonzero denominator, compute required headroom as `base_headroom_bytes+ceil((database_bytes+auxiliary_bytes)×numerator/denominator)` using checked arithmetic, and prohibit the operation from consuming the ingestion reserve or acknowledging state only in memory.

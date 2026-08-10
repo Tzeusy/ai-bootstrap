@@ -67,7 +67,7 @@ Scope: v1-mandatory
 - **THEN** the stream reports `record_limit`, quarantines at the record start, and does not buffer indefinitely
 
 ### Requirement: [TARGET-STATE] No-Skip Record State Machine
-MUST allow only `registered_irrelevant` to advance a cursor with an empty fact set; `unknown_kind`, `recognized_malformed`, `schema_inconsistent`, `unregistered_category`, and `identity_collision` MUST each store `state=quarantined` with the identically named `failure_code`, failure offset at the record start, prior cursor/context unchanged, no candidate fact or quota-component transition committed, and enabled family/global health degraded. `unknown_kind`, `schema_inconsistent`, and `unregistered_category` recover only through a newly accepted supporting parser/profile or corrected source; `recognized_malformed` and `identity_collision` recover only when corrected source makes the held identity valid or an RFC-compatible schema/profile migration explicitly resolves it; successful retry atomically consumes the identical held record before later progress and clears the current diagnostic. No force-skip, ignore override, dead-letter copy, or consumption waiver exists.
+MUST allow only the exact code/profile-registered dispositions `registered_irrelevant`, `context_only`, and `quota_state_only` to advance a complete record with an empty fact set, and each MUST commit its permitted unchanged/context or quota-component transition atomically with the cursor in the same ledger transaction; `unknown_kind`, `recognized_malformed`, `schema_inconsistent`, `unregistered_category`, and `identity_collision` MUST each store `state=quarantined` with the identically named `failure_code`, failure offset at the record start, prior cursor/context unchanged, no candidate fact or quota-component transition committed, and enabled family/global health degraded. `unknown_kind`, `schema_inconsistent`, and `unregistered_category` recover only through a newly accepted supporting parser/profile or corrected source; `recognized_malformed` and `identity_collision` recover only when corrected source makes the held identity valid or an RFC-compatible schema/profile migration explicitly resolves it; successful retry atomically consumes the identical held record before later progress and clears the current diagnostic. No unregistered, malformed, collided, or failed record may use a zero-fact disposition, and no force-skip, ignore override, dead-letter copy, or consumption waiver exists.
 
 ID: REQ-stream-reconciliation-and-health-005
 Source: RFC 0001 § Incremental Reads, Rescans, and Quarantine
@@ -76,6 +76,11 @@ Scope: v1-mandatory
 #### Scenario: Registered irrelevant record advances atomically
 - **WHEN** a complete record matches one exact profile-listed irrelevant discriminator
 - **THEN** one cursor-only ledger transaction advances through it with no fact, aggregate, sequence, or sink obligation
+
+#### Scenario: Context and quota state advance only with their transitions
+- **WHEN** a complete record has exact disposition `context_only` or `quota_state_only`
+- **THEN** its parser-context or quota-component transition and cursor commit atomically in one zero-fact ledger transaction
+- **AND** a failed transition leaves the prior context, component state, and cursor unchanged
 
 #### Scenario: Unknown record cannot be waived
 - **WHEN** an operator attempts to force-skip an unknown or recognized malformed record
@@ -153,7 +158,7 @@ Scope: v1-mandatory
 - **THEN** health records `retention_gap` and existing facts and aggregates are not retracted
 
 ### Requirement: [TARGET-STATE] Non-Masking Stream and Family Health
-MUST expose one source-component row before stream existence and one row for every stream with its technical identity, enumerated current and recovery state, last successful scan, last accepted source time, complete durable cursor, held failure code and position, reconciliation last-completed and due evidence, and coverage or retention state; family and global summaries MUST remain degraded whenever any enabled member is `unsupported_profile`, `unsupported_accounting_profile`, `trailing_deferred`, `quarantined`, `storage_hold`, `reconciliation_overdue`, `source_envelope_exceeded`, `retention_gap`, or `coverage_unknown`. Disabled source components MUST store `configured_state=disabled,runtime_state=disabled` with no stream/cursor/fact; enabling them re-enters source-profile activation and then `coverage_unknown`. Ledger storage interruption owns `storage_hold/ledger_storage_hold` and identical-input recovery; this capability only reflects it on every affected stream. Duplicate observations store `healthy` with null failure code after their atomic cursor/count commit. Quota capability states and sink retry/blocked states are owned by their respective capabilities and only composed upward by local query.
+MUST expose one source-component row before stream existence and one row for every stream with its technical identity, enumerated current and recovery state, last successful scan, last accepted source time, complete durable cursor, held failure code and position, reconciliation last-completed and due evidence, and coverage or retention state; family and global summaries MUST remain degraded whenever any enabled member is `unsupported_profile`, `unsupported_accounting_profile`, `trailing_deferred`, `quarantined`, `storage_hold`, `reconciliation_overdue`, `source_envelope_exceeded`, `retention_gap`, or `coverage_unknown`. Disabled source components MUST store `configured_state=disabled,runtime_state=disabled` with no stream/cursor/fact; enabling them re-enters source-profile activation and then `coverage_unknown`. Each active degradation dimension MUST remain independently latched until its owning recovery condition clears, and the exact stored stream-state precedence from highest to lowest MUST be `storage_hold`, `quarantined`, `retention_gap`, `source_envelope_exceeded`, `reconciliation_overdue`, `trailing_deferred`, `coverage_unknown`, then `healthy`; when a higher-priority latch clears, any uncleared lower-priority latch MUST become visible rather than being erased. Ledger unreadability composes above this source order as overall `unavailable`; readable ledger storage hold remains `storage_hold`. Ledger storage interruption owns `storage_hold/ledger_storage_hold` and identical-input recovery; this capability only reflects it on every affected stream. A duplicate-only observation may store `healthy` with null failure code after its atomic cursor/count commit only when no degradation latch is active; duplicate success MUST NOT clear or overwrite storage/unavailable, quarantine/hold, retention-gap, envelope, overdue, trailing-tail, or coverage-unknown evidence. Quota capability states and sink retry/blocked states are owned by their respective capabilities and only composed upward by local query.
 
 ID: REQ-stream-reconciliation-and-health-010
 Source: RFC 0001 § Health and Freshness State; about/heart-and-soul/vision.md § Non-Negotiable Principles → 4. Partial Failure Is Explicit
@@ -171,6 +176,11 @@ Scope: v1-mandatory
 #### Scenario: Ledger hold and recovery remain globally coordinated
 - **WHEN** durable-ledger admission stores all source streams as `storage_hold/ledger_storage_hold`
 - **THEN** source health shows no cursor or fact effect and remains degraded until ledger-owned verification retries the identical input and clears the hold
+
+#### Scenario: Duplicate success cannot clear another health dimension
+- **WHEN** a duplicate-only record commits while any overdue, coverage-unknown, retention-gap, envelope, storage, quarantine, or trailing-tail latch remains active
+- **THEN** the cursor and duplicate count may advance only where that latch permits, but the exact precedence keeps the owning degradation visible
+- **AND** the stream becomes `healthy` only after every active latch's own recovery condition clears
 
 #### Scenario: Disabled source has no runtime artifacts
 - **WHEN** a configured source is disabled

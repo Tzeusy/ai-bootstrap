@@ -13,8 +13,8 @@ flowchart TD
     Z -->|No| B{Complete record?}
     B -->|No: bounded incomplete tail| C[Hold stream cursor\nwait for later cycle]
     B -->|Yes| D{Record kind classification}
-    D -->|Registered irrelevant| E[Cursor-only ledger transaction]
-    D -->|Unknown| F[Quarantine stream\nhold cursor before record]
+    D -->|registered_irrelevant / context_only / quota_state_only| E[Zero-fact ledger transaction\nwith permitted transition]
+    D -->|Unknown / unregistered / malformed| F[Quarantine stream\nhold cursor before record]
     D -->|Registered usage or quota| G[Field-project with code-owned extraction registry]
     G --> H{Schema and arithmetic valid?}
     H -->|No: malformed| F
@@ -84,8 +84,13 @@ flowchart TD
 - An incomplete final JSONL record below the active byte cap waits for a later
   cycle with its stream cursor held. Crossing the cap without a newline is an
   immediate `record_limit` quarantine, not an indefinitely deferred tail.
-- Only an explicitly registered irrelevant record may advance a stream cursor
-  without producing a fact.
+- Only `registered_irrelevant`, `context_only`, or `quota_state_only` may advance
+  a complete record with zero facts, and only when its permitted parser-context
+  or quota-component transition and cursor commit in the same ledger
+  transaction.
+- A missing required profile member or bound is `unsupported_profile` before
+  traversal; a missing or wrongly typed required projected record value is
+  `recognized_malformed`; only measured bound overflow is `record_limit`.
 - An unknown kind or malformed/semantically inconsistent complete record
   quarantines only its stream, leaves its cursor before the record, and emits a
   degraded signal that family/global summaries do not mask.

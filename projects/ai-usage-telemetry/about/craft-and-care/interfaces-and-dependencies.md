@@ -19,11 +19,19 @@ reviewable properties:
 
 - it reads each source stream through an explicit, resolved read-only mount;
 - it emits normalized usage events with stable identities, never raw records;
-- it distinguishes admitted records, registered irrelevant records, incomplete
-  tails, duplicates, unknown kinds, and malformed complete records;
-- only a registered irrelevant record may advance a stream cursor without a
-  fact; unknown or malformed complete records hold the cursor and quarantine
-  that stream;
+- it distinguishes admitted records, the exact zero-fact dispositions
+  `registered_irrelevant`, `context_only`, and `quota_state_only`, incomplete
+  tails, duplicates, unknown kinds, unregistered kinds, and malformed complete
+  records;
+- only those three registered zero-fact dispositions may advance a complete
+  record without a fact, and only when the permitted parser-context or
+  quota-component transition and cursor commit in the same ledger transaction;
+  unknown, unregistered, malformed, collided, or failed records hold before the
+  record and quarantine that stream;
+- a missing required profile member or bound leaves the source
+  `unsupported_profile` before traversal, a missing or wrongly typed required
+  projected record value is `recognized_malformed`, and only a measured bound
+  overflow is `record_limit`;
 - it does not advance source progress until accepted events and progress can be
   committed transactionally;
 - it owns a typed, code-owned extraction registry and field-projecting parser
@@ -76,7 +84,9 @@ ledger facts.
   cardinality, reset/continuity, and privacy review.
 - PostgreSQL uses a separate projection allowlist; schema changes keep stable
   normalized columns and allowlisted JSONB semantics explicit and
-  migration-tested.
+  migration-tested. Its shared projected-fact envelope must database-enforce one
+  globally unique `(ledger_namespace,ledger_epoch,ledger_seq)` across usage and
+  quota plus exactly one fact-kind-matching child row.
 - Configuration may narrow either projection but never changes extraction,
   ledger admission, fact identity, or the accounting fingerprint.
 

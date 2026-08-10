@@ -154,7 +154,7 @@ gain authority to redefine that contract.
 | `quota-snapshot-semantics` | `QuotaSnapshot`, quota fact/subject identity, canonical utilization, availability, source/collection-time distinction, freshness evidence, and deterministic current selection | Registered Codex quota fields and common fingerprint rules | Composes admitted snapshots and current-quota semantics; it owns neither source extraction nor their query rendering |
 | `local-query-contract` | Exact stable read-only view names, columns, nullability and compatibility, plus the versioned non-networked structured-health JSON schema and inspection behavior | Ledger rows and ledger health, source health, sink health, and quota current-selection semantics | Composes the public local read model and non-masking overall health; it owns no private SQLite storage schema, migration, retry, repair, or write path |
 | `otlp-metrics-projection` | Metric names, units, descriptors, finite tuples and vocabularies, budgets, conservation, batching, lease/checkpoint state machine, retry, and projection-schema evolution | Committed ledger aggregates/current quota, ledger sequence, and its independent sink obligation | Composes bounded cumulative operational metrics only; it never becomes accounting authority or historical storage |
-| `postgresql-history-projection` | Remote event/amount/quota tables, types, nullability, keys and constraints, allowlisted metadata, event-time mapping, transactional remote checkpoint, retry, and projection-schema evolution | Committed ledger facts in ledger-sequence order and its independent sink obligation | Composes idempotent remote history; it does not own local ledger or OTLP state |
+| `postgresql-history-projection` | Shared projected-fact sequence envelope, exact fact-kind and one-to-one child constraints, remote event/amount/quota tables, types, nullability, keys and constraints, allowlisted metadata, event-time mapping, transactional remote checkpoint, retry, and projection-schema evolution | Committed ledger facts in ledger-sequence order and its independent sink obligation | Composes idempotent remote history with database-enforced cross-kind sequence uniqueness; it does not own local ledger or OTLP state |
 | `release-profile-governance` | The immutable release-profile envelope, member identity, ID/digest, compatibility rules, activation authorization, and fail-closed behavior | Explicitly owner-accepted capability contracts plus each owning domain's exact measured values and executable evidence | Composes accepted domain members into one immutable profile; it cannot invent, override, or become a second owner of a domain schema or value |
 | `portable-runtime-and-release` | The three canonical host-backed source/state targets, the separate read-only TOML configuration surface and its fixed in-container path/preflight, secret boundary, privilege/filesystem/network isolation, disabled-sink non-instantiation, locked inputs, native architecture gates, and publish decision | An activatable immutable release profile, including parser minimum-memory evidence, plus the enabled capabilities' parity tests | Composes the native amd64/arm64 images and manifest only after all applicable gates pass; it does not choose adapter, accounting, ledger, query, or sink semantics |
 
@@ -178,17 +178,21 @@ native-parity evidence but cannot set it.
 3. Discovery enumerates only regular non-symlink JSONL files beneath the
    adapter's canonical target. Relative-path byte order makes discovery and
    rescan reproducible, but a path is never a fact identity.
-4. The streaming projector syntax-scans each complete record. It decodes only
+4. Before traversal, a missing required profile member or parser bound leaves
+   the enabled source `unsupported_profile`. Under a complete activated profile,
+   the streaming projector syntax-scans each complete record. It decodes only
    the discriminator, context, accounting, and identity values named by the
    activated compile-time registry. Content-bearing and unregistered values are
    skipped without decoding, copying, hashing, logging, or retaining them.
 5. The adapter classifies incomplete trailing data, unknown kinds, and
-   recognized malformed data before consumption. For each complete consumable
-   record it deterministically produces an ordered set of zero or more fact
-   candidates plus exactly one resulting parser-context transition. The active
-   profile fixes candidate order; Codex token-count order is usage first, then
-   registered quota windows in registry order. Codex context is rebuilt only
-   from preceding records in the same stream; Claude context remains empty.
+   recognized malformed data before consumption. A missing or wrongly typed
+   required projected value is `recognized_malformed`; only an observed measure
+   exceeding an active measured bound is `record_limit`. For each complete
+   consumable record it deterministically produces one exact disposition, an
+   ordered fact set, and exactly one resulting parser-context transition. The
+   active profile fixes candidate order; Codex token-count order is usage first,
+   then registered quota windows in registry order. Codex context is rebuilt
+   only from preceding records in the same stream; Claude context remains empty.
 6. Every candidate is normalized before commit to a stable composite identity
    and the canonical accounting fingerprint. Unknown attribution remains
    unknown. Token amounts use registered non-overlapping categories; quota
@@ -219,8 +223,9 @@ Complete-record outcomes are therefore explicit:
 
 | Complete record outcome | Atomic ledger effect |
 |---|---|
-| Context-only Codex `session_meta` or `turn_context` | Commit the normalized parser-context transition and advance the cursor exactly once; emit no fact, sequence, amount, request contribution, aggregate update, or sink obligation |
-| Registered irrelevant record | Advance the cursor exactly once with unchanged parser context; emit no fact or accounting/delivery state |
+| `context_only` Codex `session_meta` or `turn_context` | Commit the permitted normalized parser-context transition and advance the cursor exactly once in the same transaction; emit no fact, sequence, amount, request contribution, aggregate update, or sink obligation |
+| `registered_irrelevant` record | Commit unchanged parser/context state and advance the cursor exactly once in the same transaction; emit no fact or accounting/delivery state |
+| `quota_state_only` record | Commit the permitted absent, null, or state-only quota-component transition and advance the cursor exactly once in the same transaction; emit no fact or accounting/delivery state |
 | All candidates are duplicates | Advance cursor and resulting parser context exactly once; add no history, amount, request, aggregate, sequence, or sink obligation |
 | Mixed new and duplicate candidates | Commit every new fact in deterministic candidate order with all of its amounts, first-seen-request effect, aggregates, sequence, and enabled-sink obligations; leave duplicates neutral; commit parser context and advance the cursor once after the whole set commits |
 | Codex duplicate usage plus new quota windows | Treat the repeated usage landmark as a duplicate while accepting each identity-distinct new quota snapshot in registered window order, then advance the cursor once; duplicate usage never suppresses quota output |
@@ -229,7 +234,10 @@ Complete-record outcomes are therefore explicit:
 An incomplete trailing fragment is not a complete-record outcome: it remains
 deferred before its start with no parser-context or cursor change. The ordered
 fact set, rather than any individual candidate, is the unit of record
-acceptance.
+acceptance. Only the exact code/profile-registered dispositions
+`registered_irrelevant`, `context_only`, and `quota_state_only` may advance a
+complete record with zero facts; unknown, unregistered, malformed, collided, or
+failed records hold before the record.
 
 ### Identity and deterministic ordering
 
@@ -266,10 +274,14 @@ Each enabled sink instance is identified by sink ID, destination ID, projection
 schema ID, and ledger epoch. Its checkpoint is independent:
 
 - PostgreSQL reads facts in ledger-sequence order, inserts an event and all
-  amount rows or a quota snapshot under mandatory uniqueness constraints, and
-  advances its remote checkpoint in the same database transaction. The local
-  checkpoint advances only after durable commit acknowledgement. Ambiguous
-  acknowledgement causes idempotent retry and equality revalidation.
+  amount rows or a quota snapshot beneath one shared projected-fact envelope
+  keyed by `(ledger_namespace,ledger_epoch,ledger_seq)`. Deferred bidirectional
+  constraints enforce exactly one child matching the envelope identity and
+  `fact_kind`, so usage and quota cannot reuse a sequence. The projector advances
+  its remote checkpoint in the same database transaction. The local checkpoint
+  advances only after durable commit acknowledgement. Ambiguous acknowledgement
+  causes idempotent retry and equality revalidation of envelope, child linkage,
+  child row, and complete amount set.
 - OTLP derives complete cumulative sums and current quota gauges from the
   committed ledger through a target sequence. One fenced lease holder exports a
   checkpoint tuple. If one request cannot hold the complete projection, the
@@ -402,7 +414,14 @@ Per-stream, ledger, sink, and quota state is retained in SQLite and rendered by
 a non-networked read-only inspection command. Overall healthy requires every
 enabled component to satisfy its own current contract. If health cannot be
 persisted, inspection combines stale persisted state with direct read-only
-evidence.
+evidence. If the ledger cannot be opened or read, the command claims no SQLite
+view result and emits the exact out-of-band `aiut.health/v1` variant: the normal
+eight top-level keys; `overall_state="unavailable"`; empty source, sink, and
+quota arrays; independently validated embedded profile ID/digest or null; and a
+ledger object containing only `ledger_unavailable`, validated configured
+namespace or null, fixed failure code, null epoch/schema, and stale-persisted
+marker. Fixed clock/configuration/profile/direct evidence produces byte-identical
+canonical JSON plus LF, with no write or network activity.
 
 Alternative: log-only health or an inbound health server. Rejected because logs
 do not provide durable component state and a server expands the runtime boundary.
@@ -432,6 +451,16 @@ retention gap, coverage unknown, and disabled states. Family and global health
 must reflect the most severe enabled child state; they cannot mask a degraded
 stream because a sibling advanced.
 
+Each degradation dimension remains independently latched until its owning
+recovery condition clears. The exact persisted stream-state precedence, highest
+first, is `storage_hold`, `quarantined`, `retention_gap`,
+`source_envelope_exceeded`, `reconciliation_overdue`, `trailing_deferred`,
+`coverage_unknown`, then `healthy`; ledger unreadability composes above it as
+overall `unavailable`. Clearing a higher-priority state reveals any uncleared
+lower-priority state. A duplicate-only commit may report `healthy` only when no
+latch remains and never overwrites storage/unavailable, quarantine/hold,
+retention-gap, envelope, overdue, trailing-tail, or coverage-unknown evidence.
+
 Coverage is deliberately asymmetric:
 
 - before a stream is first discovered, historical coverage is unknown;
@@ -444,7 +473,10 @@ Failure containment follows the narrowest safe boundary:
 
 | Condition | Containment and recovery |
 |---|---|
+| Missing required profile member or parser bound | Keep the enabled source `unsupported_profile` before traversal; create no stream, cursor, or fact |
 | Incomplete trailing record below the active byte cap | Defer at its start and retry later; other complete work continues |
+| Missing or wrongly typed required projected record value | Classify the recognized record `recognized_malformed` and hold before it; do not call it `record_limit` |
+| Observed record measure exceeds an active measured bound | Classify `record_limit` and hold before the record |
 | Unknown kind, recognized malformed record, unregistered category, or identity collision | Hold before the record and quarantine only that stream; recovery requires supported parser/profile change or corrected source |
 | Truncation, replacement, generation mismatch, or prefix-anchor mismatch | Reset that stream and parser context to the beginning; deduplicate by fact identity and fingerprint |
 | Missing or incompatible release profile | Fail startup before source or sink activity |
@@ -484,9 +516,9 @@ this documentation changeset may guess:
 | `stream-reconciliation-and-health` / reconciliation | Mutation-detection evidence, measured worst-case scan cost, exact stream-count/bytes/record/append envelope, deadline, anchor/reminder values, and scheduler/clock cases | Reconciliation cannot claim current |
 | `durable-local-ledger` / ledger schema and storage admission | Conformance to the capability-owned private tables, constraints, transactions and migration corpus; measured row/index/WAL amplification, reserve/recovery/headroom values, and full/I/O failure injection for whole record sets | Ingestion enters storage hold without any record-set effect or cursor advance |
 | `quota-snapshot-semantics` / quota freshness | Source timestamp/window evidence, exact maximum ages and skew values, duplicate-usage/new-quota vectors, and deterministic-selection vectors | Freshness remains unknown or the source profile stays unsupported |
-| `local-query-contract` / local views and inspection | Conformance fixtures for the capability-owned stable-view column manifests and health JSON schema, compatibility/migration vectors, and non-masking/read-only failure cases | Query/profile compatibility fails and activation is refused; no alternate private-table contract is exposed |
+| `local-query-contract` / local views and inspection | Conformance fixtures for the capability-owned stable-view column manifests, readable-ledger health JSON, exact out-of-band unavailable-ledger variant, compatibility/migration vectors, and non-masking/read-only failure cases | Query/profile compatibility fails and activation is refused; no alternate private-table contract is exposed |
 | `otlp-metrics-projection` / OTLP | Conformance to the capability-owned metric descriptors and vocabulary shape; exact measured tuple set, attribute/series/request ceilings, SDK cap behavior, conservation, collision, retry, and deterministic-batch vectors | Exporter is not instantiated or checkpoint is blocked |
-| `postgresql-history-projection` / PostgreSQL | Conformance to the capability-owned columns, types, nullability, constraints, comparisons, and transaction shape; migration, idempotency, ambiguous-acknowledgement, and retry vectors | Checkpoint remains pending |
+| `postgresql-history-projection` / PostgreSQL | Conformance to the capability-owned shared sequence envelope, global cross-kind sequence key, one-to-one fact-kind child constraints, columns, types, nullability, comparisons, and transaction shape; migration, idempotency, ambiguous-acknowledgement, and retry vectors | Checkpoint remains pending |
 | `release-profile-governance` / profile composition | Complete member manifests and evidence digests, deterministic profile ID/digest vectors, compatibility cases, and proof that no missing or rejected member can activate | Startup fails before source or sink activity |
 | `portable-runtime-and-release` / runtime and release | Locked inputs, measured operation-specific runtime headroom, mount/network/privilege tests, disabled-sink absence, and native amd64/arm64 parity over every applicable domain artifact | No v1 image or manifest is published |
 
@@ -559,8 +591,9 @@ crash output, SQLite, either sink, or network traffic.
   deterministic complete-target batches, cumulative replay, and checkpoint
   advancement only after all acknowledgements.
 - [PostgreSQL commits but the acknowledgement is lost] → Retry against mandatory
-  uniqueness constraints, compare normalized equality, and advance locally only
-  after durable confirmation.
+  shared-envelope and child uniqueness constraints, compare the envelope,
+  one-to-one fact-kind link, normalized child equality, and complete amount set,
+  and advance locally only after durable confirmation.
 - [A migration or downgrade would reinterpret accepted history] → Preserve
   explicit schema/profile IDs, require lossless migrations, and stop for a
   forward repair when rollback compatibility cannot be proved.
@@ -597,8 +630,9 @@ and evidence sequence:
    after its source profile is activated. Preserve the source-disabled path for
    any unsupported build or shape.
 6. Enable OTLP and PostgreSQL independently. Each new checkpoint identity starts
-   from ledger origin and proves catch-up, retry, and failure isolation before
-   broader operation.
+   from ledger origin and proves catch-up, retry, failure isolation, PostgreSQL
+   cross-kind sequence uniqueness, one-to-one envelope linkage, and lossless
+   no-renumber migration before broader operation.
 7. Run the same native release gates on amd64 and arm64. Publish no v1 manifest
    until both images pass and parity evidence matches.
 
