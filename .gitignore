@@ -84,6 +84,7 @@ scratch/
 .worktrees/parallel-agents/aib-lqp.2/
 .worktrees/parallel-agents/aib-b9x/
 .worktrees/parallel-agents/aib-lqp.3/
+.worktrees/parallel-agents/aib-2ct/
 
 # bv (beads viewer) local config and caches
 .bv/
