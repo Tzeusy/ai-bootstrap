@@ -237,6 +237,33 @@ EOF
   assert_contains "$out" "Decisions layer: [ABSENT]" "missing decisions layer should be reported absent"
 }
 
+case_numbered_heading_doctrine_rules() {
+  local repo="$TMP_ROOT/numbered-heading-rules"
+  local out
+
+  cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+  cat > "$repo/about/heart-and-soul/vision.md" <<'EOF'
+# Vision
+
+Authored doctrine using numbered principle headings.
+
+## Non-Negotiable Principles
+
+### 1. Preserve user-owned history
+
+Full rule text here.
+
+### 2. Refuse unproved meaning
+
+Full rule text here.
+EOF
+
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "Doctrine rules detected: 2" "numbered principle headings should count as doctrine rules"
+  assert_contains "$out" "MATURE_TRACEABILITY_GATE=PASS" "numbered principle headings should satisfy the mature doctrine threshold"
+  assert_contains "$out" "SHAPE_LEVEL=MATURE" "an otherwise mature project should remain mature with numbered principle headings"
+}
+
 case_legacy_layout_detected() {
   local repo="$FIXTURES_DIR/legacy-layout"
   local out
@@ -425,6 +452,7 @@ run_case "fully authored repo is mature" case_authored_repo_can_be_mature
 run_case "four pillars without craft-and-care is not mature" case_four_pillars_without_craft_not_mature
 run_case "syzygy canon is detected and guarded" case_syzygy_canon_detected
 run_case "syzygy doctrine rules and decisions layer resolve" case_syzygy_doctrine_rules_and_decisions
+run_case "numbered principle headings count as doctrine rules" case_numbered_heading_doctrine_rules
 run_case "legacy layout is detected conservatively" case_legacy_layout_detected
 run_case "html comments do not trigger scaffold classification" case_html_comments_do_not_trigger_scaffold
 run_case "ARCHITECTURE.md does not double-count topology" case_architecture_file_does_not_double_count_topology

@@ -286,8 +286,11 @@ record start excluding the JSONL delimiter; container depth with the root
 container counted as depth one; encoded object-key bytes; projected scalar
 occurrences; and each projected path's encoded bytes, decoded UTF-8 bytes,
 multiplicity, numeric range, precision, and scale. It also fixes the minimum
-supported container memory used to justify those ceilings. No parser default,
-environment variable, or operator configuration may widen them.
+supported container memory used to justify those ceilings. A profile bound for
+the non-negative signed-64-bit amount/counter domain uses the domain-owned
+canonical decimal-string subtype defined under `UsageEvent`; it is never an RFC
+8785 JSON number. No parser default, environment variable, or operator
+configuration may widen these values or their representation.
 
 Byte, key, depth, and structural guards apply while bytes are scanned. Crossing
 a ceiling is `record_limit` immediately, even when no terminating newline has
@@ -406,11 +409,11 @@ the domain imports no adapter module. It contains:
 | Field group | Contract |
 |---|---|
 | Stable identity | The immutable tuple `(collector_namespace, ledger_namespace, adapter_schema_id, source_namespace, fact_kind, native_identity)`. No member is a display alias, path, line number, byte offset, sink setting, or collection time. |
-| Accounting fingerprint | SHA-256 of RFC 8785 canonical JSON with domain tag `aiut-accounting-fingerprint-v1`. The input contains only the adapter schema, fact kind, native identity, source-observed time, registered accounting values, and source-derived attribution required to interpret them. It excludes `ledger_seq`, `collected_at`, paths, display aliases, extension metadata, every export allowlist, and every sink setting. |
+| Accounting fingerprint | SHA-256 of RFC 8785 canonical JSON with domain tag `aiut-accounting-fingerprint-v1`. The input contains only the adapter schema, fact kind, native identity, source-observed time, registered accounting values, and source-derived attribution required to interpret them. Every amount/counter leaf in this document uses the domain-owned canonical non-negative signed-64-bit decimal-string subtype, never a JSON number. It excludes `ledger_seq`, `collected_at`, paths, display aliases, extension metadata, every export allowlist, and every sink setting. |
 | Collector and source identity | The immutable technical namespaces, separate from optional human labels. |
 | Source time | The event time supplied or unambiguously derived from the source record, preserved independently of collection and sink-delivery time. |
 | Attribution | Tool, vendor, model, project, and logical request identity. Adapter-specific derivation must be documented and must not cross source-stream boundaries. |
-| Amounts | Zero or more non-negative integer amounts keyed by registered token category. Categories present in one event are non-overlapping. |
+| Amounts | Zero or more exact non-negative signed-64-bit integer amounts keyed by registered token category. Categories present in one event are non-overlapping. |
 | Metadata | Only keys admitted by the versioned ledger schema and selected from its closed registry. Metadata extends context; it cannot carry token amounts, identity, content, or credentials. |
 
 Model and project attribution remain explicitly unknown when registry-admitted
@@ -423,6 +426,15 @@ or missing, invalid, or unparseable cwd yields null. No repository discovery,
 ancestor search, filesystem probe, or absolute path enters normalization.
 Configuration may provide a presentation alias, but the alias never rewrites
 the normalized fact.
+
+The domain owns one canonical non-negative signed-64-bit decimal-string
+subtype for every RFC 8785 boundary that carries an amount, cumulative counter,
+or bound for that domain. It renders an exact integer in
+`0..9223372036854775807` as ASCII decimal digits with no sign and no leading
+zero except the value `"0"`; parsing validates that grammar and range before
+recovering the internal integer. JSON number tokens never represent these
+values. This is a serialization-boundary rule only: domain arithmetic and
+SQLite/PostgreSQL amount columns remain checked exact integers.
 
 Logical request identity is required for an accepted v1 `UsageEvent`. The
 globally scoped request key is `(collector_namespace, ledger_namespace,
@@ -671,8 +683,11 @@ freshness, privacy, and vector gates as any new source contract.
   `/payload/cwd`; it never looks ahead or crosses a stream. A rescan starts with
   empty context and reconstructs it from the beginning.
 - **Native usage identity:** the profile-versioned candidate is
-  `(session_meta.payload.id, canonical total_token_usage vector)`. The vector
-  is a native cumulative landmark, not the emitted amount. The release profile
+  `(session_meta.payload.id, canonical total_token_usage vector)`. Every
+  cumulative counter leaf in that RFC 8785 identity and the matching native
+  request identity uses the domain-owned canonical non-negative signed-64-bit
+  decimal-string subtype. The vector is a native cumulative landmark, not the
+  emitted amount. The release profile
   must prove its componentwise monotonicity, reset behavior, and relationship
   to `last_token_usage`; otherwise the adapter does not accept the candidate as
   identity. An unchanged landmark is a duplicate usage observation, even when
@@ -694,7 +709,9 @@ freshness, privacy, and vector gates as any new source contract.
   A missing cache-write field remains absent, not zero.
 - **Timestamp and fingerprint:** the applicable `turn_context` timestamp is the
   usage `source_observed_at`. The fingerprint contains the adapter schema,
-  native identity, that timestamp, source model, and sorted emitted delta.
+  native identity, that timestamp, source model, and sorted emitted delta, with
+  every emitted amount rendered through the domain-owned decimal-string
+  subtype.
 - **Quota identity:** each registered window in a token-count record is a
   separate snapshot with native identity `(session id, limit id, window name,
   record timestamp)`. Its source observation time is the record `/timestamp`;
@@ -1229,9 +1246,9 @@ The PostgreSQL sink uses five conceptual relations:
 | Table | Contract |
 |---|---|
 | `projected_facts` | One shared envelope per projected ledger fact. Primary key `(ledger_namespace, ledger_epoch, ledger_seq)` is global across usage and quota; `fact_identity` is unique; `fact_kind` is exactly `usage_event | quota_snapshot`. Its SQL `CHECK` requires the selected child pointer both `IS NOT NULL` and byte-equal to `fact_identity`, and requires the other pointer `IS NULL`. The selected pointer and the child's composite envelope reference are both `DEFERRABLE INITIALLY DEFERRED`, so commit accepts exactly one same-kind, same-identity child and rejects both-null, both-set, wrong-kind, orphan, and cross-kind sequence reuse. |
-| `usage_events` | One row per composite usage identity with mandatory technical namespaces, adapter schema, native identity, fingerprint, ledger sequence, and source time. A deferred composite foreign key binds its sequence, identity, and exact `usage_event` kind to the shared envelope. |
+| `usage_events` | One row per composite usage identity with mandatory technical namespaces, adapter schema, native identity, fingerprint, ledger sequence, exact checked non-negative signed-64-bit `source_observed_unix_nano` and `collected_unix_nano`, and source attribution. A deferred composite foreign key binds its sequence, identity, and exact `usage_event` kind to the shared envelope. |
 | `usage_event_amounts` | One row per usage identity/category, with a foreign key to `usage_events` and a unique constraint over the complete event identity plus category. |
-| `quota_snapshots` | One row per composite snapshot identity with a full-identity unique constraint, fingerprint, source/collection times, canonical utilization, freshness evidence/state, and allowed quota fields. A deferred composite foreign key binds its sequence, identity, and exact `quota_snapshot` kind to the shared envelope. |
+| `quota_snapshots` | One row per composite snapshot identity with a full-identity unique constraint, fingerprint, nullable exact checked non-negative signed-64-bit `source_observed_unix_nano`, non-null `collected_unix_nano`, nullable `reset_unix_nano`, canonical utilization, freshness evidence/state, and allowed quota fields. A deferred composite foreign key binds its sequence, identity, and exact `quota_snapshot` kind to the shared envelope. |
 | `projection_checkpoints` | One row per `(sink_id, destination_id, projection_schema_id, ledger_epoch)` with that tuple unique and a monotonic acknowledged `ledger_seq`. |
 
 The technical identity/checkpoint envelope is mandatory when PostgreSQL is
@@ -1250,11 +1267,17 @@ orphan, mismatched kind, or multiply linked child at transaction commit. No
 checkpoint may make a partially inserted fact visible as delivered. The local
 checkpoint advances only after durable PostgreSQL commit acknowledgement. If
 PostgreSQL commits but the acknowledgement is lost, at-least-once retry compares
-the envelope, exact child link, child row, and complete amount set before
-advancing locally; unequal pre-existing state is never overwritten.
+the envelope, exact child link, child row including bit-exact Unix-nanosecond
+columns, and complete amount set before advancing locally; unequal pre-existing
+state is never overwritten.
 
 Column types, nullability, foreign keys, conflict comparisons, and migration
-vectors are required pre-ship schema artifacts. Migration vectors populate the
+vectors are required pre-ship schema artifacts. Semantic source, collection,
+and reset instants are authoritative checked `bigint` Unix nanoseconds;
+`timestamptz` is not their storage or equality representation. The operational
+checkpoint `updated_at` may remain `timestamptz` because it is excluded from
+fact idempotency equality and never substitutes for source chronology.
+Migration vectors populate the
 shared envelope without renumbering, preserve cross-kind sequence uniqueness
 and one-to-one child linkage, and fail all-old-or-all-new on separate both-null,
 both-set, wrong-kind, orphan, and cross-kind-sequence fixtures. Schema creation
@@ -1269,9 +1292,11 @@ implementation details and cannot weaken the constraints.
 
 ### Event Time and Projection Time
 
-SQLite and PostgreSQL preserve the source event or snapshot time independently
-of collection, retry, and delivery time. A late rescan therefore repairs history
-at its original time rather than pretending the fact occurred when discovered.
+SQLite and PostgreSQL preserve the exact source event or snapshot instant
+independently of collection, retry, and delivery time. PostgreSQL uses the
+checked signed-64-bit Unix-nanosecond columns above so adjacent nanosecond
+instants remain distinct. A late rescan therefore repairs history at its
+original time rather than pretending the fact occurred when discovered.
 
 OTLP cumulative sums and gauges represent the operational state at export time.
 They may catch up after an outage, but they are not a substitute for event-time

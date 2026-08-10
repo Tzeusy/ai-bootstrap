@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: [TARGET-STATE] Closed UsageEvent Shape
-SHALL define a source-independent `UsageEvent` interface and admit a value only when it has the immutable identity tuple, `accounting_fingerprint`, `collector_namespace`, `ledger_namespace`, `adapter_schema_id`, `source_namespace`, `fact_kind="usage_event"`, source-observed time and collected time each normalized through the one domain-owned checked UTC Unix-nanosecond parser/renderer and its sole fixed-nine-digit RFC 3339 `Z` form, tool, vendor, nullable model and project, native logical-request identity, zero-or-more unique registered non-negative category amounts, and the closed ledger metadata object; no other field group is part of v1 normalization. The domain interface MUST accept registered source fields/evidence from adapters, MUST NOT import an adapter module, and MUST be the sole implementation owner of generic usage identity, canonical instant, cwd-basename, category, and fingerprint behavior.
+SHALL define a source-independent `UsageEvent` interface and admit a value only when it has the immutable identity tuple, `accounting_fingerprint`, `collector_namespace`, `ledger_namespace`, `adapter_schema_id`, `source_namespace`, `fact_kind="usage_event"`, source-observed time and collected time each normalized through the one domain-owned checked UTC Unix-nanosecond parser/renderer and its sole fixed-nine-digit RFC 3339 `Z` form, tool, vendor, nullable model and project, native logical-request identity, zero-or-more unique registered exact non-negative signed-64-bit category amounts in `0..9223372036854775807`, and the closed ledger metadata object; no other field group is part of v1 normalization. The domain interface MUST accept registered source fields/evidence from adapters, MUST NOT import an adapter module, and MUST be the sole implementation owner of generic usage identity, canonical instant, cwd-basename, category, fingerprint behavior, and the canonical non-negative signed-64-bit decimal-string subtype used at RFC 8785 boundaries. That subtype MUST render an internal integer as ASCII decimal digits with no sign and no leading zero except `"0"`, validate the same grammar and range on parse, and MUST NOT change the exact integer used for arithmetic or SQL storage.
 
 ID: REQ-event-identity-and-normalization-001
 Source: RFC 0001 § UsageEvent
@@ -12,11 +12,11 @@ Scope: v1-mandatory
 - **THEN** normalization emits one closed `UsageEvent` whose absent model or project is explicitly null
 
 #### Scenario: Invalid event is rejected
-- **WHEN** normalization cannot establish a required field, repeats a category, or produces a negative or unregistered amount
+- **WHEN** normalization cannot establish a required field, repeats a category, or produces a negative, greater-than-signed-64-bit, or unregistered amount
 - **THEN** no `UsageEvent` is admitted and the source receives the applicable sanitized hold
 
 ### Requirement: [TARGET-STATE] Immutable Fact Identity Encoding
-MUST define the source-independent fact-identity function as the RFC 8785 canonical UTF-8 encoding of the exact ordered JSON array `[collector_namespace,ledger_namespace,adapter_schema_id,source_namespace,fact_kind,native_identity]`, where `native_identity` is supplied as the source-profile-defined canonical JSON value, and MUST exclude aliases, paths, line or byte positions, sink settings, scan order, collection time, and projection policy. Adapters MUST invoke this function and MUST NOT implement a source-local equivalent.
+MUST define the source-independent fact-identity function as the RFC 8785 canonical UTF-8 encoding of the exact ordered JSON array `[collector_namespace,ledger_namespace,adapter_schema_id,source_namespace,fact_kind,native_identity]`, where `native_identity` is supplied as the source-profile-defined canonical JSON value and every amount/cumulative-counter leaf in that value uses the domain-owned canonical non-negative signed-64-bit decimal-string subtype rather than a JSON number, and MUST exclude aliases, paths, line or byte positions, sink settings, scan order, collection time, and projection policy. Adapters MUST invoke this function and MUST NOT implement a source-local equivalent.
 
 ID: REQ-event-identity-and-normalization-002
 Source: RFC 0001 § UsageEvent; § Compatibility and Evolution
@@ -31,15 +31,16 @@ Scope: v1-mandatory
 - **THEN** the canonical identity vector fails and the build is not releasable
 
 ### Requirement: [TARGET-STATE] Exact Usage Accounting Fingerprint Document
-MUST make the domain-owned fingerprint function compute `accounting_fingerprint` as SHA-256 over `UTF-8("aiut-accounting-fingerprint-v1\n")` followed by RFC 8785 canonical UTF-8 JSON of exactly `{"adapter_schema_id":string,"fact_kind":"usage_event","native_identity":json,"source_observed_at":RFC3339-UTC-string,"source_attribution":{"tool":string,"vendor":string,"model":string-or-null,"project":string-or-null,"native_request_identity":json},"source_consistency":object,"amounts":[[category,non-negative-integer],...]}`, where `source_observed_at` is exactly `YYYY-MM-DDTHH:MM:SS.nnnnnnnnnZ` derived by the sole domain-owned checked conversion of an explicit-offset, non-leap-second RFC 3339 instant representable as non-negative signed-64-bit UTC Unix nanoseconds, with amount pairs in registry order, Claude `source_consistency` exactly `{"message_id":string}`, Codex `source_consistency` exactly `{}`, and no ledger sequence, collection time, path, alias, extension metadata, allowlist, or sink field. Adapters supply the declared source-consistency evidence but do not own canonicalization or hashing.
+MUST make the domain-owned fingerprint function compute `accounting_fingerprint` as SHA-256 over `UTF-8("aiut-accounting-fingerprint-v1\n")` followed by RFC 8785 canonical UTF-8 JSON of exactly `{"adapter_schema_id":string,"fact_kind":"usage_event","native_identity":json,"source_observed_at":RFC3339-UTC-string,"source_attribution":{"tool":string,"vendor":string,"model":string-or-null,"project":string-or-null,"native_request_identity":json},"source_consistency":object,"amounts":[[category,canonical-nonnegative-int64-decimal-string],...]}`, where `source_observed_at` is exactly `YYYY-MM-DDTHH:MM:SS.nnnnnnnnnZ` derived by the sole domain-owned checked conversion of an explicit-offset, non-leap-second RFC 3339 instant representable as non-negative signed-64-bit UTC Unix nanoseconds; every amount/cumulative-counter leaf in `native_identity` and `native_request_identity` MUST use that same decimal-string subtype rather than a JSON number; amount pairs MUST be in registry order; Claude `source_consistency` MUST be exactly `{"message_id":string}`; Codex `source_consistency` MUST be exactly `{}`; and no ledger sequence, collection time, path, alias, extension metadata, allowlist, or sink field may enter. Adapters supply the declared source-consistency evidence but do not own integer/string conversion, canonicalization, or hashing.
 
 ID: REQ-event-identity-and-normalization-003
 Source: RFC 0001 § UsageEvent
 Scope: v1-mandatory
 
 #### Scenario: Canonical-equivalent inputs have one digest
-- **WHEN** equivalent admitted source values differ only in JSON field order, whitespace, RFC 3339 offset spelling for the same nanosecond instant, source location, alias, metadata selection, or sink enablement
+- **WHEN** equivalent admitted source values differ only in JSON field order, whitespace, RFC 3339 offset spelling for the same nanosecond instant, source location, alias, metadata selection, or sink enablement, and exact amount/counter fixtures cover `9007199254740991`, `9007199254740992`, `9007199254740993`, and `9223372036854775807`
 - **THEN** the canonical byte document and SHA-256 fingerprint are identical
+- **AND** each boundary value has its distinct canonical decimal-string bytes, while a non-canonical string or the overflow value `9223372036854775808` is rejected before hashing
 
 #### Scenario: Accounting participant changes the digest
 - **WHEN** native identity, source time, model, project identity, request identity, source-consistency value, category, or amount changes
@@ -62,7 +63,7 @@ Scope: v1-mandatory
 - **THEN** the prior fact remains immutable, the conflicting fact is not committed, and the affected source degrades
 
 ### Requirement: [TARGET-STATE] First-Seen Logical Request Accounting
-MUST require every accepted `UsageEvent` to have a registry-established `native_request_identity`, encode the global request key as RFC 8785 canonical UTF-8 JSON of `[collector_namespace,ledger_namespace,adapter_schema_id,source_namespace,native_request_identity]`, record its first-seen contribution in the same transaction as the event, and increment the request aggregate exactly once across all facts and replays sharing that key.
+MUST require every accepted `UsageEvent` to have a registry-established `native_request_identity`, encode the global request key as RFC 8785 canonical UTF-8 JSON of `[collector_namespace,ledger_namespace,adapter_schema_id,source_namespace,native_request_identity]` with every amount/cumulative-counter leaf represented by the domain-owned canonical non-negative signed-64-bit decimal-string subtype rather than a JSON number, record its first-seen contribution in the same transaction as the event, and increment the request aggregate exactly once across all facts and replays sharing that key.
 
 ID: REQ-event-identity-and-normalization-005
 Source: RFC 0001 § UsageEvent
@@ -119,7 +120,7 @@ Source: RFC 0001 § Token Category Registry; § Source-Specific V1 Attribution �
 Scope: v1-mandatory
 
 #### Scenario: Proven inclusive total is decomposed
-- **WHEN** an active profile proves that cache or reasoning detail is a subset of an inclusive total and checked subtraction is non-negative
+- **WHEN** an active profile proves that cache or reasoning detail is a subset of an inclusive total and checked subtraction is non-negative, including operands/results at `9007199254740991`, `9007199254740992`, `9007199254740993`, and `9223372036854775807`
 - **THEN** normalization emits the non-overlapping detail and remainder categories whose sum equals the source total
 
 #### Scenario: Ambiguous overlap is never double counted
