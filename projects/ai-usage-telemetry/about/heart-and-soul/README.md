@@ -4,9 +4,9 @@ Doctrine for **AI Usage Telemetry**, the `ai-usage-telemetry` project nested in
 `ai-bootstrap/`.
 
 **Status:** Adopted through Owner Decision 0001. Decision 0002 independently
-accepted the eleven R5 capability bytes without amending doctrine; seven
-current rows still match, while four corrected current rows await exact-head
-review and successor acceptance. See the central
+accepted the eleven R5 capability bytes without amending doctrine; Decision
+0003 replaces exactly four corrected rows after exact-head confirmation. All
+eleven current rows are accepted. See the central
 [lifecycle matrix](../README.md#lifecycle-status).
 
 Read this pillar first when deciding what the product may observe, retain, or
@@ -27,6 +27,9 @@ purpose.
 5. [`decisions/0002-accept-v1-capability-contracts.md`](./decisions/0002-accept-v1-capability-contracts.md)
    — the eleven independent exact contract decisions and the profile, runtime,
    archive, and release boundaries that remain.
+6. [`decisions/0003-accept-final-branch-contract-corrections.md`](./decisions/0003-accept-final-branch-contract-corrections.md)
+   — the corrected RFC/evidence promotion, four replacement contract bindings,
+   and unchanged implementation/release boundary.
 
 ## Evidence Labels
 

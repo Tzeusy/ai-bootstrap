@@ -3,9 +3,9 @@
 Design contracts for AI Usage Telemetry.
 
 **Status:** R5 confirmed and promoted predecessor RFC/evidence bytes under
-Owner Decision 0001's standing direction. Current corrected RFC/synthetic
-bytes and four affected capability rows are pending exact-head review and
-successor owner acceptance; seven current spec rows still match Decision 0002.
+Owner Decision 0001's standing direction. Decision 0003 promotes the exact-
+head-confirmed corrected RFC/synthetic bytes and replaces four capability rows;
+the other seven current rows retain Decision 0002 authority.
 See the central
 [lifecycle matrix](../README.md#lifecycle-status), the current
 [R1-R5 ledger](./reviews/0001/2026-08-10-specification-reconciliation.md),
@@ -26,8 +26,8 @@ Reading order:
    [`evidence/0001-provenance.md`](./evidence/0001-provenance.md) pins reviewed
    clients, public source, safe commands, and unresolved structural claims.
 3. [`reviews/0001/2026-08-10-final-branch-correction.md`](./reviews/0001/2026-08-10-final-branch-correction.md)
-   is the current route: it records the pending correction hashes, fail-closed
-   authority state, and exact confirmation required before promotion.
+   records the correction hashes, fail-closed intermediate state, exact-head
+   confirmation, and Decision 0003 promotion.
 4. [`reviews/0001/2026-08-10-specification-reconciliation.md`](./reviews/0001/2026-08-10-specification-reconciliation.md)
    records the exact R1-R5 reviewed heads, fix commits, accepted hashes, checks,
    and predecessor promotion boundary.
@@ -40,9 +40,10 @@ Relationship to the other pillars:
 - [`heart-and-soul`](../heart-and-soul/README.md) defines why local facts must become user-owned history while content and credentials stay outside the collector.
 - Legends-and-lore defines the load-bearing runtime, adapter, ledger, and sink contracts that preserve those principles.
 - The `READY` launch-gate administration and R1-R5 convergence are recorded,
-  and Decision 0002 preserves the R5 contract decisions independently. Four
-  corrected current rows are unknown until successor acceptance, so task 2.1
-  remains closed for non-synthetic work.
+  Decision 0002 preserves the R5 contract decisions independently, and
+  Decision 0003 replaces exactly four corrected rows. All current contract
+  rows are accepted, while task 2.1 and later implementation gates remain
+  unchecked.
   Follow
   its [`proposal`](../../openspec/changes/establish-ai-usage-telemetry-v1/proposal.md)
   → [`design`](../../openspec/changes/establish-ai-usage-telemetry-v1/design.md)
@@ -72,8 +73,9 @@ synthetic vectors
 `8e5e512144e03d437aa0349b7d00b3600fae5dd24e2d613236d6c6e699953e8a`,
 and unchanged provenance
 `dcfffe320712afbdcf805e05d30b277130e4bf81f9d718d4f4408bc077f482f0`.
-Those hashes remain accepted while the corrected current RFC/synthetic bytes
-await a new exact-head review and successor decision. The formal review and
-reconciliation entries preserve the full historical digest trail.
+Decision 0003 supersedes the predecessor RFC/synthetic authority with exact
+current hashes recorded in the final-branch correction review; source/bounds
+and provenance remain unchanged. The formal review and reconciliation entries
+preserve the full historical digest trail.
 Source/resource profiles still require their downstream evidence gates before
 real mounts, ingestion, exports, packaging, archival, or release.

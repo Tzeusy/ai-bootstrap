@@ -23,6 +23,7 @@ design violate the product boundary?"
 | [V1 scope](../../../about/heart-and-soul/v1.md) | Deciding what ships, defers, or requires later evidence |
 | [Decision 0001](../../../about/heart-and-soul/decisions/0001-finalize-and-specify.md) | Checking doctrine and RFC adoption authority |
 | [Decision 0002](../../../about/heart-and-soul/decisions/0002-accept-v1-capability-contracts.md) | Checking capability acceptance and remaining runtime/release gates |
+| [Decision 0003](../../../about/heart-and-soul/decisions/0003-accept-final-branch-contract-corrections.md) | Checking corrected RFC/evidence promotion and four replacement contract bindings |
 
 Behavior belongs in `/spec-and-spine`; design mechanics in
 `/legends-and-lore`; placement in `/lay-and-land`; change-quality evidence in
