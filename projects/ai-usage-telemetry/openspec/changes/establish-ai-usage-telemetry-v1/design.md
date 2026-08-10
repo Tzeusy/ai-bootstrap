@@ -526,9 +526,11 @@ blocks the v1 manifest rather than weakening the claim.
 
 The source-stream state machine distinguishes healthy, trailing deferred,
 quarantined, storage hold, reconciliation overdue, source envelope exceeded,
-retention gap, coverage unknown, and disabled states. Family and global health
-must reflect the most severe enabled child state; they cannot mask a degraded
-stream because a sibling advanced.
+retention gap, coverage unknown, and disabled states. Family and global
+summaries use only `healthy`, `degraded`, or `disabled`; any enabled
+non-healthy child makes them `degraded`, and they never copy an individual
+stream state code. A sibling's advancement therefore cannot mask a degraded
+stream.
 
 `stream-reconciliation-and-health` owns one pure `LatchSet` model that accepts a
 prior closed set plus one dimension-owned transition and returns the next set,
@@ -575,7 +577,7 @@ Failure containment follows the narrowest safe boundary:
 | Unknown kind, recognized malformed record, unregistered category, or identity collision | Hold before the record and quarantine only that stream; recovery requires supported parser/profile change or corrected source |
 | Truncation, replacement, generation mismatch, or prefix-anchor mismatch without proven loss | Reset that stream and parser context to the beginning; deduplicate by fact identity and fingerprint; add no new latch/degradation, preserve the prior `LatchSet`, derive the highest active state, and report healthy only when none is active |
 | Missing or incompatible release profile | Fail startup before source or sink activity |
-| Reconciliation deadline missed | Mark stream, family, and global state overdue; safe incremental ingestion may continue but current reconciliation cannot be claimed |
+| Reconciliation deadline missed | Mark the affected stream `reconciliation_overdue` and family/global summaries `degraded`; safe incremental ingestion may continue but current reconciliation cannot be claimed |
 | Supported source envelope exceeded | Degrade the stream, family, and global state; continue only work still bounded by parser and storage profiles |
 | Storage admission denied, SQLite full/I/O failure, failed commit, or ambiguous ledger state | Roll back the whole record transaction and hold all source cursors; reopen read-only and verify before writes resume |
 | OTLP or PostgreSQL failure | Keep only that sink pending; sources, ledger, and the other sink continue |

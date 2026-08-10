@@ -8,6 +8,7 @@ flowchart TD
     R --> TF[Tool facades]
     R --> SH[Shared authoring]
     R --> SU[Support utilities]
+    R --> PO[Independent offerings]
     TF --> C[.claude]
     TF --> X[.codex]
     TF --> G[.gemini]
@@ -16,6 +17,7 @@ flowchart TD
     SH --> S[skills/]
     SH --> D[about/ + openspec/]
     SU --> SC[scripts/]
+    PO --> P[projects/]
 ```
 
 ## Component Inventory
@@ -32,6 +34,7 @@ flowchart TD
 | `scripts/` | Repository-level maintenance utilities | Narrow support layer |
 | `about/` | Human-and-agent orientation docs | New canonical documentation layer |
 | `openspec/` | Normative requirements and change records | New canonical requirements layer |
+| `projects/` | Independently shaped product offerings with product-local `about/` and OpenSpec authority | Separate from shared skill mirroring and installation flow |
 
 ## Boundary Notes
 
@@ -40,4 +43,6 @@ flowchart TD
 - `agents/` is a reference layer, not the default execution path.
 - Tool facades mix tracked baseline config with ignored runtime or mirror surfaces; they are not uniformly canonical.
 - `about/` and `openspec/` own the explanation of where things belong and why.
+- `projects/` makes product offerings discoverable without turning them into a
+  root pillar, shared skill, tool facade, or installation dependency.
 - Generated or vendored outputs may sit under a skill or tool facade, but only with a documented regeneration path.

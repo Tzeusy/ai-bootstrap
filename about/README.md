@@ -10,6 +10,15 @@ This repository is the canonical local source for portable AI-assistant configur
 - `about/craft-and-care/` defines the execution-quality bar for repository changes: how shared assets, mirrors, docs, and local-only state must be handled.
 - `openspec/` turns those design decisions into testable repository requirements and change records.
 
+## Nested Offerings
+
+`projects/` holds independently shaped product offerings. It is not a sixth
+root pillar, a shared-skill source, or an installation surface. For AI Usage
+Telemetry, start at the product's
+[`about/README.md`](../projects/ai-usage-telemetry/about/README.md): its own
+shape docs and active child OpenSpec change govern product behavior, while this
+root shape continues to govern the surrounding `ai-bootstrap` harness.
+
 ## Reading Order
 
 1. Read [`heart-and-soul/vision.md`](./heart-and-soul/vision.md) for the thesis and non-negotiables.
