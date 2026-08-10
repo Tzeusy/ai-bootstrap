@@ -189,6 +189,11 @@ enabled sinks. It also supplies immutable technical namespaces:
 
 These are opaque technical IDs, not labels. They are mandatory even when a
 human alias is absent, are persisted on first use, and must match on restart.
+The Claude and Codex `source_namespace` values are globally pairwise distinct,
+including when one source is disabled; equality is rejected by TOML validation
+before component registration, mount traversal, cursor creation, or health
+serialization. Native stream identity is scoped beneath that already-distinct
+namespace and never repairs a namespace collision.
 Changing one creates a new identity/checkpoint domain; configuration never
 relabels existing rows in place. An endpoint or database target may not change
 while reusing its `destination_id`.
@@ -261,6 +266,21 @@ linear work, with application-owned memory bounded independently of record
 length. Numbers are bounded exact integers or decimals; non-finite or
 implementation-specific numeric values are rejected.
 
+Classification is a total phase order, not the first exception raised by a
+particular JSON member or transport chunk. Startup first validates the embedded
+profile and source membership; canonical mount/runtime resource preflight and
+ledger availability/storage admission follow before source traversal. Once a
+record is traversed, its order-independent failure precedence is
+`record_limit` for any measured ceiling or checked-counter overflow, then
+`schema_inconsistent` for invalid UTF-8 or invalid JSON structure, then
+`unknown_kind` for a syntactically valid unregistered discriminator, then
+`recognized_malformed` for missing, mistyped, or multiplicity-invalid projected
+values of a registered kind, then `unregistered_category`; only a parser-
+successful candidate set may reach ledger deduplication and
+`identity_collision`. Unlisted descendants are always skip-only and do not
+become unknown kinds. Compound fixtures permute JSON member order and every
+chunk boundary and must select the same disposition and zero-effect boundary.
+
 The first OpenSpec changeset freezes the profile schema and executable evidence
 gate. Each release profile then supplies exact values from measured worst-case
 parser memory and supported synthetic records before an adapter is enabled.
@@ -283,6 +303,16 @@ input. Captured logs, exceptions, crash output, SQLite, OTLP, PostgreSQL, and
 network traffic contain none of the sentinel bytes or their digests. Limit
 tests cover exactly-at and one-past every ceiling. These are release gates on
 both supported architectures.
+
+Every capture and instrumentation oracle has a safe positive control: distinct
+content-free test canaries must be observable in the application-value,
+permitted-decoder instrumentation, log, exception, crash, SQLite, OTLP,
+PostgreSQL, image filesystem/layer, environment, and packet/network channels
+that claim to detect a leak or forbidden action. Separate deliberate test-only
+mutations inject a synthetic sentinel leak, a forbidden decoder/materializer/
+fingerprint call, and an unexpected network event; each must make the harness
+fail. The controls use no personal, content-bearing, credential, source-path,
+or otherwise sensitive value.
 
 **Doctrine trace:** **2. Content and Credentials Stay Outside**;
 **4. Partial Failure Is Explicit**;
@@ -331,9 +361,15 @@ part of the v1 contract.
 | Metadata | Only keys admitted by the versioned ledger schema and selected from its closed registry. Metadata extends context; it cannot carry token amounts, identity, content, or credentials. |
 
 Model and project attribution remain explicitly unknown when registry-admitted
-structural fields cannot establish them. When project attribution is
-unambiguous, its default normalized identity is the repository basename rather
-than an absolute path; configuration may provide a stable alias.
+structural fields cannot establish them. The normalized `project` field is not
+a repository identity. When a registry-admitted source working directory is
+valid under the source profile's exact lexical path flavor and has a final
+component, `project` is exactly that component; a nested cwd therefore names
+the nested directory and a non-repository cwd names itself. A filesystem root
+or missing, invalid, or unparseable cwd yields null. No repository discovery,
+ancestor search, filesystem probe, or absolute path enters normalization.
+Configuration may provide a presentation alias, but the alias never rewrites
+the normalized fact.
 
 Logical request identity is required for an accepted v1 `UsageEvent`. The
 globally scoped request key is `(collector_namespace, ledger_namespace,
@@ -424,10 +460,20 @@ representation, but it may not weaken the complete logical identity or its
 mandatory uniqueness constraints.
 
 `collected_at` is provenance, never a substitute for `source_observed_at` and
-never a fingerprint input. A registry-owned maximum age determines freshness:
-known source time at or before `collected_at` is `fresh` through its inclusive
-deadline and `stale` afterwards; absent source time is `unknown`. A future time
-beyond the registry's allowed clock-skew bound is malformed. Exact
+never a fingerprint input. Every accepted RFC 3339 input must have an explicit
+offset, year `0001..9999`, no leap second, and an instant representable as a
+non-negative signed-64-bit UTC Unix-nanosecond integer. Checked conversion
+normalizes it to that integer and the sole fingerprint/storage text form
+`YYYY-MM-DDTHH:MM:SS.nnnnnnnnnZ`; equivalent offsets therefore have identical
+bytes. A registry-owned maximum age determines freshness using checked integer
+nanoseconds. Let `delta_ns=reference_ns-source_ns`; a future source time is
+admitted only when checked `source_ns-reference_ns <=
+allowed_future_skew_seconds*1_000_000_000`, and its age is clamped to zero.
+Otherwise `age_ns=max(0,delta_ns)`, `age_seconds=floor(age_ns/1_000_000_000)`,
+freshness is `fresh` exactly while `age_ns <=
+maximum_age_seconds*1_000_000_000`, and the first nanosecond later is `stale`.
+Absent source time is `unknown`; a future instant beyond the inclusive skew or
+any parse/multiply/subtract overflow is malformed. Exact
 source/limit maximum ages and skew bounds are fixed in the pre-ship source
 schema, not operator-tunable claims.
 
@@ -497,10 +543,12 @@ type is `recognized_malformed` and holds before that record.
 - **Timestamp and context:** `/timestamp` is the profile-admitted source-record
   time and becomes `source_observed_at`. A valid replay repeats it exactly; same
   native identity with a different timestamp is an identity inconsistency.
-  Model comes from `/message/model`. Project may be normalized from the basename
-  of `/cwd` or an exact configured alias; the absolute path remains local
-  sensitive context and is not a fingerprint input. Claude records do not
-  inherit context across JSONL records.
+  Model comes from `/message/model`. Project is the exact source working-
+  directory basename of `/cwd` under the profile's lexical path flavor, or null
+  for root/missing/invalid cwd; it is explicitly not repository identity. The
+  absolute path remains local sensitive context and is not a fingerprint input,
+  and configured aliases are presentation-only. Claude records do not inherit
+  context across JSONL records.
 - **Fingerprint:** adapter schema, fact kind, native identity, message ID,
   source-observed time, source model, and sorted registered amounts. Metadata
   and export configuration are excluded. Same identity with a different time,
@@ -605,6 +653,22 @@ logical constraints are:
 - one cursor per `(source_namespace, native stream identity)`; and
 - one sink checkpoint per `(sink_id, destination_id, projection_schema_id,
   ledger_epoch)`.
+
+Every private v1 base table is a SQLite `STRICT` table; no table relies on
+affinity-only coercion. Schema conformance introspects every typed column and
+attempts each incompatible SQLite storage class, including nullable columns
+with both null and a wrong-class non-null value, and requires database rejection
+without partial state. Persistent source health uses one closed
+`stream_health_latches` relation keyed by `(source_namespace,
+native_stream_identity,dimension)`. Its dimensions are exactly `storage`,
+`quarantine`, `retention`, `envelope`, `reconciliation`, `tail`, and `coverage`;
+each row has closed `clear|latched` state, the dimension-matched failure code
+and offset, content-free failure evidence, state-observed time, and nullable
+recovery evidence. A latched row has failure evidence and no recovery evidence;
+a cleared row has exact recovery evidence and no active failure. Initial clear
+rows carry a code-owned initialization recovery marker. The corresponding
+`source_streams.state`, failure code, and offset are a transactionally checked
+derived cache of the highest active latch, not the owner of independent state.
 
 For each consumed record, one SQLite transaction coordinates:
 
@@ -750,6 +814,9 @@ The reader obeys these rules:
   transaction;
 - a genuinely unknown record kind holds the cursor at the record and
   quarantines the stream; it is never consumed under a compatibility waiver;
+- an unlisted descendant beneath any syntactically valid record is skip-only and
+  never becomes `unknown_kind`; the hold applies only to an unregistered
+  discriminator/kind or another explicit closed semantic failure;
 - a complete record of a recognized kind that is malformed, violates the supported schema, uses an unregistered category, or conflicts with an existing fingerprint quarantines the affected source and does not advance its cursor past that record.
 
 Quarantine is source-scoped. Other source streams, source families, and sinks
@@ -818,6 +885,7 @@ invalid values fail closed.
 | Same identity with a different fingerprint | Affected source is quarantined; conflicting fact is not committed; cursor does not advance past it. | Other sources and sinks continue. |
 | Recognized malformed or schema-inconsistent record | Affected source is quarantined with explicit degraded state; cursor does not advance past it. | Other sources and sinks continue. |
 | Unknown record kind | Affected stream is quarantined with a sanitized `unknown_kind` diagnostic; cursor remains before the record and v1 has no skip waiver. | Other sources and sinks continue. |
+| Unlisted descendant of a syntactically valid record | Syntax-scanned skip-only under the parser bounds; never decoded and never classified as an unknown kind solely for being unlisted. | The record's registered disposition governs progress. |
 | File truncation or replacement | Source restarts from the beginning; stable identities deduplicate already committed facts. | Other sources and sinks continue. |
 | Coverage before source discovery | Coverage is `coverage_unknown`; no loss claim or exact historical coverage is fabricated. | Observable sources and sinks continue. |
 | Discovered source disappears or truncates across its unconsumed cursor | Source health records a proven `retention_gap`; accepted history is not retracted. | Other sources and sinks continue. |
@@ -865,16 +933,19 @@ SQLite cannot persist a transition, the read-only command still exposes
 health as stale. Restart repeats that computation before any source or sink
 write, so an unwritten hold cannot be forgotten.
 
-Health dimensions are independently latched until their owning recovery
-condition clears. The exact persisted source-stream precedence, highest first,
-is `storage_hold`, `quarantined`, `retention_gap`,
-`source_envelope_exceeded`, `reconciliation_overdue`, `trailing_deferred`,
-`coverage_unknown`, then `healthy`; clearing a higher state reveals any
-uncleared lower state rather than erasing it. Ledger unreadability composes
-above that ordering as overall `unavailable`. A duplicate-only commit may set
-the stream to `healthy` only when no latch remains: duplicate success never
-overwrites storage/unavailable, quarantine/hold, retention-gap, envelope,
-overdue, trailing-tail, or coverage-unknown evidence.
+Health dimensions are independently and persistently latched in the closed
+per-stream relation until their owning recovery condition clears that one row
+with content-free recovery evidence. Effective stream state is derived from
+active rows by the exact precedence, highest first: `storage` ->
+`storage_hold`, `quarantine` -> `quarantined`, `retention` -> `retention_gap`,
+`envelope` -> `source_envelope_exceeded`, `reconciliation` ->
+`reconciliation_overdue`, `tail` -> `trailing_deferred`, `coverage` ->
+`coverage_unknown`, then `healthy` when none is active. Clearing a higher row
+reveals the next uncleared lower row rather than erasing it; arrival order,
+restart, duplicate success, and clear order cannot change that result. Ledger
+unreadability composes above the ordering as overall `unavailable`. A
+duplicate-only commit may set the derived stream state to `healthy` only when
+no latch remains and never overwrites another dimension's evidence.
 
 A non-networked, read-only inspection command renders a readable compatible
 ledger's health views as a versioned JSON document with exact top-level keys
@@ -1043,7 +1114,7 @@ The PostgreSQL sink uses five conceptual relations:
 
 | Table | Contract |
 |---|---|
-| `projected_facts` | One shared envelope per projected ledger fact. Primary key `(ledger_namespace, ledger_epoch, ledger_seq)` is global across usage and quota; `fact_identity` is unique; `fact_kind` is exactly `usage_event | quota_snapshot`; mutually exclusive usage/quota child pointers equal the envelope identity and use deferred foreign keys so transaction commit enforces exactly one matching child. |
+| `projected_facts` | One shared envelope per projected ledger fact. Primary key `(ledger_namespace, ledger_epoch, ledger_seq)` is global across usage and quota; `fact_identity` is unique; `fact_kind` is exactly `usage_event | quota_snapshot`. Its SQL `CHECK` requires the selected child pointer both `IS NOT NULL` and byte-equal to `fact_identity`, and requires the other pointer `IS NULL`. The selected pointer and the child's composite envelope reference are both `DEFERRABLE INITIALLY DEFERRED`, so commit accepts exactly one same-kind, same-identity child and rejects both-null, both-set, wrong-kind, orphan, and cross-kind sequence reuse. |
 | `usage_events` | One row per composite usage identity with mandatory technical namespaces, adapter schema, native identity, fingerprint, ledger sequence, and source time. A deferred composite foreign key binds its sequence, identity, and exact `usage_event` kind to the shared envelope. |
 | `usage_event_amounts` | One row per usage identity/category, with a foreign key to `usage_events` and a unique constraint over the complete event identity plus category. |
 | `quota_snapshots` | One row per composite snapshot identity with a full-identity unique constraint, fingerprint, source/collection times, canonical utilization, freshness evidence/state, and allowed quota fields. A deferred composite foreign key binds its sequence, identity, and exact `quota_snapshot` kind to the shared envelope. |
@@ -1071,9 +1142,11 @@ advancing locally; unequal pre-existing state is never overwritten.
 Column types, nullability, foreign keys, conflict comparisons, and migration
 vectors are required pre-ship schema artifacts. Migration vectors populate the
 shared envelope without renumbering, preserve cross-kind sequence uniqueness
-and one-to-one child linkage, and fail all-old-or-all-new on any prior collision
-or orphan. Index tuning and migration tool choice remain implementation details
-and cannot weaken the constraints.
+and one-to-one child linkage, and fail all-old-or-all-new on separate both-null,
+both-set, wrong-kind, orphan, and cross-kind-sequence fixtures. Schema creation
+and idempotent retry run the same commit-time negative corpus plus one positive
+exactly-one-child canary. Index tuning and migration tool choice remain
+implementation details and cannot weaken the constraints.
 
 **Doctrine trace:** **1. Local Facts Become User-Owned History**;
 **3. Accounting Is Eventually Exact**;
@@ -1089,6 +1162,14 @@ at its original time rather than pretending the fact occurred when discovered.
 OTLP cumulative sums and gauges represent the operational state at export time.
 They may catch up after an outage, but they are not a substitute for event-time
 queries. Consumers needing event chronology use SQLite or PostgreSQL.
+
+Every source, collection, inspection, and export instant uses the same checked
+UTC Unix-nanosecond normalization and fixed-nine-digit RFC 3339 `Z` rendering
+defined by `QuotaSnapshot`. OTLP quota age uses
+`floor(max(0,export_unix_nano-source_unix_nano)/1_000_000_000)` with checked
+subtraction. Exact-zero, tolerated-future, one-nanosecond-before/after zero,
+freshness-deadline, and whole-export-second vectors are canonical release
+evidence; floating-point or host datetime rounding is forbidden.
 
 **Doctrine trace:** **1. Local Facts Become User-Owned History**;
 **4. Partial Failure Is Explicit**;
@@ -1120,10 +1201,11 @@ contracts rather than by copying whatever a source happens to contain.
 | OTLP | Exact fields admitted by its sink-specific allowlist whose values also belong to finite admitted vocabularies. | Per-request/event/source-file attributes, paths, timestamps as labels, fingerprints, arbitrary metadata, and unadmitted values. |
 | Diagnostics | Opaque technical source identity, numeric position, adapter/version context, code-owned failure class, capped measures, and sink state. | Raw or canonical paths, discriminator text not in the registry, exception text, record bodies, content excerpts or digests, auth material, and PostgreSQL DSN. |
 
-Project identity is a deliberate analytics dimension, but its metric form must
-be a canonical, bounded identity rather than an event-specific path or request
-value. Request identity remains in the historical accounting layer and is
-reduced to a cumulative count for OTLP.
+The normalized working-directory basename is a deliberate analytics dimension,
+but it is not repository identity and its metric form must be a canonical,
+bounded presentation value rather than an event-specific path or request value.
+Request identity remains in the historical accounting layer and is reduced to
+a cumulative count for OTLP.
 
 No adapter or sink may expand these surfaces through a generic "extra fields"
 escape hatch. A new field or attribute consumes privacy and cardinality budget
@@ -1190,6 +1272,12 @@ gate. A v1 release requires both native-gated images in the manifest; if either
 architecture lacks passing evidence, no v1 manifest or single-architecture v1
 image is published.
 
+Every privacy/log/database/image/environment/network capture and parser-
+instrumentation lane must observe its distinct safe positive-control canary,
+and the common gate must prove that deliberate test-only leak, forbidden-
+decoder, and unexpected-network mutations fail the lane before a clean run can
+count as evidence.
+
 ## Specification and Doctrine Boundary
 
 This RFC is the accepted design contract. It gates downstream work as follows.
@@ -1218,6 +1306,15 @@ The first OpenSpec changeset must freeze and test:
   inputs, and multi-architecture parity gates; and
 - retention, source deletion/non-retraction, low-disk recovery, backup/
   migration behavior, and owner-authorized privacy-repair scenarios.
+
+Closeout traceability enumerates all 249 named OpenSpec scenarios and every
+separately stated normative invariant and negative claim in the accepted
+doctrine, this RFC, the active design, and the capability requirements. Each
+entry maps to at least one behavior-executing test and a separately implemented
+oracle; source scans, identifier-presence checks, schema-text matching, and a
+shared implementation/oracle code path are insufficient. A missing clause,
+scenario, executable citation, or independent oracle blocks acceptance,
+archival, and release.
 
 Each bullet is allocated to a separately reviewable capability delta inside
 that initial changeset. The owner may accept or reject each capability

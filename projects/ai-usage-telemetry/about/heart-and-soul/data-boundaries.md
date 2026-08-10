@@ -12,7 +12,7 @@ boundaries:
 | Class | Examples | Local treatment | Export treatment |
 |---|---|---|---|
 | **Content** | Prompts, responses, message bodies, content-bearing attachments, and tool-call transcripts | A field-projecting parser may traverse their encoded bytes but must never decode, allocate, copy, hash, log, diagnose, or retain their values | Prohibited. Content cannot be admitted by code or configuration. |
-| **Ordinary metadata** | Tool, model when known, repository-basename project label, configured account alias, event time, quota window, and source freshness | May enter the stable ledger schema only when the code-owned extraction and ledger-admission registries both admit it | Denied unless the destination's separate projection registry admits it and configuration selects it |
+| **Ordinary metadata** | Tool, model when known, exact source working-directory basename, configured presentation/account aliases, event time, quota window, and source freshness | May enter the stable ledger schema only when the code-owned extraction and ledger-admission registries both admit it | Denied unless the destination's separate projection registry admits it and configuration selects it |
 | **Sensitive metadata** | Absolute working-directory paths, native account identifiers, session or conversation identifiers, source filenames, offsets, and deduplication keys | Minimize and keep local only when required for stream resolution, provenance, or exact accounting | Not exportable merely because configuration names it; a destination registry must explicitly admit the exact field and its bounded use |
 | **Credentials** | API keys, access or refresh tokens, cookies, credential-bearing auth databases, and auth configuration | Must not be mounted, read, copied, logged, or retained | Prohibited. Credentials cannot be enabled by an allowlist. |
 
@@ -96,14 +96,15 @@ fact, change its logical identity, or change its accounting fingerprint.
 Changing a projection stops or starts future delivery according to its own sink
 checkpoint; it does not create a new source contribution.
 
-[Inferred] The default project label, when available, is the repository basename
-rather than an absolute path. An account label is a configured alias when
-discovering a native identifier would require credential access. The alias is
-configuration, not evidence that the collector authenticated to the tool.
-
-[Unknown] Project attribution for usage outside a discoverable repository needs
-a downstream contract. V1 must expose the missing mapping rather than exporting
-an absolute path or inventing a project name.
+[Inferred] The normalized `project` value, when available, is exactly the final
+component of the registry-admitted source working directory under that source
+profile's lexical path flavor. It is not a repository-discovery result or a
+repository-root identity: a nested working directory maps to its nested
+basename, a non-repository working directory maps to its own basename, and a
+filesystem root or unavailable, invalid, or unparseable working directory maps
+to null. The absolute path is never retained or exported. Project and account
+aliases are presentation configuration, not normalized evidence and not proof
+that the collector discovered a repository or authenticated to a tool.
 
 ## Storage and Sink Boundaries
 

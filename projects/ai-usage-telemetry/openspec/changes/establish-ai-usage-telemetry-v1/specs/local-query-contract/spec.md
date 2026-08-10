@@ -19,7 +19,7 @@ Scope: v1-mandatory
 #### Scenario: Every view column has one exact source
 - **WHEN** the six views are materialized
 - **THEN** usage columns MUST come from the same-sequence `facts`, `usage_events`, and `usage_event_amounts` rows; quota snapshot columns MUST come from `facts` plus `quota_snapshots`, with `recorded_freshness_state` sourced from stored `freshness_state`, `state_observed_at=collected_at`, `availability='observed'`, and current-only fields derived by REQ-quota-snapshot-semantics-005 and REQ-quota-snapshot-semantics-006; quota component rows MUST come from `component_registrations`, use `is_current=0`, and keep current/fact-only fields null
-- **AND** source component columns MUST come from `component_registrations`, source stream columns from `source_streams`, sink registration/checkpoint columns from `component_registrations`, `sink_registrations`, and `sink_checkpoints`, and ledger identity/counter columns from `ledger_state` plus active `release_profile_state`; each synthetic `row_kind`, summary, capacity, backlog, or renamed lease field MUST use only the derivations closed below
+- **AND** source component columns MUST come from `component_registrations`; each stream's `state`, `failure_code`, and `failure_offset` MUST be the checked derived cache of `stream_health_latches` under the fixed precedence and all other stream columns come from `source_streams`; sink registration/checkpoint columns come from `component_registrations`, `sink_registrations`, and `sink_checkpoints`, and ledger identity/counter columns from `ledger_state` plus active `release_profile_state`; each synthetic `row_kind`, summary, capacity, backlog, or renamed lease field MUST use only the derivations closed below
 
 ### Requirement: [TARGET-STATE] Stable V1 View Compatibility
 MUST preserve the six v1 view names, column order, declared types, nullability, enum meanings, and value semantics for the life of v1, and MUST introduce a separately named versioned view rather than remove, rename, reorder, weaken, or silently reinterpret a v1 field.
@@ -37,7 +37,7 @@ Scope: v1-mandatory
 - **THEN** migration fails unless the old view remains intact and the incompatible contract uses a separately named versioned view
 
 ### Requirement: [TARGET-STATE] Source Health View Semantics
-MUST restrict stream rows' `source_health.state` to `healthy`, `trailing_deferred`, `quarantined`, `storage_hold`, `reconciliation_overdue`, `source_envelope_exceeded`, `retention_gap`, or `coverage_unknown`; restrict source-component rows to `disabled`, `unsupported_profile`, `unsupported_accounting_profile`, `coverage_unknown`, `healthy`, or `degraded`; expose the declared component or per-stream fields under their exact null rules; derive `family_state` and `global_state` as `healthy`, `degraded`, or `disabled`; and prohibit either summary from masking any enabled unsupported, held, overdue, envelope-exceeded, or coverage-degraded component.
+MUST restrict stream rows' `source_health.state` to `healthy`, `trailing_deferred`, `quarantined`, `storage_hold`, `reconciliation_overdue`, `source_envelope_exceeded`, `retention_gap`, or `coverage_unknown`; restrict source-component rows to `disabled`, `unsupported_profile`, `unsupported_accounting_profile`, `coverage_unknown`, `healthy`, or `degraded`; derive each stream state and winning failure solely from the seven persistent latch rows in exact `storage|quarantine|retention|envelope|reconciliation|tail|coverage` precedence, reveal the next active lower latch when the winner clears, expose the declared component or per-stream fields under their exact null rules, derive `family_state` and `global_state` as `healthy`, `degraded`, or `disabled`, and prohibit either summary from masking any enabled unsupported, held, overdue, envelope-exceeded, or coverage-degraded component.
 
 ID: REQ-local-query-contract-003
 Source: RFC 0001 § Health and Freshness State
@@ -48,8 +48,8 @@ Scope: v1-mandatory
 - **THEN** its row reports `healthy` with the complete durable cursor and reconciliation evidence
 
 #### Scenario: Degraded stream propagates upward
-- **WHEN** one stream is stale, overdue, held, envelope-exceeded, or lost
-- **THEN** its exact state and failure boundary are visible and no family or global row reports `healthy`
+- **WHEN** all arrival/clear permutations of two or more stream latches are inspected before and after restart
+- **THEN** the same highest active state and winning failure are visible, clearing it reveals the next active lower state, and no family or global row reports `healthy` until all owning recoveries clear
 
 #### Scenario: Unsupported and disabled sources need no invented stream
 - **WHEN** one enabled source is `unsupported_profile` or `unsupported_accounting_profile` and another source is disabled before discovery
@@ -116,6 +116,13 @@ Scope: v1-mandatory
 
 ### Requirement: [TARGET-STATE] Exact Versioned Health JSON
 MUST provide a non-networked read-only inspection command that writes RFC 8785 canonical UTF-8 JSON followed by one LF with exactly top-level keys `schema`, `generated_at`, `overall_state`, `profile`, `sources`, `ledger`, `sinks`, and `quota`; `schema` is `aiut.health/v1`; `generated_at` is RFC 3339 UTC; `overall_state` is `healthy`, `degraded`, or `unavailable`; `profile` is `{id,digest_sha256}`; for a readable compatible ledger, `sources[]` contains exactly the `source_health` columns with BLOBs lowercase-hex encoded and rows ordered by source namespace, component before stream, then native stream identity, `ledger` contains exactly the `ledger_health` columns with BLOBs lowercase-hex encoded, `sinks[]` contains exactly the `sink_health` columns ordered by sink kind then null-first registration identity, and `quota[]` contains exactly the `quota_snapshots` columns for every component-state row plus only snapshot rows with `is_current=1`, ordered by source namespace, component before snapshot, then null-first subject and fact identity, with null only where the owning view declares it. If the ledger cannot be opened or read, the command MUST instead emit one out-of-band unavailable-ledger variant with the same exact top-level keys, `overall_state="unavailable"`, empty `sources`, `sinks`, and `quota` arrays, `profile` containing exactly `id` and `digest_sha256` from the independently validated embedded profile or null when that value cannot be independently validated, and `ledger` containing exactly `availability_state="ledger_unavailable"`, `configured_ledger_namespace` from independently validated configuration or null, `failure_code="ledger_unavailable"`, `ledger_epoch=null`, `persisted_health_stale=1`, and `schema_version=null`; this variant MUST NOT claim any member came from a SQLite view and MUST perform no write, migration, retry, repair, DNS lookup, listener creation, or network activity. For identical ledger or unavailable-ledger evidence, configuration, profile, clock, and direct read-only filesystem evidence, bytes MUST be identical; between otherwise identical inspections only `generated_at`, each readable-ledger `age_seconds`, and readable-ledger freshness values derived solely from that age MAY change with inspection time.
+Normative continuation: for this exact contract, every RFC 3339 timestamp is
+the fixed-nine-digit UTC `Z` rendering of a checked non-negative signed-64-bit
+Unix-nanosecond instant, and every `age_seconds` value is
+`floor(max(0,inspection_unix_nano-source_unix_nano)/1_000_000_000)` after
+checked subtraction. Tolerated future timestamps therefore have age zero; an
+out-of-range instant, leap second, or arithmetic overflow fails closed rather
+than using host datetime or floating-point rounding.
 
 ID: REQ-local-query-contract-006
 Source: RFC 0001 § Health and Freshness State
@@ -127,8 +134,9 @@ Scope: v1-mandatory
 - **AND** repeated inspection with advancing time differs only in `generated_at`, `age_seconds`, and age-derived freshness
 
 #### Scenario: Fixed-clock vectors are byte deterministic
-- **WHEN** repeated inspections use the same fixed clock and identical ledger, configuration, and direct evidence
-- **THEN** their complete UTF-8 output including the terminal LF is byte-for-byte identical
+- **WHEN** repeated inspections and restarts use the same fixed nanosecond clock, distinct valid source namespaces, all stream-latch overlap/clear permutations, and identical ledger, configuration, and direct evidence
+- **THEN** their complete UTF-8 output including the terminal LF is byte-for-byte identical, with lower-latch reveal independent of arrival order
+- **AND** an equal Claude/Codex namespace plus same-native-stream fixture is rejected before serialization, while each JSON/database/log capture must observe its harmless positive-control canary and a deliberate test-only leak makes the harness fail
 
 #### Scenario: Unreadable ledger has one exact out-of-band variant
 - **WHEN** SQLite cannot be opened or read under otherwise identical validated configuration, embedded profile, direct filesystem evidence, and fixed clock
