@@ -22,6 +22,8 @@
 # Also detects legacy layouts (heart-and-soul/ at root, docs/rfcs/, maps/, etc.)
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOCAL_SKILL_VALIDATOR="$SCRIPT_DIR/validate_local_skill.py"
 ROOT="${1:-.}"
 ROOT="$(cd "$ROOT" && pwd)"
 active_change_count=0
@@ -259,93 +261,6 @@ emit_content_state() {
   esac
 }
 
-extract_frontmatter() {
-  local file="$1"
-  awk '
-    NR == 1 && $0 == "---" { in_fm = 1; next }
-    in_fm && $0 == "---" { exit }
-    in_fm { print }
-  ' "$file"
-}
-
-extract_description_text() {
-  local file="$1"
-  awk '
-    BEGIN { in_fm = 0; in_desc = 0 }
-    NR == 1 && $0 == "---" { in_fm = 1; next }
-    in_fm && $0 == "---" { exit }
-    in_desc {
-      if ($0 ~ /^  / || $0 == "") {
-        sub(/^  /, "", $0)
-        print
-        next
-      }
-      in_desc = 0
-    }
-    in_fm && $0 ~ /^description:[[:space:]]*/ {
-      line = $0
-      sub(/^description:[[:space:]]*/, "", line)
-      if (line == ">" || line == "|" || line == ">-" || line == ">+" || line == "|-" || line == "|+") {
-        in_desc = 1
-        next
-      }
-      print line
-    }
-  ' "$file" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//'
-}
-
-is_conservative_yaml_string_scalar() {
-  local value="$1" lowered
-  case "$value" in
-    '>'|'|'|'>-'|'>+'|'|-'|'|+') return 0 ;;
-  esac
-  [ -n "$value" ] || return 1
-  case "$value" in
-    *'#'*) return 1 ;;
-  esac
-  [[ "$value" =~ ^[A-Za-z] ]] || return 1
-  [[ "$value" =~ :[[:space:]] ]] && return 1
-  lowered=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
-  case "$lowered" in
-    null|'~'|true|false|yes|no|on|off) return 1 ;;
-  esac
-  return 0
-}
-
-frontmatter_uses_conservative_subset() {
-  awk '
-    BEGIN {
-      description_block = 0
-      valid = 1
-    }
-    {
-      if (description_block) {
-        if ($0 == "" || $0 ~ /^  /) {
-          next
-        }
-        description_block = 0
-      }
-
-      if ($0 == "") {
-        next
-      }
-      if ($0 ~ /^name:[[:space:]]*/) {
-        next
-      }
-      if ($0 ~ /^description:[[:space:]]*/) {
-        value = $0
-        sub(/^description:[[:space:]]*/, "", value)
-        if (value == ">" || value == "|" || value == ">-" || value == ">+" || value == "|-" || value == "|+") {
-          description_block = 1
-        }
-        next
-      }
-      valid = 0
-    }
-    END { exit valid ? 0 : 1 }
-  '
-}
-
 mark_skill_name() {
   local name="$1" variable_name="$2" current_value
   current_value="${!variable_name}"
@@ -361,87 +276,25 @@ check_skill() {
   for tool_dir in .claude .codex .gemini .opencode; do
     local skill_path="$ROOT/$tool_dir/skills/$name/SKILL.md"
     if [ -f "$skill_path" ]; then
-      local first_line close_count frontmatter unexpected_keys name_key_count description_key_count name_value description_header description_text
-      first_line=$(head -1 "$skill_path")
-      if [ "$first_line" != "---" ]; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] missing YAML frontmatter (file must start with ---)"
+      local validation_output validation_status=0
+      if ! command -v uv >/dev/null 2>&1; then
+        echo "    - $tool_dir/skills/$name/ [UNVERIFIED] YAML validator unavailable: uv is required"
         found=1
         continue
       fi
-
-      close_count=$(tail -n +2 "$skill_path" | grep -c '^---$' || true)
-      if [ "$close_count" -lt 1 ]; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] missing closing --- delimiter"
+      if [ ! -f "$LOCAL_SKILL_VALIDATOR" ]; then
+        echo "    - $tool_dir/skills/$name/ [UNVERIFIED] YAML validator unavailable: $LOCAL_SKILL_VALIDATOR is missing"
         found=1
         continue
       fi
-
-      frontmatter=$(extract_frontmatter "$skill_path")
-      unexpected_keys=$(printf '%s\n' "$frontmatter" | sed -n 's/^\([A-Za-z0-9_-]\+\)[[:space:]]*:.*/\1/p' | grep -Ev '^(name|description)$' || true)
-      if [ -n "$unexpected_keys" ]; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] unsupported frontmatter key(s): $(printf '%s' "$unexpected_keys" | paste -sd ', ' -)"
-        found=1
-        continue
-      fi
-
-      name_key_count=$(printf '%s\n' "$frontmatter" | grep -Ec '^name[[:space:]]*:' || true)
-      if [ "$name_key_count" -gt 1 ]; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] duplicate name key"
-        found=1
-        continue
-      fi
-      description_key_count=$(printf '%s\n' "$frontmatter" | grep -Ec '^description[[:space:]]*:' || true)
-      if [ "$description_key_count" -gt 1 ]; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] duplicate description key"
-        found=1
-        continue
-      fi
-      if ! printf '%s\n' "$frontmatter" | frontmatter_uses_conservative_subset; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] frontmatter is outside the conservative name/description YAML subset"
-        found=1
-        continue
-      fi
-
-      name_value=$(printf '%s\n' "$frontmatter" | sed -n 's/^name:[[:space:]]*//p' | head -1)
-      description_header=$(printf '%s\n' "$frontmatter" | sed -n 's/^description:[[:space:]]*//p' | head -1)
-      description_text=$(extract_description_text "$skill_path")
-      if [ -z "$name_value" ] || [ -z "$description_text" ]; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] missing required name/description fields"
-        found=1
-        continue
-      fi
-      if ! is_conservative_yaml_string_scalar "$description_header"; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] description must be a conservative YAML string scalar"
-        found=1
-        continue
-      fi
-      if ! [[ "$name_value" =~ ^[a-z0-9-]+$ ]]; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] name must use lowercase letters, numbers, and hyphens only"
-        found=1
-        continue
-      fi
-      if [ "$name_value" != "$name" ]; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] name must match expected local skill '$name'"
-        found=1
-        continue
-      fi
-      if [ "${#name_value}" -gt 64 ]; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] name exceeds 64 characters"
-        found=1
-        continue
-      fi
-      if [[ "$name_value" =~ (anthropic|claude) ]]; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] name uses reserved words"
-        found=1
-        continue
-      fi
-      if [ "${#description_text}" -gt 1024 ]; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] description exceeds 1024 characters"
-        found=1
-        continue
-      fi
-      if printf '%s\n%s\n' "$name_value" "$description_text" | grep -Eq '<[^>]+>'; then
-        echo "    - $tool_dir/skills/$name/ [INVALID] XML-like tags are not allowed in metadata"
+      validation_output=$(uv run --quiet --script "$LOCAL_SKILL_VALIDATOR" "$skill_path" "$name" 2>&1) || validation_status=$?
+      if [ "$validation_status" -ne 0 ]; then
+        validation_output=$(printf '%s' "$validation_output" | tr '\n' ' ')
+        if [ "$validation_status" -eq 1 ] && [[ "$validation_output" == invalid\ skill\ frontmatter:* ]]; then
+          echo "    - $tool_dir/skills/$name/ [INVALID] ${validation_output#invalid skill frontmatter: }"
+        else
+          echo "    - $tool_dir/skills/$name/ [UNVERIFIED] YAML validator unavailable (exit $validation_status): $validation_output"
+        fi
         found=1
         continue
       fi

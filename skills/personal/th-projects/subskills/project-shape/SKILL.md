@@ -204,6 +204,7 @@ Rendered visuals for the shape model (each `.svg` has an editable `.excalidraw` 
 |--------|-------------|
 | [`scripts/shape-scan.sh`](scripts/shape-scan.sh) `[project-root]` | Assessing an existing project's shape — reports which pillars exist, their maturity, and gaps |
 | [`scripts/shape-init.sh`](scripts/shape-init.sh) `[project-root] [--skills-only] [--tools=...]` | Scaffolding pillar directories and generating correctly-formatted local skills |
+| [`scripts/validate_local_skill.py`](scripts/validate_local_skill.py) | Internal fail-closed YAML/frontmatter validator used by `shape-scan.sh`; run through `uv` |
 | [`scripts/self-test.sh`](scripts/self-test.sh) | Verifying the scanner/scaffolder against fixtures after changing `SKILL.md`, `shape-scan.sh`, or `shape-init.sh` |
 | [`scripts/eval-fallbacks.sh`](scripts/eval-fallbacks.sh) | Confirming constrained-environment fallback behavior is still documented after changing fallback guidance |
 
