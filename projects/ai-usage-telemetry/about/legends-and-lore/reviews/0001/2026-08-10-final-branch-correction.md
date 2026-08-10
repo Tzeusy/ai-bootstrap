@@ -72,18 +72,21 @@ key blobs, and over-broad wording about optional Git whitespace classes.
   RFC/evidence and four spec rows pending/unknown rather than silently
   inheriting Decision 0002 authority.
 
-## Current candidate bindings
+## Candidate bindings at review input
 
-| Artifact | Candidate SHA-256 | State |
+These were the fail-closed states before the exact-head confirmation and
+Decision 0003 disposition recorded below.
+
+| Artifact | Candidate SHA-256 | State at review input |
 |---|---|---|
-| RFC 0001 | `1ffe8e796372ff56bdd7e81be4c25fdbf726fb51585cf53041e027857b6a5593` | Pending |
+| RFC 0001 | `1ffe8e796372ff56bdd7e81be4c25fdbf726fb51585cf53041e027857b6a5593` | Pending confirmation |
 | Source/bounds evidence | `2ca7455f0c331c8d46774f9c72bb8c3f2d6b360255fab4663bfd5d32bc09cf7d` | Unchanged accepted predecessor |
-| Synthetic vectors | `f78ece2be675b40ea0b0ae7efe20add6c3ab5036e419fa2d5ccc656842a94871` | Pending |
+| Synthetic vectors | `f78ece2be675b40ea0b0ae7efe20add6c3ab5036e419fa2d5ccc656842a94871` | Pending confirmation |
 | Provenance | `dcfffe320712afbdcf805e05d30b277130e4bf81f9d718d4f4408bc077f482f0` | Unchanged accepted predecessor |
-| `source-adapter-profiles` | `e1d13becbc66431332d484409c0263efe6e08046c0726c0373126764022c6696` | Pending replacement row |
-| `event-identity-and-normalization` | `e788522cce1d7e676cc03acae923462ab80b13236d887c78d7444a862e07966f` | Pending replacement row |
-| `postgresql-history-projection` | `724a4665536c4794ad7c13560f6f71091724908c4d2e15b1d47b99f34af85673` | Pending replacement row |
-| `release-profile-governance` | `6fe03a370a5b7f1abf772acacc27001f0a14dac8033503c1b4c22b6560e1a03f` | Pending replacement row |
+| `source-adapter-profiles` | `e1d13becbc66431332d484409c0263efe6e08046c0726c0373126764022c6696` | Pending replacement confirmation |
+| `event-identity-and-normalization` | `e788522cce1d7e676cc03acae923462ab80b13236d887c78d7444a862e07966f` | Pending replacement confirmation |
+| `postgresql-history-projection` | `724a4665536c4794ad7c13560f6f71091724908c4d2e15b1d47b99f34af85673` | Pending replacement confirmation |
+| `release-profile-governance` | `6fe03a370a5b7f1abf772acacc27001f0a14dac8033503c1b4c22b6560e1a03f` | Pending replacement confirmation |
 
 ## Required confirmation (satisfied)
 
