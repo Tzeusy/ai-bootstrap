@@ -23,12 +23,12 @@ until it is reswept.
 | Artifact | Status | Next authority gate |
 |---|---|---|
 | Heart-and-soul doctrine | **[Observed] Adopted** | Owner Decision 0001 remains authoritative; Decision 0002 accepts downstream contracts without amending doctrine |
-| RFC 0001 | **[Observed] R5-confirmed current bytes accepted** | Exact promoted RFC/evidence digests are recorded below; implementation and release evidence remain absent |
+| RFC 0001 | **[Unknown] Corrected current bytes pending exact-head review** | The R5-accepted predecessor remains authoritative until a successor owner decision binds the replacement |
 | Lay-and-land topology | **[Observed] Accepted** | Current accepted map; implementation evidence remains absent |
 | Craft-and-care standards | **[Observed] Adopted** | Governs specification and later implementation work |
-| OpenSpec capability specifications | **[Observed] Eleven independent contract rows accepted** | Decision 0002 binds each current `spec.md`; the change remains active, unimplemented, and unarchived |
+| OpenSpec capability specifications | **[Unknown] Seven current rows accepted; four corrected rows pending** | Decision 0002 remains exact for unchanged rows and predecessor bytes; task 2.1 stops non-synthetic work until a successor decision binds the four replacements |
 
-**Current accepted shape/evidence anchor:** R5 reviewed exact HEAD
+**R5-accepted predecessor shape/evidence anchor:** R5 reviewed exact HEAD
 `e2bb9ea78984878c6e06a9e37946f923032150f9` and returned
 `APPROVED_FOR_PROMOTION` with findings `0 / 0 / 0`. The accepted RFC is
 `36c062fa81bfadb5e9b90c0386ae7529579648acf04a165e923adca5e9e03163`;
@@ -38,6 +38,14 @@ synthetic vectors are
 `8e5e512144e03d437aa0349b7d00b3600fae5dd24e2d613236d6c6e699953e8a`;
 and provenance is
 `dcfffe320712afbdcf805e05d30b277130e4bf81f9d718d4f4408bc077f482f0`.
+
+**Current correction state:** a final branch review found numeric serialization
+and PostgreSQL timestamp-precision gaps after Decision 0002. The current RFC,
+synthetic vectors, and four affected capability specifications contain bounded
+candidate corrections, but they are `[Unknown]` until a fresh exact-head review
+passes and a successor owner decision binds their hashes. The other seven
+current specifications still match Decision 0002 exactly. No non-synthetic
+production task may pass task 2.1 while any current row is unknown.
 
 **Historical predecessor anchor:** R3 RFC
 `ca548d5cb5070c5e288e66d3fe97a3c0f662cd245bd7153ae640d2ed593dcbc2`;
@@ -51,7 +59,9 @@ See the
 [R4 quality-evidence re-sweep](./legends-and-lore/reviews/0001/2026-08-10-r4-quality-evidence-resweep.md)
 for the pre-R5 history and confirmation append, and the
 [R1-R5 reconciliation ledger](./legends-and-lore/reviews/0001/2026-08-10-specification-reconciliation.md)
-for the complete convergence trail. See
+for the complete convergence trail and the
+[final-branch correction record](./legends-and-lore/reviews/0001/2026-08-10-final-branch-correction.md)
+for the current pending hashes and required confirmation. See
 [Owner Decision 0001](./heart-and-soul/decisions/0001-finalize-and-specify.md)
 for the standing direction and
 [Owner Decision 0002](./heart-and-soul/decisions/0002-accept-v1-capability-contracts.md)
@@ -70,8 +80,8 @@ Contract acceptance permits later implementation planning and execution only
 through those active tasks and their evidence-backed domain profiles. It does
 not mark implementation complete, activate a profile, archive the change, or
 authorize real mounts, sinks, packaging, or release. Historical reviews and
-administrations remain off the default reading path except for the current
-R1-R5 ledger.
+administrations remain off the default reading path except for the R1-R5 ledger
+and current final-branch correction record.
 
 ## The Four `about/` Pillars
 
@@ -85,9 +95,11 @@ R1-R5 ledger.
 [Observed] Capability specifications are the fifth project-shape pillar. The
 project-direction launch gate recorded `READY` at a named commit, and the active
 `establish-ai-usage-telemetry-v1` change now contains eleven authored capability
-specifications. Decision 0002 independently accepts each exact contract row.
-Their acceptance is not a claim that any capability has been implemented or
-that an unmeasured release profile, real resource, archive, or release is valid.
+specifications. Decision 0002 independently accepted each exact R5 contract
+row; seven current rows still match it, while four corrected current rows now
+await successor acceptance. Neither the prior acceptance nor the candidate
+corrections claim that any capability has been implemented or that an
+unmeasured release profile, real resource, archive, or release is valid.
 
 ## Recommended Reading Order
 
@@ -112,12 +124,13 @@ that an unmeasured release profile, real resource, archive, or release is valid.
 ## Authority and Change
 
 - Heart-and-soul doctrine is owner-adopted through Decision 0001.
-- R5 promoted the exact current RFC/evidence bytes under Decision 0001's
-  standing direction; the current accepted digests are the central anchor
-  above, while all earlier hashes remain historical evidence.
+- R5 promoted the predecessor RFC/evidence bytes under Decision 0001's standing
+  direction; those accepted digests remain the authority while corrected
+  current bytes await an exact-head review and successor decision.
 - Topology and craft-and-care derive authority from that doctrine and RFC; they
   do not override them.
-- Decision 0002 independently accepts the eleven exact capability contracts.
-  The OpenSpec change remains active; implementation work must still trace
-  through its tasks and evidence-backed profiles, and archival/release retain
-  their later explicit gates.
+- Decision 0002 independently accepts the eleven exact R5 capability contracts.
+  Seven current rows still match; four corrected current rows are unknown, so
+  task 2.1 blocks non-synthetic implementation until successor acceptance. The
+  OpenSpec change remains active, and archival/release retain their later
+  explicit gates.

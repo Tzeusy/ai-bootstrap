@@ -9,9 +9,10 @@ description: >
 
 # AI Usage Telemetry Capability Specs
 
-The active change is accepted but unimplemented and unarchived. Load the
-smallest owning capability; do not treat acceptance as runtime or release
-evidence.
+The active change is unimplemented and unarchived. Seven current capability
+rows retain Decision 0002 acceptance; four corrected rows are unknown pending
+exact-head review and successor acceptance. Load the smallest owner, and never
+treat accepted or candidate contract bytes as runtime or release evidence.
 
 Trigger examples: "what requirement owns this?", "does this behavior match the
 spec?", "which acceptance scenarios must this task prove?"

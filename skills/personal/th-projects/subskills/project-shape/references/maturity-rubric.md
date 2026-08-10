@@ -49,7 +49,8 @@ Any of the following keeps a project in `shaped` rather than `mature`:
 All of the following:
 
 - Five pillars are authored and maintained
-- Local skills are installed and customized
+- All five local skills are installed, customized, and pass the scanner's
+  frontmatter validation; an invalid skill file does not satisfy this gate
 - Doctrine contains explicit numbered rules
 - Craft-and-care expresses project-specific execution standards rather than generic best-practices filler
 - Every authored RFC references doctrine or principles
@@ -62,7 +63,10 @@ All of the following:
 
 The scanner currently uses conservative text heuristics rather than full semantic parsing:
 
-- **Doctrine rules**: numbered items in authored `vision.md`
+- **Doctrine rules**: numbered list items or numbered headings inside an
+  authored `vision.md` section named `Non-Negotiable Rules` or
+  `Non-Negotiable Principles`; namespaced rule IDs remain the fallback for
+  alternate doctrine canons
 - **RFC doctrine references**: mentions of doctrine, principles, `heart-and-soul`, or `vision.md`
 - **Spec source references**: `Source:` lines in `spec.md`
 - **Spec scenarios**: `Scenario:` sections or `WHEN/THEN` scenario bullets
