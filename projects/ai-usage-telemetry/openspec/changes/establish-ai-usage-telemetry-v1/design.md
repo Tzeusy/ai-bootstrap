@@ -167,7 +167,7 @@ gain authority to redefine that contract.
 | `quota-snapshot-semantics` | Source-independent `QuotaSnapshot`, quota fact/subject identity and fingerprint, canonical utilization, availability, source/collection-time distinction, checked age/freshness, and deterministic current selection | The canonical instant primitive from `event-identity-and-normalization`, never an adapter module | Composes admitted snapshot candidates and current-quota semantics from supplied registered fields/evidence; it owns neither source extraction nor query rendering |
 | `local-query-contract` | Exact stable read-only view names, columns, nullability and compatibility, plus the versioned non-networked structured-health JSON schema and inspection behavior | Ledger rows/checked health cache, the stream-owned `LatchSet` validator, sink health, and quota current-selection/age functions | Composes the public local read model and validates rather than reimplements domain/latch functions; it owns no private SQLite storage schema, migration, retry, repair, or write path |
 | `otlp-metrics-projection` | Metric names, units, descriptors, finite tuples and vocabularies, budgets, conservation, batching, lease/checkpoint state machine, retry, and projection-schema evolution | Only `LedgerProjectionReader`, ledger sequence/obligation, and domain-owned checked age | Composes bounded cumulative operational metrics only; it never imports/queries public views or becomes accounting authority/historical storage |
-| `postgresql-history-projection` | Shared projected-fact sequence envelope, SQL-certain non-null selected-child checks, exact deferred fact-kind one-to-one child constraints, remote event/amount/quota tables, types, nullability, keys and constraints, allowlisted metadata, event-time mapping, transactional remote checkpoint, retry, and projection-schema evolution | Only committed ledger facts in sequence order through `LedgerProjectionReader` and its independent sink obligation | Composes idempotent remote history with commit-time rejection of both-null, both-set, wrong-kind, orphan, and cross-kind sequence states; it never imports/queries public views or owns local ledger/OTLP state |
+| `postgresql-history-projection` | Shared projected-fact sequence envelope, SQL-certain non-null selected-child checks, exact deferred fact-kind one-to-one child constraints, remote event/amount/quota tables, checked `bigint` Unix-nanosecond semantic time columns, nullability, keys and constraints, allowlisted metadata, event-time mapping, transactional remote checkpoint, retry, and projection-schema evolution | Only committed ledger facts in sequence order through `LedgerProjectionReader` and its independent sink obligation | Composes idempotent remote history with commit-time rejection of both-null, both-set, wrong-kind, orphan, cross-kind sequence, and nanosecond-rounding states; it never imports/queries public views or owns local ledger/OTLP state |
 | `release-profile-governance` | The immutable release-profile envelope, member identity, ID/digest, compatibility rules, activation authorization, and fail-closed behavior | Explicitly owner-accepted capability contracts plus each owning domain's exact measured values and executable evidence | Composes accepted domain members into one immutable profile; it cannot invent, override, or become a second owner of a domain schema or value |
 | `portable-runtime-and-release` | The three canonical host-backed source/state targets, the separate read-only TOML configuration surface, canonical mount/path validation and `ValidatedSourceHandle` provider, secret boundary, privilege/filesystem/network isolation, disabled-sink non-instantiation, locked inputs, native architecture gates, and publish decision | An activatable immutable release profile, including parser minimum-memory evidence, plus the enabled capabilities' parity tests | Supplies opaque validated source handles and composes native images/manifest only after all applicable gates pass; it does not discover files or choose adapter, accounting, ledger, query, or sink semantics |
 
@@ -289,7 +289,7 @@ Correctness uses several deliberately separate orders and identities:
 | Concern | Contract |
 |---|---|
 | Fact identity | Immutable tuple of collector namespace, ledger namespace, adapter schema ID, source namespace, fact kind, and native identity |
-| Accounting equality | SHA-256 over RFC 8785 canonical JSON with domain tag `aiut-accounting-fingerprint-v1`; inputs are only `adapter_schema_id`, `fact_kind`, `native_identity`, `source_observed_at`, registered accounting values, and source-derived attribution necessary to interpret them. `collector_namespace`, `ledger_namespace`, `source_namespace`, `ledger_seq`, `collected_at`, paths, display aliases, extension metadata, every export allowlist, and every sink setting are excluded |
+| Accounting equality | SHA-256 over RFC 8785 canonical JSON with domain tag `aiut-accounting-fingerprint-v1`; inputs are only `adapter_schema_id`, `fact_kind`, `native_identity`, `source_observed_at`, registered accounting values, and source-derived attribution necessary to interpret them. Amount/counter leaves use the domain-owned canonical non-negative signed-64-bit decimal-string subtype, never JSON numbers. `collector_namespace`, `ledger_namespace`, `source_namespace`, `ledger_seq`, `collected_at`, paths, display aliases, extension metadata, every export allowlist, and every sink setting are excluded |
 | Logical request | Source-backed request identity recorded once so multiple facts or replay cannot increment request totals twice |
 | Source resume | Stream generation, next byte offset, safe prefix anchor, and parser context; this is an optimization validated before use, never fact identity |
 | Acceptance order | Strictly increasing ledger sequence allocated only to newly committed facts; it is durable delivery order, not event time or logical identity |
@@ -312,6 +312,14 @@ profile-flavor lexical final component or null; the `project` field is never a
 repository-root claim. Timestamp comparison, freshness, and OTLP age use
 checked integer nanoseconds, clamp tolerated future age to zero, and floor only
 the final nonnegative nanosecond age to whole seconds.
+
+The same source-independent domain owns the RFC 8785 representation of every
+amount, cumulative counter, and release-profile bound for that domain. Internal
+and SQL values remain exact integers in `0..9223372036854775807`; canonical JSON
+uses an ASCII decimal string with no sign or leading zero except `"0"`, and
+rejects out-of-range or non-canonical strings. Codex native fact/request
+identity counter leaves and fingerprint amount pairs both use this subtype, so
+IEEE-754 JSON number coercion cannot collapse distinct accepted values.
 
 ### Ledger, query, and sink flow
 
@@ -338,7 +346,11 @@ schema ID, and ledger epoch. Its checkpoint is independent:
   in the same database transaction. The local checkpoint advances only after
   durable commit acknowledgement. Ambiguous acknowledgement causes idempotent
   retry and equality revalidation of envelope, child linkage, child row, and
-  complete amount set.
+  complete amount set. Semantic source, collection, and reset instants are
+  authoritative checked non-negative `bigint` Unix nanoseconds; adjacent
+  nanosecond instants remain distinct through projection, retry, and migration.
+  Only operational checkpoint `updated_at`, which is excluded from fact
+  equality, may remain `timestamptz`.
 - OTLP derives complete cumulative sums and current quota gauges from the
   committed ledger through a target sequence. One fenced lease holder exports a
   checkpoint tuple. If one request cannot hold the complete projection, the
@@ -419,7 +431,9 @@ fingerprint says whether a repeated observation carries the same accounting
 meaning. It is SHA-256 over RFC 8785 canonical JSON with domain tag
 `aiut-accounting-fingerprint-v1`, containing only adapter schema, fact kind,
 native identity, source-observed time, registered accounting values, and the
-source-derived attribution necessary to interpret them. Collector, ledger, and
+source-derived attribution necessary to interpret them. Amount/counter leaves
+use the domain-owned canonical non-negative signed-64-bit decimal-string
+subtype; internal and SQL amounts remain integers. Collector, ledger, and
 source namespaces remain members of the separate composite fact identity; they
 are not fingerprint inputs. Ledger sequence, collection time, paths, offsets,
 aliases, extension metadata, export allowlists, and sink settings are also
@@ -682,8 +696,9 @@ sensitive value is used.
   advancement only after all acknowledgements.
 - [PostgreSQL commits but the acknowledgement is lost] → Retry against mandatory
   shared-envelope and child uniqueness constraints, compare the envelope,
-  one-to-one fact-kind link, normalized child equality, and complete amount set,
-  and advance locally only after durable confirmation.
+  one-to-one fact-kind link, normalized child equality including exact
+  Unix-nanosecond `bigint` values, and complete amount set, and advance locally
+  only after durable confirmation.
 - [A migration or downgrade would reinterpret accepted history] → Preserve
   explicit schema/profile IDs, require lossless migrations, and stop for a
   forward repair when rollback compatibility cannot be proved.

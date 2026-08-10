@@ -95,6 +95,15 @@ count_numbered_list_items() {
   grep -Ec '^[[:space:]]*[0-9]+\.[[:space:]]+\S' "$file" || true
 }
 
+count_numbered_heading_items() {
+  local file="$1"
+  [ -f "$file" ] || {
+    echo 0
+    return
+  }
+  grep -Ec '^#{1,6}[[:space:]]+[0-9]+\.[[:space:]]+\S' "$file" || true
+}
+
 # Count namespaced doctrine rule definitions (e.g. Syzygy's `**VIS-1 — ...**`
 # / `**SEC-2 — ...**` bold-paragraph form) across every markdown file in a
 # doctrine directory. Counts unique rule IDs, so a rule cited in several
@@ -643,6 +652,9 @@ standards_cross_refs=0
 doctrine_rules_display=""
 if [ -n "${HAS_DIR:-}" ] && [ -f "$HAS_DIR/vision.md" ] && ! is_placeholder_file "$HAS_DIR/vision.md"; then
   doctrine_rules=$(count_numbered_list_items "$HAS_DIR/vision.md")
+  if [ "$doctrine_rules" -eq 0 ]; then
+    doctrine_rules=$(count_numbered_heading_items "$HAS_DIR/vision.md")
+  fi
   # Fall back to namespaced rule IDs (e.g. VIS-n / SEC-n across the doctrine
   # dir) before ever reporting zero: authored doctrine with an unrecognized
   # rule format must render Unknown, never a false zero.
@@ -650,7 +662,7 @@ if [ -n "${HAS_DIR:-}" ] && [ -f "$HAS_DIR/vision.md" ] && ! is_placeholder_file
     doctrine_rules=$(count_doctrine_rule_ids "$HAS_DIR")
   fi
   if [ "$doctrine_rules" -eq 0 ]; then
-    doctrine_rules_display="Unknown — authored doctrine present, but no numbered-list or namespaced (XXX-n) rule format recognized; do not read as zero rules"
+    doctrine_rules_display="Unknown — authored doctrine present, but no numbered-list, numbered-heading, or namespaced (XXX-n) rule format recognized; do not read as zero rules"
   fi
 fi
 

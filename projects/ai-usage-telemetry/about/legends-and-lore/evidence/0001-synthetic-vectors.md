@@ -14,7 +14,9 @@ outputs.
 
 Every applicable vector must prove:
 
-- the expected fact identity and RFC 8785 accounting fingerprint;
+- the expected fact identity and RFC 8785 accounting fingerprint, with every
+  amount/cumulative-counter leaf represented by the domain-owned canonical
+  non-negative signed-64-bit decimal string rather than a JSON number;
 - accepted, duplicate, deferred, quarantined, storage-held, and sink-checkpoint
   transitions as applicable;
 - transaction all-old/all-new behavior across restart;
@@ -76,6 +78,14 @@ credential, identifier, or path.
   record bytes excluding delimiter, root-counted depth, encoded key bytes,
   structural/projected scalar counts, and every path's encoded/decoded size,
   multiplicity, integer/decimal range, precision, and scale.
+- For every token amount and cumulative-counter path, parse exact integers at
+  `9007199254740991` (`2^53-1`), `9007199254740992` (`2^53`),
+  `9007199254740993` (`2^53+1`), and `9223372036854775807`; require distinct
+  domain-owned decimal-string bytes in fingerprints, Codex native fact/request
+  identities, and release-profile bounds. Reject JSON-number use at those RFC
+  8785 boundaries, signed or leading-zero strings, `9223372036854775808`, and
+  parser/arithmetic overflow while keeping admitted internal and SQL values as
+  exact integers.
 - Cross the raw record byte limit without a newline; quarantine immediately
   rather than buffering indefinitely or classifying it as an incomplete tail.
 - Split input at every UTF-8 code-unit, JSON escape, numeric lexeme, key,
@@ -110,6 +120,11 @@ credential, identifier, or path.
 
 - Vary field order and JSON formatting while requiring the same canonical
   fingerprint; vary a fingerprint participant and require a different digest.
+- Pair otherwise-equal events and Codex cumulative landmarks across the
+  `2^53-1`, `2^53`, `2^53+1`, and signed-64-bit-maximum boundaries; each
+  distinct integer must produce distinct canonical fact/request identity or
+  fingerprint bytes without IEEE-754 coercion, while equal integers from
+  different source JSON spellings converge on the one decimal-string form.
 - Vary alias, absolute project path, scan path, byte offset, export selection,
   destination, retry, and collection time while requiring unchanged fact
   identity/fingerprint.
@@ -198,6 +213,13 @@ credential, identifier, or path.
   ledger_seq)`. Every case must fail all-old-or-all-new without checkpoint
   movement; the matching positive control must commit exactly one deferred
   envelope/child pair.
+- Project source, collection, and nullable reset instants whose checked Unix-
+  nanosecond values are equal, adjacent by `1ns`, zero, and signed-64-bit
+  maximum. Require exact `bigint` round trips and retry equality; reject a
+  semantic `timestamptz` column, negative/overflow input, any microsecond
+  rounding or adjacent-instant collapse, and any migration/backfill that cannot
+  preserve every bit. Operational `projection_checkpoints.updated_at` remains
+  outside fact equality.
 
 ## Timestamp and age vectors
 
@@ -205,6 +227,10 @@ credential, identifier, or path.
   UTC Unix nanoseconds, reject leap seconds and out-of-range instants, and render
   the one canonical fixed-nine-digit `Z` form. Equivalent offsets must produce
   byte-identical fingerprint input.
+- Round-trip pairs of valid RFC 3339 instants one nanosecond apart through the
+  PostgreSQL projector's checked `bigint` source, collection, and reset columns;
+  they must remain distinct through insert, retry, migration, and backfill, with
+  no host-datetime or `timestamptz` conversion on the authoritative path.
 - At a fixed collection/export clock, cover source time at `+skew`,
   `+skew+1ns`, `+1ns`, equal time, `-1ns`, exact freshness deadline,
   deadline `+1ns`, and export ages immediately below/at/above each whole-second
