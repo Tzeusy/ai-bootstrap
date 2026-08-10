@@ -50,8 +50,9 @@ All of the following:
 
 - Five pillars are authored and maintained
 - All five local skills are installed, customized, and pass the scanner's
-  frontmatter validation, including a `name` matching the expected pillar
-  directory; an invalid or misnamed skill file does not satisfy this gate
+  conservative frontmatter validation, including unique string-valued required
+  keys and a `name` matching the expected pillar directory; an invalid or
+  misnamed skill file does not satisfy this gate
 - Doctrine contains explicit numbered rules
 - Craft-and-care expresses project-specific execution standards rather than generic best-practices filler
 - Every authored RFC references doctrine or principles
