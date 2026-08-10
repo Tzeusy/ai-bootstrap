@@ -68,19 +68,19 @@ Scope: v1-mandatory
 - **AND** the original fact remains immutable
 
 ### Requirement: [TARGET-STATE] Bounded Human-Legibility Exercise
-SHALL provide a documented exercise in which one developer who has not inspected private ledger tables starts from the qualified empty-harness fixture and, within ten minutes and no more than six read-only inspection or query commands after the single documented setup command, identifies the tool, source time, known-or-unknown model and project state, every category and amount, the single logical-request contribution, replay-neutral counts, and the health outcome using only the stable v1 views and versioned health JSON; passing requires every answer to match the fixture oracle without private-table access.
+SHALL provide a documented exercise in which one developer who has not inspected private ledger tables starts from the qualified empty-harness fixture and, with inclusive `elapsed_time <= 10 minutes` and no more than six read-only inspection or query commands after the single documented setup command, identifies the tool, source time, known-or-unknown model and project state, every category and amount, the single logical-request contribution, replay-neutral counts, and the health outcome using only the stable v1 views and versioned health JSON; passing requires every answer to match the fixture oracle without private-table access. This capability boundary deliberately tightens the immutable launch instrument's one 15-minute sitting ceiling and therefore does not contradict or amend that instrument or its administration record.
 
 ID: REQ-synthetic-usage-spine-005
 Source: Proposal § New Capabilities → synthetic-usage-spine; RFC 0001 § Health and Freshness State; about/heart-and-soul/vision.md § What Success Looks Like
 Scope: v1-mandatory
 
 #### Scenario: Developer completes the bounded exercise
-- **WHEN** an eligible developer follows the documented setup and uses at most six read-only commands within ten minutes
+- **WHEN** an eligible developer follows the documented setup, uses at most six read-only commands, and records inclusive `elapsed_time <= 10 minutes`
 - **THEN** every required answer exactly matches the synthetic fixture oracle
 - **AND** the evidence records elapsed time, command count, answers, and the absence of private-table queries
 
 #### Scenario: Legibility checkpoint fails visibly
-- **WHEN** the exercise exceeds either bound, requires a private base-table query, omits a required answer, or cannot distinguish the accepted contribution from its replay
+- **WHEN** the exercise records `elapsed_time > 10 minutes`, exceeds the command bound, requires a private base-table query, omits a required answer, or cannot distinguish the accepted contribution from its replay
 - **THEN** the human-legibility checkpoint fails
 - **AND** the synthetic capability is not accepted on that evidence
 
