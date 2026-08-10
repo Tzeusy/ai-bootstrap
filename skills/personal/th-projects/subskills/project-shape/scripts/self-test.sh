@@ -178,6 +178,54 @@ case_nonscalar_skill_description_cannot_satisfy_maturity() {
   assert_not_contains "$out" "SHAPE_LEVEL=MATURE" "non-string YAML descriptions must not satisfy the local-skill gate"
 }
 
+case_adversarial_yaml_frontmatter_cannot_satisfy_maturity() {
+  local scenario repo out skill_file
+
+  for scenario in date hex boolean null spaced-name spaced-description bogus-key indented; do
+    repo="$TMP_ROOT/adversarial-yaml-$scenario"
+    cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+    skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+    awk -v scenario="$scenario" '
+      /^description:/ && scenario == "date" {
+        print "description: 2026-08-10"
+        next
+      }
+      /^description:/ && scenario == "hex" {
+        print "description: 0x10"
+        next
+      }
+      /^description:/ && scenario == "boolean" {
+        print "description: true # prose"
+        next
+      }
+      /^description:/ && scenario == "null" {
+        print "description: null # prose"
+        next
+      }
+      { print }
+      /^name:/ && scenario == "spaced-name" {
+        print "name : wrong-valid-slug"
+      }
+      /^description:/ && scenario == "spaced-description" {
+        print "description : [bad]"
+      }
+      /^name:/ && scenario == "bogus-key" {
+        print "bogus : value"
+      }
+      /^description:/ && scenario == "indented" {
+        print "  bad: value"
+      }
+    ' "$skill_file" > "$skill_file.tmp"
+    mv "$skill_file.tmp" "$skill_file"
+
+    out="$(bash "$SCAN_SCRIPT" "$repo")"
+    assert_contains "$out" "[INVALID]" "$scenario adversarial YAML should be rejected"
+    assert_contains "$out" "Local skills installed: 4/5" "$scenario adversarial YAML must not count toward maturity"
+    assert_contains "$out" "SHAPE_LEVEL=SHAPED" "$scenario adversarial YAML must prevent mature status"
+    assert_not_contains "$out" "SHAPE_LEVEL=MATURE" "$scenario adversarial YAML must not satisfy the local-skill gate"
+  done
+}
+
 case_authored_repo_can_be_mature() {
   local repo="$FIXTURES_DIR/mature-layout"
   local out
@@ -583,6 +631,7 @@ run_case "misnamed local skills cannot satisfy maturity" case_misnamed_skill_can
 run_case "duplicate skill names cannot satisfy maturity" case_duplicate_skill_name_cannot_satisfy_maturity
 run_case "duplicate skill descriptions cannot satisfy maturity" case_duplicate_skill_description_cannot_satisfy_maturity
 run_case "non-scalar skill descriptions cannot satisfy maturity" case_nonscalar_skill_description_cannot_satisfy_maturity
+run_case "adversarial YAML frontmatter cannot satisfy maturity" case_adversarial_yaml_frontmatter_cannot_satisfy_maturity
 run_case "fully authored repo is mature" case_authored_repo_can_be_mature
 run_case "four pillars without craft-and-care is not mature" case_four_pillars_without_craft_not_mature
 run_case "syzygy canon is detected and guarded" case_syzygy_canon_detected
