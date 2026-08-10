@@ -285,13 +285,28 @@ extract_description_text() {
     in_fm && $0 ~ /^description:[[:space:]]*/ {
       line = $0
       sub(/^description:[[:space:]]*/, "", line)
-      if (line == ">" || line == "|") {
+      if (line == ">" || line == "|" || line == ">-" || line == ">+" || line == "|-" || line == "|+") {
         in_desc = 1
         next
       }
       print line
     }
   ' "$file" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//'
+}
+
+is_conservative_yaml_string_scalar() {
+  local value="$1" lowered
+  case "$value" in
+    '>'|'|'|'>-'|'>+'|'|-'|'|+') return 0 ;;
+  esac
+  [ -n "$value" ] || return 1
+  [[ "$value" =~ ^[A-Za-z0-9] ]] || return 1
+  lowered=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
+  case "$lowered" in
+    null|'~'|true|false|yes|no|on|off) return 1 ;;
+  esac
+  [[ "$value" =~ ^[-+]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][-+]?[0-9]+)?$ ]] && return 1
+  return 0
 }
 
 mark_skill_name() {
@@ -309,7 +324,7 @@ check_skill() {
   for tool_dir in .claude .codex .gemini .opencode; do
     local skill_path="$ROOT/$tool_dir/skills/$name/SKILL.md"
     if [ -f "$skill_path" ]; then
-      local first_line close_count frontmatter unexpected_keys name_value description_text
+      local first_line close_count frontmatter unexpected_keys name_key_count description_key_count name_value description_header description_text
       first_line=$(head -1 "$skill_path")
       if [ "$first_line" != "---" ]; then
         echo "    - $tool_dir/skills/$name/ [INVALID] missing YAML frontmatter (file must start with ---)"
@@ -332,10 +347,29 @@ check_skill() {
         continue
       fi
 
+      name_key_count=$(printf '%s\n' "$frontmatter" | grep -c '^name:' || true)
+      if [ "$name_key_count" -gt 1 ]; then
+        echo "    - $tool_dir/skills/$name/ [INVALID] duplicate name key"
+        found=1
+        continue
+      fi
+      description_key_count=$(printf '%s\n' "$frontmatter" | grep -c '^description:' || true)
+      if [ "$description_key_count" -gt 1 ]; then
+        echo "    - $tool_dir/skills/$name/ [INVALID] duplicate description key"
+        found=1
+        continue
+      fi
+
       name_value=$(printf '%s\n' "$frontmatter" | sed -n 's/^name:[[:space:]]*//p' | head -1)
+      description_header=$(printf '%s\n' "$frontmatter" | sed -n 's/^description:[[:space:]]*//p' | head -1)
       description_text=$(extract_description_text "$skill_path")
       if [ -z "$name_value" ] || [ -z "$description_text" ]; then
         echo "    - $tool_dir/skills/$name/ [INVALID] missing required name/description fields"
+        found=1
+        continue
+      fi
+      if ! is_conservative_yaml_string_scalar "$description_header"; then
+        echo "    - $tool_dir/skills/$name/ [INVALID] description must be a conservative YAML string scalar"
         found=1
         continue
       fi

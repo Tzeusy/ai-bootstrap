@@ -114,6 +114,70 @@ case_misnamed_skill_cannot_satisfy_maturity() {
   assert_not_contains "$out" "SHAPE_LEVEL=MATURE" "directory presence with the wrong skill name must not satisfy the local-skill gate"
 }
 
+case_duplicate_skill_name_cannot_satisfy_maturity() {
+  local repo="$TMP_ROOT/duplicate-skill-name-maturity"
+  local out skill_file
+
+  cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+  skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+  awk '
+    { print }
+    /^name:[[:space:]]*heart-and-soul[[:space:]]*$/ {
+      print "name: wrong-valid-slug"
+    }
+  ' "$skill_file" > "$skill_file.tmp"
+  mv "$skill_file.tmp" "$skill_file"
+
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "[INVALID] duplicate name key" "duplicate required YAML key should be rejected"
+  assert_contains "$out" "Local skills installed: 4/5" "a duplicate-name skill must not count toward maturity"
+  assert_contains "$out" "SHAPE_LEVEL=SHAPED" "a duplicate-name local skill must prevent mature status"
+  assert_not_contains "$out" "SHAPE_LEVEL=MATURE" "duplicate YAML keys must not satisfy the local-skill gate"
+}
+
+case_duplicate_skill_description_cannot_satisfy_maturity() {
+  local repo="$TMP_ROOT/duplicate-skill-description-maturity"
+  local out skill_file
+
+  cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+  skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+  awk '
+    { print }
+    /^description:/ {
+      print "description: A conflicting second description."
+    }
+  ' "$skill_file" > "$skill_file.tmp"
+  mv "$skill_file.tmp" "$skill_file"
+
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "[INVALID] duplicate description key" "duplicate description YAML key should be rejected"
+  assert_contains "$out" "Local skills installed: 4/5" "a duplicate-description skill must not count toward maturity"
+  assert_contains "$out" "SHAPE_LEVEL=SHAPED" "a duplicate-description local skill must prevent mature status"
+  assert_not_contains "$out" "SHAPE_LEVEL=MATURE" "duplicate description keys must not satisfy the local-skill gate"
+}
+
+case_nonscalar_skill_description_cannot_satisfy_maturity() {
+  local repo="$TMP_ROOT/nonscalar-skill-description-maturity"
+  local out skill_file
+
+  cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+  skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+  awk '
+    /^description:/ {
+      print "description: [not, a, string]"
+      next
+    }
+    { print }
+  ' "$skill_file" > "$skill_file.tmp"
+  mv "$skill_file.tmp" "$skill_file"
+
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "[INVALID] description must be a conservative YAML string scalar" "list-valued description should be rejected"
+  assert_contains "$out" "Local skills installed: 4/5" "a non-scalar-description skill must not count toward maturity"
+  assert_contains "$out" "SHAPE_LEVEL=SHAPED" "a non-scalar-description skill must prevent mature status"
+  assert_not_contains "$out" "SHAPE_LEVEL=MATURE" "non-string YAML descriptions must not satisfy the local-skill gate"
+}
+
 case_authored_repo_can_be_mature() {
   local repo="$FIXTURES_DIR/mature-layout"
   local out
@@ -516,6 +580,9 @@ run_case "fresh scaffold is not mature" case_fresh_scaffold_not_mature
 run_case "unsupported frontmatter keys are rejected" case_invalid_frontmatter_rejected
 run_case "invalid local skills cannot satisfy maturity" case_invalid_skill_cannot_satisfy_maturity
 run_case "misnamed local skills cannot satisfy maturity" case_misnamed_skill_cannot_satisfy_maturity
+run_case "duplicate skill names cannot satisfy maturity" case_duplicate_skill_name_cannot_satisfy_maturity
+run_case "duplicate skill descriptions cannot satisfy maturity" case_duplicate_skill_description_cannot_satisfy_maturity
+run_case "non-scalar skill descriptions cannot satisfy maturity" case_nonscalar_skill_description_cannot_satisfy_maturity
 run_case "fully authored repo is mature" case_authored_repo_can_be_mature
 run_case "four pillars without craft-and-care is not mature" case_four_pillars_without_craft_not_mature
 run_case "syzygy canon is detected and guarded" case_syzygy_canon_detected
