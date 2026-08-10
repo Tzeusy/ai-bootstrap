@@ -9,9 +9,9 @@ description: >
 
 # AI Usage Telemetry Design Contracts
 
-This skill routes to accepted predecessor and current candidate contracts and
-evidence. Check the pillar status before relying on corrected current bytes; it
-does not restate or promote them.
+This skill routes to the accepted current contracts, their evidence, and the
+preserved predecessor trail. Check the pillar status and owner decisions rather
+than treating this index as promotion authority.
 
 Trigger examples: "how does replay work?", "who owns this dependency?", "what
 is the sink checkpoint contract?"
@@ -23,7 +23,7 @@ is the sink checkpoint contract?"
 | [Source and bounds evidence](../../../about/legends-and-lore/evidence/0001-source-and-bounds.md) | Checking observed source surfaces or bounded profiles |
 | [Synthetic vectors](../../../about/legends-and-lore/evidence/0001-synthetic-vectors.md) | Designing fixtures, parser boundaries, or reconciliation evidence |
 | [Provenance](../../../about/legends-and-lore/evidence/0001-provenance.md) | Verifying evidence origin and the safe inspection boundary |
-| [Final-branch correction](../../../about/legends-and-lore/reviews/0001/2026-08-10-final-branch-correction.md) | Checking pending corrected hashes, review state, and promotion boundary |
+| [Final-branch correction](../../../about/legends-and-lore/reviews/0001/2026-08-10-final-branch-correction.md) | Checking corrected hashes, exact-head confirmation, and Decision 0003 promotion |
 | [R1-R5 reconciliation](../../../about/legends-and-lore/reviews/0001/2026-08-10-specification-reconciliation.md) | Auditing accepted bytes, convergence, or historical dispositions |
 
 Load `/heart-and-soul` for purpose or constitutional boundaries and

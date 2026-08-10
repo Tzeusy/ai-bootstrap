@@ -5,8 +5,8 @@
 **First correction commit reviewed:**
 `ead6fa583002851456004f9fd24c9b700a407afb`
 **First correction verdict:** `NOT APPROVED`
-**Current status:** Bounded candidate corrections applied; fresh exact-head
-confirmation and successor owner acceptance required
+**Current status:** Exact candidate approved and promoted by successor Owner
+Decision 0003
 
 ## Authority boundary
 
@@ -16,13 +16,13 @@ synthetic vectors, accept any replacement capability row, implement a
 capability, activate a profile, authorize a real source or destination, archive
 the active change, or authorize packaging or release.
 
-The current candidate is fail-closed: seven unchanged capability specs still
-match Decision 0002; corrected current bytes for
+Before exact-head confirmation, the candidate remained fail-closed: seven
+unchanged capability specs still matched Decision 0002; corrected bytes for
 `source-adapter-profiles`, `event-identity-and-normalization`,
-`postgresql-history-projection`, and `release-profile-governance` are
-`unknown`. Task 2.1 therefore blocks all non-synthetic production work until a
-fresh review approves one exact HEAD and a successor owner decision binds the
-four replacements.
+`postgresql-history-projection`, and `release-profile-governance` were
+`unknown`. Task 2.1 therefore blocked all non-synthetic production work until
+a fresh review approved one exact HEAD and a successor owner decision bound
+the four replacements.
 
 ## Findings that initiated the correction
 
@@ -68,9 +68,9 @@ key blobs, and over-broad wording about optional Git whitespace classes.
   default-enabled Git whitespace classes.
 - A compatibility forwarding document repairs the immutable packet's relative
   link without rewriting the packet.
-- Current lifecycle and acceptance routes now mark the corrected RFC/evidence
-  and four spec rows pending/unknown rather than silently inheriting Decision
-  0002 authority.
+- The candidate lifecycle and acceptance routes marked the corrected
+  RFC/evidence and four spec rows pending/unknown rather than silently
+  inheriting Decision 0002 authority.
 
 ## Current candidate bindings
 
@@ -85,7 +85,7 @@ key blobs, and over-broad wording about optional Git whitespace classes.
 | `postgresql-history-projection` | `724a4665536c4794ad7c13560f6f71091724908c4d2e15b1d47b99f34af85673` | Pending replacement row |
 | `release-profile-governance` | `6fe03a370a5b7f1abf772acacc27001f0a14dac8033503c1b4c22b6560e1a03f` | Pending replacement row |
 
-## Required confirmation
+## Required confirmation (satisfied)
 
 A fresh reviewer must bind its result to the exact committed candidate HEAD,
 re-read the complete correction series and current authority routes, reproduce
@@ -98,3 +98,24 @@ documented whitespace gates.
 Only after that result may a successor decision replace the four named
 Decision 0002 rows and promote the corrected RFC/synthetic hashes. The seven
 unchanged rows remain independently accepted throughout.
+
+## Exact-head confirmation and disposition
+
+A fresh independent reviewer bound its result to exact clean HEAD
+`5ec37f50de23c4eb36177ba8742ae9db54cdaf94`. It reproduced all eight candidate
+bindings above and returned `APPROVED_FOR_PROMOTION` with findings
+`0 / 0 / 0`.
+
+The confirmation passed strict OpenSpec validation, authoring trace, exact
+`11 / 100 / 249 / 77` cardinalities, all current artifact hashes, five
+scanner-valid and canonically valid project-local skills, project-shape
+`23 / 23`, th-projects `105 / 105`, an independent 112-case scanner/canonical
+frontmatter differential, active links, E4 exact bytes, numeric/time and task-
+ordering contracts, and the documented whitespace gates. Terminal HEAD and
+the worktree remained exact and clean.
+
+[Owner Decision 0003](../../../heart-and-soul/decisions/0003-accept-final-branch-contract-corrections.md)
+therefore promotes the corrected RFC and synthetic-vector hashes and replaces
+exactly the four pending Decision 0002 capability rows. The seven unchanged
+rows retain their Decision 0002 authority. The implementation, profile,
+resource, sink, packaging, archive, and release boundaries above remain closed.

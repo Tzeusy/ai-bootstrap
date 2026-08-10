@@ -12,12 +12,12 @@ R1-R5 converged on exact reviewed HEAD
 `APPROVED_FOR_PROMOTION` with findings `0 / 0 / 0`. Owner
 [Decision 0002](../../../about/heart-and-soul/decisions/0002-accept-v1-capability-contracts.md)
 independently accepted all eleven exact R5 contract rows. A later final branch
-review found bounded numeric/time representation gaps in four rows; their
-corrected current bytes now await exact-head review and successor owner
-acceptance, while seven current rows still match Decision 0002. The
-[acceptance projection](./acceptance.md) records that fail-closed state. No
-capability is implemented, and this change is neither archived nor
-release-authorized.
+review found bounded numeric/time representation gaps in four rows; exact-head
+confirmation approved their corrections with findings `0 / 0 / 0`, and
+[Decision 0003](../../../about/heart-and-soul/decisions/0003-accept-final-branch-contract-corrections.md)
+replaces only those four bindings. The [acceptance projection](./acceptance.md)
+records the composed eleven-row accepted set. No capability is implemented,
+and this change is neither archived nor release-authorized.
 
 ## What Changes
 

@@ -218,3 +218,22 @@ nor contract acceptance supplies unmeasured profile values or runtime/release
 evidence, and neither authorizes real mounts, non-synthetic facts, real sinks,
 production packaging, archival, or release outside the later active-task and
 profile gates.
+
+## Final-Branch Correction Confirmation and Promotion
+
+A post-R5 final-branch review found bounded project-navigation, numeric-
+representation, PostgreSQL timestamp-precision, evidence-durability, link, and
+whitespace-proof gaps. The correction series kept Decision 0002 immutable and
+marked the four changed capability rows unknown until the successor-decision
+rule could be satisfied.
+
+A fresh confirmation reviewed exact clean HEAD
+`5ec37f50de23c4eb36177ba8742ae9db54cdaf94` and returned
+`APPROVED_FOR_PROMOTION` with findings `0 / 0 / 0`. The durable review is
+[`../../legends-and-lore/reviews/0001/2026-08-10-final-branch-correction.md`](../../legends-and-lore/reviews/0001/2026-08-10-final-branch-correction.md).
+
+[Decision 0003](./0003-accept-final-branch-contract-corrections.md) promotes
+the corrected RFC and synthetic-vector bytes and replaces exactly the four
+changed Decision 0002 rows. Seven rows retain their Decision 0002 bindings.
+This completes contract-byte promotion only; it adds no implementation,
+profile value, real resource, sink, package, archive, or release authority.
