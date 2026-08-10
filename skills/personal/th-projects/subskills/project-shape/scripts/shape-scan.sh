@@ -300,13 +300,50 @@ is_conservative_yaml_string_scalar() {
     '>'|'|'|'>-'|'>+'|'|-'|'|+') return 0 ;;
   esac
   [ -n "$value" ] || return 1
-  [[ "$value" =~ ^[A-Za-z0-9] ]] || return 1
+  case "$value" in
+    *'#'*) return 1 ;;
+  esac
+  [[ "$value" =~ ^[A-Za-z] ]] || return 1
+  [[ "$value" =~ :[[:space:]] ]] && return 1
   lowered=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
   case "$lowered" in
     null|'~'|true|false|yes|no|on|off) return 1 ;;
   esac
-  [[ "$value" =~ ^[-+]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][-+]?[0-9]+)?$ ]] && return 1
   return 0
+}
+
+frontmatter_uses_conservative_subset() {
+  awk '
+    BEGIN {
+      description_block = 0
+      valid = 1
+    }
+    {
+      if (description_block) {
+        if ($0 == "" || $0 ~ /^  /) {
+          next
+        }
+        description_block = 0
+      }
+
+      if ($0 == "") {
+        next
+      }
+      if ($0 ~ /^name:[[:space:]]*/) {
+        next
+      }
+      if ($0 ~ /^description:[[:space:]]*/) {
+        value = $0
+        sub(/^description:[[:space:]]*/, "", value)
+        if (value == ">" || value == "|" || value == ">-" || value == ">+" || value == "|-" || value == "|+") {
+          description_block = 1
+        }
+        next
+      }
+      valid = 0
+    }
+    END { exit valid ? 0 : 1 }
+  '
 }
 
 mark_skill_name() {
@@ -340,22 +377,27 @@ check_skill() {
       fi
 
       frontmatter=$(extract_frontmatter "$skill_path")
-      unexpected_keys=$(printf '%s\n' "$frontmatter" | sed -n 's/^\([A-Za-z0-9_-]\+\):.*/\1/p' | grep -Ev '^(name|description)$' || true)
+      unexpected_keys=$(printf '%s\n' "$frontmatter" | sed -n 's/^\([A-Za-z0-9_-]\+\)[[:space:]]*:.*/\1/p' | grep -Ev '^(name|description)$' || true)
       if [ -n "$unexpected_keys" ]; then
         echo "    - $tool_dir/skills/$name/ [INVALID] unsupported frontmatter key(s): $(printf '%s' "$unexpected_keys" | paste -sd ', ' -)"
         found=1
         continue
       fi
 
-      name_key_count=$(printf '%s\n' "$frontmatter" | grep -c '^name:' || true)
+      name_key_count=$(printf '%s\n' "$frontmatter" | grep -Ec '^name[[:space:]]*:' || true)
       if [ "$name_key_count" -gt 1 ]; then
         echo "    - $tool_dir/skills/$name/ [INVALID] duplicate name key"
         found=1
         continue
       fi
-      description_key_count=$(printf '%s\n' "$frontmatter" | grep -c '^description:' || true)
+      description_key_count=$(printf '%s\n' "$frontmatter" | grep -Ec '^description[[:space:]]*:' || true)
       if [ "$description_key_count" -gt 1 ]; then
         echo "    - $tool_dir/skills/$name/ [INVALID] duplicate description key"
+        found=1
+        continue
+      fi
+      if ! printf '%s\n' "$frontmatter" | frontmatter_uses_conservative_subset; then
+        echo "    - $tool_dir/skills/$name/ [INVALID] frontmatter is outside the conservative name/description YAML subset"
         found=1
         continue
       fi
