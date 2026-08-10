@@ -24,10 +24,15 @@ skills/personal/   # Primary home of Beads and project workflow skills
 agents/            # Older agent prompts kept for reference / selective reuse
 about/             # Five-pillar project-shape docs for doctrine, contracts, topology, and standards
 openspec/          # Normative repository-shape requirements and change records
+projects/          # Independently shaped product offerings with product-local authority
 scripts/           # Helper scripts used by the ai-bootstrap setup
 ```
 
 `agents/` still exists, but it is no longer the center of the system. Treat it as legacy/reference material unless you have a specific reason to use one of those prompts.
+
+`projects/` is not part of the shared-skill mirror or installation flow. Start
+each offering from its own `about/README.md`; its product shape and child
+OpenSpec change govern product behavior.
 
 ## Skills Layout And Provenance
 

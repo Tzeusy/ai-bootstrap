@@ -4,6 +4,11 @@ This directory is the project-level source of truth for **AI Usage
 Telemetry**, a portable local service that turns usage facts already written by
 AI coding tools into a durable, content-free history.
 
+It lives in the parent repository's `projects/` layer. The parent
+[`about/README.md`](../../../about/README.md) governs the surrounding
+`ai-bootstrap` harness; this product's own `about/` and active child OpenSpec
+change govern AI Usage Telemetry behavior.
+
 The project is still pre-implementation. Statements about current tool file
 formats are marked **[Observed]**; proposed architectural conclusions are marked
 **[Inferred]**; unsupported future-tool behavior is marked **[Unknown]**. The
@@ -88,6 +93,17 @@ not mark implementation complete, activate a profile, archive the change, or
 authorize real mounts, sinks, packaging, or release. Historical reviews and
 administrations remain off the default reading path except for the R1-R5 ledger
 and final-branch correction record.
+
+## Tooling Scope
+
+Run OpenSpec commands from `projects/ai-usage-telemetry`; root-level OpenSpec
+commands intentionally discover the `ai-bootstrap` repository-shape change
+instead. For this product's active change, use:
+
+```bash
+cd projects/ai-usage-telemetry
+openspec validate --all --strict
+```
 
 The current implementation sequence and Tokscale comparative-evidence
 disposition are recorded in the
