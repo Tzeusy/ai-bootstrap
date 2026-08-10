@@ -44,6 +44,10 @@ and query surfaces.
   `cache_creation_input_tokens`, `cache_read_input_tokens`, and
   `output_tokens`. The public [Messages API](https://platform.claude.com/docs/en/api/messages)
   defines the counter meanings, but the local shape remains adapter-versioned.
+  `/cwd` establishes only a source working directory. No evidence here proves
+  repository discovery or a repository-root mapping; v1's normalized project
+  field therefore uses only the exact lexical working-directory basename or
+  null under the profile-frozen path flavor.
 - **[Observed/inferred] Identity and collision.** Anthropic documents every API
   response `request-id` as a [globally unique request
   identifier](https://platform.claude.com/docs/en/api/errors). The deliberately
@@ -149,7 +153,11 @@ contract](https://github.com/opencontainers/image-spec/blob/main/image-index.md)
    transport, and fully synthetic responses; generate Codex fixtures from
    hand-authored protocol values.
 5. Instrument the field projector so forbidden paths cannot invoke scalar
-   decoding, materialization, fingerprinting, or diagnostics.
+   decoding, materialization, fingerprinting, or diagnostics. Each capture and
+   instrumentation channel must also carry a distinct harmless test canary so a
+   silent or disconnected oracle cannot pass. Deliberate test-only forbidden
+   decoder calls, sentinel leaks, and unexpected network events must make the
+   harness fail; use only synthetic non-secret values.
 6. Record exact profile IDs, fixture names, expected content-free facts, client
    versions, native architecture, and unresolved claims. Never record live
    paths, identifiers, excerpts, or hashes of personal data.

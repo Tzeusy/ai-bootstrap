@@ -24,6 +24,15 @@ Every applicable vector must prove:
 - sibling-stream and independent-sink progress when the affected boundary is
   scoped rather than global.
 
+Every privacy oracle is two-sided. Each application-value, parser-
+instrumentation, log, exception, crash-output, SQLite, OTLP, PostgreSQL, image-
+filesystem/layer, environment, and packet/network capture receives a distinct
+harmless content-free positive-control canary and must prove it was observed.
+Separate deliberate test-only sentinel-leak, forbidden-decoder/materializer/
+fingerprint-call, and unexpected-network-event mutations must make the harness
+fail. Canary and mutation values are synthetic and contain no real content,
+credential, identifier, or path.
+
 ## Claude Code usage vectors
 
 | ID | Synthetic case | Expected contract |
@@ -68,13 +77,29 @@ Every applicable vector must prove:
   delimiter, and chunk boundary while keeping semantic output invariant.
 - Place the discriminator before and after large skipped content; skip-only
   values remain subject to structural limits but never invoke a scalar decoder.
+- Permute JSON member order and transport chunk boundaries across compound
+  records containing an unregistered discriminator, unlisted descendants,
+  invalid UTF-8, invalid JSON structure, one or more exceeded ceilings, missing
+  or mistyped projected fields, an unregistered category, and an identity
+  collision. The exact phase/failure precedence must be byte- and chunk-order
+  independent: unsupported profile and runtime/storage preflight occur before
+  traversal; then `record_limit` outranks structural/UTF-8
+  `schema_inconsistent`, which outranks `unknown_kind`,
+  `recognized_malformed`, and `unregistered_category`; only a parser-successful
+  candidate set can reach `identity_collision`. An unregistered discriminator
+  holds, while an unlisted descendant remains skip-only.
 - Put high-entropy synthetic sentinels in content, tool arguments/results,
   attachments, unregistered keys, malformed values, nested arrays/objects,
   exceptions, and oversize fields. Instrumentation must show zero forbidden
   decoder/materializer/fingerprint calls.
-- Cover registered irrelevant, unknown discriminator, recognized malformed,
-  incomplete tail, truncation, replacement, rotation, and same-path new
-  generation. Only registered irrelevant records may advance without a fact.
+- Cover unknown discriminator, recognized malformed, incomplete tail,
+  truncation, replacement, rotation, and same-path new generation. Inventory
+  all three complete zero-fact dispositions independently:
+  `registered_irrelevant` commits unchanged parser context plus cursor;
+  `context_only` commits its exact parser-context transition plus cursor; and
+  `quota_state_only` commits its exact quota-component transition plus cursor.
+  Each transition is all-old or all-new across injected failure and restart and
+  creates no fact, sequence, amount, aggregate, request, or sink obligation.
 
 ## Identity and reconciliation vectors
 
@@ -83,6 +108,16 @@ Every applicable vector must prove:
 - Vary alias, absolute project path, scan path, byte offset, export selection,
   destination, retry, and collection time while requiring unchanged fact
   identity/fingerprint.
+- Freeze POSIX and Windows lexical path-flavor vectors for source working-
+  directory attribution: filesystem roots map to null; nested working
+  directories map to the nested final component rather than an ancestor;
+  non-repository directories map to their own final component; invalid or
+  unavailable cwd maps to null; and presentation aliases never enter the fact.
+- Configure Claude and Codex with equal `source_namespace` values and, in a
+  second compound vector, equal native stream identities. TOML validation must
+  reject the namespace collision before component registration, traversal, or
+  fixed-clock health serialization. The valid distinct-namespace control must
+  produce byte-identical ordered health JSON at a fixed clock across restart.
 - Mutate a record before the resume anchor while preserving file size and mtime;
   scheduled full reconciliation must detect the change.
 - Restart midway through reconciliation; only a successful completion resets
@@ -144,6 +179,26 @@ Every applicable vector must prove:
   batch for one target sequence is durably acknowledged.
 - Attempt to project prompt/content, path, session, raw identity, unbounded
   metadata, or unregistered JSONB; every destination rejects it before send.
+- For PostgreSQL schema creation, idempotent retry, and every supported prior-
+  schema migration, commit-time negative fixtures separately attempt a
+  `projected_facts` envelope with both child pointers null, both pointers set,
+  the selected pointer under the wrong fact kind, an orphaned envelope or
+  child, and usage/quota reuse of one `(ledger_namespace,ledger_epoch,
+  ledger_seq)`. Every case must fail all-old-or-all-new without checkpoint
+  movement; the matching positive control must commit exactly one deferred
+  envelope/child pair.
+
+## Timestamp and age vectors
+
+- Parse offset-bearing RFC 3339 values into checked non-negative signed-64-bit
+  UTC Unix nanoseconds, reject leap seconds and out-of-range instants, and render
+  the one canonical fixed-nine-digit `Z` form. Equivalent offsets must produce
+  byte-identical fingerprint input.
+- At a fixed collection/export clock, cover source time at `+skew`,
+  `+skew+1ns`, `+1ns`, equal time, `-1ns`, exact freshness deadline,
+  deadline `+1ns`, and export ages immediately below/at/above each whole-second
+  boundary. Tolerated future time is fresh with age zero; beyond-skew time is
+  malformed; nonnegative age seconds is floor of clamped nanosecond age.
 
 ## Architecture and release vectors
 

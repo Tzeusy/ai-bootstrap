@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: [TARGET-STATE] Closed UsageEvent Shape
-SHALL admit a `UsageEvent` only when it has the immutable identity tuple, `accounting_fingerprint`, `collector_namespace`, `ledger_namespace`, `adapter_schema_id`, `source_namespace`, `fact_kind="usage_event"`, source-observed time, collected time, tool, vendor, nullable model and project, native logical-request identity, zero-or-more unique registered non-negative category amounts, and the closed ledger metadata object; no other field group is part of v1 normalization.
+SHALL admit a `UsageEvent` only when it has the immutable identity tuple, `accounting_fingerprint`, `collector_namespace`, `ledger_namespace`, `adapter_schema_id`, `source_namespace`, `fact_kind="usage_event"`, source-observed time and collected time each normalized through the common checked UTC Unix-nanosecond contract and rendered in its sole fixed-nine-digit RFC 3339 `Z` form, tool, vendor, nullable model and project, native logical-request identity, zero-or-more unique registered non-negative category amounts, and the closed ledger metadata object; no other field group is part of v1 normalization.
 
 ID: REQ-event-identity-and-normalization-001
 Source: RFC 0001 § UsageEvent
@@ -31,14 +31,14 @@ Scope: v1-mandatory
 - **THEN** the canonical identity vector fails and the build is not releasable
 
 ### Requirement: [TARGET-STATE] Exact Usage Accounting Fingerprint Document
-MUST compute `accounting_fingerprint` as SHA-256 over `UTF-8("aiut-accounting-fingerprint-v1\n")` followed by RFC 8785 canonical UTF-8 JSON of exactly `{"adapter_schema_id":string,"fact_kind":"usage_event","native_identity":json,"source_observed_at":RFC3339-UTC-string,"source_attribution":{"tool":string,"vendor":string,"model":string-or-null,"project":string-or-null,"native_request_identity":json},"source_consistency":object,"amounts":[[category,non-negative-integer],...]}`, with amount pairs in registry order, Claude `source_consistency` exactly `{"message_id":string}`, Codex `source_consistency` exactly `{}`, and no ledger sequence, collection time, path, alias, extension metadata, allowlist, or sink field.
+MUST compute `accounting_fingerprint` as SHA-256 over `UTF-8("aiut-accounting-fingerprint-v1\n")` followed by RFC 8785 canonical UTF-8 JSON of exactly `{"adapter_schema_id":string,"fact_kind":"usage_event","native_identity":json,"source_observed_at":RFC3339-UTC-string,"source_attribution":{"tool":string,"vendor":string,"model":string-or-null,"project":string-or-null,"native_request_identity":json},"source_consistency":object,"amounts":[[category,non-negative-integer],...]}`, where `source_observed_at` is exactly `YYYY-MM-DDTHH:MM:SS.nnnnnnnnnZ` derived by checked conversion of an explicit-offset, non-leap-second RFC 3339 instant representable as non-negative signed-64-bit UTC Unix nanoseconds, with amount pairs in registry order, Claude `source_consistency` exactly `{"message_id":string}`, Codex `source_consistency` exactly `{}`, and no ledger sequence, collection time, path, alias, extension metadata, allowlist, or sink field.
 
 ID: REQ-event-identity-and-normalization-003
 Source: RFC 0001 § UsageEvent
 Scope: v1-mandatory
 
 #### Scenario: Canonical-equivalent inputs have one digest
-- **WHEN** equivalent admitted source values differ only in JSON field order, whitespace, source location, alias, metadata selection, or sink enablement
+- **WHEN** equivalent admitted source values differ only in JSON field order, whitespace, RFC 3339 offset spelling for the same nanosecond instant, source location, alias, metadata selection, or sink enablement
 - **THEN** the canonical byte document and SHA-256 fingerprint are identical
 
 #### Scenario: Accounting participant changes the digest
@@ -77,15 +77,15 @@ Scope: v1-mandatory
 - **THEN** it quarantines the stream and does not undercount, fabricate, or derive a request from path, offset, content, or collection order
 
 ### Requirement: [TARGET-STATE] Source-Faithful Time and Attribution
-SHALL preserve the source-observed meaning of event time and source-derived tool, vendor, model, and canonical project attribution; unknown model or project MUST remain null, canonical project identity MUST be the exact repository basename rather than an absolute path, and no context may cross a source-stream boundary. Zero-or-more configuration mappings MAY assign different presentation aliases to distinct `(source,canonical-project)` pairs, but aliases MUST remain outside `UsageEvent`, fact/request identity, fingerprint, and aggregate bucket keys and enter only the affected sink policy and presentation.
+SHALL preserve the source-observed meaning of event time and source-derived tool, vendor, model, and working-directory attribution; unknown model or project MUST remain null. The normalized `project` value MUST be exactly the final component of the registry-admitted cwd under the source profile's frozen `posix|windows` lexical path flavor, or null for a filesystem root or unavailable, invalid, or unparseable cwd; it MUST NOT claim repository identity, discover a repository root, select an ancestor, access the filesystem, or retain the absolute path, and no context may cross a source-stream boundary. Zero-or-more configuration mappings MAY assign different presentation aliases to distinct `(source,working-directory-basename)` pairs, but aliases MUST remain outside `UsageEvent`, fact/request identity, fingerprint, and aggregate bucket keys and enter only the affected sink policy and presentation.
 
 ID: REQ-event-identity-and-normalization-006
 Source: RFC 0001 § UsageEvent; about/heart-and-soul/vision.md § Non-Negotiable Principles → 5. Normalization Preserves Meaning
 Scope: v1-mandatory
 
 #### Scenario: Structural attribution is preserved
-- **WHEN** an admitted record supplies source time, model, and a repository working directory under its source profile
-- **THEN** the event preserves source time, model, and the exact repository basename independently of collection time
+- **WHEN** admitted fixed-clock POSIX and Windows fixtures supply source time, model, and cwd values for a filesystem root, repository root, nested directory, non-repository directory, and invalid/unavailable path
+- **THEN** the event preserves the exact nanosecond source time and model and maps project to null or the exact cwd final component, including the nested/non-repository basename rather than a repository ancestor, independently of collection time
 - **AND** any configured alias is applied only by presentation or a digest-bound sink policy and never enters the event
 
 #### Scenario: Unknown attribution stays unknown
@@ -93,7 +93,7 @@ Scope: v1-mandatory
 - **THEN** the field remains null instead of being inferred from content, absolute path, a neighboring stream, or a sink default
 
 #### Scenario: Project alias changes presentation only
-- **WHEN** two canonical repository basenames have distinct configured aliases or one alias changes
+- **WHEN** two source working-directory basenames have distinct configured aliases or one alias changes
 - **THEN** retained events, fingerprints, request identity, and null-tagged aggregates remain unchanged while only the affected sink policy/presentation changes
 
 ### Requirement: [TARGET-STATE] Immutable V1 Token Registry

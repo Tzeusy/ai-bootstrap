@@ -40,8 +40,9 @@ Relationship to the other pillars:
 - [`lay-and-land`](../lay-and-land/README.md) maps the components, mounts, data flow, and deployment boundary.
 - [`craft-and-care`](../craft-and-care/README.md) governs implementation quality, verification, observability, and maintenance.
 
-RFC 0001 is accepted project law at the exact artifact digest recorded by Owner
-Decision 0001; the formal review and later specification-authoring erratum
-review preserve the digest trail. Source/resource profiles still require their
-downstream evidence gates before real mounts, ingestion, exports, or a release
-claim are enabled.
+RFC 0001 is accepted project law at current artifact digest
+`d865e6971c5ab56af5791007cefc73f53cb4d15d57ff898f61745e4f479c7b30`,
+recorded by Owner Decision 0001. The formal review and prior reconciliation
+entries preserve the historical digest trail. Source/resource profiles still
+require their downstream evidence gates before real mounts, ingestion,
+exports, or a release claim are enabled.

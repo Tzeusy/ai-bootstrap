@@ -33,12 +33,12 @@ Scope: v1-mandatory
 - **AND** syntax traversal skips all content and unregistered descendants directly from bounded input chunks
 
 #### Scenario: Runtime cannot widen the manifest
-- **WHEN** a source record contains an unregistered descendant or configuration attempts to add a path, kind, or type
-- **THEN** the value is skipped without decoding and configuration is rejected if it attempts to widen the manifest
-- **AND** an unregistered discriminator holds the stream rather than being treated as irrelevant
+- **WHEN** member/chunk permutations contain an unlisted descendant, an unregistered discriminator, or configuration that attempts to add a path, kind, or type
+- **THEN** the descendant is always skipped without decoding, configuration widening is rejected, and only the unregistered discriminator holds the stream as `unknown_kind`
+- **AND** no member or chunk order can turn a descendant into a kind or a kind into `registered_irrelevant`
 
 ### Requirement: [TARGET-STATE] Exact Parser-Limit Profile Schema
-MUST require every active adapter member to provide unsigned inclusive `max_record_bytes` measured from record start excluding the delimiter, `max_depth` with the root at one, `max_keys_per_record`, `max_encoded_key_bytes`, `max_projected_occurrences`, `max_application_memory_bytes`, and `max_structural_steps`, plus for every projected path inclusive `max_encoded_bytes`, `max_decoded_utf8_bytes`, `max_multiplicity`, integer `min_value` and `max_value` or decimal `min_value`, `max_value`, `max_precision`, and `max_scale`; all values, the minimum supported memory in bytes, counting algorithms, measurement evidence digests, and architecture results are immutable profile inputs. A missing required profile member, bound, counting rule, or evidence result MUST keep the source `unsupported_profile` before traversal; after activation, a missing or wrongly typed required projected record value MUST be `recognized_malformed`; and only an observed value, count, depth, size, structural-work total, application-memory total, or checked counter that exceeds its measured inclusive bound MUST yield the pre-ledger `record_limit` disposition whose stream state, cursor, recovery, and upward health are owned by stream reconciliation. Every exact `N` is admitted and no library or operator default is substituted.
+MUST require every active adapter member to provide unsigned inclusive `max_record_bytes` measured from record start excluding the delimiter, `max_depth` with the root at one, `max_keys_per_record`, `max_encoded_key_bytes`, `max_projected_occurrences`, `max_application_memory_bytes`, and `max_structural_steps`, plus for every projected path inclusive `max_encoded_bytes`, `max_decoded_utf8_bytes`, `max_multiplicity`, integer `min_value` and `max_value` or decimal `min_value`, `max_value`, `max_precision`, and `max_scale`; all values, the minimum supported memory in bytes, counting algorithms, measurement evidence digests, and architecture results are immutable profile inputs. Before traversal the exact phase order MUST be complete profile validation, runtime/mount resource preflight, and ledger availability/storage admission. After traversal begins, compound failures MUST use the JSON-member-order and chunk-order independent precedence `record_limit` for any measured/checked overflow, `schema_inconsistent` for invalid UTF-8 or JSON structure, `unknown_kind` for a valid unregistered discriminator, `recognized_malformed` for a registered kind's missing/wrong projected value or multiplicity, then `unregistered_category`; only parser success may reach later `identity_collision`. A missing required profile member, bound, counting rule, or evidence result MUST keep the source `unsupported_profile` before traversal. Every exact `N` is admitted and no library or operator default is substituted.
 
 ID: REQ-source-adapter-profiles-003
 Source: RFC 0001 § Mixed-Content Streaming Field Projection
@@ -59,11 +59,17 @@ Scope: v1-mandatory
 - **THEN** the source remains `unsupported_profile` and no source byte is traversed
 
 #### Scenario: Missing projected record value is malformed
-- **WHEN** an activated recognized record omits a required projected value or supplies its wrong declared type
-- **THEN** the record is `recognized_malformed`, not `record_limit`, and the stream holds before it
+- **WHEN** permutations of one complete record combine invalid UTF-8/structure, an exceeded limit, an unregistered discriminator, missing/wrong projected values, an unregistered category, and a would-be identity collision
+- **THEN** every permutation selects the exact precedence winner, holds before the record, and never reaches collision unless all parser phases succeed
 
 ### Requirement: [TARGET-STATE] Profile Fixture and Privacy Corpus
 SHALL require each supported profile member to include version-pinned zero or minimum, exactly-at, one-past, combined-memory-bound, incomplete-tail, oversized-irrelevant, malformed, replay, mutation, escaped and nested sentinel, and error-path fixtures with canonical expected classifications and content-free outputs on native amd64 and arm64.
+Every application-value, permitted-decoder instrumentation, log, exception,
+crash-output, SQLite, OTLP, PostgreSQL, image-layer/filesystem, environment, and
+packet/network capture MUST observe its own harmless content-free positive-
+control canary, and separate deliberate test-only sentinel-leak, forbidden-
+decoder/materializer/fingerprint, and unexpected-network mutations MUST fail
+the harness without using actual sensitive data.
 
 ID: REQ-source-adapter-profiles-004
 Source: RFC 0001 § Mixed-Content Streaming Field Projection; § Integration
@@ -94,16 +100,16 @@ Scope: v1-mandatory
 - **AND** a wrong projected type is `recognized_malformed`, an unprofiled kind remains unregistered, and no wildcard irrelevant-kind rule is applied
 
 ### Requirement: [TARGET-STATE] Claude Identity, Attribution, and Arithmetic
-MUST require Claude native and logical request identity `(sessionId,requestId)`, treat `message.id` as a mandatory consistency value, map `input_tokens` to `input_uncached`, `cache_creation_input_tokens` to `input_cache_write`, `cache_read_input_tokens` to `input_cache_read`, and `output_tokens` to `output_unclassified`, preserve absent optional amounts as absent, use the record's own timestamp and model plus the canonical repository basename derived from that record's `cwd` without cross-record context, keep every project alias outside the normalized event, fact/request identity, accounting fingerprint, and aggregate keys, and expose aliases only through presentation and digest-bound sink policy, and quarantine same-identity changes in time, message identity, model, or amount.
+MUST require Claude native and logical request identity `(sessionId,requestId)`, treat `message.id` as a mandatory consistency value, map `input_tokens` to `input_uncached`, `cache_creation_input_tokens` to `input_cache_write`, `cache_read_input_tokens` to `input_cache_read`, and `output_tokens` to `output_unclassified`, preserve absent optional amounts as absent, use the record's own timestamp and model plus exactly the lexical final component of that record's `cwd` under the source-profile path flavor, yield null for a filesystem root or unavailable/invalid cwd, never perform repository discovery or ancestor selection, keep every project alias outside the normalized event, fact/request identity, accounting fingerprint, and aggregate keys, expose aliases only through presentation and digest-bound sink policy, and quarantine same-identity changes in time, message identity, model, or amount.
 
 ID: REQ-source-adapter-profiles-006
 Source: RFC 0001 § Source-Specific V1 Attribution → Claude Code sessions
 Scope: v1-mandatory
 
 #### Scenario: Claude record normalizes faithfully
-- **WHEN** a qualified assistant record has the required identity, timestamp, model, project context, and registered counters
+- **WHEN** qualified assistant fixtures use a filesystem root, a repository root, a nested directory inside it, a non-repository directory, an unavailable/invalid cwd, and both profile-supported POSIX and Windows lexical path forms
 - **THEN** it yields the exact non-overlapping category mapping and one source-backed logical request identity
-- **AND** its project is exactly the record's repository basename, no configured alias or neighboring record supplies event context, and aliases remain presentation/sink-policy only
+- **AND** project is respectively null or the exact cwd final component, including the nested/non-repository basename rather than a repository ancestor; no configured alias or neighboring record supplies event context, and aliases remain presentation/sink-policy only
 
 #### Scenario: Missing or mutated identity quarantines
 - **WHEN** `requestId` is missing or an identical identity arrives with a different timestamp, message ID, model, or amount
@@ -137,8 +143,8 @@ Scope: v1-mandatory
 - **THEN** only the listed values are projected and usage and each present primary or secondary quota window are classified independently
 
 #### Scenario: Unknown advancing kind holds
-- **WHEN** a rollout contains an unprofiled envelope discriminator, an unprofiled `event_msg` payload kind, or an unregistered quota field
-- **THEN** the value is not opportunistically decoded or consumed and the stream holds before that record
+- **WHEN** a rollout contains an unprofiled envelope discriminator, an unprofiled `event_msg` payload kind, and arbitrary unlisted quota descendants in permuted member/chunk order
+- **THEN** the unregistered discriminator or payload kind is not consumed and holds as `unknown_kind`, while unlisted descendants remain skip-only without decoding and cannot independently hold the record
 
 #### Scenario: Quota presence classes are structural
 - **WHEN** otherwise-equal supported records omit `rate_limits`, set it to JSON null, provide only its admitted identity/context, or provide a complete primary window

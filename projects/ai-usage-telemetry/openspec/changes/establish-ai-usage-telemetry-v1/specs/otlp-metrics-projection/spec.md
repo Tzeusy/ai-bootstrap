@@ -66,15 +66,15 @@ Scope: v1-mandatory
 - **THEN** the target checkpoint is blocked with sanitized health and no batch or partial target is acknowledged
 
 ### Requirement: [TARGET-STATE] Exact Quota Gauge Tuples
-MUST give both quota gauges exactly point attributes `ai.account`, `ai.vendor`, `ai.quota.limit`, `ai.quota.window`, `ai.quota.scope`, and `ai.quota.freshness`; emit utilization for every selected current subject with an admitted value; emit age only when source time is non-null as `max(0,export_time-source_observed_at)` seconds; distinguish every subject injectively without aggregation; and block a target for any unrepresentable subject or tuple collision.
+MUST give both quota gauges exactly point attributes `ai.account`, `ai.vendor`, `ai.quota.limit`, `ai.quota.window`, `ai.quota.scope`, and `ai.quota.freshness`; emit utilization for every selected current subject with an admitted value; emit age only when source time is non-null as the non-negative integer `floor(max(0,target_export_time_unix_nano-source_unix_nano)/1_000_000_000)` using checked signed-64-bit nanosecond subtraction; distinguish every subject injectively without aggregation; and block a target for any unrepresentable subject, arithmetic overflow, or tuple collision.
 
 ID: REQ-otlp-metrics-projection-005
 Source: RFC 0001 § OTLP Metrics Projection
 Scope: v1-mandatory
 
 #### Scenario: Current quota subject has injective gauges
-- **WHEN** a selected quota subject has admitted finite dimensions, utilization, and source time
-- **THEN** one utilization point and one age point share its complete tuple and preserve its current freshness state
+- **WHEN** fixed-clock selected subjects place source time at tolerated future, equal, one-nanosecond past, and immediately below/at/above a whole export-age second
+- **THEN** one utilization point and one age point share each complete tuple, future age clamps to zero, and integer age floors only the checked final nanosecond delta while preserving current freshness
 
 #### Scenario: Quota tuple collision is non-mergeable
 - **WHEN** two admitted quota subjects map to the same complete series tuple or one dimension lacks a legal value
@@ -95,6 +95,7 @@ Scope: v1-mandatory
 - **WHEN** configuration requests an absolute path, request ID, fingerprint, timestamp, arbitrary model string, or unregistered metadata field
 - **THEN** it is not emitted and cannot create a series
 - **AND** a non-mergeable quota value blocks rather than entering `other`
+- **AND** the OTLP payload/network capture must first observe its harmless positive-control canary, while a deliberate test-only sentinel leak or unexpected endpoint event makes the harness fail
 
 ### Requirement: [TARGET-STATE] Exact OTLP Budget Profile Schema
 MUST require immutable byte-valued `max_attribute_utf8_bytes` per attribute, explicit legal tuple arrays per instrument, unsigned `max_series` per instrument and `max_process_series`, unsigned `max_serialized_request_bytes`, named accounting partitions, an optional single reserved `other` tuple for each allowed Sum partition, and effective SDK/exporter caps and evidence digests. The encoded-size domain MUST be exactly the uncompressed deterministic protobuf message bytes of `opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest` sent as the OTLP/HTTP `application/x-protobuf` body, with protocol `http/protobuf`, compression `none`, schema-descriptor digest, encoder artifact digest, deterministic serialization enabled, Resource/Scope/metric/data-point/attribute ordering fixed by this spec, and HTTP headers, HTTP framing, TLS, and transport compression excluded; these settings and digests MUST be members of `otlp_projection_profile_digest` and therefore of the persisted projection-policy digest. Startup MUST enumerate realizable complete series identities and require every project cap at or below its SDK cap, while runtime atomically rejects `N+1`, invalid UTF-8, checked-arithmetic overflow, or an unlisted tuple without eviction, omission, or first-seen semantics.

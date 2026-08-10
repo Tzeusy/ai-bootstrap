@@ -24,7 +24,7 @@ Scope: v1-mandatory
 - **THEN** the collector MUST persist quota availability `disabled` or `coverage_unknown` respectively, MUST emit no quota fact, and MUST transition from `disabled` through `coverage_unknown` to the exact first observed `absent|null|state_only|observed` outcome; `disabled` remains healthy-by-contract while `coverage_unknown` contributes unknown freshness wherever quota currency is required
 
 ### Requirement: [TARGET-STATE] Closed QuotaSnapshot and Fingerprint Shape
-MUST admit a `QuotaSnapshot` only with canonical fact identity, SHA-256 fingerprint, nullable registry-derived source-observed time, collected time, nullable configured account alias, vendor, limit name, native limit, window, and scope identities, canonical utilization decimal in inclusive `0.0..1.0`, optional window minutes, reset time, and scope, recorded freshness state, one exact evidence enum, and empty v1 metadata; absent account alias MUST remain null without a default, is presentation-only, and is never a quota subject or fact-identity member; its fingerprint MUST be SHA-256 over `UTF-8("aiut-accounting-fingerprint-v1\n")` plus RFC 8785 canonical UTF-8 JSON of exactly `{"adapter_schema_id":string,"fact_kind":"quota_snapshot","native_identity":json,"source_observed_at":RFC3339-UTC-string-or-null,"quota":{"vendor":string,"native_limit_identity":string,"limit_name":string,"utilization":canonical-decimal-string,"native_window_identity":string,"window_minutes":non-negative-integer-or-null,"reset_at":RFC3339-UTC-string-or-null,"native_scope_identity":string,"scope":string-or-null,"freshness_evidence":enum}}`, excluding collected time, account alias, current freshness state, paths, metadata, and sinks.
+MUST admit a `QuotaSnapshot` only with canonical fact identity, SHA-256 fingerprint, nullable registry-derived source-observed time, collected time, nullable configured account alias, vendor, limit name, native limit, window, and scope identities, canonical utilization decimal in inclusive `0.0..1.0`, optional window minutes, reset time, and scope, recorded freshness state, one exact evidence enum, and empty v1 metadata. Every non-null source, collection, and reset instant MUST parse from explicit-offset RFC 3339 with year `0001..9999`, reject leap seconds, convert with checked arithmetic to a non-negative signed-64-bit UTC Unix-nanosecond integer, and render only as `YYYY-MM-DDTHH:MM:SS.nnnnnnnnnZ`; absent account alias MUST remain null without a default, is presentation-only, and is never a quota subject or fact-identity member. The fingerprint MUST be SHA-256 over `UTF-8("aiut-accounting-fingerprint-v1\n")` plus RFC 8785 canonical UTF-8 JSON of exactly `{"adapter_schema_id":string,"fact_kind":"quota_snapshot","native_identity":json,"source_observed_at":RFC3339-UTC-string-or-null,"quota":{"vendor":string,"native_limit_identity":string,"limit_name":string,"utilization":canonical-decimal-string,"native_window_identity":string,"window_minutes":non-negative-integer-or-null,"reset_at":RFC3339-UTC-string-or-null,"native_scope_identity":string,"scope":string-or-null,"freshness_evidence":enum}}`, excluding collected time, account alias, current freshness state, paths, metadata, and sinks.
 
 ID: REQ-quota-snapshot-semantics-002
 Source: RFC 0001 § QuotaSnapshot
@@ -55,16 +55,16 @@ Scope: v1-mandatory
 - **THEN** no replacement row is committed and the source stream is quarantined
 
 ### Requirement: [TARGET-STATE] Exact Freshness Profile and Evidence Semantics
-MUST require each accepted source-and-limit member to provide immutable unsigned `maximum_age_seconds` and `allowed_future_skew_seconds` with measurement digest and native evidence, and MUST restrict `freshness_evidence` to exactly `record_timestamp`, `record_timestamp_and_window`, `record_timestamp_and_reset`, `record_timestamp_window_and_reset`, or `missing_source_timestamp`; freshness is `fresh` through the inclusive maximum-age deadline, `stale` on the first later instant, `unknown` when source time is absent, and malformed when source time exceeds collected time by more than the inclusive skew, while collected time never substitutes for source time or enters the fingerprint.
+MUST require each accepted source-and-limit member to provide immutable unsigned `maximum_age_seconds` and `allowed_future_skew_seconds` with measurement digest and native evidence, and MUST restrict `freshness_evidence` to exactly `record_timestamp`, `record_timestamp_and_window`, `record_timestamp_and_reset`, `record_timestamp_window_and_reset`, or `missing_source_timestamp`. All multiplication and subtraction MUST be checked on normalized integer nanoseconds. A known future source time is admitted only through the inclusive skew bound and maps to `age_ns=0,age_seconds=0,fresh`; beyond-skew or overflow is malformed. Otherwise `age_ns=collected_unix_nano-source_unix_nano`, `age_seconds=floor(age_ns/1_000_000_000)`, freshness is `fresh` through inclusive `age_ns=maximum_age_seconds*1_000_000_000`, and the first nanosecond later is `stale`; absent source time is `unknown`, while collected time never substitutes for source time or enters the fingerprint.
 
 ID: REQ-quota-snapshot-semantics-004
 Source: RFC 0001 § QuotaSnapshot
 Scope: v1-mandatory
 
 #### Scenario: Exact freshness boundary is deterministic
-- **WHEN** source time is known and age equals the active member's `maximum_age_seconds`
-- **THEN** recorded freshness is `fresh`
-- **AND** the first representable later instant is `stale`
+- **WHEN** fixed-clock vectors place source time at tolerated future `+1ns`, exact future skew, skew `+1ns`, equal time, past `1ns`, exact maximum-age nanosecond deadline, and deadline `+1ns`
+- **THEN** tolerated future instants are fresh with age zero, beyond-skew is malformed, equal/past instants use checked nonnegative nanosecond age, and the inclusive deadline is fresh
+- **AND** the first nanosecond after the freshness deadline is stale without floating-point or host-datetime rounding
 
 #### Scenario: Missing or future source time cannot look fresh
 - **WHEN** source time is absent or lies beyond the accepted future-skew bound
@@ -87,15 +87,15 @@ Scope: v1-mandatory
 - **THEN** the lexicographically least fact identity wins the tie or current state is `unknown`, respectively
 
 ### Requirement: [TARGET-STATE] Query-Time Freshness Recalculation
-SHALL make the read-only quota view emit one `component_state` row for each registered quota component and one `snapshot` row per retained fact, recompute current snapshot `fresh` or `stale` and `age_seconds` against inspection time using the immutable source-and-limit threshold while preserving recorded evidence, source time, collection time, and observation state, and keep `unavailable`, `absent`, `null`, `state_only`, stale, and unknown queryable under their exact fact/null rules without making a live-vendor-quota claim.
+SHALL make the read-only quota view emit one `component_state` row for each registered quota component and one `snapshot` row per retained fact, recompute current snapshot `fresh` or `stale` and `age_seconds=floor(max(0,inspection_unix_nano-source_unix_nano)/1_000_000_000)` with checked integer arithmetic against inspection time using the immutable source-and-limit threshold while preserving recorded evidence, source time, collection time, and observation state, and keep `unavailable`, `absent`, `null`, `state_only`, stale, and unknown queryable under their exact fact/null rules without making a live-vendor-quota claim.
 
 ID: REQ-quota-snapshot-semantics-006
 Source: RFC 0001 § QuotaSnapshot; § Event Time and Projection Time
 Scope: v1-mandatory
 
 #### Scenario: Fresh snapshot ages without mutation
-- **WHEN** a formerly fresh snapshot passes its threshold without a new record
-- **THEN** read-only inspection reports it `stale` while preserving its original evidence and timestamps
+- **WHEN** fixed-clock inspection places a snapshot immediately below, at, and above zero, every whole-second boundary, and the exact freshness deadline without a new record
+- **THEN** read-only inspection clamps tolerated future age to zero, floors only the final nonnegative nanosecond delta to `age_seconds`, and reports stale only after the deadline while preserving original evidence and timestamps
 - **AND** no retained fact is rewritten
 
 #### Scenario: Unknown observation remains queryable

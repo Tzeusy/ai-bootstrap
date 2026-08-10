@@ -120,3 +120,18 @@ implementation before the active change's conditional acceptance gates pass.
 
 The reconciled RFC 0001 digest is
 `4523cdc1fbc9cd3e80b04f4c08c098312dfd6cac2a4f472cd95cb8aeb496daef`.
+
+## R2 Reconciliation Clarification
+
+Under the same standing authorization, R2 reconciliation closes SQL-certain
+PostgreSQL child linkage, persistent independent SQLite health latches and
+`STRICT` storage typing, deterministic parser failure precedence, global source-
+namespace uniqueness, exact working-directory-basename attribution, checked
+Unix-nanosecond timestamp and age arithmetic, two-sided privacy/capture canary
+evidence, clause-level executable traceability, and the complete three-way
+zero-fact inventory. These corrections make existing safety and accounting
+claims testable without changing doctrine, accepting a capability, waiving an
+evidence gate, or authorizing personal mounts or real destinations.
+
+The R2-reconciled RFC 0001 digest is
+`d865e6971c5ab56af5791007cefc73f53cb4d15d57ff898f61745e4f479c7b30`.

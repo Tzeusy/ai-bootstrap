@@ -110,10 +110,15 @@ whose age matters.
 [Inferred] The normalized model must retain source identity and source
 freshness. Quota utilization uses one canonical `0-1` scale and distinguishes
 source observation time, collection time, and explicit fresh, stale, or unknown
-state; collection time must not be presented as vendor freshness. Project labels
-default to repository basenames, and configured account aliases stand in for
-identities that would otherwise require credential access. Unknown or
-unavailable dimensions remain unknown; they are never guessed.
+state; collection time must not be presented as vendor freshness. The normalized
+`project` field, when the admitted source working directory is valid and has a
+final component, is exactly that working-directory basename. It is not a
+repository-root claim: a nested working directory names the nested directory,
+a non-repository directory is still eligible, and a filesystem root or missing
+or invalid working directory yields null. Configured aliases change presentation
+only, and configured account aliases stand in for identities that would
+otherwise require credential access. Unknown or unavailable dimensions remain
+unknown; they are never guessed.
 
 **A violation is:** confusing percentages with fractions, presenting a stale
 quota snapshot as current, treating unlike event types as equivalent turns, or

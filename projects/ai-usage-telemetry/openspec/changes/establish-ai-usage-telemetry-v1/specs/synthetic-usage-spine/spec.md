@@ -49,6 +49,7 @@ Scope: v1-mandatory
 - **WHEN** content sentinels occur in nested, escaped, malformed, and oversized skipped fields
 - **THEN** none of the sentinel bytes or their digests appear in application values, output, logs, exceptions, crash output, SQLite, a sink payload, or network capture
 - **AND** parser instrumentation records zero forbidden decoder, materializer, and fingerprint invocations
+- **AND** every application-value, parser-instrumentation, log, exception, crash, SQLite, sink, image, environment, and network capture first observes its distinct harmless positive-control canary, while deliberate test-only sentinel-leak, forbidden-decoder/materializer/fingerprint, and unexpected-network mutations each make the harness fail without real sensitive data
 
 ### Requirement: [TARGET-STATE] Replay and Collision Outcome
 SHALL leave fact, amount, request, aggregate, and sink-obligation counts unchanged when the identical qualified fixture is replayed, and MUST quarantine the synthetic stream without overwriting history when the same native identity has a changed accounting fingerprint.
