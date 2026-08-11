@@ -9,11 +9,14 @@ record, secret, destination, or reusable production bypass.
 - Qualified input: `qualified-claude.jsonl`, version `synthetic-thesis@1`
 - Synthetic database: a disposable SQLite file under the test temporary
   directory; it is not retained or used by a production package.
-- Launcher: `thesis.launcher.launch`, which rejects forbidden configuration
-  before any input read. For an allowed run it validates the canonical manifest,
-  fixture membership, digest, and projected types before it creates the
-  temporary database directory or opens SQLite. Every rejected fixture leaves
-  no database file, table, or durable contribution.
+- Launcher: `thesis.launcher.launch`, which first validates Decision 0002's one
+  `synthetic-usage-spine` row is exactly `accepted` and that its bound
+  `spec.md` SHA-256 still matches. Direct harness construction repeats that
+  check, so it has no authorization bypass. Only then does the harness reject
+  forbidden configuration and validate the canonical manifest, fixture
+  membership, digest, and projected types before it creates the temporary
+  database directory or opens SQLite. Every rejected fixture leaves no
+  database file, table, or durable contribution.
 
 ## Exercise command
 
@@ -23,11 +26,14 @@ From the repository root:
 uv run pytest projects/ai-usage-telemetry/tests/spec/test_synthetic_usage_spine.py -q
 ```
 
-The six requirement-named tests execute launcher preflight, the byte-projecting
+The requirement-named tests execute launcher preflight, the byte-projecting
 parser, SQLite transaction, line/file/restart/rescan replay, capture probes,
-the bounded exercise, and retirement enforcement. The parser test fails if the
-whole raw payload is decoded; skipped sentinel-bearing bytes stay outside the
-application value boundary.
+the bounded exercise, and retirement enforcement. The privacy matrix uses real
+synthetic nested, JSON-escaped, malformed, duplicate-registered-key,
+32-level/33-level, and over-64-KiB skipped-field fixtures through the launcher
+and harness. The parser receives one `memoryview` over a read-only mapped source
+buffer rather than a copied JSONL line; it decodes only registered scalar tokens
+after a structural pass has rejected duplicate registered keys.
 
 ## Bounded read exercise
 

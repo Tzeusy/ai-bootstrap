@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import importlib
-import io
 import json
+import shutil
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -19,6 +21,7 @@ import pytest
 from thesis.harness import (
     CaptureViolation,
     HarnessConfig,
+    ProjectionStats,
     ThesisHarness,
     ValidationError,
 )
@@ -29,6 +32,29 @@ ROOT = Path(__file__).parents[2]
 FIXTURES = ROOT / "tests" / "fixtures" / "synthetic-thesis"
 QUALIFIED = FIXTURES / "qualified-claude.jsonl"
 MANIFEST = FIXTURES / "manifest.json"
+DECISION_0002 = (
+    ROOT
+    / "about"
+    / "heart-and-soul"
+    / "decisions"
+    / "0002-accept-v1-capability-contracts.md"
+)
+SYNTHETIC_SPEC = (
+    ROOT
+    / "openspec"
+    / "changes"
+    / "establish-ai-usage-telemetry-v1"
+    / "specs"
+    / "synthetic-usage-spine"
+    / "spec.md"
+)
+FORBIDDEN_SENTINEL = b"THESIS_FORBIDDEN_CONTENT_SENTINEL"
+FORBIDDEN_SENTINEL_DIGEST = (
+    hashlib.sha256(FORBIDDEN_SENTINEL).hexdigest().encode("ascii")
+)
+ESCAPED_FORBIDDEN_SENTINEL = b"".join(
+    f"\\u{byte:04x}".encode("ascii") for byte in FORBIDDEN_SENTINEL
+)
 EXPECTED_AMOUNTS = {
     "input_tokens": 11,
     "output_tokens": 7,
@@ -85,16 +111,6 @@ FIXTURE_ORACLE = {
 }
 
 
-class _NoWholePayloadDecode(bytes):
-    """Permit byte scanning but fail if the complete raw record becomes text."""
-
-    def decode(self, *args: object, **kwargs: object) -> str:
-        raise AssertionError("the complete skipped payload was decoded")
-
-    def splitlines(self, *args: object, **kwargs: object) -> list[bytes]:
-        return [self]
-
-
 def config(tmp_path: Path, **overrides: object) -> HarnessConfig:
     values: dict[str, object] = {
         "fixture_path": QUALIFIED,
@@ -105,9 +121,98 @@ def config(tmp_path: Path, **overrides: object) -> HarnessConfig:
     return HarnessConfig(**values)
 
 
-def test_req_synthetic_usage_spine_001(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def _isolated_thesis_project(tmp_path: Path) -> Path:
+    """Copy only the launcher, fixture, and acceptance inputs for real launch tests."""
+
+    project = tmp_path / "isolated-thesis-project"
+    shutil.copytree(
+        ROOT / "thesis",
+        project / "thesis",
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    shutil.copytree(FIXTURES, project / "tests" / "fixtures" / "synthetic-thesis")
+    decision = project / DECISION_0002.relative_to(ROOT)
+    decision.parent.mkdir(parents=True)
+    shutil.copy2(DECISION_0002, decision)
+    spec = project / SYNTHETIC_SPEC.relative_to(ROOT)
+    spec.parent.mkdir(parents=True)
+    shutil.copy2(SYNTHETIC_SPEC, spec)
+    return project
+
+
+def _run_isolated_launch(
+    project: Path,
+    *,
+    runner: str = "launcher",
+    missing_harness_resources: bool = False,
+) -> tuple[str, Path]:
+    database_path = project / "state" / "thesis.sqlite3"
+    program = """
+from pathlib import Path
+import sys
+
+from thesis.harness import HarnessConfig, ThesisHarness, ValidationError
+from thesis.launcher import launch
+
+project = Path.cwd()
+missing_harness_resources = sys.argv[2] == "missing"
+config = HarnessConfig(
+    fixture_path=project / "tests" / "fixtures" / "synthetic-thesis" / (
+        "missing-fixture.jsonl" if missing_harness_resources else "qualified-claude.jsonl"
+    ),
+    manifest_path=project / "tests" / "fixtures" / "synthetic-thesis" / (
+        "missing-manifest.json" if missing_harness_resources else "manifest.json"
+    ),
+    database_path=project / "state" / "thesis.sqlite3",
+)
+try:
+    result = launch(config) if sys.argv[1] == "launcher" else ThesisHarness(config).run_once()
+except ValidationError as error:
+    print(f"rejected:{error.code}")
+else:
+    print(f"accepted:{result.status}")
+"""
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            program,
+            runner,
+            "missing" if missing_harness_resources else "present",
+        ],
+        cwd=project,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip(), database_path
+
+
+def _assert_real_privacy_fixture_vector(fixture_path: Path) -> None:
+    """Keep the matrix's sentinel and limit claims independent of the harness."""
+
+    payload = fixture_path.read_bytes()
+    if fixture_path.name == "privacy-escaped.jsonl":
+        assert ESCAPED_FORBIDDEN_SENTINEL in payload
+        assert FORBIDDEN_SENTINEL not in payload
+    else:
+        assert FORBIDDEN_SENTINEL in payload
+
+    if fixture_path.name == "privacy-nested.jsonl":
+        assert b'"nested"' in payload
+    elif fixture_path.name == "privacy-malformed.jsonl":
+        assert b"\\u00ZZ" in payload
+    elif fixture_path.name == "privacy-oversized-skip.jsonl":
+        assert len(payload) > 65_536
+    elif fixture_path.name == "privacy-depth-at-limit.jsonl":
+        assert payload.count(b"[") == 32
+    elif fixture_path.name == "privacy-depth-over-limit.jsonl":
+        assert payload.count(b"[") == 33
+    elif fixture_path.name == "privacy-duplicate-registered.jsonl":
+        assert payload.count(b'"requestId"') == 2
+
+
+def test_req_synthetic_usage_spine_001(tmp_path: Path) -> None:
     accepted = launch(config(tmp_path))
     assert accepted.status == "accepted"
 
@@ -143,21 +248,15 @@ def test_req_synthetic_usage_spine_001(
     assert not invalid_manifest_database.exists()
     assert not invalid_manifest_database.parent.exists()
 
-    drifted_manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    isolated_project = _isolated_thesis_project(tmp_path / "drifted-manifest")
+    isolated_manifest = (
+        isolated_project / "tests" / "fixtures" / "synthetic-thesis" / "manifest.json"
+    )
+    drifted_manifest = json.loads(isolated_manifest.read_text(encoding="utf-8"))
     drifted_manifest["required_fields"] = ["requestId"]
-    drifted_manifest_database = tmp_path / "drifted-manifest" / "thesis.sqlite3"
-    original_open = Path.open
-
-    def open_drifted_manifest(path: Path, *args: object, **kwargs: object) -> object:
-        if path == MANIFEST:
-            return io.StringIO(json.dumps(drifted_manifest))
-        return original_open(path, *args, **kwargs)
-
-    with monkeypatch.context() as manifest_patch:
-        manifest_patch.setattr(Path, "open", open_drifted_manifest)
-        with pytest.raises(ValidationError) as error:
-            launch(config(tmp_path, database_path=drifted_manifest_database))
-    assert error.value.code == "manifest_invalid"
+    isolated_manifest.write_text(json.dumps(drifted_manifest), encoding="utf-8")
+    outcome, drifted_manifest_database = _run_isolated_launch(isolated_project)
+    assert outcome == "rejected:manifest_invalid"
     assert not drifted_manifest_database.exists()
     assert not drifted_manifest_database.parent.exists()
 
@@ -192,6 +291,65 @@ def test_req_synthetic_usage_spine_001(
         assert not database_path.parent.exists()
 
 
+@pytest.mark.parametrize(
+    ("runner", "case", "expected_code"),
+    (
+        pytest.param(
+            "launcher",
+            "missing",
+            "synthetic_authorization_missing",
+            id="launcher-missing",
+        ),
+        pytest.param(
+            "launcher",
+            "not-accepted",
+            "synthetic_authorization_not_accepted",
+            id="launcher-not-accepted",
+        ),
+        pytest.param(
+            "launcher",
+            "digest-drift",
+            "synthetic_authorization_digest_mismatch",
+            id="launcher-digest-drift",
+        ),
+        pytest.param(
+            "harness",
+            "not-accepted",
+            "synthetic_authorization_not_accepted",
+            id="direct-harness-not-accepted",
+        ),
+    ),
+)
+def test_launcher_validates_decision_0002_before_harness_resources(
+    tmp_path: Path, runner: str, case: str, expected_code: str
+) -> None:
+    project = _isolated_thesis_project(tmp_path)
+    decision = project / DECISION_0002.relative_to(ROOT)
+    spec = project / SYNTHETIC_SPEC.relative_to(ROOT)
+    if case == "missing":
+        decision.unlink()
+    elif case == "not-accepted":
+        original = decision.read_text(encoding="utf-8")
+        updated = original.replace(
+            "| `synthetic-usage-spine` | `accepted` |",
+            "| `synthetic-usage-spine` | `rejected` |",
+            1,
+        )
+        assert updated != original
+        decision.write_text(updated, encoding="utf-8")
+    else:
+        spec.write_bytes(spec.read_bytes() + b"\n")
+
+    outcome, database_path = _run_isolated_launch(
+        project,
+        runner=runner,
+        missing_harness_resources=True,
+    )
+    assert outcome == f"rejected:{expected_code}"
+    assert not database_path.exists()
+    assert not database_path.parent.exists()
+
+
 def test_req_synthetic_usage_spine_002(tmp_path: Path) -> None:
     harness = ThesisHarness(config(tmp_path))
     result = harness.run_once()
@@ -207,54 +365,150 @@ def test_req_synthetic_usage_spine_002(tmp_path: Path) -> None:
         assert failing.stable_view() == EXPECTED_STABLE_VIEW
 
 
-def test_req_synthetic_usage_spine_003(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("fixture_name", "expected_status", "expected_code"),
+    (
+        pytest.param("privacy-nested.jsonl", "accepted", None, id="nested"),
+        pytest.param("privacy-escaped.jsonl", "accepted", None, id="escaped"),
+        pytest.param(
+            "privacy-malformed.jsonl", "rejected", "schema_inconsistent", id="malformed"
+        ),
+        pytest.param(
+            "privacy-oversized-skip.jsonl", "rejected", "record_limit", id="oversized"
+        ),
+        pytest.param(
+            "privacy-depth-at-limit.jsonl", "accepted", None, id="depth-at-limit"
+        ),
+        pytest.param(
+            "privacy-depth-over-limit.jsonl",
+            "rejected",
+            "record_limit",
+            id="depth-over-limit",
+        ),
+        pytest.param(
+            "privacy-duplicate-registered.jsonl",
+            "rejected",
+            "duplicate_registered_key",
+            id="duplicate-registered-key",
+        ),
+    ),
+)
+def test_req_synthetic_usage_spine_003_real_fixture_matrix_stays_content_free(
+    tmp_path: Path,
+    fixture_name: str,
+    expected_status: str,
+    expected_code: str | None,
 ) -> None:
-    original_read_bytes = Path.read_bytes
+    fixture_path = FIXTURES / fixture_name
+    _assert_real_privacy_fixture_vector(fixture_path)
+    launcher_database = tmp_path / "launcher" / fixture_name / "thesis.sqlite3"
+    if expected_status == "accepted":
+        assert (
+            launch(
+                config(
+                    tmp_path,
+                    fixture_path=fixture_path,
+                    database_path=launcher_database,
+                )
+            ).status
+            == "accepted"
+        )
+    else:
+        with pytest.raises(ValidationError) as error:
+            launch(
+                config(
+                    tmp_path,
+                    fixture_path=fixture_path,
+                    database_path=launcher_database,
+                )
+            )
+        assert error.value.code == expected_code
+        assert not launcher_database.exists()
+        assert not launcher_database.parent.exists()
 
-    def guarded_read_bytes(path: Path) -> bytes:
-        payload = original_read_bytes(path)
-        return _NoWholePayloadDecode(payload) if path == QUALIFIED else payload
-
-    monkeypatch.setattr(Path, "read_bytes", guarded_read_bytes)
-    harness = ThesisHarness(config(tmp_path))
-    result = harness.run_privacy()
-    assert result.status == "accepted"
+    harness = ThesisHarness(config(tmp_path / "privacy-probe"))
+    result = harness.run_privacy(fixture_path=fixture_path)
+    assert result.status == expected_status
+    assert result.rejection_code == expected_code
     assert result.forbidden_decoder_calls == 0
     assert result.forbidden_materializer_calls == 0
     assert result.forbidden_fingerprint_calls == 0
-    assert result.public_capture == EXPECTED_STABLE_VIEW
-    captured_bytes = json.dumps(
-        {
-            "public_capture": result.public_capture,
-            "capture_canaries": result.capture_canaries,
-            "capture_observations": result.capture_observations,
-        },
-        sort_keys=True,
-    ).encode("utf-8")
-    forbidden_sentinel = b"THESIS_FORBIDDEN_CONTENT_SENTINEL"
-    assert forbidden_sentinel not in captured_bytes
-    assert (
-        hashlib.sha256(forbidden_sentinel).hexdigest().encode("ascii")
-        not in captured_bytes
+    assert result.framing is not None
+    assert result.framing.line_is_memoryview is True
+    assert result.framing.shares_source_buffer is True
+    assert result.framing.source_is_mmap is True
+    expected_view = (
+        EXPECTED_STABLE_VIEW if expected_status == "accepted" else EMPTY_STABLE_VIEW
     )
-    expected_lanes = json.loads(MANIFEST.read_text(encoding="utf-8"))[
-        "capture_canaries"
-    ]
+    assert result.public_capture == expected_view
+    assert harness.stable_view() == expected_view
+
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    assert manifest["max_record_bytes"] == 65_536
+    assert manifest["max_container_depth"] == 32
+    expected_lanes = manifest["capture_canaries"]
+    assert result.capture_canaries is not None
     assert set(result.capture_canaries) == set(expected_lanes)
     assert len(set(result.capture_canaries.values())) == len(expected_lanes)
     assert result.capture_observations == {
         lane: (result.capture_canaries[lane],) for lane in expected_lanes
     }
-    for mutation, lane in (
-        ("leak", "application_value"),
-        ("decoder", "parser_instrumentation"),
-        ("materializer", "application_value"),
-        ("fingerprint", "application_value"),
-        ("network", "network"),
-    ):
-        with pytest.raises(CaptureViolation, match=lane):
-            ThesisHarness(config(tmp_path / mutation)).run_privacy(mutation=mutation)
+    captured_bytes = json.dumps(
+        {
+            "public_capture": result.public_capture,
+            "capture_canaries": result.capture_canaries,
+            "capture_observations": result.capture_observations,
+            "rejection_code": result.rejection_code,
+            "framing": {
+                "line_is_memoryview": result.framing.line_is_memoryview,
+                "shares_source_buffer": result.framing.shares_source_buffer,
+                "source_is_mmap": result.framing.source_is_mmap,
+            },
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+    assert FORBIDDEN_SENTINEL not in captured_bytes
+    assert FORBIDDEN_SENTINEL_DIGEST not in captured_bytes
+    assert ".splitlines(" not in (ROOT / "thesis" / "harness.py").read_text(
+        encoding="utf-8"
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "lane", "expected_stats"),
+    (
+        pytest.param("leak", "application_value", ProjectionStats(), id="leak"),
+        pytest.param(
+            "decoder",
+            "parser_instrumentation",
+            ProjectionStats(forbidden_decoder_calls=1),
+            id="decoder",
+        ),
+        pytest.param(
+            "materializer",
+            "application_value",
+            ProjectionStats(forbidden_materializer_calls=1),
+            id="materializer",
+        ),
+        pytest.param(
+            "fingerprint",
+            "application_value",
+            ProjectionStats(forbidden_fingerprint_calls=1),
+            id="fingerprint",
+        ),
+        pytest.param("network", "network", ProjectionStats(), id="network"),
+    ),
+)
+def test_req_synthetic_usage_spine_003_capture_mutations_fail_before_contribution(
+    tmp_path: Path, mutation: str, lane: str, expected_stats: ProjectionStats
+) -> None:
+    harness = ThesisHarness(config(tmp_path / mutation))
+    before = harness.stable_view()
+    with pytest.raises(CaptureViolation) as error:
+        harness.run_privacy(mutation=mutation)
+    assert error.value.lane == lane
+    assert error.value.stats == expected_stats
+    assert harness.stable_view() == before == EMPTY_STABLE_VIEW
 
 
 def test_req_synthetic_usage_spine_004(tmp_path: Path) -> None:

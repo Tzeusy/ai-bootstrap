@@ -9,27 +9,29 @@ from __future__ import annotations
 
 import hashlib
 import json
+import mmap
 import re
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .authorization import ValidationError, validate_synthetic_authorization
+
 
 FIXTURE_ROOT = Path(__file__).parents[1] / "tests" / "fixtures" / "synthetic-thesis"
 _FORBIDDEN_MARKER = object()
-
-
-class ValidationError(ValueError):
-    """Content-free preflight or fixture rejection."""
-
-    def __init__(self, code: str):
-        self.code = code
-        super().__init__(code)
+_FORBIDDEN_SENTINEL = b"THESIS_FORBIDDEN_CONTENT_SENTINEL"
+_FORBIDDEN_DIGEST = hashlib.sha256(_FORBIDDEN_SENTINEL).hexdigest()
 
 
 class CaptureViolation(RuntimeError):
-    """A deliberately injected thesis capture mutation was observed."""
+    """A guarded thesis boundary observed a forbidden test mutation."""
+
+    def __init__(self, lane: str, stats: ProjectionStats):
+        self.lane = lane
+        self.stats = stats
+        super().__init__(f"{lane}: forbidden capture")
 
 
 @dataclass(frozen=True)
@@ -56,14 +58,25 @@ class ProjectionStats:
 
 
 @dataclass(frozen=True)
+class FramingEvidence:
+    """Evidence that the parser receives a view, not a copied JSONL line."""
+
+    line_is_memoryview: bool
+    shares_source_buffer: bool
+    source_is_mmap: bool
+
+
+@dataclass(frozen=True)
 class RunResult:
     status: str
+    rejection_code: str | None = None
     forbidden_decoder_calls: int = 0
     forbidden_materializer_calls: int = 0
     forbidden_fingerprint_calls: int = 0
     public_capture: dict[str, Any] | None = None
     capture_canaries: dict[str, str] | None = None
     capture_observations: dict[str, tuple[str, ...]] | None = None
+    framing: FramingEvidence | None = None
 
 
 @dataclass(frozen=True)
@@ -88,8 +101,16 @@ class _Record:
     line: int = 1
 
 
+class _FramedValidationError(ValidationError):
+    """A content-free parser failure paired with safe framing evidence."""
+
+    def __init__(self, code: str, framing: FramingEvidence):
+        super().__init__(code)
+        self.framing = framing
+
+
 class _CaptureAudit:
-    """Instrument synthetic capture boundaries without retaining raw payloads."""
+    """Observe real capture-boundary inputs without retaining their values."""
 
     def __init__(self, lanes: tuple[str, ...]):
         self._canaries = {
@@ -120,31 +141,117 @@ class _CaptureAudit:
             forbidden_fingerprint_calls=self._forbidden_fingerprint_calls,
         )
 
-    def capture(self, lane: str, value: object) -> None:
-        self._observations[lane].append(self._canaries[lane])
-        if value is _FORBIDDEN_MARKER:
-            raise CaptureViolation(f"{lane}: forbidden capture mutation")
+    def canary(self, lane: str) -> str:
+        return self._canaries[lane]
 
-    def inject(self, mutation: str) -> None:
-        if mutation == "leak":
-            self.capture("application_value", _FORBIDDEN_MARKER)
-        elif mutation == "decoder":
-            self._forbidden_decoder_calls += 1
-            self.capture("parser_instrumentation", _FORBIDDEN_MARKER)
-        elif mutation == "materializer":
-            self._forbidden_materializer_calls += 1
-            self.capture("application_value", _FORBIDDEN_MARKER)
-        elif mutation == "fingerprint":
-            self._forbidden_fingerprint_calls += 1
-            self.capture("application_value", _FORBIDDEN_MARKER)
-        elif mutation == "network":
-            self.capture("network", _FORBIDDEN_MARKER)
-        else:
-            raise ValidationError("unknown_mutation")
+    def observe(self, lane: str, value: object, *, kind: str | None = None) -> None:
+        """Record a canary only when that exact value reaches its real boundary."""
+
+        if self._contains_forbidden(value):
+            if kind == "decoder":
+                self._forbidden_decoder_calls += 1
+            elif kind == "materializer":
+                self._forbidden_materializer_calls += 1
+            elif kind == "fingerprint":
+                self._forbidden_fingerprint_calls += 1
+            raise CaptureViolation(lane, self.stats)
+        if value == self._canaries[lane]:
+            self._observations[lane].append(self._canaries[lane])
+
+    @classmethod
+    def _contains_forbidden(cls, value: object) -> bool:
+        if value is _FORBIDDEN_MARKER:
+            return True
+        if isinstance(value, str):
+            return (
+                _FORBIDDEN_SENTINEL.decode("ascii") in value
+                or _FORBIDDEN_DIGEST in value
+            )
+        if isinstance(value, bytes):
+            return (
+                _FORBIDDEN_SENTINEL in value
+                or _FORBIDDEN_DIGEST.encode("ascii") in value
+            )
+        if isinstance(value, _Record):
+            return any(
+                cls._contains_forbidden(item)
+                for item in (
+                    value.request_id,
+                    value.message_id,
+                    value.model,
+                    value.source_time,
+                    value.cwd,
+                    value.project,
+                    value.amounts,
+                    value.fingerprint,
+                )
+            )
+        if isinstance(value, dict):
+            return any(
+                cls._contains_forbidden(item) for pair in value.items() for item in pair
+            )
+        if isinstance(value, (list, tuple)):
+            return any(cls._contains_forbidden(item) for item in value)
+        return False
+
+
+class _CaptureBoundaries:
+    """Concrete no-egress capture boundaries used by the disposable thesis."""
+
+    def __init__(self, audit: _CaptureAudit):
+        self._audit = audit
+
+    @property
+    def stats(self) -> ProjectionStats:
+        return self._audit.stats
+
+    def application_value(self, value: object, *, kind: str | None = None) -> None:
+        self._audit.observe("application_value", value, kind=kind)
+
+    def parser_instrumentation(self, value: object) -> None:
+        self._audit.observe("parser_instrumentation", value, kind="decoder")
+
+    def log(self, value: object) -> None:
+        self._audit.observe("log", value)
+
+    def exception(self, value: object) -> None:
+        self._audit.observe("exception", value)
+
+    def crash(self, value: object) -> None:
+        self._audit.observe("crash", value)
+
+    def sqlite(self, value: object) -> None:
+        self._audit.observe("sqlite", value)
+
+    def sink(self, value: object) -> None:
+        self._audit.observe("sink", value)
+
+    def image(self, value: object) -> None:
+        self._audit.observe("image", value)
+
+    def environment(self, value: object) -> None:
+        self._audit.observe("environment", value)
+
+    def network(self, value: object) -> None:
+        self._audit.observe("network", value)
+
+    def exercise_positive_controls(self, sqlite_probe: Any) -> None:
+        """Send each harmless canary through its actual guarded boundary."""
+
+        self.application_value(self._audit.canary("application_value"))
+        self.parser_instrumentation(self._audit.canary("parser_instrumentation"))
+        self.log(self._audit.canary("log"))
+        self.exception(self._audit.canary("exception"))
+        self.crash(self._audit.canary("crash"))
+        sqlite_probe(self._audit.canary("sqlite"))
+        self.sink(self._audit.canary("sink"))
+        self.image(self._audit.canary("image"))
+        self.environment(self._audit.canary("environment"))
+        self.network(self._audit.canary("network"))
 
 
 class _Projector:
-    """Project registered scalar bytes without decoding skipped JSON values."""
+    """Project registered scalars after a bounded, byte-only structural scan."""
 
     REGISTERED_BY_TOKEN = {
         b'"requestId"': "requestId",
@@ -162,57 +269,51 @@ class _Projector:
         b'"cache_write_tokens"': "cache_write_tokens",
     }
     AMOUNT_KEYS = frozenset(AMOUNT_BY_TOKEN.values())
+    MAX_RECORD_BYTES = 64 * 1024
+    MAX_CONTAINER_DEPTH = 32
     NUMBER = re.compile(rb"-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?")
 
-    def __init__(self, audit: _CaptureAudit | None = None) -> None:
-        self._audit = audit
+    def __init__(
+        self,
+        boundaries: _CaptureBoundaries | None = None,
+        *,
+        mutation: str | None = None,
+    ) -> None:
+        self._boundaries = boundaries
+        self._mutation = mutation
 
-    def project(self, payload: bytes) -> _Record:
-        if len(payload) > 64 * 1024:
+    def project(self, payload: memoryview) -> _Record:
+        if len(payload) > self.MAX_RECORD_BYTES:
             raise ValidationError("record_limit")
-        values: dict[str, Any] = {}
-        amounts_invalid = False
         index = self._skip_ws(payload, 0)
         if index >= len(payload) or payload[index] != ord("{"):
             raise ValidationError("schema_inconsistent")
-        index += 1
-        while True:
-            index = self._skip_ws(payload, index)
-            if index >= len(payload):
-                raise ValidationError("schema_inconsistent")
-            if payload[index] == ord("}"):
-                index += 1
-                break
-            key_start = index
-            key_end = self._skip_string(payload, index)
-            key = self.REGISTERED_BY_TOKEN.get(payload[key_start:key_end])
-            index = self._skip_ws(payload, key_end)
-            if index >= len(payload) or payload[index] != ord(":"):
-                raise ValidationError("schema_inconsistent")
-            index = self._skip_ws(payload, index + 1)
-            if key == "amounts":
-                amounts, index, invalid = self._project_amounts(payload, index)
-                values[key] = amounts
-                amounts_invalid = amounts_invalid or invalid
-            elif key is not None:
-                value, index = self._decode_registered_string(payload, index)
-                values[key] = value
-            else:
-                index = self._skip_value(payload, index)
-            index = self._skip_ws(payload, index)
-            if index >= len(payload):
-                raise ValidationError("schema_inconsistent")
-            if payload[index] == ord(","):
-                index += 1
-                continue
-            if payload[index] == ord("}"):
-                index += 1
-                break
-            raise ValidationError("schema_inconsistent")
+        locations, index = self._scan_object_members(payload, index + 1)
         if self._skip_ws(payload, index) != len(payload):
             raise ValidationError("schema_inconsistent")
+
+        values: dict[str, Any] = {}
+        for field in (
+            "requestId",
+            "messageId",
+            "model",
+            "sourceTime",
+            "cwd",
+            "project",
+        ):
+            if field in locations:
+                values[field], _ = self._decode_registered_string(
+                    payload, locations[field]
+                )
+        amounts_invalid = False
+        if "amounts" in locations:
+            amounts, amounts_invalid = self._project_amounts(
+                payload, locations["amounts"]
+            )
+            values["amounts"] = amounts
+
         required = ("requestId", "messageId", "model", "sourceTime", "amounts")
-        if any(not isinstance(values.get(key), str) for key in required[:-1]):
+        if any(not isinstance(values.get(field), str) for field in required[:-1]):
             raise ValidationError(
                 "missing_identity"
                 if not isinstance(values.get("requestId"), str)
@@ -231,6 +332,7 @@ class _Projector:
             }
         except (TypeError, ValueError):
             raise ValidationError("projected_type") from None
+
         fingerprint_doc = {
             "amounts": parsed_amounts,
             "message_id": values["messageId"],
@@ -238,6 +340,13 @@ class _Projector:
             "request_id": values["requestId"],
             "source_time": values["sourceTime"],
         }
+        if self._boundaries is not None:
+            self._boundaries.application_value(
+                _FORBIDDEN_MARKER
+                if self._mutation == "fingerprint"
+                else fingerprint_doc,
+                kind="fingerprint",
+            )
         fingerprint = hashlib.sha256(
             json.dumps(fingerprint_doc, sort_keys=True, separators=(",", ":")).encode(
                 "utf-8"
@@ -255,48 +364,113 @@ class _Projector:
             amounts=parsed_amounts,
             fingerprint=fingerprint,
         )
-        if self._audit is not None:
-            self._audit.capture("parser_instrumentation", record)
+        if self._boundaries is not None:
+            self._boundaries.application_value(
+                _FORBIDDEN_MARKER
+                if self._mutation in {"leak", "materializer"}
+                else record,
+                kind="materializer" if self._mutation == "materializer" else None,
+            )
         return record
 
-    def _project_amounts(
-        self, payload: bytes, index: int
-    ) -> tuple[dict[str, Any] | None, int, bool]:
-        if index >= len(payload):
-            raise ValidationError("schema_inconsistent")
-        if payload[index] != ord("{"):
-            return None, self._skip_value(payload, index), True
-        amounts: dict[str, Any] = {}
-        invalid = False
-        index = self._skip_ws(payload, index + 1)
+    def _scan_object_members(
+        self, payload: memoryview, index: int
+    ) -> tuple[dict[str, int], int]:
+        locations: dict[str, int] = {}
+        index = self._skip_ws(payload, index)
         if index < len(payload) and payload[index] == ord("}"):
-            return amounts, index + 1, invalid
+            return locations, index + 1
         while True:
             if index >= len(payload) or payload[index] != ord('"'):
                 raise ValidationError("schema_inconsistent")
             key_start = index
             key_end = self._skip_string(payload, index)
-            key = self.AMOUNT_BY_TOKEN.get(payload[key_start:key_end])
+            key = self._registered_key(payload, key_start, key_end)
+            index = self._skip_ws(payload, key_end)
+            if index >= len(payload) or payload[index] != ord(":"):
+                raise ValidationError("schema_inconsistent")
+            index = self._skip_ws(payload, index + 1)
+            if key is not None:
+                if key in locations:
+                    raise ValidationError("duplicate_registered_key")
+                locations[key] = index
+            index = self._skip_value(payload, index)
+            index = self._skip_ws(payload, index)
+            if index >= len(payload):
+                raise ValidationError("schema_inconsistent")
+            if payload[index] == ord("}"):
+                return locations, index + 1
+            if payload[index] != ord(","):
+                raise ValidationError("schema_inconsistent")
+            index = self._skip_ws(payload, index + 1)
+
+    def _project_amounts(
+        self, payload: memoryview, index: int
+    ) -> tuple[dict[str, Any] | None, bool]:
+        if index >= len(payload):
+            raise ValidationError("schema_inconsistent")
+        if payload[index] != ord("{"):
+            self._skip_value(payload, index)
+            return None, True
+        locations: dict[str, int] = {}
+        invalid = False
+        index = self._skip_ws(payload, index + 1)
+        if index < len(payload) and payload[index] == ord("}"):
+            return {}, invalid
+        while True:
+            if index >= len(payload) or payload[index] != ord('"'):
+                raise ValidationError("schema_inconsistent")
+            key_start = index
+            key_end = self._skip_string(payload, index)
+            key = self._amount_key(payload, key_start, key_end)
             index = self._skip_ws(payload, key_end)
             if index >= len(payload) or payload[index] != ord(":"):
                 raise ValidationError("schema_inconsistent")
             index = self._skip_ws(payload, index + 1)
             if key is None:
                 invalid = True
-                index = self._skip_value(payload, index)
+            elif key in locations:
+                raise ValidationError("duplicate_registered_key")
             else:
-                if key in amounts:
-                    invalid = True
-                value, index = self._decode_registered_string(payload, index)
-                amounts[key] = value
+                locations[key] = index
+            index = self._skip_value(payload, index)
             index = self._skip_ws(payload, index)
             if index >= len(payload):
                 raise ValidationError("schema_inconsistent")
             if payload[index] == ord("}"):
-                return amounts, index + 1, invalid
+                break
             if payload[index] != ord(","):
                 raise ValidationError("schema_inconsistent")
             index = self._skip_ws(payload, index + 1)
+        if invalid:
+            return None, True
+        return {
+            key: self._decode_registered_string(payload, value_index)[0]
+            for key, value_index in locations.items()
+        }, False
+
+    @classmethod
+    def _registered_key(cls, payload: memoryview, start: int, end: int) -> str | None:
+        return cls._matched_key(payload, start, end, cls.REGISTERED_BY_TOKEN)
+
+    @classmethod
+    def _amount_key(cls, payload: memoryview, start: int, end: int) -> str | None:
+        return cls._matched_key(payload, start, end, cls.AMOUNT_BY_TOKEN)
+
+    @staticmethod
+    def _matched_key(
+        payload: memoryview, start: int, end: int, registry: dict[bytes, str]
+    ) -> str | None:
+        for token, name in registry.items():
+            if _Projector._matches(payload, start, end, token):
+                return name
+        return None
+
+    @staticmethod
+    def _matches(payload: memoryview, start: int, end: int, token: bytes) -> bool:
+        return end - start == len(token) and all(
+            payload[start + offset] == expected for offset, expected in enumerate(token)
+        )
 
     @staticmethod
     def _amount(value: str) -> int:
@@ -308,7 +482,7 @@ class _Projector:
         return result
 
     def _decode_registered_string(
-        self, payload: bytes, index: int
+        self, payload: memoryview, index: int
     ) -> tuple[str | None, int]:
         if index >= len(payload):
             raise ValidationError("schema_inconsistent")
@@ -316,68 +490,93 @@ class _Projector:
             return None, self._skip_value(payload, index)
         end = self._skip_string(payload, index)
         try:
-            value = json.loads(payload[index:end].decode("utf-8"))
+            value = json.loads(bytes(payload[index:end]).decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             raise ValidationError("schema_inconsistent") from None
+        if self._boundaries is not None:
+            self._boundaries.parser_instrumentation(
+                _FORBIDDEN_MARKER if self._mutation == "decoder" else value
+            )
         return value if isinstance(value, str) else None, end
 
     @staticmethod
-    def _skip_ws(payload: bytes, index: int) -> int:
+    def _skip_ws(payload: memoryview, index: int) -> int:
         while index < len(payload) and payload[index] in b" \t\r\n":
             index += 1
         return index
 
-    def _skip_value(self, payload: bytes, index: int) -> int:
-        if index >= len(payload):
-            raise ValidationError("schema_inconsistent")
-        char = payload[index]
-        if char == ord('"'):
-            return self._skip_string(payload, index)
-        if char == ord("{"):
-            index = self._skip_ws(payload, index + 1)
-            if index < len(payload) and payload[index] == ord("}"):
-                return index + 1
-            while True:
+    def _skip_value(self, payload: memoryview, index: int) -> int:
+        """Walk unknown JSON structurally with an explicit bounded stack."""
+
+        index = self._skip_ws(payload, index)
+        stack: list[int] = []
+        state = "value"
+        while True:
+            if state == "value":
+                if index >= len(payload):
+                    raise ValidationError("schema_inconsistent")
+                char = payload[index]
+                if char == ord('"'):
+                    index = self._skip_string(payload, index)
+                    state = "after_value"
+                    continue
+                if char in (ord("{"), ord("[")):
+                    if len(stack) >= self.MAX_CONTAINER_DEPTH:
+                        raise ValidationError("record_limit")
+                    stack.append(char)
+                    index = self._skip_ws(payload, index + 1)
+                    closer = ord("}") if char == ord("{") else ord("]")
+                    if index < len(payload) and payload[index] == closer:
+                        stack.pop()
+                        index += 1
+                        state = "after_value"
+                    else:
+                        state = "object_key" if char == ord("{") else "value"
+                    continue
+                end = index
+                while end < len(payload) and payload[end] not in b",}] \t\r\n":
+                    end += 1
+                if end == index:
+                    raise ValidationError("schema_inconsistent")
+                if (
+                    not any(
+                        self._matches(payload, index, end, token)
+                        for token in (b"true", b"false", b"null")
+                    )
+                    and self.NUMBER.fullmatch(payload[index:end]) is None
+                ):
+                    raise ValidationError("schema_inconsistent")
+                index = end
+                state = "after_value"
+                continue
+
+            if state == "object_key":
                 if index >= len(payload) or payload[index] != ord('"'):
                     raise ValidationError("schema_inconsistent")
-                index = self._skip_string(payload, index)
-                index = self._skip_ws(payload, index)
+                index = self._skip_ws(payload, self._skip_string(payload, index))
                 if index >= len(payload) or payload[index] != ord(":"):
                     raise ValidationError("schema_inconsistent")
-                index = self._skip_value(payload, self._skip_ws(payload, index + 1))
-                index = self._skip_ws(payload, index)
-                if index < len(payload) and payload[index] == ord("}"):
-                    return index + 1
-                if index >= len(payload) or payload[index] != ord(","):
-                    raise ValidationError("schema_inconsistent")
                 index = self._skip_ws(payload, index + 1)
-        if char == ord("["):
+                state = "value"
+                continue
+
+            if not stack:
+                return index
+            index = self._skip_ws(payload, index)
+            container = stack[-1]
+            closer = ord("}") if container == ord("{") else ord("]")
+            if index < len(payload) and payload[index] == closer:
+                stack.pop()
+                index += 1
+                state = "after_value"
+                continue
+            if index >= len(payload) or payload[index] != ord(","):
+                raise ValidationError("schema_inconsistent")
             index = self._skip_ws(payload, index + 1)
-            if index < len(payload) and payload[index] == ord("]"):
-                return index + 1
-            while True:
-                index = self._skip_value(payload, index)
-                index = self._skip_ws(payload, index)
-                if index < len(payload) and payload[index] == ord("]"):
-                    return index + 1
-                if index >= len(payload) or payload[index] != ord(","):
-                    raise ValidationError("schema_inconsistent")
-                index = self._skip_ws(payload, index + 1)
-        end = index
-        while end < len(payload) and payload[end] not in b",}]":
-            end += 1
-        if end == index:
-            raise ValidationError("schema_inconsistent")
-        token = payload[index:end]
-        if (
-            token not in {b"true", b"false", b"null"}
-            and self.NUMBER.fullmatch(token) is None
-        ):
-            raise ValidationError("schema_inconsistent")
-        return end
+            state = "object_key" if container == ord("{") else "value"
 
     @staticmethod
-    def _skip_string(payload: bytes, index: int) -> int:
+    def _skip_string(payload: memoryview, index: int) -> int:
         if index >= len(payload) or payload[index] != ord('"'):
             raise ValidationError("schema_inconsistent")
         index += 1
@@ -467,6 +666,7 @@ class ThesisHarness:
 
     def __init__(self, config: HarnessConfig):
         self.config = config
+        validate_synthetic_authorization()
         self._preflight_done = False
         self._stats = ProjectionStats()
         self._initial_record: _Record | None = None
@@ -474,7 +674,9 @@ class ThesisHarness:
 
     def _initialize(self) -> None:
         self._preflight()
-        self._initial_record, self._stats = self._read_record(self.config.fixture_path)
+        self._initial_record, self._stats, _ = self._read_record(
+            self.config.fixture_path
+        )
         self._preflight_done = True
         self.config.database_path.parent.mkdir(parents=True, exist_ok=True)
         self.connection = sqlite3.connect(self.config.database_path)
@@ -555,6 +757,8 @@ class ThesisHarness:
             or not isinstance(fixtures, dict)
             or payload.get("required_fields") != list(self.MANIFEST_REQUIRED_FIELDS)
             or payload.get("allowed_amounts") != list(self.MANIFEST_ALLOWED_AMOUNTS)
+            or payload.get("max_record_bytes") != _Projector.MAX_RECORD_BYTES
+            or payload.get("max_container_depth") != _Projector.MAX_CONTAINER_DEPTH
             or not isinstance(capture_canaries, list)
             or tuple(capture_canaries) != self.CAPTURE_LANES
             or len(set(capture_canaries)) != len(capture_canaries)
@@ -565,10 +769,11 @@ class ThesisHarness:
     def _read_record(
         self,
         fixture_path: Path,
-        audit: _CaptureAudit | None = None,
+        boundaries: _CaptureBoundaries | None = None,
         *,
         line_number: int = 1,
-    ) -> tuple[_Record, ProjectionStats]:
+        mutation: str | None = None,
+    ) -> tuple[_Record, ProjectionStats, FramingEvidence]:
         if not fixture_path.resolve(strict=False).is_relative_to(
             FIXTURE_ROOT.resolve()
         ):
@@ -579,18 +784,65 @@ class ThesisHarness:
         if not isinstance(entry, dict) or not isinstance(entry.get("sha256"), str):
             raise ValidationError("unregistered_fixture")
         try:
-            payload = fixture_path.read_bytes()
+            source_file = fixture_path.open("rb")
         except OSError:
             raise ValidationError("unregistered_fixture") from None
-        digest = hashlib.sha256(payload).hexdigest()
-        if digest != entry["sha256"]:
-            raise ValidationError("digest_mismatch")
-        lines = payload.splitlines()
-        if len(lines) != 1 or line_number != 1:
+        try:
+            mapped = mmap.mmap(source_file.fileno(), 0, access=mmap.ACCESS_READ)
+        except (OSError, ValueError):
+            source_file.close()
+            raise ValidationError("unregistered_fixture") from None
+        source = memoryview(mapped)
+        line: memoryview | None = None
+        try:
+            digest = hashlib.sha256(source).hexdigest()
+            if digest != entry["sha256"]:
+                raise ValidationError("digest_mismatch")
+            line, framing = self._single_line_view(source, line_number)
+            projector = _Projector(boundaries, mutation=mutation)
+            try:
+                record = projector.project(line)
+            except ValidationError as error:
+                raise _FramedValidationError(error.code, framing) from None
+            return (
+                record,
+                boundaries.stats if boundaries is not None else ProjectionStats(),
+                framing,
+            )
+        finally:
+            if line is not None:
+                line.release()
+            source.release()
+            mapped.close()
+            source_file.close()
+
+    @staticmethod
+    def _single_line_view(
+        payload: memoryview, line_number: int
+    ) -> tuple[memoryview, FramingEvidence]:
+        """Return one JSONL record as a source-buffer view without a line copy."""
+
+        if line_number != 1:
             raise ValidationError("schema_inconsistent")
-        projector = _Projector(audit)
-        record = projector.project(lines[0])
-        return record, audit.stats if audit is not None else ProjectionStats()
+        newline = next(
+            (index for index, byte in enumerate(payload) if byte == ord("\n")), -1
+        )
+        if newline == -1:
+            end = len(payload)
+        else:
+            if newline != len(payload) - 1:
+                raise ValidationError("schema_inconsistent")
+            end = (
+                newline - 1
+                if newline > 0 and payload[newline - 1] == ord("\r")
+                else newline
+            )
+        line = memoryview(payload)[:end]
+        return line, FramingEvidence(
+            line_is_memoryview=isinstance(line, memoryview),
+            shares_source_buffer=line.obj is payload.obj,
+            source_is_mmap=isinstance(payload.obj, mmap.mmap),
+        )
 
     def run_once(self, *, fail_at: str | None = None) -> RunResult:
         if self._initial_record is None:
@@ -607,7 +859,7 @@ class ThesisHarness:
     ) -> RunResult:
         if not self._preflight_done:
             self._preflight()
-        record, stats = self._read_record(fixture_path, line_number=line_number)
+        record, stats, _ = self._read_record(fixture_path, line_number=line_number)
         self._stats = stats
         return self._run_record(record, fail_at=fail_at)
 
@@ -617,22 +869,31 @@ class ThesisHarness:
     def rescan_file(self, fixture_path: Path) -> RunResult:
         return self.run_file(fixture_path)
 
-    def _run_record(self, record: _Record, *, fail_at: str | None = None) -> RunResult:
+    def _run_record(
+        self,
+        record: _Record,
+        *,
+        fail_at: str | None = None,
+        capture_boundaries: _CaptureBoundaries | None = None,
+    ) -> RunResult:
         try:
             with self.connection:
-                existing = self.connection.execute(
+                existing = self._execute(
                     "SELECT accounting_fingerprint FROM ledger_events WHERE request_id = ?",
                     (record.request_id,),
+                    capture_boundaries=capture_boundaries,
                 ).fetchone()
                 if existing:
                     if existing[0] != record.fingerprint:
-                        self.connection.execute(
+                        self._execute(
                             "INSERT INTO ledger_stream_state(stream, state) VALUES ('synthetic', 'identity_collision') "
-                            "ON CONFLICT(stream) DO UPDATE SET state = excluded.state"
+                            "ON CONFLICT(stream) DO UPDATE SET state = excluded.state",
+                            capture_boundaries=capture_boundaries,
                         )
                         return RunResult("identity_collision")
-                    self.connection.execute(
-                        "INSERT OR REPLACE INTO ledger_cursors(stream, position) VALUES ('synthetic', 1)"
+                    self._execute(
+                        "INSERT OR REPLACE INTO ledger_cursors(stream, position) VALUES ('synthetic', 1)",
+                        capture_boundaries=capture_boundaries,
                     )
                     return RunResult("accepted")
                 self._write(
@@ -649,6 +910,7 @@ class ThesisHarness:
                         record.fingerprint,
                         1,
                     ),
+                    capture_boundaries=capture_boundaries,
                 )
                 for category, amount in record.amounts.items():
                     self._write(
@@ -656,20 +918,27 @@ class ThesisHarness:
                         "amount",
                         "INSERT INTO ledger_amounts VALUES (?,?,?)",
                         (record.request_id, category, amount),
+                        capture_boundaries=capture_boundaries,
                     )
                 self._write(
                     fail_at,
                     "request",
                     "INSERT INTO ledger_requests VALUES (?)",
                     (record.request_id,),
+                    capture_boundaries=capture_boundaries,
                 )
                 self._write(
-                    fail_at, "sequence", "INSERT INTO ledger_sequences VALUES (?)", (1,)
+                    fail_at,
+                    "sequence",
+                    "INSERT INTO ledger_sequences VALUES (?)",
+                    (1,),
+                    capture_boundaries=capture_boundaries,
                 )
                 for category, amount in record.amounts.items():
-                    self.connection.execute(
+                    self._execute(
                         "INSERT INTO ledger_aggregates(category,total) VALUES (?,?) ON CONFLICT(category) DO UPDATE SET total=total+excluded.total",
                         (category, amount),
+                        capture_boundaries=capture_boundaries,
                     )
                 if fail_at == "aggregate":
                     raise sqlite3.IntegrityError("injected failure at aggregate")
@@ -678,12 +947,14 @@ class ThesisHarness:
                     "obligation",
                     "INSERT INTO ledger_obligations VALUES (?,?)",
                     (1, "synthetic"),
+                    capture_boundaries=capture_boundaries,
                 )
                 self._write(
                     fail_at,
                     "cursor",
                     "INSERT INTO ledger_cursors VALUES (?,?)",
                     ("synthetic", 1),
+                    capture_boundaries=capture_boundaries,
                 )
         except sqlite3.IntegrityError:
             raise
@@ -695,10 +966,23 @@ class ThesisHarness:
         boundary: str,
         query: str,
         parameters: tuple[Any, ...],
+        *,
+        capture_boundaries: _CaptureBoundaries | None = None,
     ) -> None:
         if fail_at == boundary:
             raise sqlite3.IntegrityError(f"injected failure at {boundary}")
-        self.connection.execute(query, parameters)
+        self._execute(query, parameters, capture_boundaries=capture_boundaries)
+
+    def _execute(
+        self,
+        query: str,
+        parameters: tuple[Any, ...] = (),
+        *,
+        capture_boundaries: _CaptureBoundaries | None = None,
+    ) -> sqlite3.Cursor:
+        if capture_boundaries is not None:
+            capture_boundaries.sqlite(query)
+        return self.connection.execute(query, parameters)
 
     def snapshot(self) -> dict[str, int]:
         stable = self.stable_view()
@@ -779,35 +1063,77 @@ class ThesisHarness:
     def close(self) -> None:
         self.connection.close()
 
-    def run_privacy(self, *, mutation: str | None = None) -> RunResult:
+    def run_privacy(
+        self,
+        *,
+        fixture_path: Path | None = None,
+        mutation: str | None = None,
+    ) -> RunResult:
+        """Exercise actual guarded capture boundaries against one fixture vector."""
+
+        if mutation not in {
+            None,
+            "leak",
+            "decoder",
+            "materializer",
+            "fingerprint",
+            "network",
+        }:
+            raise ValidationError("unknown_mutation")
         manifest = self._manifest()
         audit = _CaptureAudit(tuple(manifest["capture_canaries"]))
-        record, _ = self._read_record(self.config.fixture_path, audit=audit)
-        result = self._run_record(record)
-        audit.capture("application_value", record)
-        audit.capture("sqlite", self.stable_view())
-        for lane in (
-            "log",
-            "exception",
-            "crash",
-            "sink",
-            "image",
-            "environment",
-            "network",
-        ):
-            audit.capture(lane, f"{lane}-remained-inactive")
-        if mutation is not None:
-            audit.inject(mutation)
+        boundaries = _CaptureBoundaries(audit)
+        boundaries.exercise_positive_controls(
+            lambda canary: self._sqlite_positive_control(boundaries, canary)
+        )
+        if mutation == "network":
+            boundaries.network(_FORBIDDEN_MARKER)
+        target = self.config.fixture_path if fixture_path is None else fixture_path
+        try:
+            record, _, framing = self._read_record(
+                target,
+                boundaries,
+                mutation=mutation,
+            )
+        except ValidationError as error:
+            boundaries.exception(error.code)
+            public_capture = self.stable_view()
+            boundaries.application_value(public_capture)
+            self._stats = audit.stats
+            return RunResult(
+                "rejected",
+                rejection_code=error.code,
+                forbidden_decoder_calls=audit.stats.forbidden_decoder_calls,
+                forbidden_materializer_calls=audit.stats.forbidden_materializer_calls,
+                forbidden_fingerprint_calls=audit.stats.forbidden_fingerprint_calls,
+                public_capture=public_capture,
+                capture_canaries=audit.canaries,
+                capture_observations=audit.observations,
+                framing=getattr(error, "framing", None),
+            )
+        result = self._run_record(record, capture_boundaries=boundaries)
+        public_capture = self.stable_view()
+        boundaries.application_value(public_capture)
         self._stats = audit.stats
         return RunResult(
             result.status,
+            rejection_code=None,
             forbidden_decoder_calls=audit.stats.forbidden_decoder_calls,
             forbidden_materializer_calls=audit.stats.forbidden_materializer_calls,
             forbidden_fingerprint_calls=audit.stats.forbidden_fingerprint_calls,
-            public_capture=self.stable_view(),
+            public_capture=public_capture,
             capture_canaries=audit.canaries,
             capture_observations=audit.observations,
+            framing=framing,
         )
+
+    def _sqlite_positive_control(
+        self, boundaries: _CaptureBoundaries, canary: str
+    ) -> None:
+        """Observe a harmless SQL parameter without storing a capture artifact."""
+
+        boundaries.sqlite(canary)
+        self.connection.execute("SELECT ?", (canary,)).fetchone()
 
     def documented_exercise(
         self, *, elapsed_seconds: int, requested_reads: tuple[str, ...] | None = None
