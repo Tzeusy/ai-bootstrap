@@ -954,16 +954,18 @@ adapter-schema or compatible release-profile change and no later than the
 maximum interval fixed by the active release profile. The deadline is measured
 from the last successfully committed complete rescan using durable elapsed-time
 evidence; restart, wall-clock rollback, scan failure, or incremental success
-never pushes it forward. Once overdue, affected stream, family, and global
-health become `reconciliation_overdue`. Safe incremental ingestion may continue,
-but health cannot claim current reconciliation.
+never pushes it forward. Once overdue, the affected stream becomes
+`reconciliation_overdue`; family and global summaries become `degraded` and
+never copy an individual stream state code. Safe incremental ingestion may
+continue, but health cannot claim current reconciliation.
 
 The first OpenSpec changeset freezes the reconciliation-profile schema and
 executable evidence gate. Each release profile supplies the exact deadline plus
 a supported envelope for stream count, aggregate bytes, maximum record size,
 and sustained append rate from mutation-detection and worst-case scan-cost
-measurements. Crossing any envelope dimension sets the affected stream, family,
-and global state to `source_envelope_exceeded`. Bounded incremental ingestion may
+measurements. Crossing any envelope dimension sets the affected stream to
+`source_envelope_exceeded`; family and global summaries become `degraded` and
+never copy an individual stream state code. Bounded incremental ingestion may
 continue while parser/storage profiles remain satisfied, but full-reconciliation
 currency cannot be claimed. Recovery requires the source to return within the
 same profile or a newly reviewed profile to cover it. Tests cover each envelope
@@ -1011,7 +1013,7 @@ invalid values fail closed.
 | File truncation, replacement, generation mismatch, or anchor mismatch without proven loss | Source restarts from the beginning; stable identities deduplicate already committed facts; safe invalidation adds no latch/degradation, clears no prior latch, and preserves the prior `LatchSet`, so effective state remains its highest active latch and is healthy only when none is active. | Other sources and sinks continue. |
 | Coverage before source discovery | Coverage is `coverage_unknown`; no loss claim or exact historical coverage is fabricated. | Observable sources and sinks continue. |
 | Discovered source disappears or truncates across its unconsumed cursor | Source health records a proven `retention_gap`; accepted history is not retracted. | Other sources and sinks continue. |
-| Supported source envelope exceeded | Stream/family/global health is `source_envelope_exceeded`; bounded incremental ingestion may continue but reconciliation is not current. | Other sources and sinks continue. |
+| Supported source envelope exceeded | The affected stream is `source_envelope_exceeded`; family/global summaries are `degraded`; bounded incremental ingestion may continue but reconciliation is not current. | Other sources and sinks continue. |
 | Claude quota requested | Capability is `unavailable`; no source is mounted and no snapshot is fabricated. | Claude usage, Codex usage/rate limits, and sinks continue. |
 | Codex rate limits absent, null, exact state-only, stale, or freshness-unknown | Availability/freshness is represented explicitly; state-only requires no registered primary/secondary window object; any present registered window with missing, mistyped, or out-of-range utilization is `recognized_malformed` for the whole record; no zero or live-quota claim is fabricated. | Independent previously committed usage and sinks continue; a same-record usage candidate rolls back with malformed quota. |
 | SQLite transaction or process interruption | Transaction rolls back; event, aggregate, cursor, and sink checkpoints remain mutually consistent and retry on restart. If the ledger is unavailable, no source may safely advance. | Previously committed sink work may resume only when ledger access is safe. |

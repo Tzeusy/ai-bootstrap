@@ -37,7 +37,7 @@ Decision 0003 replacements. Every row remains independent and exact-byte
 bound. No sibling was implicitly amended, and a later replacement still
 requires a successor owner decision naming that row and its new bytes.
 
-The current artifact anchors are RFC 0001
+The last accepted artifact anchors are RFC 0001
 `1ffe8e796372ff56bdd7e81be4c25fdbf726fb51585cf53041e027857b6a5593`,
 source/bounds evidence
 `2ca7455f0c331c8d46774f9c72bb8c3f2d6b360255fab4663bfd5d32bc09cf7d`,
@@ -50,6 +50,11 @@ The durable
 preserves predecessor convergence, while the
 [final-branch correction record](../../../about/legends-and-lore/reviews/0001/2026-08-10-final-branch-correction.md)
 records the correction and exact-head confirmation.
+
+The bounded health-summary RFC/evidence candidate is **[Unknown]** until a
+fresh independent exact-head review and successor owner decision bind its new
+bytes. It does not amend or replace any of the eleven capability-row bindings
+above.
 
 The all-accepted composition satisfies one input to task 2.1; it does not mark
 that unchecked task complete or authorize later work. This file is only the

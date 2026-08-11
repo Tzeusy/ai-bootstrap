@@ -2,12 +2,12 @@
 
 ## What This Repository Is
 
-`ai-bootstrap/` is the canonical local home for reusable AI-assistant operating knowledge: a skills-first shared workflow library, Beads-backed execution patterns, tool-specific configuration layers, and a smaller agent-prompt corpus kept for selective reuse. It exists so one repository can define a coherent engineering workflow and then project that workflow into multiple agent runtimes without hiding the logic inside private local state.
+`ai-bootstrap/` is the canonical local home for reusable AI-assistant operating knowledge: a skills-first shared workflow library, Beads-backed execution patterns, tool-specific configuration layers, and a smaller agent-prompt corpus kept for selective reuse. Its harness exists so one repository can define a coherent engineering workflow and then project that workflow into multiple agent runtimes without hiding the logic inside private local state. Independently shaped product offerings may live under `projects/`; they own their product contracts without changing the harness's source, mirror, or installation boundaries.
 
 ## What This Repository Is Not
 
 - It is not a single-tool dotfiles dump where every platform diverges independently.
-- It is not a production service or deployable runtime with a long-lived server control plane.
+- The `ai-bootstrap` harness is not a production service or deployable runtime with a long-lived server control plane. A separately shaped offering under `projects/` may define its own runtime boundary; that does not make the harness a runtime, shared-skill source, or installation surface.
 - It is not a cache for machine-specific secrets, session state, or one-off local experiments.
 - It is not a generic prompt scrapbook with no structure, traceability, or maintenance contract.
 

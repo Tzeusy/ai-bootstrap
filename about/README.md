@@ -13,7 +13,8 @@ This repository is the canonical local source for portable AI-assistant configur
 ## Nested Offerings
 
 `projects/` holds independently shaped product offerings. It is not a sixth
-root pillar, a shared-skill source, or an installation surface. For AI Usage
+root pillar, a shared-skill source, or an installation surface. Its
+[`README.md`](../projects/README.md) is the offering index. For AI Usage
 Telemetry, start at the product's
 [`about/README.md`](../projects/ai-usage-telemetry/about/README.md): its own
 shape docs and active child OpenSpec change govern product behavior, while this

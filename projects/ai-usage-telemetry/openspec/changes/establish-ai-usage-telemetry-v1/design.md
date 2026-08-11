@@ -578,7 +578,7 @@ Failure containment follows the narrowest safe boundary:
 | Truncation, replacement, generation mismatch, or prefix-anchor mismatch without proven loss | Reset that stream and parser context to the beginning; deduplicate by fact identity and fingerprint; add no new latch/degradation, preserve the prior `LatchSet`, derive the highest active state, and report healthy only when none is active |
 | Missing or incompatible release profile | Fail startup before source or sink activity |
 | Reconciliation deadline missed | Mark the affected stream `reconciliation_overdue` and family/global summaries `degraded`; safe incremental ingestion may continue but current reconciliation cannot be claimed |
-| Supported source envelope exceeded | Degrade the stream, family, and global state; continue only work still bounded by parser and storage profiles |
+| Supported source envelope exceeded | Mark the affected stream `source_envelope_exceeded` and family/global summaries `degraded`; continue only work still bounded by parser and storage profiles |
 | Storage admission denied, SQLite full/I/O failure, failed commit, or ambiguous ledger state | Roll back the whole record transaction and hold all source cursors; reopen read-only and verify before writes resume |
 | OTLP or PostgreSQL failure | Keep only that sink pending; sources, ledger, and the other sink continue |
 | Ambiguous sink acknowledgement | Retry idempotently; never advance a checkpoint from assumption |
