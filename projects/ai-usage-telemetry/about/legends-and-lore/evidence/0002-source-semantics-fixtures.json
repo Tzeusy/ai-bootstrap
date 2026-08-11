@@ -31,7 +31,14 @@
       "credential-access",
       "broad-root-access",
       "unexpected-network"
-    ]
+    ],
+    "capture_control_evidence": {
+      "positive_canary_execution": "executed-isolated-content-free-harness",
+      "negative_control_execution": "executed-isolated-content-free-harness",
+      "rejection_boundary": "before-synthetic-value-touch-or-external-operation",
+      "scope": "candidate-only-no-production-parser-or-producer",
+      "limitation": "does-not-prove-producer-or-production-parser-behavior"
+    }
   },
   "pins": {
     "claude_code": {
@@ -50,10 +57,10 @@
       "tag_object": "3ed6f04f6bf8b7c46299d1cb1ff99c74ce21a51d",
       "peeled_commit": "be6e8eac029b183056b7e4402879f15d2c85f61b",
       "public_source_refs": [
-        "https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/core/src/thread_manager.rs#L974-L1123",
-        "https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/core/src/session/mod.rs#L1296-L1337",
-        "https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/rollout/src/recorder.rs#L797-L835",
-        "https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/rollout/src/recorder.rs#L1630-L1649"
+        "https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/core/src/thread_manager.rs#L1027-L1097",
+        "https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/core/src/session/mod.rs#L1359-L1396",
+        "https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/rollout/src/recorder.rs#L832-L871",
+        "https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/rollout/src/recorder.rs#L1715-L1734"
       ]
     },
     "tokscale": {
