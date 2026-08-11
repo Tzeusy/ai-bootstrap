@@ -151,13 +151,17 @@ aib-tvp is out of scope. No accepted document was modified, no Beads lifecycle s
 
 ## Evidence run ledger
 
-This candidate requires these scoped checks before PR review:
+Run these commands from `projects/ai-usage-telemetry` before PR review:
 
-    python3 about/legends-and-lore/evidence/verify_0002_source_semantics.py
-    python3 -m json.tool about/legends-and-lore/evidence/0002-source-semantics-fixtures.json >/dev/null
-    python3 -m py_compile about/legends-and-lore/evidence/verify_0002_source_semantics.py
-    openspec validate --all --strict
-    uv run ../../skills/personal/th-projects/scripts/spec-trace-check.py . --authoring
-    git diff --cached --check
+| Command | Expected result | Candidate-evidence relationship |
+|---|---|---|
+| `python3 about/legends-and-lore/evidence/verify_0002_source_semantics.py` | `PASS; 4 deliberate mutations rejected`: unregistered scalar admission, copied-child identity, canary-label, and Claude replay mutations all fail. | Candidate-evidence-only structural oracle; it does not accept or amend any RFC/OpenSpec/Decision bytes. |
+| `python3 about/legends-and-lore/evidence/exercise_0002_capture_controls.py` | `PASS; 14 canary lanes exercised; 6 negative controls rejected; 0 synthetic value touches`. Each declared content decode, forbidden materializer, egress, credential, broad-root, and network control rejects before an opaque synthetic value is touched. | Candidate-evidence-only isolated harness. It does not execute a producer, production parser, mount, credential reader, or network client. |
+| `python3 -m unittest discover -s about/legends-and-lore/evidence/tests -p 'test_0002_source_semantics.py' -v` | Five targeted regressions pass: exact source ranges, unregistered-scalar rejection, executed capture controls, exact impact map, and this ledger contract. | Candidate-evidence-only regression suite; it prevents the corrective harness from being omitted from this mandatory ledger. |
+| `python3 -m json.tool about/legends-and-lore/evidence/0002-source-semantics-fixtures.json >/dev/null` | Valid JSON with no emitted fixture value. | Validates only the synthetic candidate fixture. |
+| `python3 -m py_compile about/legends-and-lore/evidence/verify_0002_source_semantics.py about/legends-and-lore/evidence/exercise_0002_capture_controls.py about/legends-and-lore/evidence/tests/test_0002_source_semantics.py` | All three Python files compile. | Checks the candidate verifier, isolated harness, and regression suite only. |
+| `openspec validate --all --strict` | Active change validates with zero failures. | Confirms the accepted contract set remains valid; this candidate does not alter it. |
+| `uv run ../../skills/personal/th-projects/scripts/spec-trace-check.py . --authoring` | Authoring trace has zero errors and warnings. | Confirms candidate evidence did not disturb the accepted requirement trace. |
+| `git diff --cached --check` | No whitespace errors in the candidate-only patch. | Does not authorize contract or implementation work. |
 
 PR integration remains blocked pending independent privacy/accounting review. This author has not performed or claimed that independent review.

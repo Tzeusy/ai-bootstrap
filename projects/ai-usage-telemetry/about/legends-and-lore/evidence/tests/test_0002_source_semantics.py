@@ -114,6 +114,21 @@ class SourceSemanticsEvidenceTests(unittest.TestCase):
         ):
             self.assertIn(path, candidate)
 
+    def test_evidence_run_ledger_reproduces_capture_control_correction(self) -> None:
+        candidate = CANDIDATE_PATH.read_text(encoding="utf-8")
+        ledger = candidate.split("## Evidence run ledger", maxsplit=1)[1].lower()
+
+        for expected in (
+            "python3 about/legends-and-lore/evidence/exercise_0002_capture_controls.py",
+            "python3 -m unittest discover -s about/legends-and-lore/evidence/tests -p 'test_0002_source_semantics.py' -v",
+            "14 canary lanes exercised",
+            "6 negative controls rejected",
+            "0 synthetic value touches",
+            "4 deliberate mutations rejected",
+            "candidate-evidence-only",
+        ):
+            self.assertIn(expected.lower(), ledger)
+
 
 if __name__ == "__main__":
     unittest.main()
