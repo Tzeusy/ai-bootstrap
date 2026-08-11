@@ -51,8 +51,8 @@ preserves predecessor convergence, while the
 [final-branch correction record](../../../about/legends-and-lore/reviews/0001/2026-08-10-final-branch-correction.md)
 records the correction and exact-head confirmation.
 
-The bounded health-summary RFC/evidence candidate is **[Unknown]** until a
-fresh independent exact-head review and successor owner decision bind its new
+The bounded health-summary RFC/evidence/design candidate is **[Unknown]** until
+a fresh independent exact-head review and successor owner decision bind its new
 bytes. It does not amend or replace any of the eleven capability-row bindings
 above.
 

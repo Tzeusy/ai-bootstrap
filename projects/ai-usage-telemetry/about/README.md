@@ -29,6 +29,7 @@ until it is reswept.
 |---|---|---|
 | Heart-and-soul doctrine | **[Observed] Adopted** | Owner Decision 0001 remains authoritative; Decisions 0002 and 0003 accept downstream contracts without amending doctrine |
 | RFC 0001 | **[Unknown] Health-summary correction candidate** | Decision 0003 remains the last accepted RFC binding; independent exact-head review and a successor owner decision are required before the candidate bytes become accepted |
+| Active OpenSpec design | **[Unknown] Health-summary correction candidate** | The changed design bytes require the same independent review and successor owner decision; accepted capability-specification rows remain unchanged |
 | Lay-and-land topology | **[Observed] Accepted** | Current accepted map; implementation evidence remains absent |
 | Craft-and-care standards | **[Observed] Adopted** | Governs specification and later implementation work |
 | OpenSpec capability specifications | **[Observed] All eleven current rows accepted** | Seven exact Decision 0002 bindings plus four Decision 0003 replacements; active tasks and every later evidence gate remain |
@@ -56,13 +57,15 @@ synthetic vectors at
 and exactly four corrected capability rows. The other seven current
 specifications still match Decision 0002 exactly.
 
-**Health-summary correction candidate:** the current RFC and synthetic-vector
-candidate distinguish stream-specific `reconciliation_overdue` and
-`source_envelope_exceeded` from the `degraded` family/global summaries required
-by the accepted local-query contract. Those changed RFC/evidence bytes are
-**[Unknown]** until a fresh independent exact-head review and successor owner
-decision record them. All eleven accepted capability-specification rows remain
-byte-identical and retain their Decision 0002/0003 bindings.
+**Health-summary correction candidate:** the current RFC, synthetic-vector, and
+OpenSpec-design candidate distinguish stream-specific `reconciliation_overdue`
+and `source_envelope_exceeded` from the `degraded` family/global summaries
+required by the accepted local-query contract; they also reserve `disabled` for
+component/summary state rather than stream state. Those changed RFC, evidence,
+and design bytes are **[Unknown]** until a fresh independent exact-head review
+and successor owner decision record them. All eleven accepted capability-
+specification rows remain byte-identical and retain their Decision 0002/0003
+bindings.
 
 **Historical predecessor anchor:** R3 RFC
 `ca548d5cb5070c5e288e66d3fe97a3c0f662cd245bd7153ae640d2ed593dcbc2`;

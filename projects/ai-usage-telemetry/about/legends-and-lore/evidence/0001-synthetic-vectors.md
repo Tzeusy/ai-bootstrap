@@ -148,6 +148,14 @@ credential, identifier, or path.
   preserve every prior latch and evidence byte, derive `storage_hold` as the
   highest active state, reveal reconciliation then coverage as their owning
   clears occur, and report `healthy` only after all latches are clear.
+- Exercise an independently implemented source-health summary oracle for every
+  individual and overlapping stream latch (`quarantine`, `storage`,
+  `retention`, `envelope`, `reconciliation`, `tail`, and `coverage`), enabled
+  `unsupported_profile` and `unsupported_accounting_profile` components, and
+  disabled components. Every enabled non-healthy component must make its
+  family/global summary `degraded`; a disabled component must create no stream,
+  cursor, or fact and is excluded from enabled aggregation; a summary with only
+  disabled components must report `disabled`.
 - Restart midway through reconciliation; only a successful completion resets
   the durable deadline.
 - Exercise truncation, replacement, rotation, schema change, clock movement,
