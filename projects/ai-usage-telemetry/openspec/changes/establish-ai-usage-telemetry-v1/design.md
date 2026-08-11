@@ -526,11 +526,12 @@ blocks the v1 manifest rather than weakening the claim.
 
 The source-stream state machine distinguishes healthy, trailing deferred,
 quarantined, storage hold, reconciliation overdue, source envelope exceeded,
-retention gap, coverage unknown, and disabled states. Family and global
-summaries use only `healthy`, `degraded`, or `disabled`; any enabled
-non-healthy child makes them `degraded`, and they never copy an individual
-stream state code. A sibling's advancement therefore cannot mask a degraded
-stream.
+retention gap, and coverage unknown states. `disabled` belongs only to a source
+component or summary: a disabled component has no stream, cursor, or fact.
+Family and global summaries use only `healthy`, `degraded`, or `disabled`;
+they are `disabled` when every component in scope is disabled, and any enabled
+non-healthy child makes them `degraded`. They never copy an individual stream
+state code. A sibling's advancement therefore cannot mask a degraded stream.
 
 `stream-reconciliation-and-health` owns one pure `LatchSet` model that accepts a
 prior closed set plus one dimension-owned transition and returns the next set,

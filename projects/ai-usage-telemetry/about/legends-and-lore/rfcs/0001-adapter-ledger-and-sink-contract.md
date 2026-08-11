@@ -1031,10 +1031,14 @@ content-free diagnostics preserve, at minimum:
 
 - per source stream: technical identity, `healthy | trailing_deferred |
   quarantined | storage_hold | reconciliation_overdue |
-  source_envelope_exceeded | retention_gap | coverage_unknown |
-  disabled`, last successful scan, last accepted
+  source_envelope_exceeded | retention_gap | coverage_unknown`, last successful
+  scan, last accepted
   source time, durable cursor tuple, held failure code/position, and reconciliation
   due/last-completed times;
+- per source component: declared and runtime state, where `disabled` has no
+  stream, cursor, or fact; a family or global source summary is `disabled` only
+  when every component in its scope is disabled, otherwise it is `healthy` or
+  `degraded` from the enabled components;
 - ledger: namespace/epoch/schema, migration and integrity state, free-space
   reserve state, last committed `ledger_seq`, last successful transaction, and
   accepted/duplicate/held counts; and
