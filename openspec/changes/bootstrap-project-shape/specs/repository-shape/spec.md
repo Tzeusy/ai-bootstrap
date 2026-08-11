@@ -201,3 +201,27 @@ Scope: v1-mandatory
 
 - **WHEN** the repository is audited for structural drift
 - **THEN** auditors can trace doctrine principles to RFC contracts and then to repository-level requirements
+
+### Requirement: Nested Product Offering Boundaries
+
+The repository MUST make product offerings under `projects/` discoverable while
+keeping their product-local authority distinct from the parent harness and its
+shared-skill, mirror, and installation surfaces.
+
+ID: REQ-repository-shape-011
+Source: Doctrine rule 7; RFC 0001 §Repository Layers, §Distribution Model, §Integration
+Scope: v1-mandatory
+
+#### Scenario: Parent and product authority
+
+- **WHEN** a contributor enters a product offering under `projects/`
+- **THEN** parent navigation routes to that offering's `about/README.md`, the
+  parent shape continues to govern the surrounding harness, and the product's
+  local `about/` and active child OpenSpec change govern product behavior
+
+#### Scenario: Product discovery does not become distribution
+
+- **WHEN** a product offering has an active child OpenSpec change
+- **THEN** its OpenSpec commands run from the offering root, and the offering
+  is not treated as a shared-skill source, tool facade, or installation
+  surface
