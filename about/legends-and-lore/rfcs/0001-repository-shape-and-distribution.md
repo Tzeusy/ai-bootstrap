@@ -36,7 +36,8 @@ project-shape pillar or part of its shared-skill distribution flow:
   product's local `about/` and child OpenSpec change govern product behavior;
   the parent shape continues to govern the surrounding harness. Product
   offerings are not shared-skill sources, tool facades, or installation
-  surfaces.
+  surfaces. `projects/README.md` lists each immediate offering and links to its
+  product entrypoint.
 
 ### Source-of-Truth Rules
 
@@ -62,8 +63,8 @@ project-shape pillar or part of its shared-skill distribution flow:
   as the navigation layer.
 - Product-local OpenSpec commands run from the offering root. Root-level
   OpenSpec commands cover the `ai-bootstrap` repository-shape change and do
-  not aggregate child product changes; parent navigation must route readers to
-  the product's own `about/README.md`.
+  not aggregate child product changes; `projects/README.md` must route readers
+  to each product's own `about/README.md`.
 - OpenCode currently installs as config under `$HOME/.config/opencode` rather than participating in the in-repo skill-mirror layout used by Claude, Codex, and Gemini.
 - Regeneration or refresh flows must be explicit and scriptable. For example, `scripts/refresh.sh` is the supported way to rebuild the vendored Excalidraw bundle used by the personal Excalidraw skill.
 

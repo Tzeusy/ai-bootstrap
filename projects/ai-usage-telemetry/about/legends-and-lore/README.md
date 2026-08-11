@@ -3,9 +3,11 @@
 Design contracts for AI Usage Telemetry.
 
 **Status:** R5 confirmed and promoted predecessor RFC/evidence bytes under
-Owner Decision 0001's standing direction. Decision 0003 promotes the exact-
-head-confirmed corrected RFC/synthetic bytes and replaces four capability rows;
-the other seven current rows retain Decision 0002 authority.
+Owner Decision 0001's standing direction. Decision 0003 remains the last
+accepted RFC/synthetic binding and replaces four capability rows; the other
+seven current rows retain Decision 0002 authority. The bounded health-summary
+RFC/evidence correction candidate is **[Unknown]** pending fresh independent
+exact-head review and a successor owner decision.
 See the central
 [lifecycle matrix](../README.md#lifecycle-status), the current
 [R1-R5 ledger](./reviews/0001/2026-08-10-specification-reconciliation.md),

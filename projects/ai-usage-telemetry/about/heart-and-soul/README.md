@@ -6,7 +6,8 @@ Doctrine for **AI Usage Telemetry**, the `ai-usage-telemetry` project nested in
 **Status:** Adopted through Owner Decision 0001. Decision 0002 independently
 accepted the eleven R5 capability bytes without amending doctrine; Decision
 0003 replaces exactly four corrected rows after exact-head confirmation. All
-eleven current rows are accepted. See the central
+eleven current rows are accepted, while the bounded health-summary RFC/evidence
+candidate is **[Unknown]** pending review and a successor owner decision. See the central
 [lifecycle matrix](../README.md#lifecycle-status).
 
 Read this pillar first when deciding what the product may observe, retain, or

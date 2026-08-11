@@ -154,11 +154,12 @@ credential, identifier, or path.
   continuous append at the supported rate, and exactly-at/one-beyond the
   supported source envelope.
 - Cross each envelope dimension independently at `N+1`; require
-  `source_envelope_exceeded` on stream/family/global health, bounded safe
-  incremental progress, and no claim that reconciliation is current.
+  `source_envelope_exceeded` on the affected stream and `degraded` family/global
+  summaries, bounded safe incremental progress, and no claim that reconciliation
+  is current.
 - When the profile deadline is missed, preserve safe incremental behavior but
-  make stream, family, and global health `reconciliation_overdue`; never report
-  the corpus as fully reconciled.
+  make the affected stream `reconciliation_overdue` and family/global summaries
+  `degraded`; never report the corpus as fully reconciled.
 - Start with a source absent and prove coverage remains `coverage_unknown`;
   separately delete or truncate a previously discovered synthetic stream across
   its unconsumed cursor and require an explicit `retention_gap`.

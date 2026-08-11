@@ -30,9 +30,10 @@ scripts/           # Helper scripts used by the ai-bootstrap setup
 
 `agents/` still exists, but it is no longer the center of the system. Treat it as legacy/reference material unless you have a specific reason to use one of those prompts.
 
-`projects/` is not part of the shared-skill mirror or installation flow. Start
-each offering from its own `about/README.md`; its product shape and child
-OpenSpec change govern product behavior.
+`projects/` is not part of the shared-skill mirror or installation flow. Its
+[`README.md`](projects/README.md) lists each offering; start an offering from
+its own `about/README.md`, whose product shape and child OpenSpec change govern
+product behavior.
 
 ## Skills Layout And Provenance
 

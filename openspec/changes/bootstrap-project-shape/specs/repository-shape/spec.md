@@ -204,17 +204,24 @@ Scope: v1-mandatory
 
 ### Requirement: Nested Product Offering Boundaries
 
-The repository MUST make product offerings under `projects/` discoverable while
-keeping their product-local authority distinct from the parent harness and its
-shared-skill, mirror, and installation surfaces.
+The repository MUST make every immediate product offering under `projects/`
+discoverable through `projects/README.md` while keeping its product-local
+authority distinct from the parent harness and its shared-skill, mirror, and
+installation surfaces.
 
 ID: REQ-repository-shape-011
 Source: Doctrine rule 7; RFC 0001 §Repository Layers, §Distribution Model, §Integration
 Scope: v1-mandatory
 
+#### Scenario: Product index
+
+- **WHEN** an immediate product offering exists under `projects/`
+- **THEN** `projects/README.md` lists that offering and links to its
+  `about/README.md`
+
 #### Scenario: Parent and product authority
 
-- **WHEN** a contributor enters a product offering under `projects/`
+- **WHEN** a contributor follows an offering from `projects/README.md`
 - **THEN** parent navigation routes to that offering's `about/README.md`, the
   parent shape continues to govern the surrounding harness, and the product's
   local `about/` and active child OpenSpec change govern product behavior
