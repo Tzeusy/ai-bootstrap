@@ -25,11 +25,18 @@ engineering-standards pillar and in-repo shape-doc routing.
 
 ### Repository Layers
 
-The repository is divided into three logical layers:
+The `ai-bootstrap` harness is divided into three logical layers. Independently
+shaped product offerings live alongside that harness without becoming a sixth
+project-shape pillar or part of its shared-skill distribution flow:
 
 - **Tool facades:** `.claude/`, `.codex/`, and `.gemini/` contain platform-specific prompts, settings, rules, metadata, and skill mirror surfaces; `opencode/` currently contains tool-specific config only.
 - **Shared authoring layers:** `skills/` is the primary shared workflow library, `skills/personal/` is the primary local operating-model layer, `agents/` is a secondary reference corpus, and repository-level docs explain the contract.
 - **Support utilities:** `scripts/` and skill-local scripts/assets provide reproducible maintenance operations such as vendored bundle refreshes.
+- **Product offerings:** `projects/` holds independently shaped products. Each
+  product's local `about/` and child OpenSpec change govern product behavior;
+  the parent shape continues to govern the surrounding harness. Product
+  offerings are not shared-skill sources, tool facades, or installation
+  surfaces.
 
 ### Source-of-Truth Rules
 
@@ -53,6 +60,10 @@ The repository is divided into three logical layers:
   routed to `about/` and `openspec/` by the project instruction files
   (`CLAUDE.md`, `AGENTS.md`), with `about/README.md` and the pillar READMEs
   as the navigation layer.
+- Product-local OpenSpec commands run from the offering root. Root-level
+  OpenSpec commands cover the `ai-bootstrap` repository-shape change and do
+  not aggregate child product changes; parent navigation must route readers to
+  the product's own `about/README.md`.
 - OpenCode currently installs as config under `$HOME/.config/opencode` rather than participating in the in-repo skill-mirror layout used by Claude, Codex, and Gemini.
 - Regeneration or refresh flows must be explicit and scriptable. For example, `scripts/refresh.sh` is the supported way to rebuild the vendored Excalidraw bundle used by the personal Excalidraw skill.
 
@@ -90,6 +101,9 @@ RFC 0001 governs every top-level component:
 - `agents/` is a secondary reference corpus rather than the main execution path.
 - `.claude/`, `.codex/`, `.gemini/`, and `opencode/` are adapter surfaces.
 - `about/` and `openspec/` document and constrain the structure above.
+- `projects/` contains independently shaped product offerings whose local
+  `about/` and child OpenSpec changes govern product behavior without changing
+  the parent harness's shared-skill, mirror, or installation contracts.
 - Project instruction files route in-repo sessions into those canonical docs;
   no repository-specific skills live in the tool skill directories.
 
