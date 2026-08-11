@@ -1,0 +1,14 @@
+{
+  "version": "synthetic-thesis@1",
+  "synthetic": true,
+  "required_fields": ["requestId", "messageId", "model", "sourceTime", "amounts"],
+  "allowed_amounts": ["input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"],
+  "capture_canaries": ["application_value", "parser_instrumentation", "log", "exception", "crash", "sqlite", "sink", "image", "environment", "network"],
+  "fixtures": {
+    "qualified-claude.jsonl": {"sha256": "bfd489367c4a6d600a972b007d96719d45eb7072b817d855743afcce896d0bf0"},
+    "negative-requestId.jsonl": {"sha256": "02cfa0f51cc3fc3ee8b081418fa4c89b5c4ab41425668a029cd5fb9609e7292f"},
+    "negative-digest.jsonl": {"sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "negative-projected_type.jsonl": {"sha256": "bb9e5fcda950ab4cc8525da377cca3e858bd29bb3b98bbccaeb51ec82b86e757"},
+    "collision-b.jsonl": {"sha256": "8652a112bc0a9dc73eed5780a0b977962b5af878a74ca2e7df77fb6d70492019"}
+  }
+}
