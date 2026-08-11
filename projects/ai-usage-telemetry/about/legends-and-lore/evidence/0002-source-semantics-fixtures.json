@@ -1,0 +1,199 @@
+{
+  "format": "aiut-source-semantics-fixture/v1",
+  "fixture_id": "aib-kwx-source-semantics-0002",
+  "fixture_class": "synthetic-structural-content-free",
+  "safety": {
+    "personal_source_opened": false,
+    "credential_material_opened": false,
+    "real_mount_opened": false,
+    "sink_or_network_executed": false,
+    "content_bearing_values_present": false,
+    "canary_lanes": {
+      "application_value": "canary-application-value",
+      "decoder": "canary-decoder",
+      "parser": "canary-parser",
+      "log": "canary-log",
+      "exception": "canary-exception",
+      "output_capture": "canary-output-capture",
+      "crash_output": "canary-crash-output",
+      "sqlite": "canary-sqlite",
+      "otlp": "canary-otlp",
+      "postgresql": "canary-postgresql",
+      "image_layer": "canary-image-layer",
+      "filesystem": "canary-filesystem",
+      "environment": "canary-environment",
+      "packet_network": "canary-packet-network"
+    },
+    "negative_mutations": [
+      "content-decode",
+      "forbidden-decoder-materializer",
+      "sentinel-egress",
+      "credential-access",
+      "broad-root-access",
+      "unexpected-network"
+    ]
+  },
+  "pins": {
+    "claude_code": {
+      "version": "2.1.227",
+      "executable_sha256": "6832dc3f1797b890b71116e5f2dbbf9a83fd3d0498c235b4b0f9cd0e6e499ad6",
+      "producer_execution": "not-run",
+      "public_source_refs": [
+        "https://code.claude.com/docs/en/sessions",
+        "https://code.claude.com/docs/en/cli-usage"
+      ]
+    },
+    "codex": {
+      "version": "0.147.0",
+      "executable_sha256": "cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40",
+      "annotated_tag": "rust-v0.147.0",
+      "tag_object": "3ed6f04f6bf8b7c46299d1cb1ff99c74ce21a51d",
+      "peeled_commit": "be6e8eac029b183056b7e4402879f15d2c85f61b",
+      "public_source_refs": [
+        "https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/core/src/thread_manager.rs#L974-L1123",
+        "https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/core/src/session/mod.rs#L1296-L1337",
+        "https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/rollout/src/recorder.rs#L797-L835",
+        "https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/rollout/src/recorder.rs#L1630-L1649"
+      ]
+    },
+    "tokscale": {
+      "commit": "9814fa49e8ba32b19d94ef2b1545b66b17944435",
+      "role": "comparative-only-not-downloaded-or-executed"
+    }
+  },
+  "oracles": {
+    "claude_collision_oracle": {
+      "oracle_id": "claude-collision-oracle",
+      "result": "unresolved"
+    },
+    "codex_fork_neutrality_oracle": {
+      "oracle_id": "codex-fork-neutrality-oracle",
+      "result": "confirmed-contract-gap"
+    }
+  },
+  "claude_cases": [
+    {
+      "case_id": "claude-exact-replay",
+      "record_identity": ["session-alpha", "request-alpha"],
+      "message_consistency": "same",
+      "source_time": "same",
+      "model": "same",
+      "amount_movement": "same",
+      "producer_confirmation": "not-needed",
+      "expected_current_contract": "duplicate"
+    },
+    {
+      "case_id": "claude-progressive-monotone-unconfirmed",
+      "record_identity": ["session-bravo", "request-bravo"],
+      "message_consistency": "same",
+      "source_time": "changed",
+      "model": "same",
+      "amount_movement": "increase",
+      "producer_confirmation": "required-not-present",
+      "expected_current_contract": "identity-collision",
+      "candidate_disposition": "unresolved-no-admission"
+    },
+    {
+      "case_id": "claude-progressive-nonmonotone-unconfirmed",
+      "record_identity": ["session-charlie", "request-charlie"],
+      "message_consistency": "same",
+      "source_time": "changed",
+      "model": "same",
+      "amount_movement": "nonmonotone",
+      "producer_confirmation": "required-not-present",
+      "expected_current_contract": "identity-collision",
+      "candidate_disposition": "unresolved-no-admission"
+    },
+    {
+      "case_id": "claude-progressive-decrease-incomplete",
+      "record_identity": ["session-delta", "request-delta"],
+      "message_consistency": "unknown-incomplete",
+      "source_time": "unknown-incomplete",
+      "model": "unknown-incomplete",
+      "amount_movement": "decrease",
+      "producer_confirmation": "required-not-present",
+      "expected_current_contract": "incomplete-tail-hold",
+      "candidate_disposition": "unresolved-no-admission"
+    },
+    {
+      "case_id": "claude-identity-reuse",
+      "record_identity": ["session-echo", "request-echo"],
+      "message_consistency": "changed",
+      "source_time": "changed",
+      "model": "changed",
+      "amount_movement": "changed",
+      "producer_confirmation": "absent",
+      "expected_current_contract": "identity-collision"
+    },
+    {
+      "case_id": "claude-producer-confirmed-progressive-counterfactual",
+      "record_identity": ["session-foxtrot", "request-foxtrot"],
+      "message_consistency": "same",
+      "source_time": "changed",
+      "model": "same",
+      "amount_movement": "increase",
+      "producer_confirmation": "counterfactual-only",
+      "expected_current_contract": "identity-collision",
+      "if_confirmed_disposition": "requires-contract-amendment"
+    }
+  ],
+  "codex_cases": {
+    "source_observation": "confirmed-public-source",
+    "parent": {
+      "case_id": "codex-original-contribution",
+      "session": "thread-parent",
+      "cumulative_landmark": "landmark-alpha",
+      "semantic_contribution": "source-contribution-alpha"
+    },
+    "forks": [
+      {
+        "case_id": "codex-human-fork-copied-prefix",
+        "fork_kind": "human",
+        "child_session": "thread-child-human",
+        "child_ownership": "first-child-owned",
+        "copied_parent_landmark": "landmark-alpha",
+        "copied_semantic_contribution": "source-contribution-alpha",
+        "timestamp_relation": "different-or-unknown",
+        "expected_current_contract": "contract-gap"
+      },
+      {
+        "case_id": "codex-subagent-fork-copied-prefix",
+        "fork_kind": "subagent",
+        "child_session": "thread-child-subagent",
+        "child_ownership": "first-child-owned",
+        "copied_parent_landmark": "landmark-alpha",
+        "copied_semantic_contribution": "source-contribution-alpha",
+        "timestamp_relation": "same-millisecond-permitted",
+        "expected_current_contract": "contract-gap"
+      },
+      {
+        "case_id": "codex-nested-fork-copied-prefix",
+        "fork_kind": "nested",
+        "child_session": "thread-child-nested",
+        "child_ownership": "first-child-owned",
+        "copied_parent_landmark": "landmark-alpha",
+        "copied_semantic_contribution": "source-contribution-alpha",
+        "timestamp_relation": "different-or-unknown",
+        "expected_current_contract": "contract-gap"
+      }
+    ],
+    "archived_live_relocation": {
+      "case_id": "codex-archived-live-relocation",
+      "identity_inputs": "same-session-and-landmark",
+      "hypothesis_status": "unresolved",
+      "hypothesis": "archived-live-duplication",
+      "expected_current_contract": "requires-reconciliation-evidence"
+    },
+    "cumulative_regression": {
+      "case_id": "codex-cumulative-regression",
+      "prior_landmark_rank": 2,
+      "current_landmark_rank": 1,
+      "expected_current_contract": "recognized-malformed-hold"
+    },
+    "gap_falsifiers": [
+      "copied-prefix-contains-no-usage-landmark",
+      "serialized-copied-usage-remains-bound-to-parent-native-identity",
+      "accepted-successor-contract-makes-child-copy-ledger-neutral"
+    ]
+  }
+}
