@@ -28,8 +28,9 @@ until it is reswept.
 | Artifact | Status | Next authority gate |
 |---|---|---|
 | Heart-and-soul doctrine | **[Observed] Adopted** | Owner Decision 0001 remains authoritative; Decisions 0002 and 0003 accept downstream contracts without amending doctrine |
-| RFC 0001 | **[Unknown] Health-summary correction candidate** | Decision 0003 remains the last accepted RFC binding; independent exact-head review and a successor owner decision are required before the candidate bytes become accepted |
-| Active OpenSpec design | **[Unknown] Health-summary correction candidate** | The changed design bytes require the same independent review and successor owner decision; accepted capability-specification rows remain unchanged |
+| RFC 0001 | **[Observed] Accepted health-summary correction** | Decision 0004 binds the exact corrected RFC bytes; accepted capability-specification rows remain unchanged |
+| Synthetic-vector evidence | **[Observed] Accepted health-summary correction** | Decision 0004 binds the exact corrected vector bytes; source/bounds and provenance retain their existing authority |
+| Active OpenSpec design | **[Observed] Accepted health-summary correction** | Decision 0004 binds the exact supporting design bytes; accepted capability-specification rows remain unchanged |
 | Lay-and-land topology | **[Observed] Accepted** | Current accepted map; implementation evidence remains absent |
 | Craft-and-care standards | **[Observed] Adopted** | Governs specification and later implementation work |
 | OpenSpec capability specifications | **[Observed] All eleven current rows accepted** | Seven exact Decision 0002 bindings plus four Decision 0003 replacements; active tasks and every later evidence gate remain |
@@ -57,15 +58,16 @@ synthetic vectors at
 and exactly four corrected capability rows. The other seven current
 specifications still match Decision 0002 exactly.
 
-**Health-summary correction candidate:** the current RFC, synthetic-vector, and
-OpenSpec-design candidate distinguish stream-specific `reconciliation_overdue`
-and `source_envelope_exceeded` from the `degraded` family/global summaries
-required by the accepted local-query contract; they also reserve `disabled` for
-component/summary state rather than stream state. Those changed RFC, evidence,
-and design bytes are **[Unknown]** until a fresh independent exact-head review
-and successor owner decision record them. All eleven accepted capability-
-specification rows remain byte-identical and retain their Decision 0002/0003
-bindings.
+**Health-summary correction promotion:** independent semantic and authority
+lanes reviewed exact clean HEAD
+`ff19bbd2fd4eab11327194fe8519afcb8a3f5a8d` and returned `APPROVE`.
+[Decision 0004](./heart-and-soul/decisions/0004-accept-health-summary-contract-correction.md)
+binds the corrected RFC, synthetic-vector evidence, and active OpenSpec design:
+stream-specific `reconciliation_overdue` and `source_envelope_exceeded` fold to
+`degraded` at family/global scope, while `disabled` remains component/summary
+state only. The [health-summary authority re-sweep](./legends-and-lore/reviews/0001/2026-08-11-health-summary-authority-resweep.md)
+records the exact evidence. All eleven accepted capability-specification rows
+remain byte-identical and retain their Decision 0002/0003 bindings.
 
 **Historical predecessor anchor:** R3 RFC
 `ca548d5cb5070c5e288e66d3fe97a3c0f662cd245bd7153ae640d2ed593dcbc2`;
@@ -87,7 +89,9 @@ for the standing direction and
 [Owner Decision 0002](./heart-and-soul/decisions/0002-accept-v1-capability-contracts.md)
 for the original eleven independent contract decisions and
 [Owner Decision 0003](./heart-and-soul/decisions/0003-accept-final-branch-contract-corrections.md)
-for the four exact replacements.
+for the four exact replacements and
+[Owner Decision 0004](./heart-and-soul/decisions/0004-accept-health-summary-contract-correction.md)
+for the bounded health-summary correction.
 The pre-specification instrument is bound in
 [`parameters.md`](../docs/launch-gate/parameters.md), and the named-commit
 [`READY` administration](../docs/launch-gate/2026-08-10-96ba99d.md) has been
@@ -158,6 +162,7 @@ archive, or release is valid.
    contract spatially.
 7. [`heart-and-soul/decisions/0002-accept-v1-capability-contracts.md`](./heart-and-soul/decisions/0002-accept-v1-capability-contracts.md),
    [`heart-and-soul/decisions/0003-accept-final-branch-contract-corrections.md`](./heart-and-soul/decisions/0003-accept-final-branch-contract-corrections.md),
+   [`heart-and-soul/decisions/0004-accept-health-summary-contract-correction.md`](./heart-and-soul/decisions/0004-accept-health-summary-contract-correction.md),
    and the active change's
    [`acceptance.md`](../openspec/changes/establish-ai-usage-telemetry-v1/acceptance.md)
    for the exact contract decisions and their remaining boundary.
@@ -167,7 +172,8 @@ archive, or release is valid.
 - Heart-and-soul doctrine is owner-adopted through Decision 0001.
 - R5 promoted the predecessor RFC/evidence bytes under Decision 0001's standing
   direction; Decision 0003 promotes the reviewed corrected RFC and synthetic-
-  vector bytes while retaining unchanged source/provenance authority.
+  vector bytes while retaining unchanged source/provenance authority; Decision
+  0004 promotes the later bounded health-summary RFC/vector/design correction.
 - Topology and craft-and-care derive authority from that doctrine and RFC; they
   do not override them.
 - Decision 0002 independently accepts the eleven exact R5 capability contracts;
