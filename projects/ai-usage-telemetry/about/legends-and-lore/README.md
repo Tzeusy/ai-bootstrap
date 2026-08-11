@@ -3,11 +3,10 @@
 Design contracts for AI Usage Telemetry.
 
 **Status:** R5 confirmed and promoted predecessor RFC/evidence bytes under
-Owner Decision 0001's standing direction. Decision 0003 remains the last
-accepted RFC/synthetic binding and replaces four capability rows; the other
-seven current rows retain Decision 0002 authority. The bounded health-summary
-RFC/evidence/design correction candidate is **[Unknown]** pending fresh
-independent exact-head review and a successor owner decision.
+Owner Decision 0001's standing direction. Decision 0003 replaces four
+capability rows; the other seven current rows retain Decision 0002 authority.
+Decision 0004 accepts the separately reviewed bounded health-summary
+RFC/evidence/design correction without replacing a capability row.
 See the central
 [lifecycle matrix](../README.md#lifecycle-status), the current
 [R1-R5 ledger](./reviews/0001/2026-08-10-specification-reconciliation.md),
@@ -36,6 +35,9 @@ Reading order:
 5. [`reviews/0001/2026-08-10-r4-quality-evidence-resweep.md`](./reviews/0001/2026-08-10-r4-quality-evidence-resweep.md)
    preserves the R4 input, predecessor hashes, bounded corrections, and R5
    confirmation append. Earlier records remain under [`reviews/0001/`](./reviews/0001/).
+6. [`reviews/0001/2026-08-11-health-summary-authority-resweep.md`](./reviews/0001/2026-08-11-health-summary-authority-resweep.md)
+   binds the health-summary correction candidate and its independent semantic
+   and authority review before Decision 0004 promotion.
 
 Relationship to the other pillars:
 
@@ -43,9 +45,10 @@ Relationship to the other pillars:
 - Legends-and-lore defines the load-bearing runtime, adapter, ledger, and sink contracts that preserve those principles.
 - The `READY` launch-gate administration and R1-R5 convergence are recorded,
   Decision 0002 preserves the R5 contract decisions independently, and
-  Decision 0003 replaces exactly four corrected rows. All current contract
-  rows are accepted, while task 2.1 and later implementation gates remain
-  unchecked.
+  Decision 0003 replaces exactly four corrected rows, and Decision 0004
+  promotes the separately reviewed health-summary RFC/vector/design correction
+  without replacing a row. All current contract rows are accepted, while task
+  2.1 and later implementation gates remain unchecked.
   Follow
   its [`proposal`](../../openspec/changes/establish-ai-usage-telemetry-v1/proposal.md)
   → [`design`](../../openspec/changes/establish-ai-usage-telemetry-v1/design.md)
@@ -77,7 +80,9 @@ and unchanged provenance
 `dcfffe320712afbdcf805e05d30b277130e4bf81f9d718d4f4408bc077f482f0`.
 Decision 0003 supersedes the predecessor RFC/synthetic authority with exact
 current hashes recorded in the final-branch correction review; source/bounds
-and provenance remain unchanged. The formal review and reconciliation entries
+and provenance remain unchanged. Decision 0004 subsequently promotes the
+separately reviewed health-summary RFC/synthetic/design correction, with no
+capability-row replacement. The formal review and reconciliation entries
 preserve the full historical digest trail.
 Source/resource profiles still require their downstream evidence gates before
 real mounts, ingestion, exports, packaging, archival, or release.
