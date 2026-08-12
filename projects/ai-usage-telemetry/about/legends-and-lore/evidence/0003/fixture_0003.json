@@ -1,0 +1,96 @@
+{
+  "schema": "claude-progressive-probe-fixture@1",
+  "build": {
+    "version": "2.1.227",
+    "sha256": "6832dc3f1797b890b71116e5f2dbbf9a83fd3d0498c235b4b0f9cd0e6e499ad6"
+  },
+  "probe_contract": {
+    "target_invocation_count": 1,
+    "namespace_types": ["user", "pid", "net"],
+    "network_scope": "loopback-only",
+    "output_scope": "sandbox-tmpfs-only",
+    "disposition_on_insufficient_evidence": "unresolved"
+  },
+  "cases": [
+    {
+      "case_id": "exact-replay",
+      "record_shape": "complete-usage-bearing",
+      "native_pair_relation": "same",
+      "timestamp_relation": "same",
+      "message_relation": "same",
+      "model_relation": "same",
+      "counter_direction": "same",
+      "expected_disposition": "duplicate"
+    },
+    {
+      "case_id": "one-request-progressive-stream",
+      "record_shape": "complete-usage-bearing",
+      "native_pair_relation": "same",
+      "timestamp_relation": "changed",
+      "message_relation": "same",
+      "model_relation": "same",
+      "counter_direction": "monotone-increase",
+      "expected_disposition": "confirmed-contract-gap"
+    },
+    {
+      "case_id": "changed-timestamp",
+      "record_shape": "complete-usage-bearing",
+      "native_pair_relation": "same",
+      "timestamp_relation": "changed",
+      "message_relation": "same",
+      "model_relation": "same",
+      "counter_direction": "same",
+      "expected_disposition": "identity-collision"
+    },
+    {
+      "case_id": "monotone-counter",
+      "record_shape": "complete-usage-bearing",
+      "native_pair_relation": "same",
+      "timestamp_relation": "changed",
+      "message_relation": "same",
+      "model_relation": "same",
+      "counter_direction": "monotone-increase",
+      "expected_disposition": "confirmed-contract-gap"
+    },
+    {
+      "case_id": "decreasing-counter",
+      "record_shape": "complete-usage-bearing",
+      "native_pair_relation": "same",
+      "timestamp_relation": "changed",
+      "message_relation": "same",
+      "model_relation": "same",
+      "counter_direction": "decrease",
+      "expected_disposition": "identity-collision"
+    },
+    {
+      "case_id": "malformed-record",
+      "record_shape": "malformed",
+      "native_pair_relation": "not-applicable",
+      "timestamp_relation": "not-applicable",
+      "message_relation": "not-applicable",
+      "model_relation": "not-applicable",
+      "counter_direction": "not-applicable",
+      "expected_disposition": "recognized-malformed"
+    },
+    {
+      "case_id": "incomplete-record",
+      "record_shape": "incomplete",
+      "native_pair_relation": "not-applicable",
+      "timestamp_relation": "not-applicable",
+      "message_relation": "not-applicable",
+      "model_relation": "not-applicable",
+      "counter_direction": "not-applicable",
+      "expected_disposition": "incomplete-tail"
+    },
+    {
+      "case_id": "nonconforming-identity-reuse",
+      "record_shape": "complete-usage-bearing",
+      "native_pair_relation": "same",
+      "timestamp_relation": "changed",
+      "message_relation": "changed",
+      "model_relation": "changed",
+      "counter_direction": "changed",
+      "expected_disposition": "identity-collision"
+    }
+  ]
+}
