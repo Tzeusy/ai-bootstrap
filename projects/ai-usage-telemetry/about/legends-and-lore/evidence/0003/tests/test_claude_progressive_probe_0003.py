@@ -167,6 +167,42 @@ class ClaudeProgressiveProbeTests(unittest.TestCase):
         with self.assertRaisesRegex(self.probe.ContainmentRejected, "summary-.*-keys"):
             self.probe.validate_safe_summary(summary)
 
+    def test_summary_schema_rejects_opaque_values_in_allowed_string_sections(self) -> None:
+        forbidden_output = "THESIS_FORBIDDEN_RAW_OUTPUT"
+        summary = {
+            "schema": "claude-progressive-probe-summary@1",
+            "build_pin": {"version": self.probe.PINNED_VERSION, "sha256": self.probe.PINNED_SHA256},
+            "path_classes": {
+                "target": "synthetic-executable",
+                "probe_code": "read-only-candidate-code",
+                "home": "tmpfs-synthetic",
+                "work": "tmpfs-synthetic",
+                "output": "tmpfs-only",
+                "network": "loopback-only",
+            },
+            "type_assertions": {
+                "structural_projection": "explicit-safe-fields-only",
+                "complete_usage_observation": "assistant-with-required-safe-types",
+            },
+            "counts": {key: 0 for key in self.probe.SUMMARY_SECTION_KEYS["counts"]},
+            "equality_assertions": {
+                key: 0 for key in self.probe.SUMMARY_SECTION_KEYS["equality_assertions"]
+            },
+            "direction_assertions": {
+                key: 0 for key in self.probe.SUMMARY_SECTION_KEYS["direction_assertions"]
+            },
+            "control_totals": {key: 0 for key in self.probe.SUMMARY_SECTION_KEYS["control_totals"]},
+            "disposition": "unresolved",
+        }
+
+        for section, key in (("path_classes", "target"), ("type_assertions", "structural_projection")):
+            with self.subTest(section=section):
+                hostile_summary = {**summary, section: dict(summary[section])}
+                hostile_summary[section][key] = forbidden_output
+
+                with self.assertRaisesRegex(self.probe.ContainmentRejected, f"summary-{section}-values"):
+                    self.probe.validate_safe_summary(hostile_summary)
+
     def test_pin_or_environment_failure_returns_only_unresolved_safe_summary(self) -> None:
         with mock.patch.object(
             self.probe,
@@ -177,6 +213,18 @@ class ClaudeProgressiveProbeTests(unittest.TestCase):
 
         self.assertEqual(result["disposition"], "unresolved")
         self.assertEqual(result["counts"], {})
+
+    def test_unresolved_public_return_is_schema_valid_without_exception_text(self) -> None:
+        forbidden_exception_text = "THESIS_FORBIDDEN_RAW_OUTPUT"
+        with mock.patch.object(
+            self.probe,
+            "resolve_claude_executable",
+            side_effect=self.probe.ContainmentRejected(forbidden_exception_text),
+        ):
+            result = self.probe.execute_isolated_probe()
+
+        self.assertNotIn(forbidden_exception_text, json.dumps(result, sort_keys=True))
+        self.probe.validate_safe_summary(result)
 
     def test_capture_controls_exercise_every_deliberate_mutation_without_launch(self) -> None:
         controls = load_module("capture_controls_0003", CAPTURE_CONTROLS_PATH)

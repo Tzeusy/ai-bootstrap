@@ -96,6 +96,20 @@ SUMMARY_SECTION_KEYS = {
         "nonloopback_connection_count",
     },
 }
+SUMMARY_STRING_SECTION_VALUES = {
+    "path_classes": {
+        "target": "synthetic-executable",
+        "probe_code": "read-only-candidate-code",
+        "home": "tmpfs-synthetic",
+        "work": "tmpfs-synthetic",
+        "output": "tmpfs-only",
+        "network": "loopback-only",
+    },
+    "type_assertions": {
+        "structural_projection": "explicit-safe-fields-only",
+        "complete_usage_observation": "assistant-with-required-safe-types",
+    },
+}
 
 
 class ContainmentRejected(RuntimeError):
@@ -610,6 +624,7 @@ def validate_safe_summary(value: Mapping[str, object]) -> None:
             )
         else:
             require(all(isinstance(item, str) for item in section.values()), f"summary-{key}-types")
+            require(section == SUMMARY_STRING_SECTION_VALUES[key], f"summary-{key}-values")
     raw_markers = ("raw", "stdout", "stderr", "prompt", "response", "header", "session", "requestid", "identity")
     for key in value:
         require(not any(marker in key.casefold() for marker in raw_markers), "summary-privacy-key")
@@ -683,10 +698,10 @@ def _bwrap_argv(plan: ProbePlan, bwrap: str) -> list[str]:
 
 
 def _safe_unresolved_result() -> dict[str, object]:
-    return {
+    result = {
         "schema": "claude-progressive-probe-summary@1",
         "build_pin": {"version": PINNED_VERSION, "sha256": PINNED_SHA256},
-        "path_classes": {"execution": "not-started-or-unverified"},
+        "path_classes": {},
         "type_assertions": {},
         "counts": {},
         "equality_assertions": {},
@@ -694,6 +709,8 @@ def _safe_unresolved_result() -> dict[str, object]:
         "control_totals": {},
         "disposition": "unresolved",
     }
+    validate_safe_summary(result)
+    return result
 
 
 def execute_isolated_probe() -> dict[str, object]:

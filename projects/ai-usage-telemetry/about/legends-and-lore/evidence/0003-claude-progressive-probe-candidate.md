@@ -108,7 +108,7 @@ All hashes below are for code-owned candidate artifacts, not source records.
 |---|---|---|
 | `0003/fixture_0003.json` | `11bc385d4dbb5fb59aea2e53bd3134b42a6aea351ab39146388de3bf6d531b4e` | Fully synthetic structural matrix |
 | `0003/verify_0003_structural_oracle.py` | `2585565d1853e9489664eb5e22fa172f0fe0178447f2bebcd7a946d972860caa` | Independent fixture oracle and mutation checks |
-| `0003/claude_progressive_probe_0003.py` | `4d74adc92603674cf2b98f42ec221f963a157c95a9ef13bddc145df99e47f57d` | Fail-closed host launcher and summary validator |
+| `0003/claude_progressive_probe_0003.py` | `afb1704fd1372affb2e03f7a68c1de95552a565ac76a3a92e4d78c2fe09e8fb8` | Fail-closed host launcher and summary validator |
 | `0003/runtime/inner_probe_0003.py` | `3ac1e51d1c0d4f30363f4f46efb21f32bc920e2da9edbcc5f8679e34fa449197` | In-namespace loopback/control/structural helper |
 | `0003/exercise_capture_controls_0003.py` | `468d099363596a22708a4f4657d866bd4c87c3e83832663ca588bc27a0c8bc41` | Executed containment-mutation controls |
 
@@ -128,7 +128,9 @@ bwrap --die-with-parent --new-session --unshare-user --unshare-pid --unshare-net
 
 | Command | Expected safe result | Actual safe result |
 |---|---|---|
-| `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s about/legends-and-lore/evidence/0003/tests -p 'test_*.py' -v` | Containment, summary, fixture, projection, and inner-helper tests pass without target launch. | Pass; 29 focused tests. All target-launch assertions in containment controls were zero. |
+| `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s about/legends-and-lore/evidence/0003/tests -p 'test_claude_progressive_probe_0003.py' -v` | Host containment and closed safe-summary tests pass without target launch. | Pass; 19 host-safe tests. All target-launch assertions in containment controls were zero. |
+| `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s about/legends-and-lore/evidence/0003/tests -p 'test_0003_structural_oracle.py' -v` | Candidate record, fixture oracle, and digest checks pass without target launch. | Pass; five structural-oracle tests. |
+| `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s about/legends-and-lore/evidence/0003/tests -p 'test_inner_probe_0003.py' -k incomplete_tail -k malformed_or_incomplete -k network_state -k persisted_same_pair -k target_command -k unknown_content -v` | Safe inner-helper tests pass without a loopback packet or target launch. | Pass; six safe inner-helper tests. Excluded exactly `test_inner_probe_0003.InnerProbeTests.test_loopback_mock_positive_control_accepts_without_reading_request_values` because it opens a loopback client connection, which this correction must not create. |
 | `PYTHONDONTWRITEBYTECODE=1 python3 about/legends-and-lore/evidence/0003/verify_0003_structural_oracle.py` | Eight predeclared synthetic cases and four mutations are validated without a target. | Pass; eight cases and four mutations rejected. |
 | `PYTHONDONTWRITEBYTECODE=1 python3 about/legends-and-lore/evidence/0003/exercise_capture_controls_0003.py` | Every containment mutation rejects before target launch. | Pass; seven mutations rejected and zero target launches. |
 | `python3 -m json.tool about/legends-and-lore/evidence/0003/fixture_0003.json >/dev/null` | Fixture JSON is valid and emits no values. | Pass. |
