@@ -184,6 +184,25 @@ By contrast `bd show --json` and `bd update --json` emit an ARRAY → use
 `.[0].id // .id` does NOT (it throws `Cannot index object with number` on the
 create object). Observed 2026-06-13, bd 1.0.4.
 
+### A `|| bd create …` jq-fallback creates a DUPLICATE bead
+- **Symptom**: one reconciliation ran `bd create … --json | jq -r '…' || bd
+  create … 2>&1 | tail`, and a later `bd ready` showed TWO identical review
+  beads (bu-foon5 + bu-63tvy) with the SAME `created_at` second and identical
+  descriptions. Observed 2026-07-24, bd 1.0.x.
+- **Cause**: `bd create` also prints a human `✓ Created issue: …` line, and
+  `bd create --json` output can carry control characters that make the piped
+  `jq` exit non-zero EVEN THOUGH the create already committed to Dolt. The `||`
+  then re-runs `bd create`, minting a second bead. This is the create-side twin
+  of the "jq parse error but the write still landed" race.
+- **Fix**: NEVER chain `bd create` with a `|| bd create` (or any `||` that
+  re-invokes a mutating command). Run the create exactly once; write long
+  `--description` to a file and pass `--description="$(cat file)"`; read the
+  new id from the plain `✓ Created issue: <id>` line (or a separate `bd list`),
+  not from a jq-or-retry. If a duplicate slips through, the coordinator closes
+  the unclaimed twin with `bd close <dup> --reason "Duplicate of <canonical>"`.
+  Related: control-character jq breakage at "zsh `echo` can corrupt compact
+  `bd --json`" below.
+
 ### Epic→task linkage: `bd dep add` rejects it; use `--parent`
 - **Symptom**: wiring an epic to its child tasks with
   `bd dep add <epic> <task>` fails: `Error: epics can only block other epics,
@@ -311,3 +330,41 @@ an explicit method) reappears in other scripts.
   real Dolt remote is part of the same "needs human" external-server
   repair tracked in the WRITE-path entry above.
 - Observed: 2026-07-19, bd 1.0.4, aib repo.
+
+## zsh `echo` can corrupt compact `bd --json` before `jq`
+
+- **Symptom**: piping a compact JSON object stored in a shell variable through
+  `echo "$record" | jq ...` fails with `Invalid string: control characters
+  from U+0000 through U+001F must be escaped`, while the original
+  `bd show <id> --json | jq ...` succeeds.
+- **Cause**: zsh's `echo` interprets backslash escapes by default. Escaped
+  newlines in Beads notes become literal control characters before `jq` sees
+  the JSON; the `bd` output itself is valid.
+- **Fix**: project fields directly from `bd ... --json | jq ...`, or preserve
+  the variable byte-for-byte with `printf '%s' "$record" | jq ...` (or zsh
+  `print -r -- "$record"`).
+- Observed: 2026-07-20, bd 1.0.4, zsh.
+
+## `bd update --claim` refuses blocked beads: "issue not claimable: status blocked"
+
+Observed bd 1.0.4 (butlers, 2026-07-25). The coordinator PR-review lane says to
+atomically `--claim` a blocked `pr-review-task` bead before dispatch, but
+`bd update <id> --claim` hard-fails on `status=blocked` beads with
+`Error claiming <id>: issue not claimable: status blocked`.
+
+Workaround (two steps, small non-atomic window is acceptable because review
+beads are coordinator-owned):
+
+```bash
+bd update <id> --status open --json >/dev/null
+bd update <id> --claim --json   # sets assignee + in_progress atomically
+```
+
+Verify `assignee` in the result as usual. Same applies to any blocked bead you
+intend to claim for dispatch (e.g. after a decision sweep unblocks it).
+
+## `resolve_review_context.py` misses reverse "blocks" dependent edges (review bead → original)
+
+**Symptom:** A pr-reviewer worker's `resolve_review_context.py` reports missing-original-id even though the coordinator wired `bd dep add <original> <review>` correctly. Cause: that dep shape puts the link in the ORIGINAL bead's `dependents` array (original --blocks--> review); the helper only walks the review bead's own forward `dependencies` array (fallback A) or requires the pr-review label on the other side (fallback B). Hit twice on 2026-07-25 (bu-o4kzr, bu-zu768).
+
+**Workaround:** The reviewer proceeds with the original_id/PR/head already supplied in the coordinator dispatch (always include them), or resolves manually: `bd show <review-bead> --json | jq '.[0].dependents'` / `bd show <original> --json | jq '.[0].dependents'` and cross-checks via `gh pr view`. Fix the helper to also walk dependents edges when convenient.
