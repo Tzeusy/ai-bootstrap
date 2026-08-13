@@ -31,8 +31,10 @@ require_line() {
 
 validate_workflow() {
     local file="$1"
+    local checkout_block
     local paths_block
     local permissions_block
+    local setup_uv_block
     local expected_paths
 
     [[ -f "$file" ]] || return 1
@@ -57,6 +59,24 @@ validate_workflow() {
         capture { capture = 0 }
     ' "$file")"
     [[ "$permissions_block" == '  contents: read' ]] || return 1
+    [[ "$(grep -Ec '^[[:space:]]*permissions:[[:space:]]*$' "$file")" -eq 1 ]] || return 1
+    ! grep -Eq '^[[:space:]]+[A-Za-z_][A-Za-z0-9_-]*:[[:space:]]*write[[:space:]]*$' "$file" || return 1
+
+    checkout_block="$(awk '
+        /^      - uses: actions\/checkout@v4$/ { capture = 1; print; next }
+        capture && /^      - / { capture = 0 }
+        capture { print }
+    ' "$file")"
+    [[ "$checkout_block" == *$'        with:\n          persist-credentials: false'* ]] || return 1
+    ! grep -Eq '^[[:space:]]+persist-credentials:[[:space:]]*true[[:space:]]*$' "$file" || return 1
+
+    setup_uv_block="$(awk '
+        /^      - uses: astral-sh\/setup-uv@v5$/ { capture = 1; print; next }
+        capture && /^      - / { capture = 0 }
+        capture { print }
+    ' "$file")"
+    [[ "$setup_uv_block" == *$'        with:\n          enable-cache: false'* ]] || return 1
+    ! grep -Eq '^[[:space:]]+enable-cache:[[:space:]]*true[[:space:]]*$' "$file" || return 1
 
     require_line "$file" '      - uses: actions/checkout@v4' || return 1
     require_line "$file" '      - uses: actions/setup-node@v4' || return 1
@@ -74,7 +94,9 @@ validate_workflow() {
     grep -Fq -- 'about/legends-and-lore/evidence/0003/tests' "$file" || return 1
     grep -Fq -- 'NOTICE: no listed telemetry test directories are present' "$file" || return 1
 
-    ! grep -Eq 'pull_request_target|actions/cache|secrets\.|permissions:.*write|contents: write|\$\{\{[^}]*pull_request|(^|[^A-Za-z])(claude|codex)([^A-Za-z]|$)|(^|[^A-Za-z])(curl|wget|nc)([^A-Za-z]|$)|127\.0\.0\.1|localhost|\.claude|\.codex|(^|[[:space:]])sink' "$file" || return 1
+    ! grep -Fq '${{' "$file" || return 1
+    ! grep -Eiq '(^|[^A-Za-z0-9_])(curl|wget|nc|netcat|socat|telnet|ftp|ssh|scp|rsync|dig|nslookup|host)([^A-Za-z0-9_]|$)|(^|[^A-Za-z0-9_])(socket|urllib|requests|http\.client|fetch|axios|dns)([^A-Za-z0-9_]|$)|https?://|127\.0\.0\.1|localhost' "$file" || return 1
+    ! grep -Eiq 'pull_request_target|actions/cache|secrets\.|(^|[^A-Za-z])(claude|codex)([^A-Za-z]|$)|\.claude|\.codex|(^|[[:space:]])sink' "$file" || return 1
 }
 
 mutate_and_reject() {
@@ -107,5 +129,21 @@ mutate_and_reject \
 mutate_and_reject \
     'missing-loopback-deselection' \
     '/--deselect=about\/legends-and-lore\/evidence\/0003\/tests\/test_inner_probe_0003\.py::InnerProbeTests::test_loopback_mock_positive_control_accepts_without_reading_request_values/d'
+
+mutate_and_reject \
+    'job-write-permission' \
+    '/^  telemetry-validation:$/a\    permissions:\n      actions: write'
+mutate_and_reject \
+    'enabled-setup-uv-cache' \
+    '/^      - uses: astral-sh\/setup-uv@v5$/a\        with:\n          enable-cache: true'
+mutate_and_reject \
+    'persisted-checkout-credentials' \
+    '/^      - uses: actions\/checkout@v4$/a\        with:\n          persist-credentials: true'
+mutate_and_reject \
+    'unsafe-github-expression' \
+    '/^      - name: Install OpenSpec$/a\        run: echo "${{ github.sha }}"'
+mutate_and_reject \
+    'outbound-network-code' \
+    '/^      - name: Install OpenSpec$/a\        run: python -c '\''import socket; socket.create_connection(("example.com", 443))'\'''
 
 printf 'PASS: AI Usage Telemetry PR workflow contract\n'

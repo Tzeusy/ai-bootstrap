@@ -23,12 +23,16 @@ jobs:
         working-directory: projects/ai-usage-telemetry
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
 
       - name: Install OpenSpec
         run: npm install --global @fission-ai/openspec@1.3.1
