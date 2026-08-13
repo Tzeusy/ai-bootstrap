@@ -54,6 +54,19 @@ def assistant_record_with_unprojected_value(*, stamp: str, count: int, value: by
     )
 
 
+def assistant_record_with_duplicate_projected_key(*, stamp: str, count: int) -> bytes:
+    return (
+        b'{"type":"assistant","sessionId":"s","requestId":"r","timestamp":"'
+        + stamp.encode("ascii")
+        + b'","message":{"id":"synthetic-message","id":"synthetic-shadow","model":"synthetic-model",'
+        b'"content":"","usage":{"input_tokens":'
+        + str(count).encode("ascii")
+        + b',"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":'
+        + str(count).encode("ascii")
+        + b"}}}\n"
+    )
+
+
 class InnerProbeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -79,6 +92,38 @@ class InnerProbeTests(unittest.TestCase):
         self.assertNotIn(content_sentinel, repr(safe_summary))
         self.assertNotIn("session", safe_summary["counts"])
         self.assertEqual(safe_summary["direction_assertions"]["monotone-increase-groups"], 1)
+
+    def test_reachable_unique_key_o4_aggregate_retains_contract_gap_disposition(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            session_dir = root / ".claude" / "projects" / "opaque"
+            session_dir.mkdir(parents=True)
+            session_dir.joinpath("session.jsonl").write_bytes(
+                assistant_record(
+                    session="s", request="progressive", stamp="one", count=1, content="synthetic"
+                )
+                + assistant_record(
+                    session="s", request="progressive", stamp="two", count=2, content="synthetic"
+                )
+                + assistant_record(
+                    session="s", request="same-stamp", stamp="fixed", count=3, content="synthetic"
+                )
+                + assistant_record(
+                    session="s", request="same-stamp", stamp="fixed", count=4, content="synthetic"
+                )
+            )
+
+            analysis = self.inner.inspect_virtual_home(root)
+            safe_summary = self.inner.make_safe_summary(analysis, canary_connections=1)
+
+        self.assertEqual(analysis.complete_usage_observation_count, 4)
+        self.assertEqual(analysis.same_native_pair_group_count, 2)
+        self.assertEqual(analysis.progressive_same_pair_group_count, 1)
+        self.assertEqual(analysis.exact_replay_group_count, 0)
+        self.assertEqual(analysis.changed_timestamp_group_count, 1)
+        self.assertEqual(analysis.decreasing_group_count, 0)
+        self.assertEqual(analysis.nonconforming_reuse_group_count, 0)
+        self.assertEqual(safe_summary["disposition"], "confirmed-contract-gap")
 
     def test_malformed_or_incomplete_records_cannot_confirm_a_negative(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -148,6 +193,24 @@ class InnerProbeTests(unittest.TestCase):
                     self.assertEqual(analysis.malformed_record_count, 2)
                     self.assertEqual(analysis.progressive_same_pair_group_count, 0)
                     self.assertEqual(safe_summary["disposition"], "unresolved")
+
+    def test_duplicate_projected_keys_are_malformed_and_cannot_confirm(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            session_dir = root / ".claude" / "projects" / "opaque"
+            session_dir.mkdir(parents=True)
+            (session_dir / "session.jsonl").write_bytes(
+                assistant_record_with_duplicate_projected_key(stamp="one", count=1)
+                + assistant_record_with_duplicate_projected_key(stamp="two", count=2)
+            )
+
+            analysis = self.inner.inspect_virtual_home(root)
+            safe_summary = self.inner.make_safe_summary(analysis, canary_connections=1)
+
+        self.assertEqual(analysis.complete_usage_observation_count, 0)
+        self.assertEqual(analysis.malformed_record_count, 2)
+        self.assertEqual(analysis.progressive_same_pair_group_count, 0)
+        self.assertEqual(safe_summary["disposition"], "unresolved")
 
     def test_source_counter_above_signed_64_cannot_progress_or_confirm(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

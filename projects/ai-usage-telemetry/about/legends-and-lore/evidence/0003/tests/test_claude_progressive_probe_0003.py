@@ -53,6 +53,19 @@ def assistant_record_with_unprojected_value(*, stamp: str, count: int, value: by
     )
 
 
+def assistant_record_with_duplicate_projected_key(*, stamp: str, count: int) -> bytes:
+    return (
+        b'{"type":"assistant","sessionId":"s","requestId":"r","timestamp":"'
+        + stamp.encode("ascii")
+        + b'","message":{"id":"synthetic-message","id":"synthetic-shadow","model":"synthetic-model",'
+        b'"content":"","usage":{"input_tokens":'
+        + str(count).encode("ascii")
+        + b',"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":'
+        + str(count).encode("ascii")
+        + b"}}}\n"
+    )
+
+
 class CompletedSummaryProcess:
     """A no-target child process whose stdout is an untrusted summary payload."""
 
@@ -273,6 +286,15 @@ class ClaudeProgressiveProbeTests(unittest.TestCase):
 
                 self.assertEqual(summary.complete_usage_observation_count, 0)
                 self.assertEqual(summary.malformed_record_count, 1)
+
+    def test_structural_projector_rejects_duplicate_projected_keys(self) -> None:
+        summary = self.probe.inspect_jsonl_bytes(
+            assistant_record_with_duplicate_projected_key(stamp="one", count=1)
+            + assistant_record_with_duplicate_projected_key(stamp="two", count=2)
+        )
+
+        self.assertEqual(summary.complete_usage_observation_count, 0)
+        self.assertEqual(summary.malformed_record_count, 2)
 
     def test_source_counter_above_signed_64_cannot_be_a_complete_observation(self) -> None:
         for count in ((1 << 63), (1 << 63) + 1):
@@ -560,6 +582,34 @@ class ClaudeProgressiveProbeTests(unittest.TestCase):
 
                 self.assert_all_empty_unresolved(result)
                 popen.assert_called_once()
+
+    def test_reachable_unique_key_o4_aggregate_remains_admitted(self) -> None:
+        reachable = self.confirmed_gap_summary()
+        reachable["counts"].update(
+            {
+                "complete_usage_observations": 4,
+                "same_native_pair_groups": 2,
+                "progressive_same_pair_groups": 1,
+            }
+        )
+        reachable["equality_assertions"].update(
+            {
+                "exact_replay_groups": 0,
+                "changed_timestamp_groups": 1,
+                "nonconforming_reuse_groups": 0,
+            }
+        )
+        reachable["direction_assertions"].update(
+            {"monotone-increase-groups": 1, "decreasing-groups": 0}
+        )
+        self.probe.validate_safe_summary(reachable)
+
+        result, popen = self.execute_completed_summary(
+            json.dumps(reachable, sort_keys=True, separators=(",", ":")).encode("ascii")
+        )
+
+        self.assertEqual(result, reachable)
+        popen.assert_called_once()
 
     def test_primitive_supported_contract_gap_remains_admitted(self) -> None:
         summary = self.confirmed_gap_summary()

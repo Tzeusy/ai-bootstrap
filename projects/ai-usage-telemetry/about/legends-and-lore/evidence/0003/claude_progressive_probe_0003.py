@@ -440,11 +440,16 @@ class _SafeJsonLineScanner:
         self._skip_whitespace()
         if self._consume(ord("}")):
             return
+        seen_projected_paths: set[tuple[str, ...]] = set()
         while True:
             key = self._read_key()
             self._skip_whitespace()
             self._expect(ord(":"))
             next_path = _next_safe_path(path, key)
+            if next_path is not None:
+                if next_path in seen_projected_paths:
+                    raise ValueError("duplicate-projected-key")
+                seen_projected_paths.add(next_path)
             self._parse_value(next_path)
             self._skip_whitespace()
             if self._consume(ord("}")):
