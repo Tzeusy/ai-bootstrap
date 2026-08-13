@@ -29,6 +29,48 @@ require_line() {
     grep -Fqx -- "$expected" "$file" || return 1
 }
 
+require_single_canonical_action() {
+    local file="$1"
+    local action_family="$2"
+    local expected_action="$3"
+
+    awk -v action_family="$action_family" -v expected_action="$expected_action" '
+        function trim(value) {
+            sub(/^[[:space:]]+/, "", value)
+            sub(/[[:space:]]+$/, "", value)
+            return value
+        }
+        BEGIN {
+            single_quote = sprintf("%c", 39)
+        }
+        {
+            value = $0
+            if (value ~ /^[[:space:]]*-[[:space:]]*uses:[[:space:]]*/) {
+                sub(/^[[:space:]]*-[[:space:]]*uses:[[:space:]]*/, "", value)
+            } else if (value ~ /^[[:space:]]*uses:[[:space:]]*/) {
+                sub(/^[[:space:]]*uses:[[:space:]]*/, "", value)
+            } else {
+                next
+            }
+
+            sub(/[[:space:]]+#.*$/, "", value)
+            value = trim(value)
+            if ((substr(value, 1, 1) == "\"" && substr(value, length(value), 1) == "\"") ||
+                (substr(value, 1, 1) == single_quote && substr(value, length(value), 1) == single_quote)) {
+                value = substr(value, 2, length(value) - 2)
+            }
+
+            if (index(value, action_family "@") == 1) {
+                count++
+                if (value != expected_action) {
+                    invalid = 1
+                }
+            }
+        }
+        END { exit (count == 1 && !invalid) ? 0 : 1 }
+    ' "$file"
+}
+
 validate_workflow() {
     local file="$1"
     local checkout_block
@@ -103,21 +145,24 @@ validate_workflow() {
         return 1
     fi
 
+    require_single_canonical_action "$file" 'actions/checkout' 'actions/checkout@v4' || return 1
+    require_single_canonical_action "$file" 'astral-sh/setup-uv' 'astral-sh/setup-uv@v5' || return 1
+    [[ "$(grep -Ec '^[[:space:]]*persist-credentials:[[:space:]]*' "$file")" -eq 1 ]] || return 1
+    [[ "$(grep -Ec '^[[:space:]]*enable-cache:[[:space:]]*' "$file")" -eq 1 ]] || return 1
+
     checkout_block="$(awk '
         /^      - uses: actions\/checkout@v4$/ { capture = 1; print; next }
         capture && /^      - / { capture = 0 }
         capture { print }
     ' "$file")"
-    [[ "$checkout_block" == *$'        with:\n          persist-credentials: false'* ]] || return 1
-    ! grep -Eq '^[[:space:]]+persist-credentials:[[:space:]]*true[[:space:]]*$' "$file" || return 1
+    [[ "$checkout_block" == $'      - uses: actions/checkout@v4\n        with:\n          persist-credentials: false' ]] || return 1
 
     setup_uv_block="$(awk '
         /^      - uses: astral-sh\/setup-uv@v5$/ { capture = 1; print; next }
         capture && /^      - / { capture = 0 }
         capture { print }
     ' "$file")"
-    [[ "$setup_uv_block" == *$'        with:\n          enable-cache: false'* ]] || return 1
-    ! grep -Eq '^[[:space:]]+enable-cache:[[:space:]]*true[[:space:]]*$' "$file" || return 1
+    [[ "$setup_uv_block" == $'      - uses: astral-sh/setup-uv@v5\n        with:\n          enable-cache: false' ]] || return 1
 
     require_line "$file" '      - uses: actions/checkout@v4' || return 1
     require_line "$file" '      - uses: actions/setup-node@v4' || return 1
@@ -218,6 +263,18 @@ mutate_and_reject \
 mutate_and_reject \
     'persisted-checkout-credentials' \
     '/^      - uses: actions\/checkout@v4$/a\        with:\n          persist-credentials: true'
+mutate_and_reject \
+    'duplicate-checkout-action' \
+    '/^          persist-credentials: false$/a\      - uses: actions/checkout@v4\n        with:\n          persist-credentials: false'
+mutate_and_reject \
+    'duplicate-checkout-action-quoted-true' \
+    '/^          persist-credentials: false$/a\      - uses: actions/checkout@v4\n        with:\n          persist-credentials: "true"'
+mutate_and_reject \
+    'duplicate-setup-uv-action' \
+    '/^          enable-cache: false$/a\      - uses: astral-sh/setup-uv@v5\n        with:\n          enable-cache: false'
+mutate_and_reject \
+    'duplicate-setup-uv-action-quoted-true' \
+    '/^          enable-cache: false$/a\      - uses: astral-sh/setup-uv@v5\n        with:\n          enable-cache: "true"'
 mutate_and_reject \
     'unsafe-github-expression' \
     '/^      - name: Install OpenSpec$/a\        run: echo "${{ github.sha }}"'
