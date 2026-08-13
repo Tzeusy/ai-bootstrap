@@ -520,6 +520,47 @@ class ClaudeProgressiveProbeTests(unittest.TestCase):
                 self.assert_all_empty_unresolved(result)
                 popen.assert_called_once()
 
+    def test_unreachable_inner_analysis_aggregates_normalize_to_unresolved(self) -> None:
+        cases = {
+            "exact-replay-overlaps-progressive": (1, 1, 1, 1, 0, 0),
+            "changed-timestamps-overlap-exact-replay": (3, 1, 1, 3, 0, 0),
+            "decreasing-groups-overlap-exact-replay": (3, 1, 1, 1, 3, 0),
+            "nonconforming-groups-overlap-exact-replay": (3, 1, 1, 1, 0, 3),
+            "progressive-groups-overlap-decreasing-groups": (3, 2, 1, 2, 1, 0),
+            "progressive-groups-overlap-nonconforming-groups": (3, 2, 1, 2, 0, 1),
+        }
+        for name, (same_pairs, progressive, exact_replays, changed, decreasing, nonconforming) in cases.items():
+            with self.subTest(name=name):
+                forged = self.confirmed_gap_summary()
+                forged["counts"].update(
+                    {
+                        "complete_usage_observations": 2 * same_pairs,
+                        "same_native_pair_groups": same_pairs,
+                        "progressive_same_pair_groups": progressive,
+                    }
+                )
+                forged["equality_assertions"].update(
+                    {
+                        "exact_replay_groups": exact_replays,
+                        "changed_timestamp_groups": changed,
+                        "nonconforming_reuse_groups": nonconforming,
+                    }
+                )
+                forged["direction_assertions"].update(
+                    {
+                        "monotone-increase-groups": progressive,
+                        "decreasing-groups": decreasing,
+                    }
+                )
+                self.probe.validate_safe_summary(forged)
+
+                result, popen = self.execute_completed_summary(
+                    json.dumps(forged, sort_keys=True, separators=(",", ":")).encode("ascii")
+                )
+
+                self.assert_all_empty_unresolved(result)
+                popen.assert_called_once()
+
     def test_primitive_supported_contract_gap_remains_admitted(self) -> None:
         summary = self.confirmed_gap_summary()
 
