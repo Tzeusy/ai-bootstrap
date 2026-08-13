@@ -59,8 +59,45 @@ validate_workflow() {
         capture { capture = 0 }
     ' "$file")"
     [[ "$permissions_block" == '  contents: read' ]] || return 1
-    [[ "$(grep -Ec '^[[:space:]]*permissions:[[:space:]]*$' "$file")" -eq 1 ]] || return 1
-    ! grep -Eq '^[[:space:]]+[A-Za-z_][A-Za-z0-9_-]*:[[:space:]]*write[[:space:]]*$' "$file" || return 1
+    # Keep one top-level permission map. A job-level declaration is denied
+    # regardless of whether it uses scalar, flow-map, or block-map syntax.
+    [[ "$(grep -Ec '^[[:space:]]*permissions:' "$file")" -eq 1 ]] || return 1
+    # Reject write-bearing values within any workflow/job permission map,
+    # including scalar write-all and inline mapping forms.
+    if awk '
+        function leading_spaces(text, prefix) {
+            prefix = text
+            sub(/[^ ]+.*/, "", prefix)
+            return length(prefix)
+        }
+        {
+            if ($0 ~ /^[[:space:]]*permissions:[[:space:]]*/) {
+                value = $0
+                sub(/^[[:space:]]*permissions:[[:space:]]*/, "", value)
+                if (value ~ /(^|[^[:alnum:]_-])write(-all)?([^[:alnum:]_-]|$)/) {
+                    found = 1
+                }
+                permissions_indent = leading_spaces($0)
+                in_permissions = 1
+                next
+            }
+            if (!in_permissions) {
+                next
+            }
+            current_indent = leading_spaces($0)
+            if ($0 !~ /^[[:space:]]*(#|$)/ && current_indent <= permissions_indent) {
+                in_permissions = 0
+                next
+            }
+            if (current_indent > permissions_indent &&
+                $0 ~ /^[[:space:]]*[A-Za-z_][A-Za-z0-9_-]*[[:space:]]*:[[:space:]]*[^#]*write(-all)?([^A-Za-z0-9_-]|$)/) {
+                found = 1
+            }
+        }
+        END { exit found ? 0 : 1 }
+    ' "$file"; then
+        return 1
+    fi
 
     checkout_block="$(awk '
         /^      - uses: actions\/checkout@v4$/ { capture = 1; print; next }
@@ -133,6 +170,21 @@ mutate_and_reject \
 mutate_and_reject \
     'job-write-permission' \
     '/^  telemetry-validation:$/a\    permissions:\n      actions: write'
+mutate_and_reject \
+    'job-write-all-permission' \
+    '/^  telemetry-validation:$/a\    permissions: write-all'
+mutate_and_reject \
+    'job-contents-write-permission' \
+    '/^  telemetry-validation:$/a\    permissions:\n      contents: write'
+mutate_and_reject \
+    'job-flow-write-permission' \
+    '/^  telemetry-validation:$/a\    permissions: { contents: write }'
+mutate_and_reject \
+    'workflow-write-all-permission' \
+    '/^permissions:$/,/^jobs:$/c\permissions: write-all\n\njobs:'
+mutate_and_reject \
+    'workflow-flow-write-permission' \
+    '/^permissions:$/,/^jobs:$/c\permissions: { contents: write }\n\njobs:'
 mutate_and_reject \
     'enabled-setup-uv-cache' \
     '/^      - uses: astral-sh\/setup-uv@v5$/a\        with:\n          enable-cache: true'
