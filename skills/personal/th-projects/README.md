@@ -16,6 +16,8 @@ README is a signpost for humans browsing the repo, nothing more.
 | `subskills/project-feature-request/` | Idea funnel → signed-off spec delta; amendment mode |
 | `subskills/project-review/` | Scored repo health audit; spec reconciliation |
 | `subskills/project-direction/` | Prioritized spec-driven work plan; milestone synthesis |
+| `subskills/relentless-vision-pursuit/` | Recurring doctrine-grounded pursuit of the project's ideal |
+| `subskills/user-questionnaire/` | Vetted asynchronous owner-decision packets and signoff walkthroughs |
 | `references/spec-format.md` | Shared OpenSpec file contract (IDs, headings, test tagging) |
 | `references/work-allocation.md` | Shared cohesive-bead, ownership, overhead, and discovery-triage contract |
 | `scripts/spec-trace-check.py` | Mechanical spec-traceability validator (`uv run`) |

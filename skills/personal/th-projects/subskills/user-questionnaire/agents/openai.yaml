@@ -1,0 +1,4 @@
+interface:
+  display_name: "User Questionnaire"
+  short_description: "Build vetted owner decision packets"
+  default_prompt: "Collect the genuine owner decisions in this project into a vetted asynchronous signoff packet."

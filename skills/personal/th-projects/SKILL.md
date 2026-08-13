@@ -1,20 +1,18 @@
 ---
 name: th-projects
 description: >
-  Use for project-level engineering governance in any repository — bootstrap
-  or audit the knowledge architecture (doctrine, specs, topology,
-  standards), concretize a feature request into a spec delta, amend a spec
-  found wrong mid-implementation, reconcile specs against implementation,
-  run a repo-wide health audit, decide what to work on next via spec-driven
-  planning, milestone synthesis, and doctrine-grounded feature ideation, or
-  run a recurring vision-pursuit audit that generates the next best moves
-  toward the project's ideal. Route to exactly one subskill per task. Triggers: "project
-  shape", "bootstrap docs", "what should we work on next", "should we build
-  this", "I want to add X", "spec this feature", "the spec is wrong",
-  "break this down", "review this project", "audit the codebase", "does the
-  code match the spec", "what's the next milestone", "brainstorm features",
-  "are we ready to write specs", "run the vision pursuit", "relentlessly
-  improve this project".
+  Use for project-level engineering governance: bootstrap or audit the
+  doctrine/spec/topology/standards shape; concretize or amend one feature
+  spec; reconcile specs and implementation; audit repo health; prioritize
+  work; synthesize milestones; ideate from doctrine; run a recurring
+  vision-pursuit; or accumulate and walk through independently vetted owner
+  decisions. Route to exactly one subskill. Triggers: "project shape",
+  "bootstrap docs", "what should we work on next", "should we build this",
+  "spec this feature", "the spec is wrong", "review this project", "audit the
+  codebase", "does code match the spec", "what's the next milestone",
+  "brainstorm features", "run the vision pursuit", "relentlessly improve this
+  project", "prepare decisions for me to review", "walk me through the blocked
+  decisions", "collect owner signoffs".
 metadata:
   owner: tze
   authors:
@@ -22,18 +20,18 @@ metadata:
     - Claude Fable 5
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-27"
+  last_reviewed: "2026-08-13"
 compatibility: Subskill scripts require bash, git, grep, find, and uv; project-shape uses uv for fail-closed YAML validation. project-direction additionally assumes the bd (beads) CLI and an OpenSpec-capable environment for changeset synthesis.
 ---
 
 # TH Projects
 
-Superskill router for spec-driven project governance. Five subskills under
-`subskills/`; each a complete standard package (own `SKILL.md`, `references/`,
-`scripts/`). Subskills **not** in global catalog — discover lazily here, load
-**at most one** subskill body per task. A subskill may route you to a sibling
-(e.g. project-review runs project-shape's scanner); follow that link from the
-subskill, not here.
+Superskill router for spec-driven project governance. Five lifecycle subskills
+plus one cross-cutting human-gate transport live under `subskills/`; each is a
+complete standard package. Subskills **not** in global catalog — discover lazily
+here, load **at most one** subskill body per task. A subskill may route you to a
+sibling (e.g. project-review runs project-shape's scanner); follow that link
+from the subskill, not here.
 
 Five subskills, one lifecycle:
 
@@ -50,6 +48,10 @@ Five subskills, one lifecycle:
 5. **Pursuit** — recurring generative loop against the baseline's ideal:
    fan-out surface audits + ideation lenses → ranked moves, tier-board
    movement, gated work plan; pursued moves re-enter via feature request.
+
+**Questionnaire** crosses that lifecycle only at hard human gates. It
+accumulates, independently reviews, presents, and records owner decisions; it
+does not create doctrine, specs, priorities, or implementation authority.
 
 VISION is a **continuous constraint**, not a one-time gate: proposal, spec,
 allocation, implementation discovery, reconciliation, and milestone closeout
@@ -75,6 +77,7 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 | Decide what to work on next; evaluate competing priorities; check roadmap alignment; turn approved specs into a prioritized beads work plan. Also the vision-generative modes when nothing is proposed: milestone synthesis (derive work doctrine already implies) and ideation (brainstorm new feature candidates grounded in doctrine); and the launch gate, which judges whether goals and requirements are settled enough to author a project's first specs. | [subskills/project-direction/SKILL.md](subskills/project-direction/SKILL.md) | "what's highest leverage", "what should we work on next", "break this down", "is this roadmap aligned", "what's the next milestone", "brainstorm features for this project", "are we ready to write specs" |
 | Repo-wide health audit: code quality, reliability, security, docs, maintainability — scored, evidence-based, with a planning handoff packet. Includes the exhaustive spec-reconciliation mode (bidirectional spec↔code gap audit + remediation). | [subskills/project-review/SKILL.md](subskills/project-review/SKILL.md) | "review this project", "audit the codebase", "assess project health", "reconcile spec vs implementation", "what's implemented but undocumented" |
 | Recurring generative pursuit of the project's ideal: fan-out audits of every surface against the applicable bar + vision-grounded ideation lenses → ranked move list, tier-board movement across runs, gated (never auto-released) work plan. | [subskills/relentless-vision-pursuit/SKILL.md](subskills/relentless-vision-pursuit/SKILL.md) | "run the vision pursuit", "what's the next best step toward the vision", "relentlessly improve this project", "audit the whole project against the ideal" |
+| Accumulate genuine hard owner gates into a local asynchronous packet, independently vet each problem scope and recommendation, walk the owner through one decision at a time, or route recorded signoffs through the canonical owning workflow. | [subskills/user-questionnaire/SKILL.md](subskills/user-questionnaire/SKILL.md) | "prepare decisions for me to review", "review when I wake up", "walk me through blocked decisions", "collect owner signoffs" |
 
 ## Routing rules
 
@@ -95,6 +98,12 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   ask is to *invent* candidates → direction (ideation), whose pursued picks
   feed the funnel. A feature request surviving its funnel hands its spec delta
   to direction for sequencing.
+- **Questionnaire vs. governance**: questionnaire transports already-identified
+  hard human gates; it does not decide what should be built or turn ordinary
+  engineering judgment into owner work. One fuzzy feature → feature-request;
+  competing priorities → direction; tracker mechanics → beads-orchestration.
+  Use questionnaire only when asynchronous accumulation, adversarial review,
+  walkthrough, or durable signoff recording is the actual task.
 - **Scope guard**: single-PR/diff review → `/code-review`, not here.
   Change-level engineering-quality judgment (engineering bar, readability, test
   rigor, dependency hygiene, cruft cleanup, skill reviews, diagrams) →
@@ -147,6 +156,10 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 
 - Every major claim cites evidence, labeled [Observed], [Inferred], or
   [Unknown].
+- A questionnaire item is not owner-review-ready until an independent subagent
+  has separately passed its problem scope and recommendation against the target
+  project's shape and engineering bar. The packet records the decision; it does
+  not broaden the authorization granted by it.
 - Subskills cross-reference by relative path (`../project-shape/…`) inside this
   package; those paths are package-internal and stable.
 
