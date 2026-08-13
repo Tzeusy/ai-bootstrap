@@ -782,6 +782,32 @@ def validate_safe_summary(value: Mapping[str, object]) -> None:
         require(not any(marker in key.casefold() for marker in raw_markers), "summary-privacy-key")
 
 
+def _has_reachable_inner_analysis_aggregates(
+    counts: dict[str, int],
+    equality_assertions: dict[str, int],
+    direction_assertions: dict[str, int],
+) -> bool:
+    """Require aggregate relationships that the inner classifier can actually emit."""
+    same_pair_groups = counts["same_native_pair_groups"]
+    progressive_groups = counts["progressive_same_pair_groups"]
+    exact_replay_groups = equality_assertions["exact_replay_groups"]
+    changed_timestamp_groups = equality_assertions["changed_timestamp_groups"]
+    nonconforming_reuse_groups = equality_assertions["nonconforming_reuse_groups"]
+    decreasing_groups = direction_assertions["decreasing-groups"]
+    if exact_replay_groups > same_pair_groups:
+        return False
+    non_exact_pair_groups = same_pair_groups - exact_replay_groups
+    return (
+        progressive_groups <= non_exact_pair_groups
+        and changed_timestamp_groups <= non_exact_pair_groups
+        and decreasing_groups <= non_exact_pair_groups
+        and nonconforming_reuse_groups <= non_exact_pair_groups
+        and progressive_groups <= changed_timestamp_groups
+        and progressive_groups + decreasing_groups <= non_exact_pair_groups
+        and progressive_groups + nonconforming_reuse_groups <= non_exact_pair_groups
+    )
+
+
 def _has_confirmed_contract_gap_evidence(value: Mapping[str, object]) -> bool:
     """Require the exact primitive relationships emitted by a completed control run."""
     counts = value["counts"]
@@ -792,6 +818,9 @@ def _has_confirmed_contract_gap_evidence(value: Mapping[str, object]) -> bool:
     assert isinstance(equality_assertions, dict)
     assert isinstance(direction_assertions, dict)
     assert isinstance(control_totals, dict)
+    assert all(isinstance(item, int) for item in counts.values())
+    assert all(isinstance(item, int) for item in equality_assertions.values())
+    assert all(isinstance(item, int) for item in direction_assertions.values())
     same_pair_groups = counts["same_native_pair_groups"]
     progressive_groups = counts["progressive_same_pair_groups"]
     return (
@@ -803,14 +832,11 @@ def _has_confirmed_contract_gap_evidence(value: Mapping[str, object]) -> bool:
         and counts["incomplete_tails"] == 0
         and same_pair_groups >= 1
         and progressive_groups >= 1
-        and progressive_groups <= same_pair_groups
         and counts["complete_usage_observations"] >= 2 * same_pair_groups
-        and equality_assertions["exact_replay_groups"] <= same_pair_groups
-        and equality_assertions["changed_timestamp_groups"] >= progressive_groups
-        and equality_assertions["changed_timestamp_groups"] <= same_pair_groups
-        and equality_assertions["nonconforming_reuse_groups"] <= same_pair_groups
+        and _has_reachable_inner_analysis_aggregates(
+            counts, equality_assertions, direction_assertions
+        )
         and direction_assertions["monotone-increase-groups"] == progressive_groups
-        and direction_assertions["decreasing-groups"] <= same_pair_groups
         and control_totals["loopback_canary_connections"] == 1
         and control_totals["nonloopback_interface_count"] == 0
         and control_totals["default_route_count"] == 0
