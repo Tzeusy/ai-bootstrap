@@ -782,6 +782,59 @@ def validate_safe_summary(value: Mapping[str, object]) -> None:
         require(not any(marker in key.casefold() for marker in raw_markers), "summary-privacy-key")
 
 
+def _has_confirmed_contract_gap_evidence(value: Mapping[str, object]) -> bool:
+    """Require the exact primitive relationships emitted by a completed control run."""
+    counts = value["counts"]
+    equality_assertions = value["equality_assertions"]
+    direction_assertions = value["direction_assertions"]
+    control_totals = value["control_totals"]
+    assert isinstance(counts, dict)
+    assert isinstance(equality_assertions, dict)
+    assert isinstance(direction_assertions, dict)
+    assert isinstance(control_totals, dict)
+    same_pair_groups = counts["same_native_pair_groups"]
+    progressive_groups = counts["progressive_same_pair_groups"]
+    return (
+        counts["target_started"] == 1
+        and counts["target_completed"] == 1
+        and counts["loopback_mock_connections"] >= 1
+        and counts["complete_usage_observations"] >= 2
+        and counts["malformed_records"] == 0
+        and counts["incomplete_tails"] == 0
+        and same_pair_groups >= 1
+        and progressive_groups >= 1
+        and progressive_groups <= same_pair_groups
+        and counts["complete_usage_observations"] >= 2 * same_pair_groups
+        and equality_assertions["exact_replay_groups"] <= same_pair_groups
+        and equality_assertions["changed_timestamp_groups"] >= progressive_groups
+        and equality_assertions["changed_timestamp_groups"] <= same_pair_groups
+        and equality_assertions["nonconforming_reuse_groups"] <= same_pair_groups
+        and direction_assertions["monotone-increase-groups"] == progressive_groups
+        and direction_assertions["decreasing-groups"] <= same_pair_groups
+        and control_totals["loopback_canary_connections"] == 1
+        and control_totals["nonloopback_interface_count"] == 0
+        and control_totals["default_route_count"] == 0
+        and control_totals["nonloopback_connection_count"] == 0
+    )
+
+
+def _derive_summary_disposition(value: Mapping[str, object]) -> str:
+    if _has_confirmed_contract_gap_evidence(value):
+        return "confirmed-contract-gap"
+    return "unresolved"
+
+
+def normalize_safe_summary(value: dict[str, object]) -> dict[str, object]:
+    """Keep only a host-derived confirmation; erase every other untrusted summary."""
+    validate_safe_summary(value)
+    if all(not value[key] for key in SUMMARY_SECTION_KEYS):
+        return value
+    derived_disposition = _derive_summary_disposition(value)
+    if value["disposition"] == derived_disposition == "confirmed-contract-gap":
+        return value
+    return _safe_unresolved_result()
+
+
 class _SafeSummaryAdmissionScanner:
     """Admit only the exact safe-summary grammar without decoding unknown values."""
 
@@ -1029,7 +1082,7 @@ class _SafeSummaryAdmissionScanner:
 
 def _parse_summary_bytes(raw: bytes | bytearray) -> dict[str, object]:
     require(len(raw) <= MAX_SAFE_SUMMARY_BYTES, "summary-size")
-    return _SafeSummaryAdmissionScanner(raw).parse()
+    return normalize_safe_summary(_SafeSummaryAdmissionScanner(raw).parse())
 
 
 def _bwrap_argv(plan: ProbePlan, bwrap: Path) -> list[str]:

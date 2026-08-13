@@ -117,6 +117,40 @@ class ClaudeProgressiveProbeTests(unittest.TestCase):
             "disposition": "unresolved",
         }
 
+    def confirmed_gap_summary(self):
+        summary = self.full_safe_summary()
+        summary["counts"].update(
+            {
+                "target_started": 1,
+                "target_completed": 1,
+                "loopback_mock_connections": 1,
+                "complete_usage_observations": 2,
+                "same_native_pair_groups": 1,
+                "progressive_same_pair_groups": 1,
+            }
+        )
+        summary["equality_assertions"].update(
+            {
+                "changed_timestamp_groups": 1,
+            }
+        )
+        summary["direction_assertions"].update(
+            {
+                "monotone-increase-groups": 1,
+            }
+        )
+        summary["control_totals"].update(
+            {
+                "loopback_canary_connections": 1,
+            }
+        )
+        summary["disposition"] = "confirmed-contract-gap"
+        return summary
+
+    def assert_all_empty_unresolved(self, result):
+        self.assertEqual(result, self.probe._safe_unresolved_result())
+        self.probe.validate_safe_summary(result)
+
     def assert_rejected_before_launch(self, plan, *, pin_ok: bool = True) -> None:
         launcher = RecordingLauncher()
         with self.assertRaises(self.probe.ContainmentRejected):
@@ -321,13 +355,22 @@ class ClaudeProgressiveProbeTests(unittest.TestCase):
                 with self.assertRaisesRegex(self.probe.ContainmentRejected, f"summary-{section}-values"):
                     self.probe.validate_safe_summary(hostile_summary)
 
-    def test_summary_admission_never_decodes_the_whole_untrusted_document(self) -> None:
+    def test_zero_evidence_summary_never_decodes_or_survives_admission(self) -> None:
         payload = json.dumps(self.full_safe_summary(), sort_keys=True, separators=(",", ":")).encode("ascii")
 
         with mock.patch.object(self.probe.json, "loads", side_effect=AssertionError("whole-summary-decoded")):
             admitted = self.probe._parse_summary_bytes(payload)
 
-        self.assertEqual(admitted, self.full_safe_summary())
+        self.assert_all_empty_unresolved(admitted)
+
+    def test_all_empty_unresolved_summary_remains_admitted(self) -> None:
+        unresolved = self.probe._safe_unresolved_result()
+
+        admitted = self.probe._parse_summary_bytes(
+            json.dumps(unresolved, sort_keys=True, separators=(",", ":")).encode("ascii")
+        )
+
+        self.assertEqual(admitted, unresolved)
 
     def test_summary_admission_rejects_hostile_allowed_value_without_materializing_it(self) -> None:
         sentinel = b"THESIS_FORBIDDEN_RAW_SUMMARY"
@@ -357,6 +400,135 @@ class ClaudeProgressiveProbeTests(unittest.TestCase):
         with mock.patch.object(self.probe.json, "loads", side_effect=AssertionError("whole-summary-decoded")):
             with self.assertRaisesRegex(self.probe.ContainmentRejected, "summary-counts"):
                 self.probe._parse_summary_bytes(malformed_payload)
+
+    def test_forged_confirmation_without_required_primitive_evidence_normalizes_to_unresolved(self) -> None:
+        def erase_primitive_evidence(summary) -> None:
+            summary["counts"].update(
+                {
+                    "target_started": 0,
+                    "target_completed": 0,
+                    "loopback_mock_connections": 0,
+                    "complete_usage_observations": 0,
+                    "same_native_pair_groups": 0,
+                    "progressive_same_pair_groups": 0,
+                }
+            )
+            summary["equality_assertions"].update({"changed_timestamp_groups": 0})
+            summary["direction_assertions"].update({"monotone-increase-groups": 0})
+            summary["control_totals"].update({"loopback_canary_connections": 0})
+
+        mutations = {
+            "confirmed-enum-with-zero-evidence": erase_primitive_evidence,
+            "target-not-started": lambda summary: summary["counts"].update({"target_started": 0}),
+            "target-not-completed": lambda summary: summary["counts"].update({"target_completed": 0}),
+            "canary-not-observed": lambda summary: summary["counts"].update(
+                {"loopback_mock_connections": 0}
+            ),
+            "canary-control-not-proven": lambda summary: summary["control_totals"].update(
+                {"loopback_canary_connections": 0}
+            ),
+            "zero-observations": lambda summary: summary["counts"].update(
+                {"complete_usage_observations": 0}
+            ),
+            "malformed-analysis": lambda summary: summary["counts"].update({"malformed_records": 1}),
+            "incomplete-analysis": lambda summary: summary["counts"].update({"incomplete_tails": 1}),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name):
+                forged = self.confirmed_gap_summary()
+                mutate(forged)
+                self.probe.validate_safe_summary(forged)
+
+                result, popen = self.execute_completed_summary(
+                    json.dumps(forged, sort_keys=True, separators=(",", ":")).encode("ascii")
+                )
+
+                self.assert_all_empty_unresolved(result)
+                popen.assert_called_once()
+
+    def test_inconsistent_or_unsupported_confirmation_normalizes_to_unresolved(self) -> None:
+        for name, mutate in {
+            "progressive-group-mismatch": lambda summary: summary["direction_assertions"].update(
+                {"monotone-increase-groups": 0}
+            ),
+            "current-contract-has-no-negative-oracle-proof": lambda summary: summary.update(
+                {"disposition": "confirmed-current-contract"}
+            ),
+        }.items():
+            with self.subTest(name=name):
+                forged = self.confirmed_gap_summary()
+                mutate(forged)
+                self.probe.validate_safe_summary(forged)
+
+                result, popen = self.execute_completed_summary(
+                    json.dumps(forged, sort_keys=True, separators=(",", ":")).encode("ascii")
+                )
+
+                self.assert_all_empty_unresolved(result)
+                popen.assert_called_once()
+
+    def test_inconsistent_primitive_relationships_normalize_to_unresolved(self) -> None:
+        def progressive_groups_exceed_same_pair_groups(summary) -> None:
+            summary["counts"].update(
+                {"progressive_same_pair_groups": 2, "complete_usage_observations": 4}
+            )
+            summary["direction_assertions"].update({"monotone-increase-groups": 2})
+            summary["equality_assertions"].update({"changed_timestamp_groups": 2})
+
+        def insufficient_complete_observations(summary) -> None:
+            summary["counts"].update(
+                {
+                    "same_native_pair_groups": 2,
+                    "progressive_same_pair_groups": 2,
+                    "complete_usage_observations": 3,
+                }
+            )
+            summary["direction_assertions"].update({"monotone-increase-groups": 2})
+            summary["equality_assertions"].update({"changed_timestamp_groups": 2})
+
+        def insufficient_changed_timestamps(summary) -> None:
+            summary["counts"].update(
+                {
+                    "same_native_pair_groups": 2,
+                    "progressive_same_pair_groups": 2,
+                    "complete_usage_observations": 4,
+                }
+            )
+            summary["direction_assertions"].update({"monotone-increase-groups": 2})
+
+        mutations = {
+            "monotone-count-exceeds-progressive": lambda summary: summary["direction_assertions"].update(
+                {"monotone-increase-groups": 2}
+            ),
+            "loopback-control-is-not-a-flag": lambda summary: summary["control_totals"].update(
+                {"loopback_canary_connections": 2}
+            ),
+            "progressive-groups-exceed-same-pair-groups": progressive_groups_exceed_same_pair_groups,
+            "complete-observations-cannot-cover-same-pair-groups": insufficient_complete_observations,
+            "changed-timestamps-do-not-cover-progressive-groups": insufficient_changed_timestamps,
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name):
+                forged = self.confirmed_gap_summary()
+                mutate(forged)
+                self.probe.validate_safe_summary(forged)
+
+                result, popen = self.execute_completed_summary(
+                    json.dumps(forged, sort_keys=True, separators=(",", ":")).encode("ascii")
+                )
+
+                self.assert_all_empty_unresolved(result)
+                popen.assert_called_once()
+
+    def test_primitive_supported_contract_gap_remains_admitted(self) -> None:
+        summary = self.confirmed_gap_summary()
+
+        result, popen = self.execute_completed_summary(
+            json.dumps(summary, sort_keys=True, separators=(",", ":")).encode("ascii")
+        )
+
+        self.assertEqual(result, summary)
+        popen.assert_called_once()
 
     def test_trusted_bwrap_identity_ignores_a_shadowed_path_entry(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
