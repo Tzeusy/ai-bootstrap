@@ -32,10 +32,14 @@ require_line() {
 validate_workflow() {
     local file="$1"
     local checkout_block
+    local contract_step
+    local contract_step_line
+    local install_openspec_line
     local paths_block
     local permissions_block
     local setup_uv_block
     local expected_paths
+    local validate_openspec_line
 
     [[ -f "$file" ]] || return 1
 
@@ -120,10 +124,27 @@ validate_workflow() {
     require_line "$file" '          node-version: 22' || return 1
     require_line "$file" '      - uses: astral-sh/setup-uv@v5' || return 1
     require_line "$file" '        run: npm install --global @fission-ai/openspec@1.3.1' || return 1
+    require_line "$file" '      - name: Run workflow contract test' || return 1
+    require_line "$file" '        run: bash ../../tests/ai-usage-telemetry-pr-checks-test.sh' || return 1
     require_line "$file" '        run: openspec validate --all --strict' || return 1
     require_line "$file" '        run: uv run ../../skills/personal/th-projects/scripts/spec-trace-check.py . --authoring' || return 1
     require_line "$file" '        run: bash ../../skills/personal/th-projects/subskills/project-shape/scripts/shape-scan.sh .' || return 1
     require_line "$file" '        working-directory: projects/ai-usage-telemetry' || return 1
+
+    contract_step="$(awk '
+        /^      - name: Run workflow contract test$/ { capture = 1; print; next }
+        capture && /^      - / { exit }
+        capture { print }
+    ' "$file")"
+    [[ "$contract_step" == $'      - name: Run workflow contract test\n        run: bash ../../tests/ai-usage-telemetry-pr-checks-test.sh' ]] || return 1
+
+    install_openspec_line="$(grep -nF '      - name: Install OpenSpec' "$file" | cut -d: -f1)"
+    contract_step_line="$(grep -nF '      - name: Run workflow contract test' "$file" | cut -d: -f1)"
+    validate_openspec_line="$(grep -nF '      - name: Validate OpenSpec' "$file" | cut -d: -f1)"
+    [[ "$install_openspec_line" =~ ^[0-9]+$ &&
+       "$contract_step_line" =~ ^[0-9]+$ &&
+       "$validate_openspec_line" =~ ^[0-9]+$ ]] || return 1
+    (( install_openspec_line < contract_step_line && contract_step_line < validate_openspec_line )) || return 1
 
     require_line "$file" '                  --deselect=about/legends-and-lore/evidence/0003/tests/test_inner_probe_0003.py::InnerProbeTests::test_loopback_mock_positive_control_accepts_without_reading_request_values' || return 1
     grep -Fq -- 'tests/spec' "$file" || return 1
@@ -163,6 +184,12 @@ mutate_and_reject \
 mutate_and_reject \
     'missing-required-validation' \
     '/openspec validate --all --strict/d'
+mutate_and_reject \
+    'missing-workflow-contract-execution' \
+    '/^        run: bash \.\.\/\.\.\/tests\/ai-usage-telemetry-pr-checks-test\.sh$/d'
+mutate_and_reject \
+    'skipped-workflow-contract-execution' \
+    '/^      - name: Run workflow contract test$/a\        if: false'
 mutate_and_reject \
     'missing-loopback-deselection' \
     '/--deselect=about\/legends-and-lore\/evidence\/0003\/tests\/test_inner_probe_0003\.py::InnerProbeTests::test_loopback_mock_positive_control_accepts_without_reading_request_values/d'
