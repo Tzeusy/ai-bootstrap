@@ -149,6 +149,54 @@ class InnerProbeTests(unittest.TestCase):
                     self.assertEqual(analysis.progressive_same_pair_group_count, 0)
                     self.assertEqual(safe_summary["disposition"], "unresolved")
 
+    def test_source_counter_above_signed_64_cannot_progress_or_confirm(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            session_dir = root / ".claude" / "projects" / "opaque"
+            session_dir.mkdir(parents=True)
+            session_dir.joinpath("session.jsonl").write_bytes(
+                assistant_record(
+                    session="s",
+                    request="r",
+                    stamp="one",
+                    count=1 << 63,
+                    content="synthetic",
+                )
+                + assistant_record(
+                    session="s",
+                    request="r",
+                    stamp="two",
+                    count=(1 << 63) + 1,
+                    content="synthetic",
+                )
+            )
+
+            analysis = self.inner.inspect_virtual_home(root)
+            safe_summary = self.inner.make_safe_summary(analysis, canary_connections=1)
+
+        self.assertEqual(analysis.complete_usage_observation_count, 0)
+        self.assertEqual(analysis.malformed_record_count, 2)
+        self.assertEqual(analysis.progressive_same_pair_group_count, 0)
+        self.assertNotIn(
+            safe_summary["disposition"],
+            {"confirmed-contract-gap", "confirmed-current-contract"},
+        )
+        self.assertEqual(safe_summary["disposition"], "unresolved")
+
+    def test_signed_64_source_counter_maximum_is_admitted(self) -> None:
+        values = self.inner.StructuralJsonScanner(
+            assistant_record(
+                session="s",
+                request="r",
+                stamp="one",
+                count=(1 << 63) - 1,
+                content="synthetic",
+            ).rstrip(b"\n")
+        ).parse()
+
+        self.assertEqual(values[("message", "usage", "input_tokens")], (1 << 63) - 1)
+        self.assertEqual(values[("message", "usage", "output_tokens")], (1 << 63) - 1)
+
     def test_loopback_mock_positive_control_accepts_without_reading_request_values(self) -> None:
         mock = self.inner.LoopbackOnlyMock()
         try:

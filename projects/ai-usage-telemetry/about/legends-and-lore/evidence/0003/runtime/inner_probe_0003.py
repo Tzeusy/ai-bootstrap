@@ -33,6 +33,7 @@ SYNTHETIC_TARGET = "/opt/claude/claude"
 TRUSTED_BWRAP_PATH = "/usr/bin/bwrap"
 MOCK_PORT = 18080
 MAX_RECORD_BYTES = 1 << 20
+MAX_SAFE_SOURCE_COUNTER = (1 << 63) - 1
 SAFE_PROJECTED_PATH_CLASSES = (
     "type",
     "session-id",
@@ -232,6 +233,8 @@ class StructuralJsonScanner:
         value = 0
         for offset in range(start, end):
             value = value * 10 + self.raw[offset] - ord("0")
+            if value > MAX_SAFE_SOURCE_COUNTER:
+                raise SafeParseError("source-counter-range")
         return value
 
     def _scan_string_bounds(self) -> tuple[int, int, bool]:

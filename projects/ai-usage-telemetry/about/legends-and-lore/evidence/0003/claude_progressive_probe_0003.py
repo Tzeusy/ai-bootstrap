@@ -128,7 +128,8 @@ SAFE_SUMMARY_CAPTURE_BYTES = MAX_SAFE_SUMMARY_BYTES + 1
 SUMMARY_READ_CHUNK_BYTES = 4_096
 PROBE_TIMEOUT_SECONDS = 90
 PROCESS_STOP_TIMEOUT_SECONDS = 5
-MAX_SAFE_SUMMARY_INTEGER = (1 << 63) - 1
+MAX_SAFE_SOURCE_COUNTER = (1 << 63) - 1
+MAX_SAFE_SUMMARY_INTEGER = MAX_SAFE_SOURCE_COUNTER
 _JSON_HEX_DIGITS = frozenset(b"0123456789abcdefABCDEF")
 
 
@@ -489,6 +490,8 @@ class _SafeJsonLineScanner:
         value = 0
         for offset in range(start, end):
             value = value * 10 + self.raw[offset] - ord("0")
+            if value > MAX_SAFE_SOURCE_COUNTER:
+                raise ValueError("source-counter-range")
         return value
 
     def _scan_string_bounds(self) -> tuple[int, int, bool]:
