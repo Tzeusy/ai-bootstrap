@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import io
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -35,6 +37,41 @@ class RecordingLauncher:
         self.calls += 1
 
 
+class CompletedSummaryProcess:
+    """A no-target child process whose stdout is an untrusted summary payload."""
+
+    def __init__(self, payload: bytes, *, returncode: int = 0) -> None:
+        self.stdout = io.BytesIO(payload)
+        self.returncode = returncode
+        self.killed = False
+
+    def poll(self) -> int:
+        return self.returncode
+
+    def wait(self, timeout: float | None = None) -> int:
+        del timeout
+        return self.returncode
+
+    def kill(self) -> None:
+        self.killed = True
+        self.returncode = -9
+
+
+class TimedOutSummaryProcess(CompletedSummaryProcess):
+    def __init__(self) -> None:
+        super().__init__(b"")
+        self.returncode = None
+
+    def poll(self):
+        return self.returncode
+
+    def wait(self, timeout: float | None = None):
+        del timeout
+        if self.returncode is None:
+            raise subprocess.TimeoutExpired("synthetic-bwrap", 0)
+        return self.returncode
+
+
 class ClaudeProgressiveProbeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -52,6 +89,24 @@ class ClaudeProgressiveProbeTests(unittest.TestCase):
         with self.assertRaises(self.probe.ContainmentRejected):
             self.probe.launch_if_safe(plan, pin_checker=lambda _target: pin_ok, launcher=launcher)
         self.assertEqual(launcher.calls, 0)
+
+    def execute_completed_summary(self, payload: bytes, *, returncode: int = 0):
+        process = CompletedSummaryProcess(payload, returncode=returncode)
+        completed = self.probe.subprocess.CompletedProcess(
+            args=["synthetic-bwrap"], returncode=0, stdout=payload
+        )
+        with (
+            mock.patch.object(self.probe, "resolve_claude_executable", return_value=Path("/synthetic-target/claude")),
+            mock.patch.object(self.probe, "verify_pinned_build"),
+            mock.patch.object(self.probe.shutil, "which", return_value="/synthetic-bwrap"),
+            mock.patch.object(self.probe.subprocess, "run", return_value=completed) as run,
+            mock.patch.object(self.probe.subprocess, "Popen", return_value=process) as popen,
+        ):
+            try:
+                result = self.probe.execute_isolated_probe()
+            except self.probe.ContainmentRejected:
+                result = {"disposition": "unsafe-exception"}
+        return result, run, popen
 
     def test_missing_network_namespace_rejects_before_launch(self) -> None:
         plan = self.safe_plan().replace(namespaces=frozenset({"user", "pid"}))
@@ -225,6 +280,64 @@ class ClaudeProgressiveProbeTests(unittest.TestCase):
 
         self.assertNotIn(forbidden_exception_text, json.dumps(result, sort_keys=True))
         self.probe.validate_safe_summary(result)
+
+    def test_successful_malformed_summary_returns_content_free_unresolved(self) -> None:
+        result, run, popen = self.execute_completed_summary(b"{malformed-summary")
+
+        self.assertEqual(result["disposition"], "unresolved")
+        self.assertEqual(result["counts"], {})
+        self.probe.validate_safe_summary(result)
+        run.assert_not_called()
+        popen.assert_called_once()
+        self.assertEqual(popen.call_args.kwargs.get("bufsize"), 0)
+
+    def test_successful_oversized_summary_returns_content_free_unresolved(self) -> None:
+        forbidden_raw_output = b"THESIS_FORBIDDEN_RAW_OUTPUT"
+        payload = forbidden_raw_output * ((16_385 // len(forbidden_raw_output)) + 1)
+
+        result, run, popen = self.execute_completed_summary(payload)
+
+        self.assertEqual(result["disposition"], "unresolved")
+        self.assertEqual(result["counts"], {})
+        self.assertNotIn(forbidden_raw_output.decode("ascii"), json.dumps(result, sort_keys=True))
+        self.probe.validate_safe_summary(result)
+        run.assert_not_called()
+        popen.assert_called_once()
+
+    def test_successful_schema_invalid_summary_returns_content_free_unresolved(self) -> None:
+        result, run, popen = self.execute_completed_summary(b"{}")
+
+        self.assertEqual(result["disposition"], "unresolved")
+        self.assertEqual(result["counts"], {})
+        self.probe.validate_safe_summary(result)
+        run.assert_not_called()
+        popen.assert_called_once()
+
+    def test_nonzero_summary_process_returns_content_free_unresolved(self) -> None:
+        result, run, popen = self.execute_completed_summary(b"{}", returncode=2)
+
+        self.assertEqual(result["disposition"], "unresolved")
+        self.assertEqual(result["counts"], {})
+        self.probe.validate_safe_summary(result)
+        run.assert_not_called()
+        popen.assert_called_once()
+
+    def test_timed_out_summary_process_returns_content_free_unresolved(self) -> None:
+        process = TimedOutSummaryProcess()
+        with (
+            mock.patch.object(self.probe, "resolve_claude_executable", return_value=Path("/synthetic-target/claude")),
+            mock.patch.object(self.probe, "verify_pinned_build"),
+            mock.patch.object(self.probe.shutil, "which", return_value="/synthetic-bwrap"),
+            mock.patch.object(self.probe.subprocess, "Popen", return_value=process) as popen,
+            mock.patch.object(self.probe, "PROBE_TIMEOUT_SECONDS", 0),
+        ):
+            result = self.probe.execute_isolated_probe()
+
+        self.assertEqual(result["disposition"], "unresolved")
+        self.assertEqual(result["counts"], {})
+        self.assertTrue(process.killed)
+        self.probe.validate_safe_summary(result)
+        popen.assert_called_once()
 
     def test_capture_controls_exercise_every_deliberate_mutation_without_launch(self) -> None:
         controls = load_module("capture_controls_0003", CAPTURE_CONTROLS_PATH)

@@ -139,8 +139,9 @@ class InnerProbeTests(unittest.TestCase):
             ):
                 self.inner._run_target()
 
+        argv = popen.call_args.args[0]
         self.assertEqual(
-            popen.call_args.args[0],
+            argv[argv.index("--") + 1 :],
             [
                 self.inner.SYNTHETIC_TARGET,
                 "-p",
@@ -155,8 +156,51 @@ class InnerProbeTests(unittest.TestCase):
         self.assertEqual(popen.call_args.kwargs["env"], self.inner.SAFE_TARGET_ENVIRONMENT)
         self.assertIs(popen.call_args.kwargs["stdin"], self.inner.subprocess.DEVNULL)
         self.assertTrue(popen.call_args.kwargs["start_new_session"])
-        self.assertEqual(Path(popen.call_args.kwargs["stdout"].name).parent, output)
-        self.assertEqual(Path(popen.call_args.kwargs["stderr"].name).parent, output)
+        self.assertIs(popen.call_args.kwargs["stdout"], self.inner.subprocess.DEVNULL)
+        self.assertIs(popen.call_args.kwargs["stderr"], self.inner.subprocess.DEVNULL)
+
+    def test_target_runs_as_nested_pid_namespace_init_without_reporter_descriptor_access(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            output = root / "output"
+            work = root / "work"
+            output.mkdir()
+            work.mkdir()
+            process = mock.Mock()
+            with (
+                mock.patch.object(self.inner, "SYNTHETIC_OUTPUT", output),
+                mock.patch.object(self.inner, "SYNTHETIC_WORK", work),
+                mock.patch.object(self.inner, "shutil", create=True) as shutil_module,
+                mock.patch.object(self.inner.subprocess, "Popen", return_value=process) as popen,
+            ):
+                shutil_module.which.return_value = "/synthetic/bwrap"
+                self.inner._run_target()
+
+        argv = popen.call_args.args[0]
+        self.assertEqual(argv[0], "/synthetic/bwrap")
+        self.assertIn("--unshare-pid", argv)
+        self.assertIn("--proc", argv)
+        self.assertIn("--new-session", argv)
+        self.assertEqual(argv[argv.index("--") + 1], self.inner.SYNTHETIC_TARGET)
+        self.assertTrue(popen.call_args.kwargs["close_fds"])
+
+    def test_target_discards_raw_standard_streams_instead_of_materializing_them(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            output = root / "output"
+            work = root / "work"
+            output.mkdir()
+            work.mkdir()
+            process = mock.Mock()
+            with (
+                mock.patch.object(self.inner, "SYNTHETIC_OUTPUT", output),
+                mock.patch.object(self.inner, "SYNTHETIC_WORK", work),
+                mock.patch.object(self.inner.subprocess, "Popen", return_value=process) as popen,
+            ):
+                self.inner._run_target()
+
+        self.assertIs(popen.call_args.kwargs["stdout"], self.inner.subprocess.DEVNULL)
+        self.assertIs(popen.call_args.kwargs["stderr"], self.inner.subprocess.DEVNULL)
 
 
 if __name__ == "__main__":

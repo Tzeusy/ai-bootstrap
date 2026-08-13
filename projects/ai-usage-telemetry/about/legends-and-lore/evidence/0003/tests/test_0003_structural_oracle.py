@@ -71,6 +71,8 @@ class StructuralOracleTests(unittest.TestCase):
         self.assertIn("**Unresolved.**", candidate)
         self.assertIn("target_started=0", candidate)
         self.assertIn("fresh independent high-risk privacy/accounting review", candidate)
+        self.assertIn("nested PID namespace", candidate)
+        self.assertIn("16,385-byte", candidate)
         self.assertNotIn("PENDING-FINAL-DIGEST", candidate)
         self.assertNotIn("/home/", candidate)
 
