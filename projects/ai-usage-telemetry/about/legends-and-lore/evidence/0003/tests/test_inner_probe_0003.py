@@ -67,6 +67,84 @@ def assistant_record_with_duplicate_projected_key(*, stamp: str, count: int) -> 
     )
 
 
+def assistant_record_with_escaped_semantic_duplicate(
+    *, stamp: str, count: int, duplicate: str, escaped_first: bool
+) -> bytes:
+    header = (
+        b'{"type":"assistant","sessionId":"s","requestId":"r","timestamp":"'
+        + stamp.encode("ascii")
+        + b'",'
+    )
+    usage = (
+        b'"usage":{"input_tokens":'
+        + str(count).encode("ascii")
+        + b',"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":'
+        + str(count).encode("ascii")
+        + b"}"
+    )
+    if duplicate == "message-id":
+        literal_key = b'"id"'
+        escaped_key = b'"\\u0069\\u0064"'
+        literal_value = b'"synthetic-message"'
+        escaped_value = b'"synthetic-shadow"'
+        first_key, first_value, second_key, second_value = (
+            (escaped_key, escaped_value, literal_key, literal_value)
+            if escaped_first
+            else (literal_key, literal_value, escaped_key, escaped_value)
+        )
+        return (
+            header
+            + b'"message":{'
+            + first_key
+            + b":"
+            + first_value
+            + b","
+            + second_key
+            + b":"
+            + second_value
+            + b',"model":"synthetic-model","content":"",'
+            + usage
+            + b"}}\n"
+        )
+    if duplicate == "message-prefix":
+        literal_key = b'"message"'
+        escaped_key = b'"m\\u0065ssage"'
+
+        def message_value(message_id: bytes) -> bytes:
+            return b'{"id":' + message_id + b',"model":"synthetic-model","content":"",' + usage + b"}"
+
+        first_key, first_value, second_key, second_value = (
+            (escaped_key, message_value(b'"synthetic-shadow"'), literal_key, message_value(b'"synthetic-message"'))
+            if escaped_first
+            else (literal_key, message_value(b'"synthetic-message"'), escaped_key, message_value(b'"synthetic-shadow"'))
+        )
+        return (
+            header
+            + first_key
+            + b":"
+            + first_value
+            + b","
+            + second_key
+            + b":"
+            + second_value
+            + b"}\n"
+        )
+    raise ValueError(f"unknown duplicate fixture: {duplicate}")
+
+
+def assistant_record_with_escaped_unprojected_key(*, stamp: str, count: int) -> bytes:
+    return (
+        b'{"type":"assistant","sessionId":"s","requestId":"r","timestamp":"'
+        + stamp.encode("ascii")
+        + b'","message":{"id":"synthetic-message","model":"synthetic-model",'
+        b'"m\\u0065tadata":"synthetic-unprojected","content":"","usage":{"input_tokens":'
+        + str(count).encode("ascii")
+        + b',"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":'
+        + str(count).encode("ascii")
+        + b"}}}\n"
+    )
+
+
 class InnerProbeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -211,6 +289,70 @@ class InnerProbeTests(unittest.TestCase):
         self.assertEqual(analysis.malformed_record_count, 2)
         self.assertEqual(analysis.progressive_same_pair_group_count, 0)
         self.assertEqual(safe_summary["disposition"], "unresolved")
+
+    def test_escaped_semantic_projected_duplicates_are_malformed_and_cannot_confirm(self) -> None:
+        cases = (
+            ("literal-then-escaped-projected-leaf", "message-id", False),
+            ("escaped-then-literal-projected-leaf", "message-id", True),
+            ("literal-then-escaped-projected-prefix", "message-prefix", False),
+            ("escaped-then-literal-projected-prefix", "message-prefix", True),
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            session_dir = root / ".claude" / "projects" / "opaque"
+            session_dir.mkdir(parents=True)
+            session_path = session_dir / "session.jsonl"
+            for name, duplicate, escaped_first in cases:
+                with self.subTest(name=name):
+                    session_path.write_bytes(
+                        assistant_record_with_escaped_semantic_duplicate(
+                            stamp="one", count=1, duplicate=duplicate, escaped_first=escaped_first
+                        )
+                        + assistant_record_with_escaped_semantic_duplicate(
+                            stamp="two", count=2, duplicate=duplicate, escaped_first=escaped_first
+                        )
+                    )
+
+                    analysis = self.inner.inspect_virtual_home(root)
+                    safe_summary = self.inner.make_safe_summary(analysis, canary_connections=1)
+
+                    self.assertEqual(analysis.complete_usage_observation_count, 0)
+                    self.assertEqual(analysis.malformed_record_count, 2)
+                    self.assertEqual(analysis.progressive_same_pair_group_count, 0)
+                    self.assertEqual(safe_summary["disposition"], "unresolved")
+
+    def test_escaped_projected_duplicate_rejects_before_second_value_decode(self) -> None:
+        sentinel = b"escaped-duplicate-value-must-not-decode"
+
+        class SecondValueSliceTrap(bytes):
+            def __getitem__(self, item):
+                value = super().__getitem__(item)
+                if isinstance(item, slice) and sentinel in value:
+                    raise AssertionError("escaped-duplicate-value-sliced")
+                return value
+
+        raw_record = SecondValueSliceTrap(
+            assistant_record_with_escaped_semantic_duplicate(
+                stamp="one", count=1, duplicate="message-id", escaped_first=False
+            ).rstrip(b"\n").replace(b"synthetic-shadow", sentinel)
+        )
+
+        with self.assertRaisesRegex(self.inner.SafeParseError, "duplicate-projected-key"):
+            self.inner.StructuralJsonScanner(raw_record).parse()
+
+    def test_escaped_unprojected_key_remains_skip_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            session_dir = root / ".claude" / "projects" / "opaque"
+            session_dir.mkdir(parents=True)
+            (session_dir / "session.jsonl").write_bytes(
+                assistant_record_with_escaped_unprojected_key(stamp="one", count=1)
+            )
+
+            analysis = self.inner.inspect_virtual_home(root)
+
+        self.assertEqual(analysis.complete_usage_observation_count, 1)
+        self.assertEqual(analysis.malformed_record_count, 0)
 
     def test_source_counter_above_signed_64_cannot_progress_or_confirm(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
