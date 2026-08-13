@@ -32,6 +32,16 @@ FIXTURE_PATH = EVIDENCE_DIRECTORY / "fixture_0003.json"
 RUNTIME_DIRECTORY = EVIDENCE_DIRECTORY / "runtime"
 INNER_PROBE_PATH = "/probe/runtime/inner_probe_0003.py"
 SYNTHETIC_TARGET_PATH = "/opt/claude/claude"
+TRUSTED_BWRAP_PATH = Path("/usr/bin/bwrap")
+TRUSTED_BWRAP_SHA256 = "d78807229d616606e339c5988392b9e0ab4a6a6998fa51e4590837f426a12fca"
+ATTEMPT_GATE_PATH = RUNTIME_DIRECTORY / "attempt_gate_0003.json"
+CONSUMED_ATTEMPT_GATE_BYTES = (
+    b"{\n"
+    b'  "schema": "candidate-0003-attempt-gate@1",\n'
+    b'  "state": "consumed"\n'
+    b"}\n"
+)
+CONSUMED_ATTEMPT_GATE_SHA256 = "296d9c192435acb6a65ce0c18766916e329a916f515fb41bb39c4a96b5eb3fec"
 SAFE_PROJECTED_PATH_CLASSES = (
     "type",
     "session-id",
@@ -52,6 +62,7 @@ DEFAULT_RUNTIME_MOUNT_SOURCES = (
     Path("/usr/bin/python3"),
     Path("/usr/lib"),
     Path("/usr/lib64"),
+    TRUSTED_BWRAP_PATH,
 )
 SAFE_ENVIRONMENT = {
     "HOME": "/sandbox-home",
@@ -117,6 +128,8 @@ SAFE_SUMMARY_CAPTURE_BYTES = MAX_SAFE_SUMMARY_BYTES + 1
 SUMMARY_READ_CHUNK_BYTES = 4_096
 PROBE_TIMEOUT_SECONDS = 90
 PROCESS_STOP_TIMEOUT_SECONDS = 5
+MAX_SAFE_SUMMARY_INTEGER = (1 << 63) - 1
+_JSON_HEX_DIGITS = frozenset(b"0123456789abcdefABCDEF")
 
 
 class ContainmentRejected(RuntimeError):
@@ -256,6 +269,34 @@ def verify_pinned_build(target: Path) -> PinnedBuild:
     require(actual_sha256 == PINNED_SHA256, "build-pin-sha256")
     require(version_present, "build-pin-version")
     return PinnedBuild(version=PINNED_VERSION, sha256=actual_sha256)
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        while chunk := source.read(1 << 20):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def resolve_trusted_bwrap() -> Path:
+    resolved = TRUSTED_BWRAP_PATH.resolve(strict=True)
+    metadata = resolved.stat()
+    require(resolved == TRUSTED_BWRAP_PATH, "bubblewrap-path")
+    require(stat.S_ISREG(metadata.st_mode), "bubblewrap-not-regular-file")
+    require(metadata.st_mode & stat.S_IXUSR, "bubblewrap-not-executable")
+    require(_sha256_file(resolved) == TRUSTED_BWRAP_SHA256, "bubblewrap-sha256")
+    return resolved
+
+
+def assert_attempt_gate_allows_launch() -> None:
+    try:
+        gate = ATTEMPT_GATE_PATH.read_bytes()
+    except OSError as error:
+        raise ContainmentRejected("attempt-gate-read") from error
+    require(hashlib.sha256(gate).hexdigest() == CONSUMED_ATTEMPT_GATE_SHA256, "attempt-gate-integrity")
+    require(gate == CONSUMED_ATTEMPT_GATE_BYTES, "attempt-gate-shape")
+    raise ContainmentRejected("attempt-consumed")
 
 
 def resolve_claude_executable() -> Path:
@@ -440,33 +481,96 @@ class _SafeJsonLineScanner:
         return value
 
     def _decode_integer(self) -> int:
-        start = self.index
-        while self.index < len(self.raw) and self.raw[self.index] in b"0123456789":
-            self.index += 1
-        if start == self.index:
+        start, end = self._scan_number()
+        if self.raw[start] == ord("-") or any(
+            self.raw[offset] in b".eE" for offset in range(start, end)
+        ):
             raise ValueError("expected-integer")
-        return int(self.raw[start : self.index])
+        value = 0
+        for offset in range(start, end):
+            value = value * 10 + self.raw[offset] - ord("0")
+        return value
 
     def _scan_string_bounds(self) -> tuple[int, int, bool]:
         self._expect(ord('"'))
         start = self.index
-        escaped = False
         has_escape = False
         while self.index < len(self.raw):
             current = self.raw[self.index]
-            self.index += 1
-            if escaped:
-                escaped = False
-                continue
-            if current == ord("\\"):
-                escaped = True
-                has_escape = True
-                continue
             if current == ord('"'):
+                self.index += 1
                 return start, self.index - 1, has_escape
+            if current == ord("\\"):
+                self.index += 1
+                has_escape = True
+                if self.index >= len(self.raw):
+                    raise ValueError("unterminated-escape")
+                escaped = self.raw[self.index]
+                self.index += 1
+                if escaped in b'"\\/bfnrt':
+                    continue
+                if escaped != ord("u"):
+                    raise ValueError("invalid-escape")
+                for _ in range(4):
+                    if self.index >= len(self.raw) or self.raw[self.index] not in _JSON_HEX_DIGITS:
+                        raise ValueError("invalid-unicode-escape")
+                    self.index += 1
+                continue
             if current < 0x20:
                 raise ValueError("invalid-string")
+            if current < 0x80:
+                self.index += 1
+                continue
+            self._skip_utf8_codepoint()
         raise ValueError("unterminated-string")
+
+    def _skip_utf8_codepoint(self) -> None:
+        start = self.index
+        first = self.raw[start]
+
+        def continuation(offset: int, lower: int = 0x80, upper: int = 0xBF) -> None:
+            position = start + offset
+            if position >= len(self.raw) or not lower <= self.raw[position] <= upper:
+                raise ValueError("invalid-utf8")
+
+        if 0xC2 <= first <= 0xDF:
+            continuation(1)
+            self.index += 2
+            return
+        if first == 0xE0:
+            continuation(1, 0xA0, 0xBF)
+            continuation(2)
+            self.index += 3
+            return
+        if 0xE1 <= first <= 0xEC or 0xEE <= first <= 0xEF:
+            continuation(1)
+            continuation(2)
+            self.index += 3
+            return
+        if first == 0xED:
+            continuation(1, 0x80, 0x9F)
+            continuation(2)
+            self.index += 3
+            return
+        if first == 0xF0:
+            continuation(1, 0x90, 0xBF)
+            continuation(2)
+            continuation(3)
+            self.index += 4
+            return
+        if 0xF1 <= first <= 0xF3:
+            continuation(1)
+            continuation(2)
+            continuation(3)
+            self.index += 4
+            return
+        if first == 0xF4:
+            continuation(1, 0x80, 0x8F)
+            continuation(2)
+            continuation(3)
+            self.index += 4
+            return
+        raise ValueError("invalid-utf8")
 
     def _skip_value(self) -> None:
         self._skip_whitespace()
@@ -489,6 +593,7 @@ class _SafeJsonLineScanner:
                 if self._consume(ord("}")):
                     return
                 self._expect(ord(","))
+            return
         if current == ord("["):
             self.index += 1
             self._skip_whitespace()
@@ -500,12 +605,49 @@ class _SafeJsonLineScanner:
                 if self._consume(ord("]")):
                     return
                 self._expect(ord(","))
-        else:
-            scalar_start = self.index
-            while self.index < len(self.raw) and self.raw[self.index] not in b" \t\r\n,]}":
+            return
+        self._skip_literal_or_number()
+
+    def _skip_literal_or_number(self) -> None:
+        for literal in (b"true", b"false", b"null"):
+            if self.raw.startswith(literal, self.index):
+                self.index += len(literal)
+                return
+        self._scan_number()
+
+    def _scan_number(self) -> tuple[int, int]:
+        start = self.index
+        if self.index < len(self.raw) and self.raw[self.index] == ord("-"):
+            self.index += 1
+        if self.index >= len(self.raw):
+            raise ValueError("invalid-number")
+        if self.raw[self.index] == ord("0"):
+            self.index += 1
+            if self.index < len(self.raw) and self.raw[self.index] in b"0123456789":
+                raise ValueError("leading-zero-number")
+        elif self.raw[self.index] in b"123456789":
+            self.index += 1
+            while self.index < len(self.raw) and self.raw[self.index] in b"0123456789":
                 self.index += 1
-            if scalar_start == self.index:
-                raise ValueError("invalid-scalar")
+        else:
+            raise ValueError("invalid-number")
+        if self.index < len(self.raw) and self.raw[self.index] == ord("."):
+            self.index += 1
+            fraction_start = self.index
+            while self.index < len(self.raw) and self.raw[self.index] in b"0123456789":
+                self.index += 1
+            if self.index == fraction_start:
+                raise ValueError("invalid-number")
+        if self.index < len(self.raw) and self.raw[self.index] in b"eE":
+            self.index += 1
+            if self.index < len(self.raw) and self.raw[self.index] in b"+-":
+                self.index += 1
+            exponent_start = self.index
+            while self.index < len(self.raw) and self.raw[self.index] in b"0123456789":
+                self.index += 1
+            if self.index == exponent_start:
+                raise ValueError("invalid-number")
+        return start, self.index
 
     def _skip_scalar_or_container(self) -> None:
         """Compatibility wrapper retained only for the fixed safe-path caller."""
@@ -637,20 +779,259 @@ def validate_safe_summary(value: Mapping[str, object]) -> None:
         require(not any(marker in key.casefold() for marker in raw_markers), "summary-privacy-key")
 
 
-def _parse_summary_bytes(raw: bytes) -> dict[str, object]:
+class _SafeSummaryAdmissionScanner:
+    """Admit only the exact safe-summary grammar without decoding unknown values."""
+
+    def __init__(self, raw: bytes | bytearray) -> None:
+        self.raw = raw
+        self.index = 0
+
+    def parse(self) -> dict[str, object]:
+        self._skip_whitespace()
+        summary = self._parse_object()
+        self._skip_whitespace()
+        require(self.index == len(self.raw), "summary-json")
+        validate_safe_summary(summary)
+        return summary
+
+    def _parse_object(self) -> dict[str, object]:
+        self._expect(ord("{"))
+        summary: dict[str, object] = {}
+        self._skip_whitespace()
+        while not self._consume(ord("}")):
+            key = self._read_allowed_key(SAFE_SUMMARY_KEYS, "summary-key")
+            require(key not in summary, "summary-key")
+            self._expect(ord(":"))
+            summary[key] = self._parse_top_level_value(key)
+            self._skip_whitespace()
+            if self._consume(ord("}")):
+                break
+            self._expect(ord(","))
+        require(set(summary) == SAFE_SUMMARY_KEYS, "summary-key")
+        return summary
+
+    def _parse_top_level_value(self, key: str) -> object:
+        if key == "schema":
+            return self._parse_expected_string("claude-progressive-probe-summary@1", "summary-schema")
+        if key == "build_pin":
+            return self._parse_fixed_string_object(
+                {"version": PINNED_VERSION, "sha256": PINNED_SHA256}, "summary-build-pin"
+            )
+        if key in SUMMARY_STRING_SECTION_VALUES:
+            return self._parse_fixed_string_object(
+                SUMMARY_STRING_SECTION_VALUES[key], f"summary-{key}"
+            )
+        if key in SUMMARY_SECTION_KEYS:
+            return self._parse_nonnegative_integer_object(SUMMARY_SECTION_KEYS[key], f"summary-{key}")
+        if key == "disposition":
+            return self._parse_enum_string(
+                {"confirmed-contract-gap", "confirmed-current-contract", "unresolved"},
+                "summary-disposition",
+            )
+        raise ContainmentRejected("summary-key")
+
+    def _parse_fixed_string_object(
+        self, expected: Mapping[str, str], code: str
+    ) -> dict[str, str]:
+        self._expect(ord("{"))
+        values: dict[str, str] = {}
+        self._skip_whitespace()
+        if self._consume(ord("}")):
+            return values
+        while True:
+            key = self._read_allowed_key(expected, f"{code}-keys")
+            require(key not in values, f"{code}-keys")
+            self._expect(ord(":"))
+            values[key] = self._parse_expected_string(expected[key], f"{code}-values")
+            self._skip_whitespace()
+            if self._consume(ord("}")):
+                break
+            self._expect(ord(","))
+        require(set(values) == set(expected), f"{code}-keys")
+        return values
+
+    def _parse_nonnegative_integer_object(
+        self, expected: set[str], code: str
+    ) -> dict[str, int]:
+        self._expect(ord("{"))
+        values: dict[str, int] = {}
+        self._skip_whitespace()
+        if self._consume(ord("}")):
+            return values
+        while True:
+            key = self._read_allowed_key(expected, f"{code}-keys")
+            require(key not in values, f"{code}-keys")
+            self._expect(ord(":"))
+            values[key] = self._parse_nonnegative_integer(code)
+            self._skip_whitespace()
+            if self._consume(ord("}")):
+                break
+            self._expect(ord(","))
+        require(set(values) == expected, f"{code}-keys")
+        return values
+
+    def _read_allowed_key(self, allowed: Iterable[str], code: str) -> str:
+        start, end, escaped = self._scan_string_bounds()
+        if not escaped:
+            for candidate in allowed:
+                encoded = candidate.encode("ascii")
+                if end - start == len(encoded) and all(
+                    self.raw[start + offset] == value for offset, value in enumerate(encoded)
+                ):
+                    return candidate
+        raise ContainmentRejected(code)
+
+    def _parse_expected_string(self, expected: str, code: str) -> str:
+        self._skip_whitespace()
+        literal_start = self.index
+        self._scan_string_bounds()
+        expected_literal = b'"' + expected.encode("ascii") + b'"'
+        if self.index - literal_start != len(expected_literal) or any(
+            self.raw[literal_start + offset] != value for offset, value in enumerate(expected_literal)
+        ):
+            raise ContainmentRejected(code)
+        return expected
+
+    def _parse_enum_string(self, allowed: set[str], code: str) -> str:
+        self._skip_whitespace()
+        literal_start = self.index
+        self._scan_string_bounds()
+        for candidate in allowed:
+            expected_literal = b'"' + candidate.encode("ascii") + b'"'
+            if self.index - literal_start == len(expected_literal) and all(
+                self.raw[literal_start + offset] == value for offset, value in enumerate(expected_literal)
+            ):
+                return candidate
+        raise ContainmentRejected(code)
+
+    def _parse_nonnegative_integer(self, code: str) -> int:
+        self._skip_whitespace()
+        if self.index >= len(self.raw):
+            raise ContainmentRejected(code)
+        if self.raw[self.index] == ord("0"):
+            self.index += 1
+            if self.index < len(self.raw) and self.raw[self.index] in b"0123456789":
+                raise ContainmentRejected(code)
+            return 0
+        if self.raw[self.index] not in b"123456789":
+            raise ContainmentRejected(code)
+        value = 0
+        while self.index < len(self.raw) and self.raw[self.index] in b"0123456789":
+            value = value * 10 + self.raw[self.index] - ord("0")
+            if value > MAX_SAFE_SUMMARY_INTEGER:
+                raise ContainmentRejected(code)
+            self.index += 1
+        if self.index < len(self.raw) and self.raw[self.index] in b".eE":
+            raise ContainmentRejected(code)
+        return value
+
+    def _scan_string_bounds(self) -> tuple[int, int, bool]:
+        self._expect(ord('"'))
+        start = self.index
+        has_escape = False
+        while self.index < len(self.raw):
+            current = self.raw[self.index]
+            if current == ord('"'):
+                self.index += 1
+                return start, self.index - 1, has_escape
+            if current == ord("\\"):
+                self.index += 1
+                has_escape = True
+                if self.index >= len(self.raw):
+                    raise ContainmentRejected("summary-json")
+                escaped = self.raw[self.index]
+                self.index += 1
+                if escaped in b'"\\/bfnrt':
+                    continue
+                if escaped != ord("u"):
+                    raise ContainmentRejected("summary-json")
+                for _ in range(4):
+                    if self.index >= len(self.raw) or self.raw[self.index] not in _JSON_HEX_DIGITS:
+                        raise ContainmentRejected("summary-json")
+                    self.index += 1
+                continue
+            if current < 0x20:
+                raise ContainmentRejected("summary-json")
+            if current < 0x80:
+                self.index += 1
+                continue
+            self._skip_utf8_codepoint()
+        raise ContainmentRejected("summary-json")
+
+    def _skip_utf8_codepoint(self) -> None:
+        start = self.index
+        first = self.raw[start]
+
+        def continuation(offset: int, lower: int = 0x80, upper: int = 0xBF) -> None:
+            position = start + offset
+            if position >= len(self.raw) or not lower <= self.raw[position] <= upper:
+                raise ContainmentRejected("summary-json")
+
+        if 0xC2 <= first <= 0xDF:
+            continuation(1)
+            self.index += 2
+            return
+        if first == 0xE0:
+            continuation(1, 0xA0, 0xBF)
+            continuation(2)
+            self.index += 3
+            return
+        if 0xE1 <= first <= 0xEC or 0xEE <= first <= 0xEF:
+            continuation(1)
+            continuation(2)
+            self.index += 3
+            return
+        if first == 0xED:
+            continuation(1, 0x80, 0x9F)
+            continuation(2)
+            self.index += 3
+            return
+        if first == 0xF0:
+            continuation(1, 0x90, 0xBF)
+            continuation(2)
+            continuation(3)
+            self.index += 4
+            return
+        if 0xF1 <= first <= 0xF3:
+            continuation(1)
+            continuation(2)
+            continuation(3)
+            self.index += 4
+            return
+        if first == 0xF4:
+            continuation(1, 0x80, 0x8F)
+            continuation(2)
+            continuation(3)
+            self.index += 4
+            return
+        raise ContainmentRejected("summary-json")
+
+    def _skip_whitespace(self) -> None:
+        while self.index < len(self.raw) and self.raw[self.index] in b" \t\r\n":
+            self.index += 1
+
+    def _expect(self, expected: int) -> None:
+        self._skip_whitespace()
+        if self.index >= len(self.raw) or self.raw[self.index] != expected:
+            raise ContainmentRejected("summary-json")
+        self.index += 1
+
+    def _consume(self, expected: int) -> bool:
+        self._skip_whitespace()
+        if self.index < len(self.raw) and self.raw[self.index] == expected:
+            self.index += 1
+            return True
+        return False
+
+
+def _parse_summary_bytes(raw: bytes | bytearray) -> dict[str, object]:
     require(len(raw) <= MAX_SAFE_SUMMARY_BYTES, "summary-size")
-    try:
-        value = json.loads(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ContainmentRejected("summary-json") from error
-    require(isinstance(value, dict), "summary-object")
-    validate_safe_summary(value)
-    return value
+    return _SafeSummaryAdmissionScanner(raw).parse()
 
 
-def _bwrap_argv(plan: ProbePlan, bwrap: str) -> list[str]:
+def _bwrap_argv(plan: ProbePlan, bwrap: Path) -> list[str]:
     args = [
-        bwrap,
+        str(bwrap),
         "--die-with-parent",
         "--new-session",
         "--unshare-user",
@@ -749,7 +1130,7 @@ def _stop_process(process: subprocess.Popen[bytes]) -> None:
         return
 
 
-def _run_bwrap_with_bounded_summary(argv: list[str]) -> bytes | None:
+def _run_bwrap_with_bounded_summary(argv: list[str]) -> bytearray | None:
     process = subprocess.Popen(
         argv,
         stdin=subprocess.DEVNULL,
@@ -781,19 +1162,19 @@ def _run_bwrap_with_bounded_summary(argv: list[str]) -> bytes | None:
     reader.join(timeout=0)
     if not done.is_set() or overflow.is_set() or read_failed.is_set() or process.returncode != 0:
         return None
-    return bytes(payload)
+    return payload
 
 
 def execute_isolated_probe() -> dict[str, object]:
     try:
+        assert_attempt_gate_allows_launch()
         target = resolve_claude_executable()
         verify_pinned_build(target)
         require(RUNTIME_DIRECTORY.is_dir(), "probe-code-missing")
         plan = make_safe_plan(target=target, probe_code=RUNTIME_DIRECTORY)
         require(plan.probe_code.resolve() == RUNTIME_DIRECTORY.resolve(), "probe-code-boundary")
         assert_plan_safe(plan)
-        bwrap = shutil.which("bwrap")
-        require(bwrap is not None, "bubblewrap-missing")
+        bwrap = resolve_trusted_bwrap()
         summary = _run_bwrap_with_bounded_summary(_bwrap_argv(plan, bwrap))
     except (ContainmentRejected, OSError, subprocess.TimeoutExpired):
         return _safe_unresolved_result()

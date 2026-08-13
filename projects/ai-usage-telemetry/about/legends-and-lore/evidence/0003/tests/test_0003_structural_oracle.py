@@ -70,7 +70,7 @@ class StructuralOracleTests(unittest.TestCase):
 
         self.assertIn("**Unresolved.**", candidate)
         self.assertIn("target_started=0", candidate)
-        self.assertIn("fresh independent high-risk privacy/accounting review", candidate)
+        self.assertIn("fresh **different** independent high-risk privacy/accounting review", candidate)
         self.assertIn("nested PID namespace", candidate)
         self.assertIn("16,385-byte", candidate)
         self.assertNotIn("PENDING-FINAL-DIGEST", candidate)
@@ -81,6 +81,7 @@ class StructuralOracleTests(unittest.TestCase):
             "verify_0003_structural_oracle.py",
             "claude_progressive_probe_0003.py",
             "runtime/inner_probe_0003.py",
+            "runtime/attempt_gate_0003.json",
             "exercise_capture_controls_0003.py",
         ):
             digest = hashlib.sha256((EVIDENCE_DIR / relative_path).read_bytes()).hexdigest()

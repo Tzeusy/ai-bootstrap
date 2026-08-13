@@ -15,7 +15,6 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
-import shutil
 import signal
 import socket
 import subprocess
@@ -31,6 +30,7 @@ SYNTHETIC_HOME = Path("/sandbox-home")
 SYNTHETIC_WORK = Path("/sandbox-work")
 SYNTHETIC_OUTPUT = Path("/sandbox-output")
 SYNTHETIC_TARGET = "/opt/claude/claude"
+TRUSTED_BWRAP_PATH = "/usr/bin/bwrap"
 MOCK_PORT = 18080
 MAX_RECORD_BYTES = 1 << 20
 SAFE_PROJECTED_PATH_CLASSES = (
@@ -102,6 +102,7 @@ _SAFE_INTEGER_PATHS = frozenset(
 _PATH_PREFIXES = frozenset(
     path[:index] for path in (*_SAFE_STRING_PATHS, *_SAFE_INTEGER_PATHS) for index in range(1, len(path) + 1)
 )
+_JSON_HEX_DIGITS = frozenset(b"0123456789abcdefABCDEF")
 
 
 class SafeParseError(ValueError):
@@ -223,33 +224,96 @@ class StructuralJsonScanner:
         return value
 
     def _decode_safe_integer(self) -> int:
-        start = self.index
-        while self.index < len(self.raw) and self.raw[self.index] in b"0123456789":
-            self.index += 1
-        if self.index == start:
+        start, end = self._scan_number()
+        if self.raw[start] == ord("-") or any(
+            self.raw[offset] in b".eE" for offset in range(start, end)
+        ):
             raise SafeParseError("expected-safe-integer")
-        return int(self.raw[start : self.index])
+        value = 0
+        for offset in range(start, end):
+            value = value * 10 + self.raw[offset] - ord("0")
+        return value
 
     def _scan_string_bounds(self) -> tuple[int, int, bool]:
         self._expect(ord('"'))
         start = self.index
-        escaped = False
         has_escape = False
         while self.index < len(self.raw):
             current = self.raw[self.index]
-            self.index += 1
-            if escaped:
-                escaped = False
-                continue
-            if current == ord("\\"):
-                escaped = True
-                has_escape = True
-                continue
             if current == ord('"'):
+                self.index += 1
                 return start, self.index - 1, has_escape
+            if current == ord("\\"):
+                self.index += 1
+                has_escape = True
+                if self.index >= len(self.raw):
+                    raise SafeParseError("unterminated-escape")
+                escaped = self.raw[self.index]
+                self.index += 1
+                if escaped in b'"\\/bfnrt':
+                    continue
+                if escaped != ord("u"):
+                    raise SafeParseError("invalid-escape")
+                for _ in range(4):
+                    if self.index >= len(self.raw) or self.raw[self.index] not in _JSON_HEX_DIGITS:
+                        raise SafeParseError("invalid-unicode-escape")
+                    self.index += 1
+                continue
             if current < 0x20:
                 raise SafeParseError("invalid-string")
+            if current < 0x80:
+                self.index += 1
+                continue
+            self._skip_utf8_codepoint()
         raise SafeParseError("unterminated-string")
+
+    def _skip_utf8_codepoint(self) -> None:
+        start = self.index
+        first = self.raw[start]
+
+        def continuation(offset: int, lower: int = 0x80, upper: int = 0xBF) -> None:
+            position = start + offset
+            if position >= len(self.raw) or not lower <= self.raw[position] <= upper:
+                raise SafeParseError("invalid-utf8")
+
+        if 0xC2 <= first <= 0xDF:
+            continuation(1)
+            self.index += 2
+            return
+        if first == 0xE0:
+            continuation(1, 0xA0, 0xBF)
+            continuation(2)
+            self.index += 3
+            return
+        if 0xE1 <= first <= 0xEC or 0xEE <= first <= 0xEF:
+            continuation(1)
+            continuation(2)
+            self.index += 3
+            return
+        if first == 0xED:
+            continuation(1, 0x80, 0x9F)
+            continuation(2)
+            self.index += 3
+            return
+        if first == 0xF0:
+            continuation(1, 0x90, 0xBF)
+            continuation(2)
+            continuation(3)
+            self.index += 4
+            return
+        if 0xF1 <= first <= 0xF3:
+            continuation(1)
+            continuation(2)
+            continuation(3)
+            self.index += 4
+            return
+        if first == 0xF4:
+            continuation(1, 0x80, 0x8F)
+            continuation(2)
+            continuation(3)
+            self.index += 4
+            return
+        raise SafeParseError("invalid-utf8")
 
     def _skip_value(self) -> None:
         self._skip_whitespace()
@@ -272,6 +336,7 @@ class StructuralJsonScanner:
                 if self._consume(ord("}")):
                     return
                 self._expect(ord(","))
+            return
         if current == ord("["):
             self.index += 1
             self._skip_whitespace()
@@ -283,12 +348,49 @@ class StructuralJsonScanner:
                 if self._consume(ord("]")):
                     return
                 self._expect(ord(","))
-        else:
-            scalar_start = self.index
-            while self.index < len(self.raw) and self.raw[self.index] not in b" \t\r\n,]}":
+            return
+        self._skip_literal_or_number()
+
+    def _skip_literal_or_number(self) -> None:
+        for literal in (b"true", b"false", b"null"):
+            if self.raw.startswith(literal, self.index):
+                self.index += len(literal)
+                return
+        self._scan_number()
+
+    def _scan_number(self) -> tuple[int, int]:
+        start = self.index
+        if self.index < len(self.raw) and self.raw[self.index] == ord("-"):
+            self.index += 1
+        if self.index >= len(self.raw):
+            raise SafeParseError("invalid-number")
+        if self.raw[self.index] == ord("0"):
+            self.index += 1
+            if self.index < len(self.raw) and self.raw[self.index] in b"0123456789":
+                raise SafeParseError("leading-zero-number")
+        elif self.raw[self.index] in b"123456789":
+            self.index += 1
+            while self.index < len(self.raw) and self.raw[self.index] in b"0123456789":
                 self.index += 1
-            if scalar_start == self.index:
-                raise SafeParseError("invalid-scalar")
+        else:
+            raise SafeParseError("invalid-number")
+        if self.index < len(self.raw) and self.raw[self.index] == ord("."):
+            self.index += 1
+            fraction_start = self.index
+            while self.index < len(self.raw) and self.raw[self.index] in b"0123456789":
+                self.index += 1
+            if self.index == fraction_start:
+                raise SafeParseError("invalid-number")
+        if self.index < len(self.raw) and self.raw[self.index] in b"eE":
+            self.index += 1
+            if self.index < len(self.raw) and self.raw[self.index] in b"+-":
+                self.index += 1
+            exponent_start = self.index
+            while self.index < len(self.raw) and self.raw[self.index] in b"0123456789":
+                self.index += 1
+            if self.index == exponent_start:
+                raise SafeParseError("invalid-number")
+        return start, self.index
 
     def _expect(self, expected: int) -> None:
         self._skip_whitespace()
@@ -691,11 +793,8 @@ def _nested_target_argv(nested_bwrap: str) -> list[str]:
 
 
 def _run_target() -> tuple[int, int]:
-    nested_bwrap = shutil.which("bwrap")
-    if nested_bwrap is None:
-        raise SafeParseError("nested-bubblewrap-missing")
     process = subprocess.Popen(
-        _nested_target_argv(nested_bwrap),
+        _nested_target_argv(TRUSTED_BWRAP_PATH),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
