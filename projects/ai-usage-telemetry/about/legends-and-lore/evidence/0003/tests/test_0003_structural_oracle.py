@@ -74,6 +74,7 @@ class StructuralOracleTests(unittest.TestCase):
         self.assertIn("nested PID namespace", candidate)
         self.assertIn("16,385-byte", candidate)
         self.assertIn("0..9223372036854775807", candidate)
+        self.assertIn("host-derived confirmation", candidate)
         self.assertNotIn("PENDING-FINAL-DIGEST", candidate)
         self.assertNotIn("/home/", candidate)
 
