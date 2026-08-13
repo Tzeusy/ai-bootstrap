@@ -180,11 +180,16 @@ class StructuralJsonScanner:
         self._skip_whitespace()
         if self._consume(ord("}")):
             return
+        seen_projected_paths: set[tuple[str, ...]] = set()
         while True:
             key = self._read_structural_key()
             self._skip_whitespace()
             self._expect(ord(":"))
             child_path = _next_safe_path(path, key)
+            if child_path is not None:
+                if child_path in seen_projected_paths:
+                    raise SafeParseError("duplicate-projected-key")
+                seen_projected_paths.add(child_path)
             self._parse_value(child_path)
             self._skip_whitespace()
             if self._consume(ord("}")):
