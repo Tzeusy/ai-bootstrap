@@ -77,6 +77,7 @@ class StructuralOracleTests(unittest.TestCase):
         self.assertIn("host-derived confirmation", candidate)
         self.assertIn("inner-classifier reachable", candidate)
         self.assertIn("duplicate projected", candidate)
+        self.assertIn("escaped semantic duplicate", candidate)
         self.assertIn("aggregate cardinality premise was false", candidate)
         self.assertNotIn("PENDING-FINAL-DIGEST", candidate)
         self.assertNotIn("/home/", candidate)

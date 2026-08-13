@@ -442,13 +442,15 @@ class _SafeJsonLineScanner:
             return
         seen_projected_paths: set[tuple[str, ...]] = set()
         while True:
-            key = self._read_key()
+            key, escaped_key = self._read_key()
             self._skip_whitespace()
             self._expect(ord(":"))
             next_path = _next_safe_path(path, key)
             if next_path is not None:
                 if next_path in seen_projected_paths:
                     raise ValueError("duplicate-projected-key")
+                if escaped_key:
+                    raise ValueError("escaped-projected-key")
                 seen_projected_paths.add(next_path)
             self._parse_value(next_path)
             self._skip_whitespace()
@@ -468,14 +470,49 @@ class _SafeJsonLineScanner:
                 return
             self._expect(ord(","))
 
-    def _read_key(self) -> str | None:
+    def _read_key(self) -> tuple[str | None, bool]:
         start, end, escaped = self._scan_string_bounds()
-        if escaped:
-            return None
         for known in _KNOWN_STRUCTURAL_KEYS:
-            if end - start == len(known) and all(self.raw[start + offset] == byte for offset, byte in enumerate(known)):
-                return known.decode("ascii")
-        return None
+            if self._matches_known_key(start, end, known):
+                return known.decode("ascii"), escaped
+        return None, escaped
+
+    def _matches_known_key(self, start: int, end: int, known: bytes) -> bool:
+        """Compare against one fixed ASCII key without decoding an arbitrary key."""
+        raw_index = start
+        known_index = 0
+        while raw_index < end:
+            if known_index == len(known):
+                return False
+            current = self.raw[raw_index]
+            if current == ord("\\"):
+                raw_index += 1
+                if raw_index >= end or self.raw[raw_index] != ord("u"):
+                    return False
+                raw_index += 1
+                if raw_index + 4 > end:
+                    return False
+                codepoint = 0
+                for _ in range(4):
+                    digit = self.raw[raw_index]
+                    if ord("0") <= digit <= ord("9"):
+                        digit_value = digit - ord("0")
+                    elif ord("a") <= digit <= ord("f"):
+                        digit_value = digit - ord("a") + 10
+                    elif ord("A") <= digit <= ord("F"):
+                        digit_value = digit - ord("A") + 10
+                    else:
+                        return False
+                    codepoint = codepoint * 16 + digit_value
+                    raw_index += 1
+                if codepoint != known[known_index]:
+                    return False
+            elif current == known[known_index]:
+                raw_index += 1
+            else:
+                return False
+            known_index += 1
+        return known_index == len(known)
 
     def _decode_string(self) -> str:
         start = self.index
