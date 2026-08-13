@@ -100,14 +100,15 @@ Afterward, harmless no-target namespace diagnostics showed that loopback could n
 
 After the fail-closed result, a unit-only hardening change replaced the never-reached target argument with an empty argument and added its non-launching regression test. It did not invoke Bubblewrap, start the target, inspect a source, or retry the probe. The recorded execution result remains the same unresolved no-target result.
 
-## P1 containment correction before renewed review
+## P1 containment corrections before renewed review
 
-This correction is unit-only and did not execute Bubblewrap, the target, the loopback canary, a socket, a session source, or a credential. It repairs the two reviewer-identified boundaries without creating a second producer attempt:
+These corrections are unit-only and did not execute Bubblewrap, the target, the loopback canary, a socket, a session source, or a credential. They repair the reviewer-identified boundaries without creating a second producer attempt:
 
 - The target now starts only under a second Bubblewrap user and **nested PID namespace** with a fresh `/proc`. It is the nested namespace init, inherits only `stdin`, `stdout`, and `stderr` redirected to `/dev/null`, and `close_fds=True` closes every other descriptor. The outer reporter and the summary-writing parent are outside that PID namespace, so the target cannot reopen their descriptors through procfs or another inherited-descriptor path.
 - The host launcher no longer accumulates `subprocess.run(..., stdout=PIPE)` output. It reads at most one **16,385-byte** bounded safe-summary envelope (16,384 bytes of permitted summary plus one overflow sentinel) in fixed chunks. A timeout, nonzero exit, malformed JSON, oversized envelope, or schema-validation failure returns only the validated, content-free `unresolved` summary.
+- Nested target completion now requires a zero exit. A nonzero exit or timeout-after-kill returns `target_started=1`, `target_completed=0` and stops before home inspection or classification; malformed or incomplete structural analysis likewise cannot confirm either contract outcome.
 
-The new hostile-boundary regressions use mocked processes only. They prove the nested descriptor boundary and prove malformed, oversized, schema-invalid, nonzero, and timeout summaries all fail closed. The following digests identify the corrected review artifact, not a second producer attempt.
+The new hostile-boundary regressions use mocked processes only. They prove the nested descriptor boundary, nonzero/timeout completion gate, inspection bypass, and malformed/incomplete-analysis closure; malformed, oversized, schema-invalid, nonzero, and timeout summaries all fail closed. The following digests identify the corrected review artifact, not a second producer attempt.
 
 ## Artifact digests
 
@@ -118,7 +119,7 @@ All hashes below are for code-owned candidate artifacts, not source records.
 | `0003/fixture_0003.json` | `11bc385d4dbb5fb59aea2e53bd3134b42a6aea351ab39146388de3bf6d531b4e` | Fully synthetic structural matrix |
 | `0003/verify_0003_structural_oracle.py` | `2585565d1853e9489664eb5e22fa172f0fe0178447f2bebcd7a946d972860caa` | Independent fixture oracle and mutation checks |
 | `0003/claude_progressive_probe_0003.py` | `ac9137e21abc84b4ad2497471c5eb55250ee6014aea7eb6167823a324e17dfe3` | Bounded fail-closed host launcher and summary validator |
-| `0003/runtime/inner_probe_0003.py` | `56d707325ade6fc929df8fdf515fd5adb2b729325a8610492eb839b47092d37e` | Nested-PID in-namespace loopback/control/structural helper |
+| `0003/runtime/inner_probe_0003.py` | `0bb8d7066223a9637c3a3880cd4b167d8ab7ac83178144deab4214b9b6fe1e78` | Nested-PID in-namespace loopback/control/structural helper |
 | `0003/exercise_capture_controls_0003.py` | `468d099363596a22708a4f4657d866bd4c87c3e83832663ca588bc27a0c8bc41` | Executed containment-mutation controls |
 
 ## Accepted-byte integrity
@@ -139,7 +140,7 @@ bwrap --die-with-parent --new-session --unshare-user --unshare-pid --unshare-net
 |---|---|---|
 | `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s about/legends-and-lore/evidence/0003/tests -p 'test_claude_progressive_probe_0003.py' -v` | Host containment and closed safe-summary tests pass without target launch. | Pass; 24 host-safe tests, including malformed/oversized/schema-invalid/nonzero/timeout safe-summary regressions. All target-launch assertions in containment controls were zero. |
 | `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s about/legends-and-lore/evidence/0003/tests -p 'test_0003_structural_oracle.py' -v` | Candidate record, fixture oracle, and digest checks pass without target launch. | Pass; five structural-oracle tests. |
-| `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s about/legends-and-lore/evidence/0003/tests -p 'test_inner_probe_0003.py' -k incomplete_tail -k malformed_or_incomplete -k network_state -k persisted_same_pair -k target_ -k unknown_content -v` | Safe inner-helper tests pass without a loopback packet or target launch. | Pass; eight safe inner-helper tests, including nested-PID descriptor containment and raw-stdio discard. Excluded exactly `test_inner_probe_0003.InnerProbeTests.test_loopback_mock_positive_control_accepts_without_reading_request_values` because it opens a loopback client connection, which this correction must not create. |
+| `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s about/legends-and-lore/evidence/0003/tests -p 'test_inner_probe_0003.py' -k incomplete_tail -k malformed_or_incomplete -k network_state -k persisted_same_pair -k target_ -k unknown_content -k malformed_analysis -k incomplete_analysis -v` | Safe inner-helper tests pass without a loopback packet or target launch. | Pass; thirteen safe inner-helper tests, including nested-PID descriptor containment, nonzero/timeout completion closure, inspection bypass, and raw-stdio discard. Excluded exactly `test_inner_probe_0003.InnerProbeTests.test_loopback_mock_positive_control_accepts_without_reading_request_values` because it opens a loopback client connection, which this correction must not create. |
 | `PYTHONDONTWRITEBYTECODE=1 python3 about/legends-and-lore/evidence/0003/verify_0003_structural_oracle.py` | Eight predeclared synthetic cases and four mutations are validated without a target. | Pass; eight cases and four mutations rejected. |
 | `PYTHONDONTWRITEBYTECODE=1 python3 about/legends-and-lore/evidence/0003/exercise_capture_controls_0003.py` | Every containment mutation rejects before target launch. | Pass; seven mutations rejected and zero target launches. |
 | `python3 -m json.tool about/legends-and-lore/evidence/0003/fixture_0003.json >/dev/null` | Fixture JSON is valid and emits no values. | Pass. |

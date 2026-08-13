@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -201,6 +202,74 @@ class InnerProbeTests(unittest.TestCase):
 
         self.assertIs(popen.call_args.kwargs["stdout"], self.inner.subprocess.DEVNULL)
         self.assertIs(popen.call_args.kwargs["stderr"], self.inner.subprocess.DEVNULL)
+
+    def test_nested_target_nonzero_exit_is_not_completed(self) -> None:
+        process = mock.Mock()
+        process.wait.return_value = 2
+        with (
+            mock.patch.object(self.inner.shutil, "which", return_value="/synthetic/bwrap"),
+            mock.patch.object(self.inner.subprocess, "Popen", return_value=process),
+        ):
+            outcome = self.inner._run_target()
+
+        self.assertEqual(outcome, (1, 0))
+
+    def test_nested_target_timeout_after_kill_is_not_completed(self) -> None:
+        process = mock.Mock()
+        process.pid = 4242
+        process.wait.side_effect = [subprocess.TimeoutExpired("synthetic-target", 60), -9]
+        with (
+            mock.patch.object(self.inner.shutil, "which", return_value="/synthetic/bwrap"),
+            mock.patch.object(self.inner.subprocess, "Popen", return_value=process),
+            mock.patch.object(self.inner.os, "killpg") as killpg,
+        ):
+            outcome = self.inner._run_target()
+
+        self.assertEqual(outcome, (1, 0))
+        killpg.assert_called_once_with(process.pid, self.inner.signal.SIGKILL)
+        self.assertEqual(process.wait.call_args_list, [mock.call(timeout=60), mock.call(timeout=10)])
+
+    def test_incomplete_target_outcome_stops_before_home_inspection(self) -> None:
+        safe_mock = mock.Mock()
+        safe_mock.connection_count = 1
+        safe_mock.nonloopback_connection_count = 0
+        safe_mock.wait_for_connections.return_value = True
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            with (
+                mock.patch.object(self.inner, "SYNTHETIC_HOME", root / "home"),
+                mock.patch.object(self.inner, "SYNTHETIC_WORK", root / "work"),
+                mock.patch.object(self.inner, "SYNTHETIC_OUTPUT", root / "output"),
+                mock.patch.object(self.inner, "LoopbackOnlyMock", return_value=safe_mock),
+                mock.patch.object(self.inner, "_prepare_loopback_network", return_value=(("lo",), 0)),
+                mock.patch.object(self.inner, "run_loopback_canary"),
+                mock.patch.object(self.inner, "_run_target", return_value=(1, 0)),
+                mock.patch.object(
+                    self.inner,
+                    "inspect_virtual_home",
+                    side_effect=AssertionError("incomplete target must not be inspected"),
+                ) as inspect_virtual_home,
+            ):
+                safe_summary = self.inner.run_probe()
+
+        inspect_virtual_home.assert_not_called()
+        self.assertEqual(safe_summary["disposition"], "unresolved")
+        self.assertEqual(safe_summary["counts"]["target_started"], 1)
+        self.assertEqual(safe_summary["counts"]["target_completed"], 0)
+
+    def test_malformed_analysis_cannot_confirm_a_contract_gap(self) -> None:
+        analysis = self.inner.InspectionAnalysis(2, 1, 0, 1, 1, 1, 0, 1, 0, 0)
+
+        safe_summary = self.inner.make_safe_summary(analysis, canary_connections=1)
+
+        self.assertEqual(safe_summary["disposition"], "unresolved")
+
+    def test_incomplete_analysis_cannot_confirm_a_contract_gap(self) -> None:
+        analysis = self.inner.InspectionAnalysis(2, 0, 1, 1, 1, 1, 0, 1, 0, 0)
+
+        safe_summary = self.inner.make_safe_summary(analysis, canary_connections=1)
+
+        self.assertEqual(safe_summary["disposition"], "unresolved")
 
 
 if __name__ == "__main__":
