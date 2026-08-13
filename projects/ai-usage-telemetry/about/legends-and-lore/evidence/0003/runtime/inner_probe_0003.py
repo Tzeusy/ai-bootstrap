@@ -590,6 +590,9 @@ def make_safe_summary(
     nonloopback_connection_count: int = 0,
     negative_oracles_complete: bool = False,
 ) -> dict[str, object]:
+    analysis_complete = (
+        analysis.malformed_record_count == 0 and analysis.incomplete_tail_count == 0
+    )
     controls_complete = (
         target_started_count == 1
         and target_completed_count == 1
@@ -597,6 +600,7 @@ def make_safe_summary(
         and nonloopback_interface_count == 0
         and default_route_count == 0
         and nonloopback_connection_count == 0
+        and analysis_complete
     )
     if controls_complete and analysis.progressive_same_pair_group_count >= 1:
         disposition = "confirmed-contract-gap"
@@ -701,10 +705,13 @@ def _run_target() -> tuple[int, int]:
         close_fds=True,
     )
     try:
-        process.wait(timeout=60)
+        returncode = process.wait(timeout=60)
     except subprocess.TimeoutExpired:
         os.killpg(process.pid, signal.SIGKILL)
         process.wait(timeout=10)
+        return 1, 0
+    if returncode != 0:
+        return 1, 0
     return 1, 1
 
 
@@ -743,6 +750,16 @@ def run_probe() -> dict[str, object]:
                 nonloopback_connection_count=mock.nonloopback_connection_count,
             )
         target_started, target_completed = _run_target()
+        if (target_started, target_completed) != (1, 1):
+            return make_safe_summary(
+                InspectionAnalysis(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                canary_connections=mock.connection_count,
+                target_started_count=target_started,
+                target_completed_count=target_completed,
+                nonloopback_interface_count=len([name for name in interface_names if name != "lo"]),
+                default_route_count=default_routes,
+                nonloopback_connection_count=mock.nonloopback_connection_count,
+            )
         analysis = inspect_virtual_home(SYNTHETIC_HOME)
         return make_safe_summary(
             analysis,
