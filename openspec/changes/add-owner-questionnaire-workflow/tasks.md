@@ -15,4 +15,4 @@
 
 ## 3. Publication
 
-- [ ] 3.1 Reconcile final review findings, commit the exact validated artifact, push the feature branch, and update the Bead with publication evidence.
+- [x] 3.1 Reconcile final review findings, commit the exact validated artifact, push the feature branch, and update the Bead with publication evidence.
