@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 
 # This contract test protects the narrow hosted-evidence route for the
-# documentation-only telemetry project. It creates visible PR evidence only;
-# it does not configure or imply required branch policy.
+# documentation-only telemetry project.
+# This creates visible, exact-head, informational evidence for accidental
+# regressions in telemetry changes only. Because the workflow and its in-tree
+# contract can change together, they do not constitute an independently protected
+# or adversarial no-write/no-network enforcement control.
+# It does not configure or imply required branch policy.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -22,6 +26,22 @@ fail() {
     exit 1
 }
 
+assert_claim_scope() {
+    local file="$1"
+
+    grep -Fqx '# This creates visible, exact-head, informational evidence for accidental' "$file" \
+        || fail "limited workflow claim is missing: $file"
+    grep -Fqx '# regressions in telemetry changes only. Because the workflow and its in-tree' "$file" \
+        || fail "accidental-regression scope is missing: $file"
+    grep -Fqx '# contract can change together, they do not constitute an independently protected' "$file" \
+        || fail "co-mutable oracle limitation is missing: $file"
+    grep -Fqx '# or adversarial no-write/no-network enforcement control.' "$file" \
+        || fail "adversarial-enforcement limitation is missing: $file"
+}
+
+assert_claim_scope "$WORKFLOW"
+assert_claim_scope "${BASH_SOURCE[0]}"
+
 # The runner has Bash but does not provision a YAML parser as part of this
 # workflow. Its fixed security surface is therefore bound to this complete,
 # fail-closed schema: any YAML spelling, permission, action, or run-step drift
@@ -39,8 +59,11 @@ on:
       - "tests/ai-usage-telemetry-pr-checks-test.sh"
   workflow_dispatch:
 
-# This creates visible hosted evidence for telemetry changes only. It does not
-# configure or imply required branch policy.
+# This creates visible, exact-head, informational evidence for accidental
+# regressions in telemetry changes only. Because the workflow and its in-tree
+# contract can change together, they do not constitute an independently protected
+# or adversarial no-write/no-network enforcement control.
+# It does not configure or imply required branch policy.
 permissions:
   contents: read
 

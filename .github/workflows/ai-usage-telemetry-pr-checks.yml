@@ -9,8 +9,11 @@ on:
       - "tests/ai-usage-telemetry-pr-checks-test.sh"
   workflow_dispatch:
 
-# This creates visible hosted evidence for telemetry changes only. It does not
-# configure or imply required branch policy.
+# This creates visible, exact-head, informational evidence for accidental
+# regressions in telemetry changes only. Because the workflow and its in-tree
+# contract can change together, they do not constitute an independently protected
+# or adversarial no-write/no-network enforcement control.
+# It does not configure or imply required branch policy.
 permissions:
   contents: read
 
