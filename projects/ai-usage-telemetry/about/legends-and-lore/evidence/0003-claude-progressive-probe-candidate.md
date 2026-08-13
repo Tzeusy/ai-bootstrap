@@ -64,7 +64,7 @@ The host launcher is [`claude_progressive_probe_0003.py`](./0003/claude_progress
 | Candidate probe/mock code | read-only | This 0003 runtime directory only |
 | Synthetic home, work, output, and temporary locations | empty tmpfs | No host home/config/session/workspace/output bind |
 
-The helper starts its mock only on loopback and deliberately never calls `recv`: target request headers and bodies are not materialized by the mock. It proves a positive loopback canary before any target start, requires no non-loopback interface/default route, captures target stdout/stderr only under sandbox tmpfs, and lets only a schema-checked summary cross the boundary. That summary allows build pin, path classes, type/count/equality/direction assertions, control totals, and one disposition; it rejects raw-output-like keys or unregistered nested fields.
+The helper starts its mock only on loopback and deliberately never calls `recv`: target request headers and bodies are not materialized by the mock. It proves a positive loopback canary before any target start, requires no non-loopback interface/default route, discards target stdout/stderr to the nested target envelope's `/dev/null`, and lets only a schema-checked summary cross the boundary. That summary allows build pin, path classes, type/count/equality/direction assertions, control totals, and one disposition; it rejects raw-output-like keys or unregistered nested fields.
 
 [`exercise_capture_controls_0003.py`](./0003/exercise_capture_controls_0003.py) ran every deliberate mutation without launching a target. It rejected exactly:
 
@@ -98,7 +98,16 @@ The one target-capable invocation was run through the host launcher exactly once
 
 Afterward, harmless no-target namespace diagnostics showed that loopback could not be brought up in that exact unprivileged containment setup. They did not open the target, a session source, a credential store, a host home, or an external network path. This is a containment/environment limitation to resolve only through a fresh owner-authorized candidate run; it is not permission to alter the guard in this evidence lane.
 
-After the fail-closed result, a unit-only hardening change replaced the never-reached target argument with an empty argument and added its non-launching regression test. It did not invoke Bubblewrap, start the target, inspect a source, or retry the probe. The recorded execution result remains the same unresolved no-target result; the following digests identify the final review artifact, not a second producer attempt.
+After the fail-closed result, a unit-only hardening change replaced the never-reached target argument with an empty argument and added its non-launching regression test. It did not invoke Bubblewrap, start the target, inspect a source, or retry the probe. The recorded execution result remains the same unresolved no-target result.
+
+## P1 containment correction before renewed review
+
+This correction is unit-only and did not execute Bubblewrap, the target, the loopback canary, a socket, a session source, or a credential. It repairs the two reviewer-identified boundaries without creating a second producer attempt:
+
+- The target now starts only under a second Bubblewrap user and **nested PID namespace** with a fresh `/proc`. It is the nested namespace init, inherits only `stdin`, `stdout`, and `stderr` redirected to `/dev/null`, and `close_fds=True` closes every other descriptor. The outer reporter and the summary-writing parent are outside that PID namespace, so the target cannot reopen their descriptors through procfs or another inherited-descriptor path.
+- The host launcher no longer accumulates `subprocess.run(..., stdout=PIPE)` output. It reads at most one **16,385-byte** bounded safe-summary envelope (16,384 bytes of permitted summary plus one overflow sentinel) in fixed chunks. A timeout, nonzero exit, malformed JSON, oversized envelope, or schema-validation failure returns only the validated, content-free `unresolved` summary.
+
+The new hostile-boundary regressions use mocked processes only. They prove the nested descriptor boundary and prove malformed, oversized, schema-invalid, nonzero, and timeout summaries all fail closed. The following digests identify the corrected review artifact, not a second producer attempt.
 
 ## Artifact digests
 
@@ -108,8 +117,8 @@ All hashes below are for code-owned candidate artifacts, not source records.
 |---|---|---|
 | `0003/fixture_0003.json` | `11bc385d4dbb5fb59aea2e53bd3134b42a6aea351ab39146388de3bf6d531b4e` | Fully synthetic structural matrix |
 | `0003/verify_0003_structural_oracle.py` | `2585565d1853e9489664eb5e22fa172f0fe0178447f2bebcd7a946d972860caa` | Independent fixture oracle and mutation checks |
-| `0003/claude_progressive_probe_0003.py` | `afb1704fd1372affb2e03f7a68c1de95552a565ac76a3a92e4d78c2fe09e8fb8` | Fail-closed host launcher and summary validator |
-| `0003/runtime/inner_probe_0003.py` | `3ac1e51d1c0d4f30363f4f46efb21f32bc920e2da9edbcc5f8679e34fa449197` | In-namespace loopback/control/structural helper |
+| `0003/claude_progressive_probe_0003.py` | `ac9137e21abc84b4ad2497471c5eb55250ee6014aea7eb6167823a324e17dfe3` | Bounded fail-closed host launcher and summary validator |
+| `0003/runtime/inner_probe_0003.py` | `56d707325ade6fc929df8fdf515fd5adb2b729325a8610492eb839b47092d37e` | Nested-PID in-namespace loopback/control/structural helper |
 | `0003/exercise_capture_controls_0003.py` | `468d099363596a22708a4f4657d866bd4c87c3e83832663ca588bc27a0c8bc41` | Executed containment-mutation controls |
 
 ## Accepted-byte integrity
@@ -128,9 +137,9 @@ bwrap --die-with-parent --new-session --unshare-user --unshare-pid --unshare-net
 
 | Command | Expected safe result | Actual safe result |
 |---|---|---|
-| `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s about/legends-and-lore/evidence/0003/tests -p 'test_claude_progressive_probe_0003.py' -v` | Host containment and closed safe-summary tests pass without target launch. | Pass; 19 host-safe tests. All target-launch assertions in containment controls were zero. |
+| `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s about/legends-and-lore/evidence/0003/tests -p 'test_claude_progressive_probe_0003.py' -v` | Host containment and closed safe-summary tests pass without target launch. | Pass; 24 host-safe tests, including malformed/oversized/schema-invalid/nonzero/timeout safe-summary regressions. All target-launch assertions in containment controls were zero. |
 | `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s about/legends-and-lore/evidence/0003/tests -p 'test_0003_structural_oracle.py' -v` | Candidate record, fixture oracle, and digest checks pass without target launch. | Pass; five structural-oracle tests. |
-| `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s about/legends-and-lore/evidence/0003/tests -p 'test_inner_probe_0003.py' -k incomplete_tail -k malformed_or_incomplete -k network_state -k persisted_same_pair -k target_command -k unknown_content -v` | Safe inner-helper tests pass without a loopback packet or target launch. | Pass; six safe inner-helper tests. Excluded exactly `test_inner_probe_0003.InnerProbeTests.test_loopback_mock_positive_control_accepts_without_reading_request_values` because it opens a loopback client connection, which this correction must not create. |
+| `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s about/legends-and-lore/evidence/0003/tests -p 'test_inner_probe_0003.py' -k incomplete_tail -k malformed_or_incomplete -k network_state -k persisted_same_pair -k target_ -k unknown_content -v` | Safe inner-helper tests pass without a loopback packet or target launch. | Pass; eight safe inner-helper tests, including nested-PID descriptor containment and raw-stdio discard. Excluded exactly `test_inner_probe_0003.InnerProbeTests.test_loopback_mock_positive_control_accepts_without_reading_request_values` because it opens a loopback client connection, which this correction must not create. |
 | `PYTHONDONTWRITEBYTECODE=1 python3 about/legends-and-lore/evidence/0003/verify_0003_structural_oracle.py` | Eight predeclared synthetic cases and four mutations are validated without a target. | Pass; eight cases and four mutations rejected. |
 | `PYTHONDONTWRITEBYTECODE=1 python3 about/legends-and-lore/evidence/0003/exercise_capture_controls_0003.py` | Every containment mutation rejects before target launch. | Pass; seven mutations rejected and zero target launches. |
 | `python3 -m json.tool about/legends-and-lore/evidence/0003/fixture_0003.json >/dev/null` | Fixture JSON is valid and emits no values. | Pass. |

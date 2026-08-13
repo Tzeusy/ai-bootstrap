@@ -15,6 +15,7 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
+import shutil
 import signal
 import socket
 import subprocess
@@ -52,6 +53,20 @@ SAFE_TARGET_ENVIRONMENT = {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:18080",
     "PATH": "/bin:/usr/bin",
 }
+NESTED_READ_ONLY_PATHS = (
+    "/bin",
+    "/lib",
+    "/lib64",
+    "/usr/bin",
+    "/usr/lib",
+    "/usr/lib64",
+    "/opt",
+)
+NESTED_WRITABLE_SYNTHETIC_PATHS = (
+    "/sandbox-home",
+    "/sandbox-work",
+    "/sandbox-output",
+)
 _KNOWN_STRUCTURAL_KEYS = (
     b"type",
     b"sessionId",
@@ -633,24 +648,63 @@ def make_safe_summary(
     }
 
 
+def _nested_target_argv(nested_bwrap: str) -> list[str]:
+    args = [
+        nested_bwrap,
+        "--die-with-parent",
+        "--new-session",
+        "--unshare-user",
+        "--unshare-pid",
+        "--uid",
+        "1000",
+        "--gid",
+        "1000",
+        "--clearenv",
+        "--proc",
+        "/proc",
+        "--dev",
+        "/dev",
+    ]
+    for path in NESTED_READ_ONLY_PATHS:
+        args.extend(["--ro-bind", path, path])
+    for path in NESTED_WRITABLE_SYNTHETIC_PATHS:
+        args.extend(["--bind", path, path])
+    for name, value in SAFE_TARGET_ENVIRONMENT.items():
+        args.extend(["--setenv", name, value])
+    return [
+        *args,
+        "--chdir",
+        str(SYNTHETIC_WORK),
+        "--",
+        SYNTHETIC_TARGET,
+        "-p",
+        "",
+        "--output-format",
+        "json",
+        "--permission-mode",
+        "plan",
+    ]
+
+
 def _run_target() -> tuple[int, int]:
-    stdout_path = SYNTHETIC_OUTPUT / "target.stdout"
-    stderr_path = SYNTHETIC_OUTPUT / "target.stderr"
-    with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
-        process = subprocess.Popen(
-            [SYNTHETIC_TARGET, "-p", "", "--output-format", "json", "--permission-mode", "plan"],
-            stdin=subprocess.DEVNULL,
-            stdout=stdout_file,
-            stderr=stderr_file,
-            cwd=SYNTHETIC_WORK,
-            env=dict(SAFE_TARGET_ENVIRONMENT),
-            start_new_session=True,
-        )
-        try:
-            process.wait(timeout=60)
-        except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
-            process.wait(timeout=10)
+    nested_bwrap = shutil.which("bwrap")
+    if nested_bwrap is None:
+        raise SafeParseError("nested-bubblewrap-missing")
+    process = subprocess.Popen(
+        _nested_target_argv(nested_bwrap),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        cwd=SYNTHETIC_WORK,
+        env=dict(SAFE_TARGET_ENVIRONMENT),
+        start_new_session=True,
+        close_fds=True,
+    )
+    try:
+        process.wait(timeout=60)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait(timeout=10)
     return 1, 1
 
 

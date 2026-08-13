@@ -20,6 +20,8 @@ import shutil
 import stat
 import subprocess
 import sys
+import threading
+import time
 from typing import Any, Callable, Iterable, Mapping
 
 
@@ -110,6 +112,11 @@ SUMMARY_STRING_SECTION_VALUES = {
         "complete_usage_observation": "assistant-with-required-safe-types",
     },
 }
+MAX_SAFE_SUMMARY_BYTES = 16_384
+SAFE_SUMMARY_CAPTURE_BYTES = MAX_SAFE_SUMMARY_BYTES + 1
+SUMMARY_READ_CHUNK_BYTES = 4_096
+PROBE_TIMEOUT_SECONDS = 90
+PROCESS_STOP_TIMEOUT_SECONDS = 5
 
 
 class ContainmentRejected(RuntimeError):
@@ -631,7 +638,7 @@ def validate_safe_summary(value: Mapping[str, object]) -> None:
 
 
 def _parse_summary_bytes(raw: bytes) -> dict[str, object]:
-    require(len(raw) <= 16_384, "summary-size")
+    require(len(raw) <= MAX_SAFE_SUMMARY_BYTES, "summary-size")
     try:
         value = json.loads(raw)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -713,6 +720,70 @@ def _safe_unresolved_result() -> dict[str, object]:
     return result
 
 
+def _read_bounded_summary(
+    stream: Any,
+    payload: bytearray,
+    overflow: threading.Event,
+    read_failed: threading.Event,
+    done: threading.Event,
+) -> None:
+    try:
+        while len(payload) < SAFE_SUMMARY_CAPTURE_BYTES:
+            chunk = stream.read(min(SUMMARY_READ_CHUNK_BYTES, SAFE_SUMMARY_CAPTURE_BYTES - len(payload)))
+            if not chunk:
+                return
+            payload.extend(chunk)
+        overflow.set()
+    except Exception:
+        read_failed.set()
+    finally:
+        done.set()
+
+
+def _stop_process(process: subprocess.Popen[bytes]) -> None:
+    if process.poll() is None:
+        process.kill()
+    try:
+        process.wait(timeout=PROCESS_STOP_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        return
+
+
+def _run_bwrap_with_bounded_summary(argv: list[str]) -> bytes | None:
+    process = subprocess.Popen(
+        argv,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        env={},
+        close_fds=True,
+        bufsize=0,
+    )
+    require(process.stdout is not None, "summary-pipe")
+    payload = bytearray()
+    overflow = threading.Event()
+    read_failed = threading.Event()
+    done = threading.Event()
+    reader = threading.Thread(
+        target=_read_bounded_summary,
+        args=(process.stdout, payload, overflow, read_failed, done),
+        daemon=True,
+    )
+    reader.start()
+    deadline = time.monotonic() + PROBE_TIMEOUT_SECONDS
+    while process.poll() is None and not overflow.is_set() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    if process.poll() is None:
+        _stop_process(process)
+    else:
+        process.wait(timeout=PROCESS_STOP_TIMEOUT_SECONDS)
+    done.wait(timeout=PROCESS_STOP_TIMEOUT_SECONDS)
+    reader.join(timeout=0)
+    if not done.is_set() or overflow.is_set() or read_failed.is_set() or process.returncode != 0:
+        return None
+    return bytes(payload)
+
+
 def execute_isolated_probe() -> dict[str, object]:
     try:
         target = resolve_claude_executable()
@@ -723,20 +794,15 @@ def execute_isolated_probe() -> dict[str, object]:
         assert_plan_safe(plan)
         bwrap = shutil.which("bwrap")
         require(bwrap is not None, "bubblewrap-missing")
-        completed = subprocess.run(
-            _bwrap_argv(plan, bwrap),
-            check=False,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            env={},
-            timeout=90,
-        )
+        summary = _run_bwrap_with_bounded_summary(_bwrap_argv(plan, bwrap))
     except (ContainmentRejected, OSError, subprocess.TimeoutExpired):
         return _safe_unresolved_result()
-    if completed.returncode != 0:
+    if summary is None:
         return _safe_unresolved_result()
-    return _parse_summary_bytes(completed.stdout)
+    try:
+        return _parse_summary_bytes(summary)
+    except ContainmentRejected:
+        return _safe_unresolved_result()
 
 
 def main() -> int:
