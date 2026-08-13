@@ -40,6 +40,20 @@ def assistant_record(*, session: str, request: str, stamp: str, count: int, cont
     ).encode("utf-8")
 
 
+def assistant_record_with_unprojected_value(*, stamp: str, count: int, value: bytes) -> bytes:
+    return (
+        b'{"type":"assistant","sessionId":"s","requestId":"r","timestamp":"'
+        + stamp.encode("ascii")
+        + b'","message":{"id":"synthetic-message","model":"synthetic-model","content":'
+        + value
+        + b',"usage":{"input_tokens":'
+        + str(count).encode("ascii")
+        + b',"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":'
+        + str(count).encode("ascii")
+        + b"}}}\n"
+    )
+
+
 class InnerProbeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -110,6 +124,31 @@ class InnerProbeTests(unittest.TestCase):
         self.assertEqual(values[("message", "id")], "outer")
         self.assertEqual(values[("message", "usage", "input_tokens")], 1)
 
+    def test_invalid_skip_only_escape_utf8_and_number_cannot_confirm(self) -> None:
+        invalid_unprojected_values = {
+            "invalid-escape": b'"\\q"',
+            "invalid-utf8": b'"\xc0\x80"',
+            "leading-zero-number": b"01",
+        }
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            session_dir = root / ".claude" / "projects" / "opaque"
+            session_dir.mkdir(parents=True)
+            for name, invalid_value in invalid_unprojected_values.items():
+                with self.subTest(name=name):
+                    (session_dir / "session.jsonl").write_bytes(
+                        assistant_record_with_unprojected_value(stamp="one", count=1, value=invalid_value)
+                        + assistant_record_with_unprojected_value(stamp="two", count=2, value=invalid_value)
+                    )
+
+                    analysis = self.inner.inspect_virtual_home(root)
+                    safe_summary = self.inner.make_safe_summary(analysis, canary_connections=1)
+
+                    self.assertEqual(analysis.complete_usage_observation_count, 0)
+                    self.assertEqual(analysis.malformed_record_count, 2)
+                    self.assertEqual(analysis.progressive_same_pair_group_count, 0)
+                    self.assertEqual(safe_summary["disposition"], "unresolved")
+
     def test_loopback_mock_positive_control_accepts_without_reading_request_values(self) -> None:
         mock = self.inner.LoopbackOnlyMock()
         try:
@@ -171,14 +210,12 @@ class InnerProbeTests(unittest.TestCase):
             with (
                 mock.patch.object(self.inner, "SYNTHETIC_OUTPUT", output),
                 mock.patch.object(self.inner, "SYNTHETIC_WORK", work),
-                mock.patch.object(self.inner, "shutil", create=True) as shutil_module,
                 mock.patch.object(self.inner.subprocess, "Popen", return_value=process) as popen,
             ):
-                shutil_module.which.return_value = "/synthetic/bwrap"
                 self.inner._run_target()
 
         argv = popen.call_args.args[0]
-        self.assertEqual(argv[0], "/synthetic/bwrap")
+        self.assertEqual(argv[0], self.inner.TRUSTED_BWRAP_PATH)
         self.assertIn("--unshare-pid", argv)
         self.assertIn("--proc", argv)
         self.assertIn("--new-session", argv)
@@ -207,7 +244,6 @@ class InnerProbeTests(unittest.TestCase):
         process = mock.Mock()
         process.wait.return_value = 2
         with (
-            mock.patch.object(self.inner.shutil, "which", return_value="/synthetic/bwrap"),
             mock.patch.object(self.inner.subprocess, "Popen", return_value=process),
         ):
             outcome = self.inner._run_target()
@@ -219,7 +255,6 @@ class InnerProbeTests(unittest.TestCase):
         process.pid = 4242
         process.wait.side_effect = [subprocess.TimeoutExpired("synthetic-target", 60), -9]
         with (
-            mock.patch.object(self.inner.shutil, "which", return_value="/synthetic/bwrap"),
             mock.patch.object(self.inner.subprocess, "Popen", return_value=process),
             mock.patch.object(self.inner.os, "killpg") as killpg,
         ):
