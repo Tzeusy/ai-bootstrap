@@ -240,6 +240,24 @@ class ClaudeProgressiveProbeTests(unittest.TestCase):
                 self.assertEqual(summary.complete_usage_observation_count, 0)
                 self.assertEqual(summary.malformed_record_count, 1)
 
+    def test_source_counter_above_signed_64_cannot_be_a_complete_observation(self) -> None:
+        for count in ((1 << 63), (1 << 63) + 1):
+            with self.subTest(count=count):
+                summary = self.probe.inspect_jsonl_bytes(
+                    assistant_record_with_unprojected_value(stamp="one", count=count, value=b'""')
+                )
+
+                self.assertEqual(summary.complete_usage_observation_count, 0)
+                self.assertEqual(summary.malformed_record_count, 1)
+
+    def test_signed_64_source_counter_maximum_remains_a_complete_observation(self) -> None:
+        summary = self.probe.inspect_jsonl_bytes(
+            assistant_record_with_unprojected_value(stamp="one", count=(1 << 63) - 1, value=b'""')
+        )
+
+        self.assertEqual(summary.complete_usage_observation_count, 1)
+        self.assertEqual(summary.malformed_record_count, 0)
+
     def test_unknown_subtree_cannot_reenter_the_safe_projection_paths(self) -> None:
         raw_record = (
             b'{"type":"assistant","sessionId":"s","requestId":"r","timestamp":"t",'
