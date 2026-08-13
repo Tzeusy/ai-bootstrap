@@ -33,7 +33,7 @@ require_file() {
 
 check_pattern() {
   local file="$1" pattern="$2" label="$3"
-  if grep -Eq "$pattern" "$file"; then
+  if grep -Eq -- "$pattern" "$file"; then
     _pass "$label"
   else
     _fail "$label (pattern not found in ${file#"$ROOT/"})"
@@ -282,6 +282,12 @@ FEATURE_SKILL="$ROOT/subskills/project-feature-request/SKILL.md"
 DIRECTION_SKILL="$ROOT/subskills/project-direction/SKILL.md"
 LAUNCH_GATE="$ROOT/subskills/project-direction/references/launch-gate.md"
 RECONCILIATION="$ROOT/subskills/project-review/references/spec-reconciliation.md"
+QUESTIONNAIRE_DIR="$ROOT/subskills/user-questionnaire"
+QUESTIONNAIRE_SKILL="$QUESTIONNAIRE_DIR/SKILL.md"
+QUESTIONNAIRE_REVIEW="$QUESTIONNAIRE_DIR/references/adversarial-review.md"
+QUESTIONNAIRE_TEMPLATE="$QUESTIONNAIRE_DIR/assets/questionnaire-template.md"
+QUESTIONNAIRE_VALIDATOR="$QUESTIONNAIRE_DIR/scripts/validate_questionnaire.py"
+QUESTIONNAIRE_VALID_FIXTURE="$QUESTIONNAIRE_DIR/tests/fixtures/review-ready.md"
 
 check_pattern "$ROUTER" 'VISION.*continuous constraint' \
   "router: VISION is an always-on constraint"
@@ -332,8 +338,56 @@ if require_file "$LAUNCH_GATE" "project-direction/references/launch-gate.md exis
 fi
 check_pattern "$RECONCILIATION" 'work-allocation.md' \
   "spec reconciliation: gaps use the shared allocation contract"
+if require_file "$QUESTIONNAIRE_SKILL" \
+    "user-questionnaire/SKILL.md exists"; then
+  check_pattern "$QUESTIONNAIRE_SKILL" 'problem scope' \
+    "user questionnaire: problem scope receives an explicit verdict"
+  check_pattern "$QUESTIONNAIRE_SKILL" 'recommendation' \
+    "user questionnaire: recommendation receives an explicit verdict"
+  check_pattern "$QUESTIONNAIRE_SKILL" 'independent adversarial subagent' \
+    "user questionnaire: independent subagent review is mandatory"
+  check_pattern "$QUESTIONNAIRE_SKILL" 'th-projects' \
+    "user questionnaire: target project governance is loaded"
+  check_pattern "$QUESTIONNAIRE_SKILL" 'th-engineering' \
+    "user questionnaire: engineering bar is loaded"
+  check_pattern "$QUESTIONNAIRE_SKILL" '--require-review-ready' \
+    "user questionnaire: review-ready validation is required"
+fi
+if require_file "$QUESTIONNAIRE_REVIEW" \
+    "user-questionnaire/references/adversarial-review.md exists"; then
+  check_pattern "$QUESTIONNAIRE_REVIEW" 'Scope verdict: Pass.*Revise.*Reject' \
+    "user questionnaire: scope verdict vocabulary is closed"
+  check_pattern "$QUESTIONNAIRE_REVIEW" 'Recommendation verdict: Pass.*Revise.*Reject' \
+    "user questionnaire: recommendation verdict vocabulary is closed"
+fi
+require_file "$QUESTIONNAIRE_TEMPLATE" \
+  "user-questionnaire/assets/questionnaire-template.md exists"
+require_file "$QUESTIONNAIRE_VALIDATOR" \
+  "user-questionnaire/scripts/validate_questionnaire.py exists"
 
-# ── 5. spec-trace-check fixtures ─────────────────────────────────────────
+# ── 5. user-questionnaire validator tests ────────────────────────────────────
+section "user-questionnaire validator tests"
+
+if [[ -f "$QUESTIONNAIRE_VALIDATOR" ]]; then
+  rc=0
+  out=$(uv run --with pytest pytest -q "$QUESTIONNAIRE_DIR/tests" 2>&1) || rc=$?
+  if [[ $rc -eq 0 ]]; then
+    _pass "user-questionnaire: validator tests pass"
+  else
+    _fail "user-questionnaire: validator tests failed (exit $rc): $out"
+  fi
+
+  rc=0
+  out=$(uv run "$QUESTIONNAIRE_VALIDATOR" "$QUESTIONNAIRE_VALID_FIXTURE" \
+    --require-review-ready 2>&1) || rc=$?
+  if [[ $rc -eq 0 ]]; then
+    _pass "user-questionnaire: review-ready fixture passes the CLI gate"
+  else
+    _fail "user-questionnaire: review-ready fixture failed CLI gate (exit $rc): $out"
+  fi
+fi
+
+# ── 6. spec-trace-check fixtures ─────────────────────────────────────────
 section "spec-trace-check fixtures"
 
 TRACE_SCRIPT="$ROOT/scripts/spec-trace-check.py"
