@@ -25,37 +25,41 @@ in `PREDECESSOR_GATE`:
 - `128e0d800bcdba78c13efe6d02eddec50980b1656b520c4737103d02eec089fc`
 - `468d099363596a22708a4f4657d866bd4c87c3e83832663ca588bc27a0c8bc41`
 
-The bound state is immutable within the protocol: `attempt_consumed=True`,
-`disposition="unresolved"`, `starts=0`, and `completions=0`. A request is
-accepted only when its complete frozen predecessor value is equal to that
-fixed record and its gate ID is exactly
-`aib-g0k-successor-attempt-gate-0004`. That fixed gate ID is the one attempt
-identity. Each protocol instance starts as `proposed` and has exactly one
-terminal transition: a valid binding becomes `reviewed-candidate`; malformed,
-tampered, or mismatched input becomes `denied`. Either terminal state denies
-every retry. The protocol therefore cannot reset, replace, or bypass the
-consumed predecessor attempt.
+The bound state is immutable within the candidate package:
+`attempt_consumed=True`, `disposition="unresolved"`, `starts=0`, and
+`completions=0`. `CANDIDATE_ATTEMPT_STATE` additionally binds exactly that
+predecessor and `aib-g0k-successor-attempt-gate-0004`, records
+`candidate_attempt_consumed=True`, and fixes its disposition to
+`consumed-without-launch`. The public binding surface accepts only the complete
+frozen request and that complete frozen candidate state. It has no resettable
+protocol constructor or mutable module-global transition state. Fresh imports,
+restarts, and reloads reconstruct the same terminal candidate state and deny
+the same request; any schema-valid state reset or identity edit fails closed as
+`candidate-state-binding`. The protocol therefore cannot reset, replace, or
+bypass the consumed predecessor or successor candidate attempt.
 
 ## Candidate-only decision
 
-`bind_successor_attempt_gate()` is the default one-shot in-memory protocol;
-tests may construct a fresh `SuccessorAttemptGateProtocol` only to prove state
-transitions with fake data. It accepts only the fixed binding and produces a
-schema-valid, content-free decision:
+`bind_successor_attempt_gate()` is the only public candidate surface. It is a
+pure terminal check against the immutable candidate state and always produces
+a schema-valid, content-free denial; it has no approval, reset, launch, or
+state-creation path:
 
 | Result field | Fixed value |
 |---|---|
-| `status` | `candidate-review-required` |
+| `status` | `candidate-denied` |
 | `execution_authority` | `none` |
 | `required_next_gate` | `fresh-independent-high-risk-privacy-accounting-review` |
-| accepted `denial_code` | `none` |
+| exact bound request/state `denial_code` | `attempt-already-consumed` |
 
-Malformed request/predecessor shapes, any changed binding field, and every
-duplicate or retry return `status="candidate-denied"`, retain the canonical
-predecessor fields and `execution_authority="none"`, and carry only an
-allowlisted denial code (for example `request-schema`, `predecessor-schema`,
-`predecessor-binding`, or `attempt-already-consumed`). They never echo input
-content or raise an input-derived exception.
+Malformed request/predecessor or candidate-state shapes, any changed binding
+field, and every duplicate, fresh-instance, restart, or reload retry return
+`status="candidate-denied"`, retain the canonical predecessor fields and
+`execution_authority="none"`, and carry only an allowlisted denial code (for
+example `request-schema`, `predecessor-schema`, `predecessor-binding`,
+`candidate-state-schema`, `candidate-state-binding`, or
+`attempt-already-consumed`). They never echo input content or raise an
+input-derived exception.
 
 There is deliberately no command-line entrypoint, process control, filesystem
 inspection, source access, credential handling, socket use, or target-launch
@@ -66,22 +70,24 @@ new attempt or confer any authority to act on a target.
 
 The original focused test was written before the module existed and was
 observed to fail with `FileNotFoundError` for
-`0004/successor_attempt_gate_0004.py`. The current seven fake-data regressions
+`0004/successor_attempt_gate_0004.py`. The current ten fake-data regressions
 cover exact immutable binding, predecessor reset/head/identifier mismatch,
-one-shot duplicate denial, and `None` or malformed request/predecessor denial:
+fresh-load and restart retry denial, candidate-state reset/tamper denial, and
+`None` or malformed request/predecessor/state denial:
 
 ```text
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest \
   projects/ai-usage-telemetry/about/legends-and-lore/evidence/0004/tests/test_successor_attempt_gate_0004.py -v
 ```
 
-The tests prove exact predecessor binding, rejection of a consumed-flag reset,
-rejection of a different predecessor head or gate ID, one-shot retry denial,
-controlled malformed-input denials, and the absence of process/socket/target
-execution surfaces. They use only in-memory frozen values and this candidate
-package's source text. No predecessor artifact, target, source, credential,
-sink, namespace, loopback endpoint, or external control was invoked while
-producing this package.
+The tests prove exact predecessor and successor-state binding, rejection of a
+consumed-flag reset, rejection of a different predecessor head or gate ID,
+terminal denial through fresh imports and restart retries, controlled malformed
+or tampered-state denials, and the absence of process/socket/target execution
+surfaces. They use only in-memory frozen values and this candidate package's
+source text. No predecessor artifact, target, source, credential, sink,
+namespace, loopback endpoint, or external control was invoked while producing
+this package.
 
 ## Review hold
 

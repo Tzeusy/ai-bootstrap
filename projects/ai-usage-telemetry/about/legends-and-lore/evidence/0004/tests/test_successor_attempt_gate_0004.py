@@ -33,21 +33,15 @@ class SuccessorAttemptGateTests(unittest.TestCase):
             predecessor=self.gate.PREDECESSOR_GATE,
         )
 
-    def test_exact_consumed_predecessor_binds_to_candidate_review_only(self) -> None:
+    def test_exact_consumed_predecessor_is_already_terminal_without_launch(self) -> None:
         decision = self.gate.bind_successor_attempt_gate(self.valid_request())
 
         self.assertEqual(decision.predecessor_commit, "62829a9f65f4527a1a07e29b673666d8bb224935")
         self.assertTrue(decision.predecessor_attempt_consumed)
         self.assertEqual(decision.predecessor_disposition, "unresolved")
-        self.assertEqual(decision.status, "candidate-review-required")
-        self.assertEqual(decision.execution_authority, "none")
-        self.assertEqual(
-            decision.required_next_gate,
-            "fresh-independent-high-risk-privacy-accounting-review",
-        )
+        self.assert_denial(decision, "attempt-already-consumed")
 
     def assert_denial(self, decision, code: str) -> None:
-        self.assertIsInstance(decision, self.gate.CandidateReviewDecision)
         self.assertEqual(decision.status, "candidate-denied")
         self.assertEqual(decision.execution_authority, "none")
         self.assertEqual(decision.required_next_gate, self.gate.REQUIRED_NEXT_GATE)
@@ -74,39 +68,48 @@ class SuccessorAttemptGateTests(unittest.TestCase):
             "predecessor-binding",
         )
 
-        different_gate_protocol = self.gate.SuccessorAttemptGateProtocol()
         self.assert_denial(
-            different_gate_protocol.bind(
+            self.gate.bind_successor_attempt_gate(
                 replace(self.valid_request(), successor_gate_id="aib-alo-attempt-0003")
             ),
             "successor-gate-id",
         )
 
-    def test_duplicate_valid_request_is_denied_after_the_one_shot_binding(self) -> None:
+    def test_fresh_module_load_and_restart_retry_are_terminal(self) -> None:
         request = self.valid_request()
+        fresh_module = load_gate_module()
+        restart_module = load_gate_module()
+        fresh_request = fresh_module.SuccessorAttemptGateRequest(
+            successor_gate_id=fresh_module.SUCCESSOR_GATE_ID,
+            predecessor=fresh_module.PREDECESSOR_GATE,
+        )
+        restart_request = restart_module.SuccessorAttemptGateRequest(
+            successor_gate_id=restart_module.SUCCESSOR_GATE_ID,
+            predecessor=restart_module.PREDECESSOR_GATE,
+        )
 
-        accepted = self.gate.bind_successor_attempt_gate(request)
-        duplicate = self.gate.bind_successor_attempt_gate(request)
+        initial = self.gate.bind_successor_attempt_gate(request)
+        fresh_load = fresh_module.bind_successor_attempt_gate(fresh_request)
+        restart_retry = restart_module.bind_successor_attempt_gate(restart_request)
 
-        self.assertEqual(accepted.status, "candidate-review-required")
-        self.assertEqual(accepted.execution_authority, "none")
-        self.assert_denial(duplicate, "attempt-already-consumed")
+        self.assertIsInstance(initial, self.gate.CandidateReviewDecision)
+        self.assertIsInstance(fresh_load, fresh_module.CandidateReviewDecision)
+        self.assertIsInstance(restart_retry, restart_module.CandidateReviewDecision)
+        self.assert_denial(initial, "attempt-already-consumed")
+        self.assert_denial(fresh_load, "attempt-already-consumed")
+        self.assert_denial(restart_retry, "attempt-already-consumed")
 
     def test_none_and_malformed_requests_return_schema_valid_denials(self) -> None:
-        protocol = self.gate.SuccessorAttemptGateProtocol()
-
-        self.assert_denial(protocol.bind(None), "request-schema")
-        self.assert_denial(protocol.bind(self.valid_request()), "attempt-already-consumed")
-
-        malformed_request_protocol = self.gate.SuccessorAttemptGateProtocol()
-        self.assert_denial(malformed_request_protocol.bind(object()), "request-schema")
-
-        malformed_protocol = self.gate.SuccessorAttemptGateProtocol()
+        self.assert_denial(self.gate.bind_successor_attempt_gate(None), "request-schema")
+        self.assert_denial(self.gate.bind_successor_attempt_gate(object()), "request-schema")
         malformed_request = self.gate.SuccessorAttemptGateRequest(
             successor_gate_id=self.gate.SUCCESSOR_GATE_ID,
             predecessor=object(),
         )
-        self.assert_denial(malformed_protocol.bind(malformed_request), "predecessor-schema")
+        self.assert_denial(
+            self.gate.bind_successor_attempt_gate(malformed_request),
+            "predecessor-schema",
+        )
 
     def test_malformed_gate_identifier_is_a_denial_not_an_exception(self) -> None:
         request = self.gate.SuccessorAttemptGateRequest(
@@ -115,6 +118,45 @@ class SuccessorAttemptGateTests(unittest.TestCase):
         )
 
         self.assert_denial(self.gate.bind_successor_attempt_gate(request), "successor-gate-id")
+
+    def test_schema_valid_tampered_candidate_state_is_content_free_and_denied(self) -> None:
+        reset_state = replace(
+            self.gate.CANDIDATE_ATTEMPT_STATE,
+            candidate_attempt_consumed=False,
+        )
+        tampered_predecessor_state = replace(
+            self.gate.CANDIDATE_ATTEMPT_STATE,
+            predecessor=replace(self.gate.PREDECESSOR_GATE, exact_head="0" * 40),
+        )
+
+        self.assert_denial(
+            self.gate.bind_successor_attempt_gate(self.valid_request(), reset_state),
+            "candidate-state-binding",
+        )
+        self.assert_denial(
+            self.gate.bind_successor_attempt_gate(
+                self.valid_request(), tampered_predecessor_state
+            ),
+            "candidate-state-binding",
+        )
+
+    def test_candidate_state_schema_mismatch_is_a_denial_not_an_exception(self) -> None:
+        self.assert_denial(
+            self.gate.bind_successor_attempt_gate(self.valid_request(), object()),
+            "candidate-state-schema",
+        )
+
+    def test_module_exposes_no_resettable_protocol_surface(self) -> None:
+        self.assertFalse(hasattr(self.gate, "SuccessorAttemptGateProtocol"))
+        self.assertTrue(self.gate.CANDIDATE_ATTEMPT_STATE.candidate_attempt_consumed)
+        self.assertEqual(
+            self.gate.CANDIDATE_ATTEMPT_STATE.predecessor,
+            self.gate.PREDECESSOR_GATE,
+        )
+        self.assertEqual(
+            self.gate.CANDIDATE_ATTEMPT_STATE.successor_gate_id,
+            self.gate.SUCCESSOR_GATE_ID,
+        )
 
     def test_module_offers_no_target_or_execution_surface(self) -> None:
         source = GATE_PATH.read_text(encoding="utf-8")

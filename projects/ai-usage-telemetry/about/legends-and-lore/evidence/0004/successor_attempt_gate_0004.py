@@ -46,6 +46,24 @@ class SuccessorAttemptGateRequest:
 
 
 @dataclass(frozen=True)
+class CandidateAttemptState:
+    """Candidate-only terminal state bound to one predecessor/successor pair."""
+
+    predecessor: PredecessorGate
+    successor_gate_id: str
+    candidate_attempt_consumed: bool
+    disposition: str
+
+
+CANDIDATE_ATTEMPT_STATE = CandidateAttemptState(
+    predecessor=PREDECESSOR_GATE,
+    successor_gate_id=SUCCESSOR_GATE_ID,
+    candidate_attempt_consumed=True,
+    disposition="consumed-without-launch",
+)
+
+
+@dataclass(frozen=True)
 class CandidateReviewDecision:
     predecessor_commit: str
     predecessor_attempt_consumed: bool
@@ -88,29 +106,26 @@ def _rejection_code(request: object) -> str | None:
     return None
 
 
-class SuccessorAttemptGateProtocol:
-    """One-shot, in-memory candidate binding with a terminal denial state."""
-
-    def __init__(self) -> None:
-        self._state = "proposed"
-
-    def bind(self, request: object) -> CandidateReviewDecision:
-        if self._state != "proposed":
-            return _decision("candidate-denied", "attempt-already-consumed")
-
-        rejection_code = _rejection_code(request)
-        if rejection_code is not None:
-            self._state = "denied"
-            return _decision("candidate-denied", rejection_code)
-
-        self._state = "reviewed-candidate"
-        return _decision("candidate-review-required", "none")
+def _candidate_state_rejection_code(state: object) -> str | None:
+    if not isinstance(state, CandidateAttemptState):
+        return "candidate-state-schema"
+    if state != CANDIDATE_ATTEMPT_STATE:
+        return "candidate-state-binding"
+    return None
 
 
-_DEFAULT_PROTOCOL = SuccessorAttemptGateProtocol()
+def bind_successor_attempt_gate(
+    request: object,
+    state: object = CANDIDATE_ATTEMPT_STATE,
+) -> CandidateReviewDecision:
+    """Deny every retry against the fixed, already consumed candidate state."""
 
+    rejection_code = _rejection_code(request)
+    if rejection_code is not None:
+        return _decision("candidate-denied", rejection_code)
 
-def bind_successor_attempt_gate(request: object) -> CandidateReviewDecision:
-    """Bind exactly one candidate review request to the fixed predecessor."""
+    state_rejection_code = _candidate_state_rejection_code(state)
+    if state_rejection_code is not None:
+        return _decision("candidate-denied", state_rejection_code)
 
-    return _DEFAULT_PROTOCOL.bind(request)
+    return _decision("candidate-denied", "attempt-already-consumed")
