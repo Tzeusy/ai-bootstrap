@@ -11,6 +11,8 @@ from pathlib import Path
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 LOOP = SKILL_ROOT / "references" / "coordinator-loop.md"
 SAFETY = SKILL_ROOT / "references" / "runtime-and-safety.md"
+NORMALIZER = SKILL_ROOT / "scripts" / "normalize_pr_review_state.py"
+SKILL_AUDIT_WORKFLOW = SKILL_ROOT.parents[4] / ".github" / "workflows" / "skill-audit.yml"
 
 
 class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
@@ -97,6 +99,46 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
             cleanup,
         )
         self.assertNotIn("agent/<id>", cleanup)
+
+    def test_step_zero_uses_the_report_only_normalizer_then_reverifies_before_mutation(self) -> None:
+        contents = LOOP.read_text(encoding="utf-8")
+        self.assertTrue(NORMALIZER.exists(), NORMALIZER)
+        self.assertIn("scripts/normalize_pr_review_state.py", contents)
+        self.assertIn("beads-pr-review-normalization/v1", contents)
+        self.assertIn("immediately before an actual mutation", contents)
+        self.assertIn("sole PR-state mutator", contents)
+        self.assertIn("echo the requested original bead\nID", contents)
+        self.assertIn("self-referential", contents)
+        self.assertIn("reciprocal or longer", contents)
+        self.assertIn("cyclic-review-relation", contents)
+        self.assertIn("duplicate review-ID", contents)
+        self.assertIn("same original", contents)
+        self.assertIn("resolver `issue_id`", contents)
+        self.assertIn("required label,\nstatus, or uniqueness", contents)
+        self.assertIn("every active review-task context", contents)
+        self.assertIn("does not form a partial graph or canonical set", contents)
+
+    def test_review_deduplication_uses_parsed_chronology_and_fails_closed(self) -> None:
+        contents = LOOP.read_text(encoding="utf-8")
+        self.assertIn("parsed creation chronology", contents)
+        self.assertIn("partial manual triage", contents)
+        self.assertIn("never choose by raw timestamp text", contents)
+
+    def test_pr_ci_runs_only_the_report_only_fake_command_suites(self) -> None:
+        contents = SKILL_AUDIT_WORKFLOW.read_text(encoding="utf-8")
+        marker = "      - name: Run report-only Beads safety suites"
+        self.assertIn(marker, contents)
+        step = contents.split(marker, 1)[1].split(
+            "      - name:", 1
+        )[0]
+        for command in (
+            "uv run skills/personal/beads-orchestration/subskills/beads-coordinator/tests/test_normalize_pr_review_state.py",
+            "uv run skills/personal/beads-orchestration/subskills/beads-cleanup/tests/test_cleanup_scan.py",
+            "uv run skills/personal/beads-orchestration/subskills/beads-pr-reviewer-worker/tests/test_scripts.py",
+        ):
+            self.assertIn(command, step)
+        self.assertNotIn("bd ", step)
+        self.assertNotIn("gh ", step)
 
 
 if __name__ == "__main__":

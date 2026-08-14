@@ -54,6 +54,69 @@ re-querying `gh pr view` for those same PRs. Re-verify with `gh` only in the
 moment right before an actual mutation, so a stale finding never drives an
 irreversible close/reopen.
 
+First collect the compact, read-only scan from
+[`scripts/normalize_pr_review_state.py`](../scripts/normalize_pr_review_state.py):
+
+```bash
+# from the beads-coordinator package directory
+uv run scripts/normalize_pr_review_state.py --repo-root "${REPO_ROOT}"
+```
+
+It emits one `beads-pr-review-normalization/v1` envelope with deterministic
+lists of blocked original/review-task contexts, duplicate selections, cooldown
+candidates, and open-branch self-heal candidates. It invokes the canonical
+review-context resolver, preserving opaque dotted child IDs. Its
+recommendations are **not authorization**: Step 0 remains the sole PR-state
+mutator, and it must freshly verify the exact `gh`/Beads state, assignee, and
+heartbeat immediately before an actual mutation. A `partial` or `fatal` scan is a
+report-only triage result, never a reason to guess or mutate.
+A list-shaped but malformed `pr-review-task` inventory is incomplete evidence:
+the normalizer reports partial manual triage and keeps every self-heal candidate
+at `manual-triage` until it can collect a clean task inventory.
+The normalizer accepts resolver output only when its resolver `issue_id` matches
+the discovered review-task ID. An inventory record missing a required label,
+status, or uniqueness guarantee is malformed before recommendation selection:
+the report is partial and every finding and self-heal candidate remains
+`manual-triage`.
+Each `bd show` response for an original must echo the requested original bead
+ID; a mismatched record is partial manual triage. A review task whose resolved
+original ID is its own review ID is self-referential and must fail closed before
+canonical selection, dispatch, or wiring.
+Before relation validation, every active review-task context must resolve a
+valid original identity. If any active context is missing or invalid, Step 0
+does not form a partial graph or canonical set; it reports partial manual
+triage and suppresses dispatch, wiring, and self-heal actions throughout the
+collection.
+The same collection-wide hold applies when any active scope lacks a valid
+creation timestamp: canonical selection and every recommendation require a
+complete inventory, task lookup, resolved context, relation graph, and parsed
+chronology for the whole active collection.
+Before that selection, every blocked original must resolve to the requested
+bead and provide a valid `gh-pr:<N>` reference. A lookup or reference failure
+in any original scope makes the whole collection partial/manual, so no sibling
+canonical ID, dispatch, wiring, or self-heal recommendation survives.
+PR metadata is collection evidence too: every resolved PR number must yield a
+valid `gh pr view` record before canonical dispatch or any wiring/self-heal
+recommendation survives. A metadata failure makes the collection partial and
+all wiring candidates manual. The only retained exception is a lone otherwise
+complete `command-failed` PR lookup, reported solely as existing no-action
+`skip-command-failure` findings.
+Actionability is finalized only after open-PR discovery has also completed:
+`gh pr list` and every candidate source lookup are collection evidence, not a
+post-selection best effort. Any discovery failure makes the whole result
+partial/manual, including recommendations derived from precomputed canonical
+selection such as dedupe, dispatch, and wiring. The singleton no-action skip
+survives only when no other metadata phase failed.
+
+The same total pure relation-graph validation applies across the complete
+resolved review-task collection before canonical selection or any
+recommendation. Malformed relation entries, self-links, duplicate review-ID
+left sides, and reuse of a review ID as an original role all emit partial
+manual triage. A reciprocal or longer task-to-original cycle is
+`cyclic-review-relation` and likewise permits no dispatch or wiring
+recommendation. Distinct review tasks may still point to the same original for
+valid canonical-plus-duplicate dedupe.
+
 Before discovering new work, and whenever a worker frees a slot, check
 (projected — never dump the unfiltered JSON into context; see
 `../../../references/token-efficiency.md`):
@@ -76,7 +139,9 @@ Before creating or dispatching any review bead, dedupe by:
 - `external_ref` PR number on the original bead
 
 If multiple review beads refer to the same original bead or PR:
-- keep the oldest non-closed review bead as canonical
+- keep the oldest non-closed review bead by parsed creation chronology as canonical
+- if any candidate creation timestamp is invalid, emit partial manual triage;
+  never choose by raw timestamp text
 - remove stale `review-running` labels from duplicates
 - append notes to duplicates explaining they were superseded
 - close duplicates if safe, or leave them blocked for explicit cleanup if

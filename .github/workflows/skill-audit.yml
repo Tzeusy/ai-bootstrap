@@ -21,6 +21,11 @@ jobs:
         run: uv run --script skills/personal/th-tooling/subskills/audit-skill-hygiene/tests/test_skill_usage_audit.py
       - name: Self-test the audit script
         run: uv run skills/personal/th-engineering/subskills/skill-standards/tests/run_tests.py
+      - name: Run report-only Beads safety suites
+        run: |
+          uv run skills/personal/beads-orchestration/subskills/beads-coordinator/tests/test_normalize_pr_review_state.py
+          uv run skills/personal/beads-orchestration/subskills/beads-cleanup/tests/test_cleanup_scan.py
+          uv run skills/personal/beads-orchestration/subskills/beads-pr-reviewer-worker/tests/test_scripts.py
       - name: Audit personal skill packages
         # --strict: skills/personal is warning-free as of dotfiles-hyd; keep it that way.
         run: >
