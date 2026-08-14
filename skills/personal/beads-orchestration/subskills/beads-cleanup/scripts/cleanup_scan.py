@@ -17,6 +17,15 @@ from pathlib import Path
 from typing import Any
 
 
+CANONICAL_COORDINATOR_SCRIPTS = (
+    Path(__file__).resolve().parents[2] / "beads-coordinator" / "scripts"
+)
+if str(CANONICAL_COORDINATOR_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(CANONICAL_COORDINATOR_SCRIPTS))
+
+from review_relation_graph import review_relation_error  # noqa: E402
+
+
 SCHEMA = "beads-cleanup-scan/v1"
 NORMALIZER_SCHEMA = "beads-pr-review-normalization/v1"
 STALL_THRESHOLD = timedelta(minutes=30)
@@ -406,6 +415,10 @@ def collection_roles_are_unambiguous(
         canonical_scope = canonical_scopes.get(review_id)
         if canonical_scope is not None and canonical_scope != review_scope:
             return False
+    if review_relation_error(
+        (review_id, review_scope[0]) for review_id, review_scope in review_scopes.items()
+    ) is not None:
+        return False
     if any(canonical_finding_scopes.get(review_id) != scope for review_id, scope in canonical_scopes.items()):
         return False
     review_roles = set(review_scopes) | set(canonical_scopes)

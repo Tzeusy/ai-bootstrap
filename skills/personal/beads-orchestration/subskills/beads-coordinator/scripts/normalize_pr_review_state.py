@@ -16,6 +16,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from review_relation_graph import review_relation_error
+
 
 SCHEMA = "beads-pr-review-normalization/v1"
 COOLDOWN = timedelta(minutes=5)
@@ -556,26 +558,37 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             report_error(errors, error, "review-context")
             task_lookup_complete = False
 
+    relation_error = review_relation_error(
+        (review_id, context["original_id"])
+        for review_id, context in task_contexts.items()
+        if context is not None
+    )
+    relation_graph_complete = relation_error is None
+    if relation_error:
+        report_error(errors, relation_error, "review-context")
+        task_lookup_complete = False
+
     canonical_by_key: dict[tuple[str, int], str] = {}
     invalid_task_keys: set[tuple[str, int]] = set()
     tasks_by_key: dict[tuple[str, int], list[str]] = {}
-    for review_id, context in task_contexts.items():
-        if context is None:
-            continue
-        key = (context["original_id"], context["pr_number"])
-        tasks_by_key.setdefault(key, []).append(review_id)
-    for key, review_ids in tasks_by_key.items():
-        chronology: list[tuple[datetime, str]] = []
-        for review_id in review_ids:
-            created_at = parse_time(tasks[review_id].get("created_at"))
-            if created_at is None:
-                invalid_task_keys.add(key)
-                report_error(errors, "invalid-created-at", "review-context")
-                task_lookup_complete = False
-                break
-            chronology.append((created_at, review_id))
-        if key not in invalid_task_keys:
-            canonical_by_key[key] = min(chronology, key=lambda item: (item[0], item[1]))[1]
+    if relation_graph_complete:
+        for review_id, context in task_contexts.items():
+            if context is None:
+                continue
+            key = (context["original_id"], context["pr_number"])
+            tasks_by_key.setdefault(key, []).append(review_id)
+        for key, review_ids in tasks_by_key.items():
+            chronology: list[tuple[datetime, str]] = []
+            for review_id in review_ids:
+                created_at = parse_time(tasks[review_id].get("created_at"))
+                if created_at is None:
+                    invalid_task_keys.add(key)
+                    report_error(errors, "invalid-created-at", "review-context")
+                    task_lookup_complete = False
+                    break
+                chronology.append((created_at, review_id))
+            if key not in invalid_task_keys:
+                canonical_by_key[key] = min(chronology, key=lambda item: (item[0], item[1]))[1]
 
     pr_cache: dict[int, tuple[dict[str, Any] | None, str | None]] = {}
     findings: list[dict[str, Any]] = []
@@ -739,7 +752,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         task_lookup_complete=task_lookup_complete,
         errors=errors,
     )
-    if not inventory_complete:
+    if not inventory_complete or not relation_graph_complete:
         for finding in findings:
             finding["recommendation"] = "manual-triage"
         for candidate in self_heal:

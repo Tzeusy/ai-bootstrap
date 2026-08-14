@@ -40,6 +40,10 @@ also enforces collection-wide role binding: a review or canonical-review ID may
 map to only one original/PR scope, and each such scope may have only one
 canonical review ID. Distinct canonical-plus-duplicate review tasks remain
 valid when their IDs and roles are unambiguous.
+Cleanup uses the Step 0 canonical pure relation-graph validator as well: a
+reciprocal or longer review-task-to-original cycle is invalid normalizer
+evidence and becomes partial manual triage before it can preserve dispatch or
+wiring recommendations.
 
 ## Pass 2: Blocked Original Beads With `pr-review`
 
