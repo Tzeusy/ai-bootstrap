@@ -426,6 +426,39 @@ def collection_roles_are_unambiguous(
     return not (set(original_scopes) & review_roles)
 
 
+def is_lone_pr_state_command_failure_skip(
+    *,
+    status: str,
+    errors: list[dict[str, str]],
+    findings: list[dict[str, Any]],
+    candidates: list[dict[str, Any]],
+) -> bool:
+    """Allow only the established no-action singleton PR-state failure through."""
+    if status != "partial" or not findings:
+        return False
+    if len(errors) != 1 or {(item["scope"], item["code"]) for item in errors} != {
+        ("pr-state", "command-failed")
+    }:
+        return False
+    scopes = {(item["original_id"], item["pr_number"]) for item in findings}
+    if len(scopes) != 1 or sum(item["kind"] == "original" for item in findings) != 1:
+        return False
+    original_id, pr_number = next(iter(scopes))
+    if original_id is None or not valid_pr_number(pr_number):
+        return False
+    return all(
+        item["recommendation"] == "skip-command-failure"
+        and item["context_status"] == "command-failed"
+        and item["pr_state"] is None
+        for item in findings
+    ) and all(
+        item["recommendation"] == "manual-triage"
+        and item["original_id"] == original_id
+        and item["pr_number"] == pr_number
+        for item in candidates
+    )
+
+
 def sanitize_normalizer(payload: object) -> dict[str, Any]:
     """Keep only the canonical normalizer's safe, compact public fields."""
     if not isinstance(payload, dict) or payload.get("schema") != NORMALIZER_SCHEMA:
@@ -640,9 +673,17 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
     elif status == "fatal" and (findings or self_heal):
         report_error(errors, "inconsistent-normalizer-status", "pr-review")
 
+    preserve_lone_skip = is_lone_pr_state_command_failure_skip(
+        status=status,
+        errors=errors,
+        findings=findings,
+        candidates=self_heal,
+    )
     if errors:
         status = "partial"
         for item in findings:
+            if preserve_lone_skip and item["recommendation"] == "skip-command-failure":
+                continue
             item["recommendation"] = "manual-triage"
         for item in self_heal:
             item["recommendation"] = "manual-triage"

@@ -101,6 +101,12 @@ recommendation survives. A metadata failure makes the collection partial and
 all wiring candidates manual. The only retained exception is a lone otherwise
 complete `command-failed` PR lookup, reported solely as existing no-action
 `skip-command-failure` findings.
+Actionability is finalized only after open-PR discovery has also completed:
+`gh pr list` and every candidate source lookup are collection evidence, not a
+post-selection best effort. Any discovery failure makes the whole result
+partial/manual, including recommendations derived from precomputed canonical
+selection such as dedupe, dispatch, and wiring. The singleton no-action skip
+survives only when no other metadata phase failed.
 
 The same total pure relation-graph validation applies across the complete
 resolved review-task collection before canonical selection or any

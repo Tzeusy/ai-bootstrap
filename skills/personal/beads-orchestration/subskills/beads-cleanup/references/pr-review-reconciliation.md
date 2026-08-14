@@ -20,6 +20,11 @@ A zero-exit delegated envelope must provide list-shaped `errors`, `findings`,
 and `self_heal_candidates` collections whose status matches its evidence.
 Otherwise cleanup downgrades the nested and outer reports to partial manual
 triage and preserves no actionable recommendation.
+The sole retained no-action exception is one fully validated partial envelope
+with exactly one `pr-state` / `command-failed` error, one original/PR scope,
+and only matching `skip-command-failure` findings (plus at most manual
+candidates for that scope). An open-PR discovery error, a second error, or any
+other mixed evidence downgrades every nested recommendation to `manual-triage`.
 Each retained finding or candidate must also pass its type-appropriate opaque
 identity, positive PR number, PR-state, and recommendation semantics. Missing,
 malformed, or incompatible evidence adds the sanitized
