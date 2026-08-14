@@ -366,6 +366,50 @@ sys.exit(1)
         self.assertEqual(payload["pr_number"], 99)
         self.assertEqual(payload["owner"], "owner")
         self.assertEqual(payload["repo"], "repo")
+        self.assertEqual(payload["head_branch"], "agent/aib-abc")
+
+    def test_preserves_dotted_child_id_and_expected_branch(self) -> None:
+        description = (
+            "Original implementation bead: aib-swr.1\n"
+            "https://github.com/owner/repo/pull/99"
+        )
+        with FakeBinDir() as fbd:
+            self._make_bins(
+                fbd,
+                description=description,
+                original_id="aib-swr.1",
+            )
+            result = run_script(
+                "resolve_review_context.py",
+                ["--issue-id", "aib-xyz"],
+                env=fbd.env(),
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["original_id"], "aib-swr.1")
+        self.assertEqual(payload["head_branch"], "agent/aib-swr.1")
+
+    def test_rejects_malformed_dotted_child_without_parent_fallback(self) -> None:
+        description = (
+            "Original implementation bead: aib-swr.invalid\n"
+            "https://github.com/owner/repo/pull/99"
+        )
+        with FakeBinDir() as fbd:
+            # The parent exists to prove the resolver must not silently fall
+            # back from the malformed child token to the parent prefix.
+            self._make_bins(
+                fbd,
+                description=description,
+                original_id="aib-swr",
+            )
+            result = run_script(
+                "resolve_review_context.py",
+                ["--issue-id", "aib-xyz"],
+                env=fbd.env(),
+            )
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stderr)
+        self.assertEqual(payload["error_code"], "malformed-original-id")
 
     def test_success_resolves_context_from_review_target_marker(self) -> None:
         description = "REVIEW TARGET BEAD: aib-abc\nhttps://github.com/owner/repo/pull/99"
