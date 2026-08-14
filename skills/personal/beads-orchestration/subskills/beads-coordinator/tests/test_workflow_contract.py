@@ -114,6 +114,8 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         self.assertIn("same original", contents)
         self.assertIn("resolver `issue_id`", contents)
         self.assertIn("required label,\nstatus, or uniqueness", contents)
+        self.assertIn("every active review-task context", contents)
+        self.assertIn("does not form a partial graph or canonical set", contents)
 
     def test_review_deduplication_uses_parsed_chronology_and_fails_closed(self) -> None:
         contents = LOOP.read_text(encoding="utf-8")

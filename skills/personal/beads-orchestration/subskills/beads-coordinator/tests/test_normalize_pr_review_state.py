@@ -1011,6 +1011,97 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                 self.assertEqual(finding["original_id"], None)
                 self.assertEqual(finding["recommendation"], "manual-triage")
 
+    def test_active_review_context_collection_must_be_complete_before_actions(self) -> None:
+        original_id = "aib-swr.1"
+        first_review_id = "aib-review.1"
+        second_review_id = "aib-review.2"
+        cases = {
+            "missing-original": (
+                {"ok": False, "error_code": "missing-original-id"},
+                "missing-original-id",
+                False,
+                {},
+            ),
+            "invalid-original": (
+                {"ok": True, "original_id": "invalid", "pr_number": 41},
+                "invalid-original-id",
+                False,
+                {},
+            ),
+            "missing-original-with-pr-read-failure": (
+                {"ok": False, "error_code": "missing-original-id"},
+                "missing-original-id",
+                False,
+                {"gh-pr-view:41": "read failed"},
+            ),
+            "full-valid-control": (
+                {"ok": True, "original_id": original_id, "pr_number": 41},
+                None,
+                True,
+                {},
+            ),
+        }
+        for name, (second_context, error_code, expected_actionable, failures) in cases.items():
+            with self.subTest(name=name):
+                fixture = {
+                    "blocked_pr_review": [
+                        original_bead(original_id, 41),
+                        review_task(first_review_id, original_id),
+                        review_task(second_review_id, original_id),
+                    ],
+                    "resolver_payloads": {
+                        first_review_id: {"ok": True, "original_id": original_id, "pr_number": 41},
+                        second_review_id: second_context,
+                    },
+                    "shows": {original_id: [original_bead(original_id, 41)]},
+                    "prs": {"41": pr_payload("OPEN")},
+                    "open_prs": [
+                        {
+                            "number": 41,
+                            "headRefName": f"agent/{original_id}",
+                            "createdAt": "2026-08-14T03:00:00Z",
+                        }
+                    ],
+                    "failures": failures,
+                }
+
+                result, _, _ = self.run_fixture(fixture)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                if expected_actionable:
+                    self.assertEqual(payload["status"], "success")
+                    self.assertTrue(
+                        any(
+                            finding["recommendation"] == "dispatch-canonical-review"
+                            for finding in payload["findings"]
+                        )
+                    )
+                    self.assertTrue(
+                        any(
+                            candidate["recommendation"] == "review-wiring-current"
+                            for candidate in payload["self_heal_candidates"]
+                        )
+                    )
+                    continue
+
+                self.assertEqual(payload["status"], "partial")
+                self.assertIn({"code": error_code, "scope": "review-context"}, payload["errors"])
+                self.assertTrue(payload["findings"])
+                self.assertTrue(
+                    all(finding["recommendation"] == "manual-triage" for finding in payload["findings"])
+                )
+                self.assertTrue(
+                    all(finding["canonical_review_id"] is None for finding in payload["findings"])
+                )
+                self.assertTrue(payload["self_heal_candidates"])
+                self.assertTrue(
+                    all(
+                        candidate["recommendation"] == "manual-triage"
+                        for candidate in payload["self_heal_candidates"]
+                    )
+                )
+
     def test_pr_state_recommendations_cover_merged_closed_open_and_command_failure(self) -> None:
         cases = {
             "MERGED": ("MERGED", "close-review-and-original", None),
