@@ -11,6 +11,7 @@ from pathlib import Path
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 LOOP = SKILL_ROOT / "references" / "coordinator-loop.md"
 SAFETY = SKILL_ROOT / "references" / "runtime-and-safety.md"
+NORMALIZER = SKILL_ROOT / "scripts" / "normalize_pr_review_state.py"
 
 
 class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
@@ -97,6 +98,14 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
             cleanup,
         )
         self.assertNotIn("agent/<id>", cleanup)
+
+    def test_step_zero_uses_the_report_only_normalizer_then_reverifies_before_mutation(self) -> None:
+        contents = LOOP.read_text(encoding="utf-8")
+        self.assertTrue(NORMALIZER.exists(), NORMALIZER)
+        self.assertIn("scripts/normalize_pr_review_state.py", contents)
+        self.assertIn("beads-pr-review-normalization/v1", contents)
+        self.assertIn("immediately before an actual mutation", contents)
+        self.assertIn("sole PR-state mutator", contents)
 
 
 if __name__ == "__main__":

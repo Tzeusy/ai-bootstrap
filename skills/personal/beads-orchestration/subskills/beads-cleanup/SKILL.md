@@ -8,7 +8,7 @@ metadata:
     - OpenAI Codex
   status: active
   last_reviewed: "2026-04-12"
-compatibility: Requires a Beads-backed git repository with `bd`, `git`, `gh`, `jq`, and git worktree support. Authenticated GitHub access is required for PR reconciliation and branch cleanup.
+compatibility: Requires a Beads-backed git repository with `bd`, `git`, `gh`, `jq`, and git worktree support. Authenticated GitHub access is required for report-only PR reconciliation.
 ---
 
 # Beads Cleanup
@@ -17,9 +17,9 @@ Run this skill before a `beads-coordinator` loop when stale worker state may
 have been left behind by crashes, compaction, out-of-token exits, or missed
 handoffs.
 
-This skill is a read-heavy reconciliation pass. It repairs Beads metadata and
-git artifacts; it does not implement code, dispatch workers, or invent new
-workflow rules.
+This skill is a read-only reconciliation pass. It reports Beads and Git
+evidence for the coordinator; it does not implement code, dispatch workers,
+or mutate lifecycle state.
 
 ## Use This Skill When
 
@@ -27,7 +27,7 @@ workflow rules.
 - recovering after a crashed coordinator or killed worker
 - auditing stuck `in_progress`, `blocked`, `pr-review`, or `review-running`
   state
-- cleaning orphaned coordinator worktrees or branches tied to Beads issues
+- reporting orphaned coordinator worktrees or branches tied to Beads issues
 
 ## Do Not Use This Skill When
 
@@ -54,25 +54,22 @@ become a competing doctrine.
 ## Non-Negotiable Boundaries
 
 - Never implement code.
+- **The coordinator is the sole mutation authority.** Cleanup never claims,
+  releases, creates, closes, relabels, unblocks, removes a worktree, deletes a
+  branch, or repairs Dolt. It reports evidence and recommendations only.
 - Never mutate a bead held by a live actor. Decide ownership by the bead's
   `assignee` plus a fresh stall heartbeat, per
   `../beads-coordinator/references/runtime-and-safety.md`.
-- **Never mutate PR-review bead state from PR outcome.** Cleanup does not run
-  `bd close` / reopen / PR-driven label changes in response to a PR being
-  `MERGED` or `CLOSED`. It inspects PR state and **reports** the finding plus a
-  recommended action; the coordinator's Step 0 is the sole PR-state mutator.
-- Cleanup retains ownership of worktree / branch / Dolt hygiene and stale
-  `review-running` lock release (a liveness repair, not PR-state
-  reconciliation — see Pass 5b/Pass 6 in `local-state-reconciliation.md`).
+- **Never mutate PR-review bead state from PR outcome.** Cleanup inspects PR
+  state and reports the finding plus a recommended action; the coordinator's
+  Step 0 is the sole PR-state mutator.
 - Never create new beads from cleanup. Missing wiring should be reported for the
   coordinator loop to self-heal.
 - Never touch `.beads/dolt/` manually.
-- Append notes for every bead mutation so later operators can see what cleanup
-  changed and why.
 - Inspect token-efficiently (`../../references/token-efficiency.md`): project
   every `bd`/`gh` listing through `jq` to the fields the pass needs, batch
   related checks into one composite command, and keep the final report to
-  findings and mutations — not raw command output.
+  findings and recommendations — not raw command output.
 
 ## Load Only The Reference You Need
 
@@ -84,19 +81,28 @@ become a competing doctrine.
   `pr-review-task` review beads.
 - [`references/reporting.md`](references/reporting.md)
   Load for the cleanup report shape, rig-routing notes, command quick reference,
-  and final mutation summary.
+  and coordinator handoff summary.
+- [`scripts/cleanup_scan.py`](scripts/cleanup_scan.py)
+  Run first for one compact `beads-cleanup-scan/v1` read model covering claims,
+  dependencies, Dolt, worktrees/branches, review locks, and nested PR findings.
+  It is report-only: it has no apply mode and never replaces fresh verification
+  before a coordinator-owned mutation.
 
 ## Workflow
 
 1. Read `../beads-coordinator/references/runtime-and-safety.md` if you need the
-   exact claim, stall-heartbeat, and mutation-authority rules before touching
-   Beads state.
-2. Run the relevant passes from the reference files in order, skipping mutation
-   when evidence is incomplete or a bead is held by a live actor (fresh
-   heartbeat). For PR-review beads, run detection only and report findings.
-3. Keep canonical PR metadata on the original implementation bead only; review
+   exact claim, stall-heartbeat, and mutation-authority rules before handing a
+   finding to the coordinator.
+2. From the cleanup package directory, run
+   `uv run scripts/cleanup_scan.py --repo-root "${REPO_ROOT}"` to collect
+   compact read-only findings. Treat `partial` and `fatal` as manual-triage
+   reports; do not forward command output or infer a mutation from them.
+3. Use the relevant passes from the reference files to interpret the report.
+   When evidence is incomplete or a bead is held by a live actor (fresh
+   heartbeat), report manual triage. For PR-review beads, report findings only.
+4. Keep canonical PR metadata on the original implementation bead only; review
    beads must not invent their own `external_ref`.
-4. Clean worktrees and branches conservatively. Preserve anything that may still
-   contain useful unpublished work.
-5. Produce the structured report from `references/reporting.md` so the
-   coordinator has a clear mutation ledger before dispatch begins.
+5. Report worktrees and branches conservatively. Preserve anything that may
+   still contain useful unpublished work.
+6. Produce the structured report from `references/reporting.md` so the
+   coordinator has a clear evidence ledger before dispatch begins.
