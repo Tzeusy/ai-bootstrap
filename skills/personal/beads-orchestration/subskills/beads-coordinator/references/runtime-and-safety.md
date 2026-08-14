@@ -73,17 +73,29 @@ The coordinator has discretion on subagent model choice based on task type.
 
 ### Complexity Constants
 
-| Strategy | Claude | ChatGPT | Gemini |
+| Strategy | Claude | Codex / ChatGPT | Gemini |
 |---|---|---|---|
-| `EPIC_COMPLEXITY_MODEL` | Opus 4.8 | 5.6 Sol Max | gemini-3-pro |
-| `HIGH_COMPLEXITY_MODEL` | Sonnet 5 | 5.6 Terra Max | gemini-3-pro |
-| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5 | 5.6 Luna High | gemini-3-pro |
-| `LOW_COMPLEXITY_MODEL` | 4.5 Haiku | 5.6 Luna Medium | gemini-3-flash-preview |
+| `EPIC_COMPLEXITY_MODEL` | Opus 4.8 | 5.6 Sol Medium | gemini-3-pro |
+| `HIGH_COMPLEXITY_MODEL` | Sonnet 5 | 5.6 Sol Medium | gemini-3-pro |
+| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5 | 5.6 Luna Max | gemini-3-pro |
+| `LOW_COMPLEXITY_MODEL` | 4.5 Haiku | 5.6 Luna Max | gemini-3-flash-preview |
+| `DESIGN_AND_SPECIFICATION_MODEL` | Sonnet 5 | 5.6 Sol High | gemini-3-pro |
 
-The ChatGPT column is a Pareto frontier: move up only when the assigned
-complexity tier requires it. Reserve Sol Max for the most complicated tasks at
-`EPIC_COMPLEXITY_MODEL`; never use it for high-, medium-, or low-complexity
-work.
+For Codex, dispatch low and medium work with 5.6 Luna Max and operational
+high/epic work with 5.6 Sol Medium. Use 5.6 Sol High only for work whose
+primary deliverable is a design or specification artifact; it is not a generic
+complexity escalation.
+
+### Codex Dispatch Binding
+
+Pass a base model and independent reasoning effort when using Codex's native
+subagent mechanism:
+
+| Policy choice | `model` | `reasoning_effort` |
+|---|---|---|
+| 5.6 Luna Max | `gpt-5.6-luna` | `max` |
+| 5.6 Sol Medium | `gpt-5.6-sol` | `medium` |
+| 5.6 Sol High | `gpt-5.6-sol` | `high` |
 
 ### Assignment Rules
 
@@ -91,7 +103,7 @@ work.
 |---|---|
 | Epic / team-coordinated work | `EPIC_COMPLEXITY_MODEL` |
 | Reconciliation bead for a medium-or-higher epic | `EPIC_COMPLEXITY_MODEL` (floor — see below) |
-| Planning, research, architecting | `HIGH_COMPLEXITY_MODEL` |
+| Planning, research, architecting, design, or specification work | `DESIGN_AND_SPECIFICATION_MODEL` |
 | Coding | `MEDIUM_COMPLEXITY_MODEL` unless trivial (see LOW criteria below) |
 | Orchestration | `HIGH_COMPLEXITY_MODEL` |
 | PR review (`pr-review-task`) | `MEDIUM_COMPLEXITY_MODEL`; escalate to `HIGH_COMPLEXITY_MODEL` only for large (>400 changed lines) or risk-flagged (security/auth/schema/public-API) diffs |
@@ -120,12 +132,18 @@ Concrete `LOW_COMPLEXITY_MODEL` criteria — dispatch at LOW when **all** hold:
 - no API, schema, auth, or cross-module behavior change
 - acceptance criteria are fully mechanical (no design judgment required)
 
-**Complexity-label fast path.** If the bead carries a `complexity:<tier>` label
-(`low`/`medium`/`high`/`epic`, stamped by `beads-writer` at creation), map it
-directly to the matching `*_COMPLEXITY_MODEL` and skip re-deriving complexity
-from the description. Re-derive only when the label is obviously stale
-(e.g. scope grew via follow-ups). Apply the Reconciliation Floor below
-regardless of label.
+**Design/specification override.** If the bead's primary deliverable is a
+design or specification artifact, select `DESIGN_AND_SPECIFICATION_MODEL`
+before the complexity-label fast path. Do not apply this override to
+implementation, review, or reconciliation work merely because it consumes a
+design or specification.
+
+**Complexity-label fast path.** Otherwise, if the bead carries a
+`complexity:<tier>` label (`low`/`medium`/`high`/`epic`, stamped by
+`beads-writer` at creation), map it directly to the matching
+`*_COMPLEXITY_MODEL` and skip re-deriving complexity from the description.
+Re-derive only when the label is obviously stale (e.g. scope grew via
+follow-ups). Apply the Reconciliation Floor below regardless of label.
 
 **Right-size deliberately.** Token spend scales with the dispatched model, and
 most backlog beads are not the hard case. Default to the lowest tier the
