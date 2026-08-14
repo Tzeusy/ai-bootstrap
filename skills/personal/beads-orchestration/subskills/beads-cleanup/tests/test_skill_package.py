@@ -114,6 +114,7 @@ class BeadsCleanupPackageTests(unittest.TestCase):
         self.assertIn("`invalid-normalizer-evidence` error", pr_recon)
         self.assertIn("success` envelope with no sanitized findings or candidates", pr_recon)
         self.assertIn("must cross-link to a matching resolved", pr_recon)
+        self.assertIn("self or equivocal", pr_recon)
         self.assertIn("malformed `pr-review-task` inventory", pr_recon)
         self.assertIn("## Beads Cleanup Report", reporting)
         self.assertIn("| Metric | Count |", reporting)

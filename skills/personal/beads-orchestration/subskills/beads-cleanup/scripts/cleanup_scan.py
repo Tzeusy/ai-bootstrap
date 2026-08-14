@@ -262,17 +262,59 @@ def self_heal_action_is_consistent(
     return False
 
 
+def finding_source_relations_are_unambiguous(
+    *,
+    kind: str,
+    original_id: str | None,
+    review_id: str | None,
+    canonical_review_id: str | None,
+    duplicate_of: str | None,
+) -> bool:
+    if kind == "original":
+        return (
+            original_id is not None
+            and review_id is None
+            and duplicate_of is None
+            and canonical_review_id != original_id
+        )
+    if review_id is None:
+        return False
+    if original_id is not None and review_id == original_id:
+        return False
+    if canonical_review_id is not None and canonical_review_id == original_id:
+        return False
+    if duplicate_of is not None:
+        if duplicate_of == review_id or duplicate_of == original_id:
+            return False
+        if duplicate_of != canonical_review_id:
+            return False
+    if canonical_review_id is None:
+        return duplicate_of is None
+    if canonical_review_id == review_id:
+        return duplicate_of is None
+    return duplicate_of == canonical_review_id
+
+
+def self_heal_source_relations_are_unambiguous(
+    *, original_id: str | None, canonical_review_id: str | None
+) -> bool:
+    return original_id is not None and canonical_review_id != original_id
+
+
 def has_matching_canonical_review_finding(
     candidate: dict[str, Any], findings: list[dict[str, Any]]
 ) -> bool:
     """Require wiring actions to be backed by their resolved canonical task."""
     canonical_review_id = candidate["canonical_review_id"]
     return any(
-        finding["kind"] == "review-task"
+        canonical_review_id != candidate["original_id"]
+        and finding["kind"] == "review-task"
         and finding["context_status"] == "resolved"
         and finding["canonical_review_id"] == canonical_review_id
         and finding["review_id"] == canonical_review_id
         and finding["duplicate_of"] is None
+        and finding["review_id"] != finding["original_id"]
+        and finding["canonical_review_id"] != finding["original_id"]
         and finding["original_id"] == candidate["original_id"]
         and finding["pr_number"] == candidate["pr_number"]
         for finding in findings
@@ -357,6 +399,13 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
             or raw_recommendation != recommendation
             or (kind == "original" and (original_id is None or review_id is not None or duplicate_of is not None))
             or (kind == "review-task" and review_id is None)
+            or not finding_source_relations_are_unambiguous(
+                kind=kind,
+                original_id=original_id,
+                review_id=review_id,
+                canonical_review_id=canonical_review_id,
+                duplicate_of=duplicate_of,
+            )
             or not finding_action_is_consistent(
                 kind=kind,
                 context_status=context_status,
@@ -418,6 +467,10 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
             or not valid_optional_id(item.get("original_id"))
             or raw_recommendation != recommendation
             or original_id is None
+            or not self_heal_source_relations_are_unambiguous(
+                original_id=original_id,
+                canonical_review_id=canonical_review_id,
+            )
             or not self_heal_action_is_consistent(
                 context_status=context_status,
                 original_id=original_id,
