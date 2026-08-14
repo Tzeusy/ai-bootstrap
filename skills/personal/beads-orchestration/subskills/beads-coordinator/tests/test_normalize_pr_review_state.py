@@ -258,7 +258,9 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                             "import os",
                             "import sys",
                             "fixture = json.loads(open(os.environ['NORMALIZER_FIXTURE'], encoding='utf-8').read())",
-                            "print(json.dumps(fixture['resolver_payload']))",
+                            "payload = dict(fixture['resolver_payload'])",
+                            "payload.setdefault('issue_id', sys.argv[sys.argv.index('--issue-id') + 1])",
+                            "print(json.dumps(payload))",
                             "raise SystemExit(int(fixture.get('resolver_exit', 0)))",
                         )
                     ),
@@ -477,6 +479,92 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                         {"code": "self-referential-review-id", "scope": "review-context"},
                         payload["errors"],
                     )
+
+    def test_resolver_identity_must_match_the_discovered_review_task(self) -> None:
+        original_id = "aib-swr.1"
+        review_id = "aib-review.1"
+        fixture = {
+            "blocked_pr_review": [original_bead(original_id, 41), review_task(review_id, original_id)],
+            "resolver_payload": {
+                "ok": True,
+                "issue_id": "aib-other.1",
+                "original_id": original_id,
+                "pr_number": 41,
+            },
+            "prs": {"41": pr_payload("OPEN")},
+            "open_prs": [],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertTrue(payload["findings"])
+        self.assertTrue(all(item["recommendation"] == "manual-triage" for item in payload["findings"]))
+        self.assertIn({"code": "mismatched-review-id", "scope": "review-context"}, payload["errors"])
+
+    def test_malformed_pr_review_inventory_forces_partial_manual_triage(self) -> None:
+        original_id = "aib-swr.1"
+        review_id = "aib-review.1"
+        original = original_bead(original_id, 41)
+        task = review_task(review_id, original_id)
+        cases = {
+            "missing-original-label": (
+                [{**original, "labels": []}],
+                [task],
+                "invalid-record",
+                "blocked-pr-review",
+            ),
+            "wrong-original-status": (
+                [{**original, "status": "open"}],
+                [task],
+                "invalid-record",
+                "blocked-pr-review",
+            ),
+            "duplicate-original-id": (
+                [original, dict(original)],
+                [task],
+                "duplicate-record",
+                "blocked-pr-review",
+            ),
+            "missing-task-pr-review-label": (
+                [original],
+                [{**task, "labels": ["pr-review-task"]}],
+                "invalid-record",
+                "blocked-pr-review-task",
+            ),
+            "missing-task-status": (
+                [original],
+                [{**task, "status": None}],
+                "invalid-record",
+                "blocked-pr-review-task",
+            ),
+            "duplicate-task-id": (
+                [original],
+                [task, dict(task)],
+                "duplicate-record",
+                "blocked-pr-review-task",
+            ),
+        }
+        for name, (original_records, task_records, code, scope) in cases.items():
+            with self.subTest(name=name):
+                fixture = {
+                    "blocked_pr_review": original_records,
+                    "blocked_pr_review_tasks": task_records,
+                    "resolver_payload": {"ok": True, "original_id": original_id, "pr_number": 41},
+                    "prs": {"41": pr_payload("OPEN")},
+                    "open_prs": [],
+                }
+
+                result, _, _ = self.run_fixture(fixture)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], "partial")
+                self.assertTrue(payload["findings"])
+                self.assertTrue(all(item["recommendation"] == "manual-triage" for item in payload["findings"]))
+                self.assertIn({"code": code, "scope": scope}, payload["errors"])
 
     def test_preserves_dotted_child_and_reports_open_pr_cooldown(self) -> None:
         original_id = "aib-swr.1"
@@ -929,7 +1017,12 @@ class NormalizePrReviewStateTests(unittest.TestCase):
     def test_missing_canonical_pr_reference_is_an_unresolved_partial_finding(self) -> None:
         fixture = {
             "blocked_pr_review": [
-                {"id": "aib-swr.1", "labels": ["pr-review"], "external_ref": ""},
+                {
+                    "id": "aib-swr.1",
+                    "labels": ["pr-review"],
+                    "external_ref": "",
+                    "status": "blocked",
+                },
             ],
             "open_prs": [],
         }

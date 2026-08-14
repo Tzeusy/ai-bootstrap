@@ -73,6 +73,11 @@ report-only triage result, never a reason to guess or mutate.
 A list-shaped but malformed `pr-review-task` inventory is incomplete evidence:
 the normalizer reports partial manual triage and keeps every self-heal candidate
 at `manual-triage` until it can collect a clean task inventory.
+The normalizer accepts resolver output only when its resolver `issue_id` matches
+the discovered review-task ID. An inventory record missing a required label,
+status, or uniqueness guarantee is malformed before recommendation selection:
+the report is partial and every finding and self-heal candidate remains
+`manual-triage`.
 Each `bd show` response for an original must echo the requested original bead
 ID; a mismatched record is partial manual triage. A review task whose resolved
 original ID is its own review ID is self-referential and must fail closed before

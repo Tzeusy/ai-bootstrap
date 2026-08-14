@@ -22,6 +22,7 @@ COOLDOWN = timedelta(minutes=5)
 BEAD_ID_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)+(?:\.[0-9]+)*\Z")
 SAFE_CODE_RE = re.compile(r"[a-z0-9][a-z0-9-]*\Z")
 PR_STATES = frozenset({"OPEN", "CLOSED", "MERGED"})
+BEAD_STATUSES = frozenset({"open", "in_progress", "blocked", "closed"})
 
 
 def emit(payload: dict[str, Any]) -> None:
@@ -91,11 +92,6 @@ def command_json(argv: list[str], repo_root: Path) -> tuple[object | None, str |
         return None, "invalid-json"
 
 
-def first_record(payload: object) -> dict[str, Any] | None:
-    candidate = payload[0] if isinstance(payload, list) and payload else payload
-    return candidate if isinstance(candidate, dict) else None
-
-
 def list_records(
     repo_root: Path,
     label: str,
@@ -130,12 +126,48 @@ def record_id(record: dict[str, Any]) -> str | None:
 
 
 def requested_record(payload: object, issue_id: str) -> tuple[dict[str, Any] | None, str | None]:
-    record = first_record(payload)
-    if record is None:
-        return None, "invalid-json"
+    if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+        return None, "invalid-show-response"
+    record = payload[0]
     if record_id(record) != issue_id:
         return None, "mismatched-record-id"
     return record, None
+
+
+def validate_inventory_records(
+    records: list[dict[str, Any]] | None,
+    *,
+    required_labels: frozenset[str],
+    required_status: str | None,
+    scope: str,
+    errors: list[dict[str, str]],
+) -> tuple[list[dict[str, Any]], bool]:
+    """Retain only uniquely identified records matching the queried inventory."""
+    if records is None:
+        return [], False
+    valid_records: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    complete = True
+    for record in records:
+        issue_id = record_id(record)
+        status = record.get("status")
+        if (
+            issue_id is None
+            or not required_labels.issubset(labels(record))
+            or not isinstance(status, str)
+            or status not in BEAD_STATUSES
+            or (required_status is not None and status != required_status)
+        ):
+            report_error(errors, "invalid-record", scope)
+            complete = False
+            continue
+        if issue_id in seen_ids:
+            report_error(errors, "duplicate-record", scope)
+            complete = False
+            continue
+        seen_ids.add(issue_id)
+        valid_records.append(record)
+    return valid_records, complete
 
 
 def valid_pr_number(value: object) -> bool:
@@ -188,6 +220,8 @@ def resolve_review_task(
         return None, "invalid-json"
     if not isinstance(payload, dict) or not payload.get("ok"):
         return None, safe_code(payload.get("error_code") if isinstance(payload, dict) else None, "command-failed")
+    if payload.get("issue_id") != review_id:
+        return None, "mismatched-review-id"
     original_id = payload.get("original_id")
     pr_number = payload.get("pr_number")
     if not isinstance(original_id, str) or not BEAD_ID_RE.fullmatch(original_id):
@@ -457,21 +491,42 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             1,
         )
 
+    validated_pr_review_records, pr_review_inventory_complete = validate_inventory_records(
+        pr_review_records,
+        required_labels=frozenset({"pr-review"}),
+        required_status="blocked",
+        scope="blocked-pr-review",
+        errors=errors,
+    )
+    validated_task_records, task_inventory_complete = validate_inventory_records(
+        task_records,
+        required_labels=frozenset({"pr-review", "pr-review-task"}),
+        required_status=None,
+        scope="blocked-pr-review-task",
+        errors=errors,
+    )
+    inventory_complete = (
+        original_error is None
+        and task_error is None
+        and pr_review_inventory_complete
+        and task_inventory_complete
+    )
+    task_lookup_complete = inventory_complete
     records_by_id: dict[str, dict[str, Any]] = {}
-    for record in pr_review_records or []:
+    for record in validated_pr_review_records:
         issue_id = record_id(record)
-        if issue_id is None:
-            report_error(errors, "invalid-record", "blocked-pr-review")
-            continue
+        assert issue_id is not None
         records_by_id[issue_id] = record
-    task_lookup_complete = task_error is None
-    for record in task_records or []:
+    for record in validated_task_records:
         issue_id = record_id(record)
-        if issue_id is None or "pr-review-task" not in labels(record):
-            report_error(errors, "invalid-record", "blocked-pr-review-task")
+        assert issue_id is not None
+        existing = records_by_id.get(issue_id)
+        if existing is not None and existing != record:
+            report_error(errors, "conflicting-record", "pr-review-inventory")
+            inventory_complete = False
             task_lookup_complete = False
             continue
-        records_by_id[issue_id] = record
+        records_by_id.setdefault(issue_id, record)
 
     originals: dict[str, dict[str, Any]] = {}
     tasks: dict[str, dict[str, Any]] = {}
@@ -684,6 +739,11 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         task_lookup_complete=task_lookup_complete,
         errors=errors,
     )
+    if not inventory_complete:
+        for finding in findings:
+            finding["recommendation"] = "manual-triage"
+        for candidate in self_heal:
+            candidate["recommendation"] = "manual-triage"
     findings.sort(key=finding_sort_key)
     errors.sort(key=lambda item: (item["scope"], item["code"]))
     status = "partial" if errors else "empty" if not findings and not self_heal else "success"

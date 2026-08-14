@@ -116,6 +116,8 @@ class BeadsCleanupPackageTests(unittest.TestCase):
         self.assertIn("must cross-link to a matching resolved", pr_recon)
         self.assertIn("self or equivocal", pr_recon)
         self.assertIn("malformed `pr-review-task` inventory", pr_recon)
+        self.assertIn("singleton and must\necho its requested ID", pr_recon)
+        self.assertIn("collection-wide role binding", pr_recon)
         self.assertIn("## Beads Cleanup Report", reporting)
         self.assertIn("| Metric | Count |", reporting)
 

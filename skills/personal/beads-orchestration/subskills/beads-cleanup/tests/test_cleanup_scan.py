@@ -1005,6 +1005,331 @@ class CleanupScanTests(unittest.TestCase):
                 )
                 self.assertEqual(payload["pr_review"]["errors"], [])
 
+    def test_collection_sanitizer_rejects_cross_record_role_collisions(self) -> None:
+        original_id = "aib-swr.1"
+        canonical_review_id = "aib-review.1"
+        duplicate_review_id = "aib-review.2"
+        canonical_finding = {
+            "canonical_review_id": canonical_review_id,
+            "context_status": "resolved",
+            "cooldown_until": "2026-08-14T04:05:00Z",
+            "duplicate_of": None,
+            "kind": "review-task",
+            "original_id": original_id,
+            "pr_number": 41,
+            "pr_state": "OPEN",
+            "recommendation": "dispatch-canonical-review",
+            "review_id": canonical_review_id,
+        }
+        duplicate_finding = {
+            **canonical_finding,
+            "duplicate_of": canonical_review_id,
+            "recommendation": "dedupe-review-task",
+            "review_id": duplicate_review_id,
+        }
+        canonical_candidate = {
+            "canonical_review_id": canonical_review_id,
+            "context_status": "resolved",
+            "cooldown_until": "2026-08-14T04:05:00Z",
+            "original_id": original_id,
+            "pr_number": 41,
+            "recommendation": "review-wiring-current",
+        }
+        foreign_canonical = {
+            **canonical_finding,
+            "canonical_review_id": original_id,
+            "original_id": "aib-other.1",
+            "review_id": original_id,
+        }
+        foreign_candidate = {
+            **canonical_candidate,
+            "canonical_review_id": original_id,
+            "original_id": "aib-other.1",
+        }
+        cases = {
+            "valid-distinct-dedupe": (
+                [canonical_finding, duplicate_finding],
+                [canonical_candidate],
+                "success",
+            ),
+            "review-id-reused-for-another-original": (
+                [canonical_finding, {**canonical_finding, "original_id": "aib-other.1"}],
+                [],
+                "partial",
+            ),
+            "two-canonicals-for-one-original": (
+                [
+                    canonical_finding,
+                    {
+                        **canonical_finding,
+                        "canonical_review_id": "aib-review.3",
+                        "review_id": "aib-review.3",
+                    },
+                ],
+                [canonical_candidate],
+                "partial",
+            ),
+            "foreign-original-reused-as-review-and-candidate-canonical": (
+                [canonical_finding, foreign_canonical],
+                [foreign_candidate],
+                "partial",
+            ),
+            "review-id-is-a-foreign-canonical-role": (
+                [
+                    {
+                        **canonical_finding,
+                        "canonical_review_id": "aib-review.3",
+                        "review_id": "aib-review.3",
+                    },
+                    {
+                        **canonical_finding,
+                        "canonical_review_id": "aib-review.3",
+                        "duplicate_of": "aib-review.3",
+                        "recommendation": "dedupe-review-task",
+                    },
+                    {
+                        **canonical_finding,
+                        "canonical_review_id": canonical_review_id,
+                        "duplicate_of": canonical_review_id,
+                        "original_id": "aib-other.1",
+                        "recommendation": "dedupe-review-task",
+                        "review_id": "aib-review.2",
+                    },
+                ],
+                [],
+                "partial",
+            ),
+        }
+        for name, (findings, candidates, expected_status) in cases.items():
+            with self.subTest(name=name):
+                fixture = {
+                    "in_progress": [],
+                    "blocked": [],
+                    "review_running": [],
+                    "normalizer_stdout": json.dumps(
+                        {
+                            "errors": [],
+                            "findings": findings,
+                            "schema": "beads-pr-review-normalization/v1",
+                            "self_heal_candidates": candidates,
+                            "status": "success",
+                        }
+                    ),
+                }
+
+                result, _, _ = self.run_fixture(fixture)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], expected_status)
+                self.assertEqual(payload["pr_review"]["status"], expected_status)
+                if name == "valid-distinct-dedupe":
+                    self.assertEqual(
+                        payload["pr_review"]["findings"][1]["recommendation"],
+                        "dedupe-review-task",
+                    )
+                    self.assertEqual(
+                        payload["pr_review"]["self_heal_candidates"][0]["recommendation"],
+                        "review-wiring-current",
+                    )
+                    self.assertEqual(payload["pr_review"]["errors"], [])
+                    continue
+                self.assertTrue(
+                    all(item["recommendation"] == "manual-triage" for item in payload["pr_review"]["findings"])
+                )
+                self.assertTrue(
+                    all(
+                        item["recommendation"] == "manual-triage"
+                        for item in payload["pr_review"]["self_heal_candidates"]
+                    )
+                )
+                self.assertIn(
+                    {"code": "invalid-normalizer-evidence", "scope": "pr-review"},
+                    payload["pr_review"]["errors"],
+                )
+
+    def test_cleanup_direct_show_requires_singleton_requested_identity(self) -> None:
+        blocker_id = "aib-blocker"
+        dependency_id = "aib-dependency"
+        worktree_id = "aib-worktree"
+        normalizer_empty = json.dumps(
+            {
+                "errors": [],
+                "findings": [],
+                "schema": "beads-pr-review-normalization/v1",
+                "self_heal_candidates": [],
+                "status": "empty",
+            }
+        )
+        base_fixture = {
+            "in_progress": [],
+            "blocked": [bead(blocker_id, "blocked")],
+            "review_running": [],
+            "dependencies": {blocker_id: [{"depends_on_id": dependency_id}]},
+            "normalizer_stdout": normalizer_empty,
+            "remote_branches": [],
+            "worktree_dirs": [worktree_id],
+            "worktrees_raw": f"worktree /safe/parallel-agents/{worktree_id}\\n",
+        }
+        cases = {
+            "valid-control": (
+                {
+                    dependency_id: [bead(dependency_id, "closed")],
+                    worktree_id: [bead(worktree_id, "closed")],
+                },
+                "success",
+                None,
+                None,
+            ),
+            "dependency-non-singleton": (
+                {
+                    dependency_id: [bead(dependency_id, "closed"), bead(dependency_id, "closed")],
+                    worktree_id: [bead(worktree_id, "closed")],
+                },
+                "partial",
+                "blockers",
+                "invalid-show-response",
+            ),
+            "dependency-mismatched-id": (
+                {
+                    dependency_id: [bead("aib-other.1", "closed")],
+                    worktree_id: [bead(worktree_id, "closed")],
+                },
+                "partial",
+                "blockers",
+                "mismatched-record-id",
+            ),
+            "worktree-non-singleton": (
+                {
+                    dependency_id: [bead(dependency_id, "closed")],
+                    worktree_id: [bead(worktree_id, "closed"), bead(worktree_id, "closed")],
+                },
+                "partial",
+                "worktrees",
+                "invalid-show-response",
+            ),
+            "worktree-mismatched-id": (
+                {
+                    dependency_id: [bead(dependency_id, "closed")],
+                    worktree_id: [bead("aib-other.1", "closed")],
+                },
+                "partial",
+                "worktrees",
+                "mismatched-record-id",
+            ),
+        }
+        for name, (shows, expected_status, scope, code) in cases.items():
+            with self.subTest(name=name):
+                result, _, _ = self.run_fixture({**base_fixture, "shows": shows})
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], expected_status)
+                if name == "valid-control":
+                    self.assertEqual(payload["blockers"][0]["recommendation"], "unblock-candidate")
+                    self.assertEqual(payload["worktrees"][0]["recommendation"], "cleanup-eligible-after-verification")
+                    continue
+                self.assertIn({"code": code, "scope": scope}, payload["errors"])
+                if scope == "blockers":
+                    self.assertEqual(payload["blockers"][0]["recommendation"], "manual-triage")
+                else:
+                    self.assertEqual(payload["worktrees"][0]["recommendation"], "manual-triage")
+
+    def test_default_delegated_cleanup_chain_uses_exact_fake_read_argv_sequence(self) -> None:
+        original_id = "aib-swr.1"
+        review_id = "aib-review.1"
+        original = {
+            "id": original_id,
+            "labels": ["pr-review"],
+            "status": "blocked",
+            "external_ref": "gh-pr:41",
+        }
+        review_task = {
+            "id": review_id,
+            "labels": ["pr-review", "pr-review-task"],
+            "status": "blocked",
+            "created_at": "2026-08-14T03:00:00Z",
+        }
+        review_show = {
+            "id": review_id,
+            "description": (
+                f"Original implementation bead: {original_id}\n"
+                "https://github.com/owner/repo/pull/41"
+            ),
+            "dependencies": [],
+        }
+        pr = {
+            "number": 41,
+            "url": "https://github.com/owner/repo/pull/41",
+            "state": "OPEN",
+            "isDraft": False,
+            "mergeStateStatus": "CLEAN",
+            "reviewDecision": None,
+            "headRefName": f"agent/{original_id}",
+            "baseRefName": "main",
+            "mergedAt": None,
+            "headRefOid": "abc123",
+            "createdAt": "2026-08-14T03:00:00Z",
+        }
+        fixture = {
+            "in_progress": [],
+            "blocked": [],
+            "review_running": [],
+            "blocked_pr_review": [original],
+            "blocked_pr_review_tasks": [review_task],
+            "shows": {review_id: [review_show], original_id: [original]},
+            "prs": {"41": pr},
+            "open_prs": [],
+        }
+
+        result, calls, repo_root = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "success")
+        expected = [
+            {
+                "tool": "bd",
+                "argv": [
+                    "-C",
+                    repo_root,
+                    "list",
+                    "--status=blocked",
+                    "--label",
+                    "pr-review",
+                    "--json",
+                    "--limit",
+                    "0",
+                ],
+            },
+            {
+                "tool": "bd",
+                "argv": ["-C", repo_root, "list", "--label", "pr-review-task", "--json", "--limit", "0"],
+            },
+            {"tool": "bd", "argv": ["show", review_id, "--json"]},
+            {"tool": "bd", "argv": ["show", original_id, "--json"]},
+            {"tool": "gh", "argv": ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]},
+            {
+                "tool": "gh",
+                "argv": [
+                    "pr",
+                    "view",
+                    "41",
+                    "--json",
+                    "number,url,state,isDraft,mergeStateStatus,reviewDecision,headRefName,baseRefName,mergedAt,headRefOid",
+                ],
+            },
+            {"tool": "gh", "argv": ["pr", "view", "41", "--json", "number,state,mergedAt,createdAt"]},
+            {"tool": "gh", "argv": ["pr", "list", "--state", "open", "--json", "number,headRefName,createdAt"]},
+            {"tool": "bd", "argv": ["-C", repo_root, "list", "--status=in_progress", "--json", "--limit", "0"]},
+            {"tool": "bd", "argv": ["-C", repo_root, "list", "--status=blocked", "--json", "--limit", "0"]},
+            {"tool": "bd", "argv": ["-C", repo_root, "list", "--label", "review-running", "--json", "--limit", "0"]},
+            {"tool": "bd", "argv": ["-C", repo_root, "worktree", "list"]},
+            {"tool": "bd", "argv": ["-C", repo_root, "dolt", "status"]},
+            {"tool": "bd", "argv": ["-C", repo_root, "doctor"]},
+        ]
+        self.assertEqual(calls, expected)
+
     def test_worktree_correlation_preserves_opaque_ids_containing_review(self) -> None:
         issue_id = "aib-release-review-preserve"
         fixture = {
