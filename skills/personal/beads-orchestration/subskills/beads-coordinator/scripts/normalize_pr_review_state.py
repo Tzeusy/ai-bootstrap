@@ -560,6 +560,29 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         else:
             originals[issue_id] = record
 
+    original_contexts: dict[str, tuple[dict[str, Any] | None, int | None, str | None]] = {}
+    original_contexts_complete = True
+    for original_id in sorted(originals):
+        original, error = load_original(originals[original_id], repo_root)
+        if original is None:
+            context_error = error or "invalid-json"
+            report_error(errors, context_error, "original-context")
+            original_contexts[original_id] = (None, None, context_error)
+            original_contexts_complete = False
+            continue
+        pr_number = pr_number_from_ref(original.get("external_ref"))
+        if pr_number is None:
+            report_error(errors, "missing-pr-number", "original-context")
+            original_contexts[original_id] = (original, None, "missing-pr-number")
+            original_contexts_complete = False
+            continue
+        if not valid_pr_number(pr_number):
+            report_error(errors, "invalid-pr-number", "original-context")
+            original_contexts[original_id] = (original, None, "invalid-pr-number")
+            original_contexts_complete = False
+            continue
+        original_contexts[original_id] = (original, pr_number, None)
+
     task_contexts: dict[str, dict[str, Any] | None] = {}
     task_context_errors: dict[str, str] = {}
     for review_id in sorted(tasks):
@@ -584,7 +607,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             report_error(errors, relation_error, "review-context")
             task_lookup_complete = False
 
-    chronological_canonical_by_key: dict[tuple[str, int], str] = {}
+    chronology_by_key: dict[tuple[str, int], list[tuple[datetime, str]]] = {}
     invalid_task_keys: set[tuple[str, int]] = set()
     tasks_by_key: dict[tuple[str, int], list[str]] = {}
     if active_contexts_complete and relation_graph_complete:
@@ -604,7 +627,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                     break
                 chronology.append((created_at, review_id))
             if key not in invalid_task_keys:
-                chronological_canonical_by_key[key] = min(chronology, key=lambda item: (item[0], item[1]))[1]
+                chronology_by_key[key] = chronology
 
     chronology_complete = (
         active_contexts_complete and relation_graph_complete and not invalid_task_keys
@@ -612,24 +635,31 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     collection_complete = (
         inventory_complete
         and task_lookup_complete
+        and original_contexts_complete
         and active_contexts_complete
         and relation_graph_complete
         and chronology_complete
     )
-    canonical_by_key = chronological_canonical_by_key if collection_complete else {}
+    canonical_by_key = (
+        {
+            key: min(chronology, key=lambda item: (item[0], item[1]))[1]
+            for key, chronology in chronology_by_key.items()
+        }
+        if collection_complete
+        else {}
+    )
 
     pr_cache: dict[int, tuple[dict[str, Any] | None, str | None]] = {}
     findings: list[dict[str, Any]] = []
 
     for original_id in sorted(originals):
-        original, error = load_original(originals[original_id], repo_root)
+        original, pr_number, context_error = original_contexts[original_id]
         if original is None:
-            report_error(errors, error or "invalid-json", "original-context")
             findings.append(
                 original_finding(
                     original_id=original_id,
                     pr_number=None,
-                    context_status=error or "invalid-json",
+                    context_status=context_error or "invalid-json",
                     canonical_review_id=None,
                     pr_state=None,
                     cooldown=None,
@@ -637,14 +667,12 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                 )
             )
             continue
-        pr_number = pr_number_from_ref(original.get("external_ref"))
         if pr_number is None:
-            report_error(errors, "missing-pr-number", "original-context")
             findings.append(
                 original_finding(
                     original_id=original_id,
                     pr_number=None,
-                    context_status="missing-pr-number",
+                    context_status=context_error or "missing-pr-number",
                     canonical_review_id=None,
                     pr_state=None,
                     cooldown=None,
