@@ -1148,6 +1148,65 @@ class CleanupScanTests(unittest.TestCase):
                     payload["pr_review"]["errors"],
                 )
 
+    def test_delegated_cleanup_preserves_reciprocal_review_relations_as_manual_triage(self) -> None:
+        first_review_id = "aib-review.1"
+        second_review_id = "aib-review.2"
+        canonical_findings = [
+            {
+                "canonical_review_id": first_review_id,
+                "context_status": "resolved",
+                "cooldown_until": "2026-08-14T04:05:00Z",
+                "duplicate_of": None,
+                "kind": "review-task",
+                "original_id": second_review_id,
+                "pr_number": 41,
+                "pr_state": "OPEN",
+                "recommendation": "dispatch-canonical-review",
+                "review_id": first_review_id,
+            },
+            {
+                "canonical_review_id": second_review_id,
+                "context_status": "resolved",
+                "cooldown_until": "2026-08-14T04:05:00Z",
+                "duplicate_of": None,
+                "kind": "review-task",
+                "original_id": first_review_id,
+                "pr_number": 41,
+                "pr_state": "OPEN",
+                "recommendation": "dispatch-canonical-review",
+                "review_id": second_review_id,
+            },
+        ]
+        fixture = {
+            "in_progress": [],
+            "blocked": [],
+            "review_running": [],
+            "normalizer_stdout": json.dumps(
+                {
+                    "errors": [],
+                    "findings": canonical_findings,
+                    "schema": "beads-pr-review-normalization/v1",
+                    "self_heal_candidates": [],
+                    "status": "success",
+                }
+            ),
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertEqual(payload["pr_review"]["status"], "partial")
+        self.assertTrue(
+            all(item["recommendation"] == "manual-triage" for item in payload["pr_review"]["findings"])
+        )
+        self.assertIn(
+            {"code": "invalid-normalizer-evidence", "scope": "pr-review"},
+            payload["pr_review"]["errors"],
+        )
+        self.assertIn({"code": "normalizer-failed", "scope": "pr-review"}, payload["errors"])
+
     def test_cleanup_direct_show_requires_singleton_requested_identity(self) -> None:
         blocker_id = "aib-blocker"
         dependency_id = "aib-dependency"

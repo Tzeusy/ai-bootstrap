@@ -249,7 +249,7 @@ class NormalizePrReviewStateTests(unittest.TestCase):
             calls_path = root / "calls.jsonl"
             fixture_path.write_text(json.dumps(fixture), encoding="utf-8")
             resolver = None
-            if "resolver_payload" in fixture:
+            if "resolver_payload" in fixture or "resolver_payloads" in fixture:
                 resolver = root / "resolver.py"
                 resolver.write_text(
                     "\n".join(
@@ -258,8 +258,10 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                             "import os",
                             "import sys",
                             "fixture = json.loads(open(os.environ['NORMALIZER_FIXTURE'], encoding='utf-8').read())",
-                            "payload = dict(fixture['resolver_payload'])",
-                            "payload.setdefault('issue_id', sys.argv[sys.argv.index('--issue-id') + 1])",
+                            "issue_id = sys.argv[sys.argv.index('--issue-id') + 1]",
+                            "raw_payload = fixture.get('resolver_payloads', {}).get(issue_id, fixture.get('resolver_payload', {}))",
+                            "payload = dict(raw_payload)",
+                            "payload.setdefault('issue_id', issue_id)",
                             "print(json.dumps(payload))",
                             "raise SystemExit(int(fixture.get('resolver_exit', 0)))",
                         )
@@ -479,6 +481,39 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                         {"code": "self-referential-review-id", "scope": "review-context"},
                         payload["errors"],
                     )
+
+    def test_reciprocal_review_task_relations_are_partial_manual_triage(self) -> None:
+        first_review_id = "aib-review.1"
+        second_review_id = "aib-review.2"
+        fixture = {
+            "blocked_pr_review": [
+                review_task(first_review_id, second_review_id),
+                review_task(second_review_id, first_review_id),
+            ],
+            "resolver_payloads": {
+                first_review_id: {
+                    "ok": True,
+                    "original_id": second_review_id,
+                    "pr_number": 41,
+                },
+                second_review_id: {
+                    "ok": True,
+                    "original_id": first_review_id,
+                    "pr_number": 41,
+                },
+            },
+            "prs": {"41": pr_payload("OPEN")},
+            "open_prs": [],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertIn({"code": "cyclic-review-relation", "scope": "review-context"}, payload["errors"])
+        self.assertTrue(payload["findings"])
+        self.assertTrue(all(item["recommendation"] == "manual-triage" for item in payload["findings"]))
 
     def test_resolver_identity_must_match_the_discovered_review_task(self) -> None:
         original_id = "aib-swr.1"

@@ -108,6 +108,8 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         self.assertIn("sole PR-state mutator", contents)
         self.assertIn("echo the requested original bead\nID", contents)
         self.assertIn("self-referential", contents)
+        self.assertIn("reciprocal or longer", contents)
+        self.assertIn("cyclic-review-relation", contents)
         self.assertIn("resolver `issue_id`", contents)
         self.assertIn("required label,\nstatus, or uniqueness", contents)
 
