@@ -26,6 +26,11 @@ malformed, or incompatible evidence adds the sanitized
 `invalid-normalizer-evidence` error and preserves only `manual-triage`. A
 well-shaped `success` envelope with no sanitized findings or candidates is
 normalized to `empty`, never retained as a misleading success-without-work.
+`dedupe-review-task` must identify a distinct duplicate, never self-link its
+review ID to the canonical review ID. `review-wiring-current` and
+`self-heal-original-wiring` candidates must cross-link to a matching resolved
+canonical `pr-review-task` finding for the same original ID and PR. Any failed
+cross-link is invalid normalizer evidence and remains partial manual triage.
 
 ## Pass 2: Blocked Original Beads With `pr-review`
 

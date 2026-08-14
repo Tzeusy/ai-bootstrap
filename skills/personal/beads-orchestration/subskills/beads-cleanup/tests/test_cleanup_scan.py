@@ -746,6 +746,160 @@ class CleanupScanTests(unittest.TestCase):
         self.assertEqual(payload["pr_review"]["status"], "empty")
         self.assertEqual(payload["errors"], [])
 
+    def test_dedupe_review_task_rejects_self_linked_canonical_evidence(self) -> None:
+        review_id = "aib-review.1"
+        fixture = {
+            "in_progress": [],
+            "blocked": [],
+            "review_running": [],
+            "normalizer_stdout": json.dumps(
+                {
+                    "errors": [],
+                    "findings": [
+                        {
+                            "canonical_review_id": review_id,
+                            "context_status": "resolved",
+                            "cooldown_until": "2026-08-14T04:05:00Z",
+                            "duplicate_of": review_id,
+                            "kind": "review-task",
+                            "original_id": "aib-swr.1",
+                            "pr_number": 41,
+                            "pr_state": "OPEN",
+                            "recommendation": "dedupe-review-task",
+                            "review_id": review_id,
+                        }
+                    ],
+                    "schema": "beads-pr-review-normalization/v1",
+                    "self_heal_candidates": [],
+                    "status": "success",
+                }
+            ),
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertEqual(payload["pr_review"]["status"], "partial")
+        self.assertEqual(payload["pr_review"]["findings"][0]["recommendation"], "manual-triage")
+        self.assertIn(
+            {"code": "invalid-normalizer-evidence", "scope": "pr-review"},
+            payload["pr_review"]["errors"],
+        )
+        self.assertIn({"code": "normalizer-failed", "scope": "pr-review"}, payload["errors"])
+
+    def test_canonical_candidate_actions_require_matching_resolved_review_findings(self) -> None:
+        canonical_review_id = "aib-review.1"
+        candidate = {
+            "canonical_review_id": canonical_review_id,
+            "context_status": "resolved",
+            "cooldown_until": "2026-08-14T04:05:00Z",
+            "original_id": "aib-swr.1",
+            "pr_number": 41,
+        }
+        canonical_finding = {
+            "canonical_review_id": canonical_review_id,
+            "context_status": "resolved",
+            "cooldown_until": "2026-08-14T04:05:00Z",
+            "duplicate_of": None,
+            "kind": "review-task",
+            "original_id": "aib-swr.1",
+            "pr_number": 41,
+            "pr_state": "OPEN",
+            "recommendation": "dispatch-canonical-review",
+            "review_id": canonical_review_id,
+        }
+        mismatches = {
+            "missing-finding": [],
+            "different-original": [{**canonical_finding, "original_id": "aib-other.1"}],
+            "different-pr": [{**canonical_finding, "pr_number": 42}],
+            "noncanonical-finding": [{**canonical_finding, "canonical_review_id": "aib-review.2"}],
+        }
+        for recommendation in ("review-wiring-current", "self-heal-original-wiring"):
+            for name, findings in mismatches.items():
+                with self.subTest(recommendation=recommendation, name=name):
+                    fixture = {
+                        "in_progress": [],
+                        "blocked": [],
+                        "review_running": [],
+                        "normalizer_stdout": json.dumps(
+                            {
+                                "errors": [],
+                                "findings": findings,
+                                "schema": "beads-pr-review-normalization/v1",
+                                "self_heal_candidates": [{**candidate, "recommendation": recommendation}],
+                                "status": "success",
+                            }
+                        ),
+                    }
+
+                    result, _, _ = self.run_fixture(fixture)
+
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    payload = json.loads(result.stdout)
+                    self.assertEqual(payload["status"], "partial")
+                    self.assertEqual(payload["pr_review"]["status"], "partial")
+                    self.assertEqual(
+                        payload["pr_review"]["self_heal_candidates"][0]["recommendation"],
+                        "manual-triage",
+                    )
+                    self.assertIn(
+                        {"code": "invalid-normalizer-evidence", "scope": "pr-review"},
+                        payload["pr_review"]["errors"],
+                    )
+                    self.assertIn({"code": "normalizer-failed", "scope": "pr-review"}, payload["errors"])
+
+    def test_canonical_candidate_actions_preserve_matching_resolved_review_findings(self) -> None:
+        canonical_review_id = "aib-review.1"
+        finding = {
+            "canonical_review_id": canonical_review_id,
+            "context_status": "resolved",
+            "cooldown_until": "2026-08-14T04:05:00Z",
+            "duplicate_of": None,
+            "kind": "review-task",
+            "original_id": "aib-swr.1",
+            "pr_number": 41,
+            "pr_state": "OPEN",
+            "recommendation": "dispatch-canonical-review",
+            "review_id": canonical_review_id,
+        }
+        candidate = {
+            "canonical_review_id": canonical_review_id,
+            "context_status": "resolved",
+            "cooldown_until": "2026-08-14T04:05:00Z",
+            "original_id": "aib-swr.1",
+            "pr_number": 41,
+        }
+        for recommendation in ("review-wiring-current", "self-heal-original-wiring"):
+            with self.subTest(recommendation=recommendation):
+                fixture = {
+                    "in_progress": [],
+                    "blocked": [],
+                    "review_running": [],
+                    "normalizer_stdout": json.dumps(
+                        {
+                            "errors": [],
+                            "findings": [finding],
+                            "schema": "beads-pr-review-normalization/v1",
+                            "self_heal_candidates": [{**candidate, "recommendation": recommendation}],
+                            "status": "success",
+                        }
+                    ),
+                }
+
+                result, _, _ = self.run_fixture(fixture)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], "success")
+                self.assertEqual(payload["pr_review"]["status"], "success")
+                self.assertEqual(
+                    payload["pr_review"]["self_heal_candidates"][0]["recommendation"],
+                    recommendation,
+                )
+                self.assertEqual(payload["pr_review"]["errors"], [])
+
     def test_worktree_correlation_preserves_opaque_ids_containing_review(self) -> None:
         issue_id = "aib-release-review-preserve"
         fixture = {
