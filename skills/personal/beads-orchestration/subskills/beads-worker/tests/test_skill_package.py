@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import re
+import runpy
 import unittest
 from pathlib import Path
 
@@ -18,6 +19,15 @@ ASSERT_CONTEXT = SKILL_ROOT / "scripts" / "assert_worker_context.py"
 EMIT_REPORT = SKILL_ROOT / "scripts" / "emit_worker_report.py"
 RUNTIME_CONTRACT = SKILL_ROOT / "references" / "runtime-contract.md"
 WORKER_REPORT = SKILL_ROOT / "references" / "worker-report.md"
+AUDIT_SCRIPT = (
+    SKILL_ROOT.parents[2]
+    / "th-engineering"
+    / "subskills"
+    / "skill-standards"
+    / "scripts"
+    / "audit_skill.py"
+)
+COLLECT_LOCAL_LINKS = runpy.run_path(str(AUDIT_SCRIPT))["collect_local_links"]
 
 
 class BeadsWorkerPackageTests(unittest.TestCase):
@@ -35,7 +45,7 @@ class BeadsWorkerPackageTests(unittest.TestCase):
         contents = SKILL_MD.read_text(encoding="utf-8")
         self.assertIn("scripts/assert_worker_context.py", contents)
         self.assertIn("scripts/emit_worker_report.py", contents)
-        self.assertIn("references/known-errors.md", contents)
+        self.assertIn("references/known-errors.md", COLLECT_LOCAL_LINKS(SKILL_MD))
         self.assertIn("references/runtime-contract.md", contents)
         self.assertIn("references/worker-report.md", contents)
 
