@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import shutil
@@ -22,6 +23,13 @@ LINKER = REPO_ROOT / "scripts" / "link-ai-skills.sh"
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 AS_OF = "2026-08-14T00:00:00Z"
 AS_OF_DATETIME = datetime(2026, 8, 14, tzinfo=timezone.utc)
+
+
+AUDIT_MODULE_SPEC = importlib.util.spec_from_file_location("skill_usage_audit", AUDIT_SCRIPT)
+if AUDIT_MODULE_SPEC is None or AUDIT_MODULE_SPEC.loader is None:
+    raise RuntimeError("unable to load the audit script for behavioral tests")
+AUDIT_MODULE = importlib.util.module_from_spec(AUDIT_MODULE_SPEC)
+AUDIT_MODULE_SPEC.loader.exec_module(AUDIT_MODULE)
 
 CANDIDATES = [
     "using-superpowers",
@@ -88,6 +96,10 @@ def claude_skill_event(name: str) -> str:
     )
 
 
+def fixture_records(name: str) -> list[dict]:
+    return [json.loads(line) for line in (FIXTURES / name).read_text(encoding="utf-8").splitlines()]
+
+
 class CatalogManifestTests(unittest.TestCase):
     def test_manifest_reuses_linker_selection_without_creating_tool_homes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -152,6 +164,48 @@ class CatalogManifestTests(unittest.TestCase):
 
 
 class UsageAuditTests(unittest.TestCase):
+    def test_real_extractors_ignore_skill_like_decoys_in_unverified_event_fields(self) -> None:
+        claude_fixture = FIXTURES / "claude-events.jsonl"
+        codex_fixture = FIXTURES / "codex-events.jsonl"
+        claude_records = fixture_records("claude-events.jsonl")
+        codex_records = fixture_records("codex-events.jsonl")
+
+        user_contents = [
+            record["message"]["content"]
+            for record in claude_records
+            if record.get("type") == "user" and record.get("message", {}).get("role") == "user"
+        ]
+        self.assertTrue(
+            any(
+                "<command-message>" not in content
+                and "<command-name>/systematic-debugging</command-name>" in content
+                for content in user_contents
+            )
+        )
+        self.assertTrue(
+            any(
+                "<command-args><command-name>/systematic-debugging</command-name></command-args>" in content
+                for content in user_contents
+            )
+        )
+        self.assertTrue(
+            any(
+                record.get("payload", {}).get("type") == "function_call"
+                and record["payload"].get("name") != "read_file"
+                and json.loads(record["payload"]["arguments"]).get("path")
+                == "skills/personal/systematic-debugging/SKILL.md"
+                for record in codex_records
+            )
+        )
+
+        claude_counts = AUDIT_MODULE.scan_claude([claude_fixture])
+        codex_counts = AUDIT_MODULE.scan_codex([codex_fixture])
+
+        self.assertEqual(claude_counts["writing-plans"], 1)
+        self.assertEqual(codex_counts["test-driven-development"], 1)
+        self.assertEqual(claude_counts["systematic-debugging"], 0)
+        self.assertEqual(codex_counts["systematic-debugging"], 0)
+
     def make_complete_catalog(self, repo: Path) -> Path:
         entries = []
         for name in CANDIDATES:
@@ -330,6 +384,41 @@ class UsageAuditTests(unittest.TestCase):
             report = json.loads(result.stdout)
             self.assertFalse(report["coverage"]["complete"])
             self.assertEqual(matrix_row(report, "systematic-debugging")["disposition"], "insufficient-evidence")
+
+    def test_one_sided_coverage_keeps_zero_count_insufficient_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            source = write_skill(repo, "skills/personal/systematic-debugging")
+            manifest = write_manifest(
+                repo,
+                [{"name": "systematic-debugging", "source": str(source.relative_to(repo)), "ownership": "repo"}],
+            )
+            write_skill(repo, "skills/superpowers/skills/test-driven-development")
+            self.seed_old_repo_history(repo)
+            claude_dir = repo / "transcripts" / "claude"
+            codex_dir = repo / "transcripts" / "codex"
+            claude_dir.mkdir(parents=True)
+            codex_dir.mkdir(parents=True)
+            claude_history = claude_dir / "history.jsonl"
+            codex_recent = codex_dir / "recent.jsonl"
+            shutil.copyfile(FIXTURES / "claude-events.jsonl", claude_history)
+            shutil.copyfile(FIXTURES / "codex-events.jsonl", codex_recent)
+            set_mtime(claude_history, AS_OF_DATETIME - timedelta(days=100))
+            set_mtime(codex_recent, AS_OF_DATETIME - timedelta(days=2))
+
+            result = self.run_audit(repo, manifest, claude_dir, codex_dir)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            report = json.loads(result.stdout)
+            row = matrix_row(report, "systematic-debugging")
+            self.assertTrue(report["coverage"]["claude"]["coverage_complete"])
+            self.assertFalse(report["coverage"]["codex"]["coverage_complete"])
+            self.assertFalse(report["coverage"]["complete"])
+            self.assertEqual(row["freshness"], "established")
+            self.assertEqual(row["counts"]["primary"]["total"], 0)
+            self.assertEqual(row["disposition"], "insufficient-evidence")
+            self.assertEqual(row["protection_reason"], "incomplete-history")
 
     def test_thresholds_keep_marginal_and_zero_usage_in_review_only_states(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
