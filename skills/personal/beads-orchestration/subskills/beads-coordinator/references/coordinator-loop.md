@@ -93,7 +93,9 @@ Before creating or dispatching any review bead, dedupe by:
 - `external_ref` PR number on the original bead
 
 If multiple review beads refer to the same original bead or PR:
-- keep the oldest non-closed review bead as canonical
+- keep the oldest non-closed review bead by parsed creation chronology as canonical
+- if any candidate creation timestamp is invalid, emit partial manual triage;
+  never choose by raw timestamp text
 - remove stale `review-running` labels from duplicates
 - append notes to duplicates explaining they were superseded
 - close duplicates if safe, or leave them blocked for explicit cleanup if

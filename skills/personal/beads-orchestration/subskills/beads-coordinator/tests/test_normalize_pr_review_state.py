@@ -51,9 +51,18 @@ class FakeBinDir:
         return environment
 
 
-def run_normalizer(repo_root: Path, *, now: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def run_normalizer(
+    repo_root: Path,
+    *,
+    now: str,
+    env: dict[str, str],
+    resolver: Path | None = None,
+) -> subprocess.CompletedProcess[str]:
+    argv = [sys.executable, str(SCRIPT), "--repo-root", str(repo_root), "--now", now]
+    if resolver is not None:
+        argv.extend(["--resolver", str(resolver)])
     return subprocess.run(
-        [sys.executable, str(SCRIPT), "--repo-root", str(repo_root), "--now", now],
+        argv,
         capture_output=True,
         text=True,
         env=env,
@@ -239,6 +248,22 @@ class NormalizePrReviewStateTests(unittest.TestCase):
             fixture_path = root / "fixture.json"
             calls_path = root / "calls.jsonl"
             fixture_path.write_text(json.dumps(fixture), encoding="utf-8")
+            resolver = None
+            if "resolver_payload" in fixture:
+                resolver = root / "resolver.py"
+                resolver.write_text(
+                    "\n".join(
+                        (
+                            "import json",
+                            "import os",
+                            "import sys",
+                            "fixture = json.loads(open(os.environ['NORMALIZER_FIXTURE'], encoding='utf-8').read())",
+                            "print(json.dumps(fixture['resolver_payload']))",
+                            "raise SystemExit(int(fixture.get('resolver_exit', 0)))",
+                        )
+                    ),
+                    encoding="utf-8",
+                )
             install_fakes(fake_bin)
             result = run_normalizer(
                 repo_root,
@@ -247,6 +272,7 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                     NORMALIZER_FIXTURE=str(fixture_path),
                     NORMALIZER_CALLS=str(calls_path),
                 ),
+                resolver=resolver,
             )
             calls = [
                 json.loads(line)
@@ -299,6 +325,43 @@ class NormalizePrReviewStateTests(unittest.TestCase):
         )
         self.assertEqual(result.stderr, "")
 
+    def test_fake_commands_match_strict_read_only_argv_allowlists(self) -> None:
+        result, calls, repo_root = self.run_fixture(
+            {
+                "blocked_pr_review": [],
+                "blocked_pr_review_tasks": [],
+                "open_prs": [],
+            }
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        allowed = {
+            "bd": {
+                (
+                    "-C",
+                    repo_root,
+                    "list",
+                    "--status=blocked",
+                    "--label",
+                    "pr-review",
+                    "--json",
+                    "--limit",
+                    "0",
+                ),
+                ("-C", repo_root, "list", "--label", "pr-review-task", "--json", "--limit", "0"),
+            },
+            "gh": {("pr", "list", "--state", "open", "--json", "number,headRefName,createdAt")},
+            "git": set(),
+        }
+        self.assertTrue(calls)
+        for call in calls:
+            tool = call["tool"]
+            argv = call["argv"]
+            self.assertIsInstance(tool, str)
+            self.assertIsInstance(argv, list)
+            self.assertIn(tool, allowed, call)
+            self.assertIn(tuple(argv), allowed[tool], call)
+
     def test_preserves_dotted_child_and_reports_open_pr_cooldown(self) -> None:
         original_id = "aib-swr.1"
         review_id = "aib-review.1"
@@ -329,15 +392,15 @@ class NormalizePrReviewStateTests(unittest.TestCase):
         self.assertTrue(any(call["tool"] == "bd" for call in calls))
         self.assertTrue(any(call["tool"] == "gh" for call in calls))
 
-    def test_duplicate_review_tasks_choose_the_oldest_then_id_and_never_mutate(self) -> None:
+    def test_duplicate_review_tasks_choose_the_chronological_oldest_then_id(self) -> None:
         original_id = "aib-swr.1"
         first_review = "aib-review.1"
         duplicate_review = "aib-review.2"
         fixture = {
             "blocked_pr_review": [
                 original_bead(original_id, 41),
-                review_task(first_review, original_id, created_at="2026-08-14T03:00:00Z"),
-                review_task(duplicate_review, original_id, created_at="2026-08-14T03:00:00Z"),
+                review_task(first_review, original_id, created_at="2026-08-14T03:00:00+02:00"),
+                review_task(duplicate_review, original_id, created_at="2026-08-14T02:30:00Z"),
             ],
             "shows": {
                 original_id: [original_bead(original_id, 41)],
@@ -356,18 +419,117 @@ class NormalizePrReviewStateTests(unittest.TestCase):
         self.assertEqual(duplicate["canonical_review_id"], first_review)
         self.assertEqual(duplicate["duplicate_of"], first_review)
         self.assertEqual(duplicate["recommendation"], "dedupe-review-task")
-        def is_mutation(call: dict[str, object]) -> bool:
-            tool = call["tool"]
-            argv = call["argv"]
-            assert isinstance(tool, str)
-            assert isinstance(argv, list)
-            if tool == "bd":
-                return any(token in {"update", "close", "create"} for token in argv) or argv[:2] == ["dep", "add"] or argv[:2] == ["worktree", "remove"]
-            if tool == "git":
-                return "push" in argv or "branch" in argv
-            return argv[:2] in (["pr", "merge"], ["pr", "comment"])
 
-        self.assertFalse([call for call in calls if is_mutation(call)], calls)
+    def test_invalid_review_task_created_at_fails_closed_without_canonical_selection(self) -> None:
+        original_id = "aib-swr.1"
+        invalid_review = "aib-review.1"
+        other_review = "aib-review.2"
+        fixture = {
+            "blocked_pr_review": [
+                original_bead(original_id, 41),
+                review_task(invalid_review, original_id, created_at="not-a-timestamp"),
+                review_task(other_review, original_id, created_at="2026-08-14T03:00:00Z"),
+            ],
+            "shows": {
+                original_id: [original_bead(original_id, 41)],
+                invalid_review: review_show(invalid_review, original_id),
+                other_review: review_show(other_review, original_id),
+            },
+            "prs": {"41": pr_payload("OPEN")},
+            "open_prs": [],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertIn({"code": "invalid-created-at", "scope": "review-context"}, payload["errors"])
+        for review_id in (invalid_review, other_review):
+            finding = next(item for item in payload["findings"] if item["review_id"] == review_id)
+            self.assertEqual(finding["context_status"], "invalid-created-at")
+            self.assertIsNone(finding["canonical_review_id"])
+            self.assertIsNone(finding["duplicate_of"])
+            self.assertEqual(finding["recommendation"], "manual-triage")
+
+    def test_resolver_bool_pr_number_is_invalid_manual_triage(self) -> None:
+        review_id = "aib-review.1"
+        fixture = {
+            "blocked_pr_review": [review_task(review_id, "aib-swr.1")],
+            "resolver_payload": {"ok": True, "original_id": "aib-swr.1", "pr_number": True},
+            "prs": {"True": pr_payload("OPEN")},
+            "open_prs": [],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        finding = next(item for item in payload["findings"] if item["review_id"] == review_id)
+        self.assertEqual(finding["context_status"], "invalid-pr-number")
+        self.assertIsNone(finding["pr_number"])
+        self.assertEqual(finding["recommendation"], "manual-triage")
+        self.assertIn({"code": "invalid-pr-number", "scope": "review-context"}, payload["errors"])
+
+    def test_invalid_pr_created_at_is_partial_manual_triage_for_every_state(self) -> None:
+        original_id = "aib-swr.1"
+        review_id = "aib-review.1"
+        for state in ("OPEN", "CLOSED", "MERGED"):
+            with self.subTest(state=state):
+                fixture = {
+                    "blocked_pr_review": [original_bead(original_id, 41), review_task(review_id, original_id)],
+                    "shows": {
+                        original_id: [original_bead(original_id, 41)],
+                        review_id: review_show(review_id, original_id),
+                    },
+                    "prs": {"41": pr_payload(state, created_at="not-a-timestamp")},
+                    "open_prs": [],
+                }
+
+                result, _, _ = self.run_fixture(fixture)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], "partial")
+                for finding in payload["findings"]:
+                    self.assertEqual(finding["context_status"], "invalid-pr-created-at")
+                    self.assertIsNone(finding["pr_state"])
+                    self.assertEqual(finding["recommendation"], "manual-triage")
+                self.assertIn({"code": "invalid-pr-created-at", "scope": "pr-state"}, payload["errors"])
+
+    def test_malformed_open_pr_candidates_are_partial_manual_triage_never_self_heal(self) -> None:
+        original_id = "aib-swr.1"
+        cases = {
+            "bool-number": (
+                {"number": True, "headRefName": f"agent/{original_id}", "createdAt": "2026-08-14T03:00:00Z"},
+                "invalid-pr-number",
+                None,
+            ),
+            "invalid-created-at": (
+                {"number": 77, "headRefName": f"agent/{original_id}", "createdAt": "not-a-timestamp"},
+                "invalid-pr-created-at",
+                77,
+            ),
+        }
+        for name, (open_pr, error_code, expected_number) in cases.items():
+            with self.subTest(name=name):
+                fixture = {
+                    "blocked_pr_review": [],
+                    "shows": {original_id: [{"id": original_id, "status": "open", "labels": [], "external_ref": ""}]},
+                    "open_prs": [open_pr],
+                }
+
+                result, _, _ = self.run_fixture(fixture)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], "partial")
+                candidate = payload["self_heal_candidates"][0]
+                self.assertEqual(candidate["context_status"], error_code)
+                self.assertEqual(candidate["pr_number"], expected_number)
+                self.assertEqual(candidate["recommendation"], "manual-triage")
+                self.assertIn({"code": error_code, "scope": "open-prs"}, payload["errors"])
 
     def test_active_review_task_is_canonical_and_blocks_self_heal(self) -> None:
         original_id = "aib-swr.1"

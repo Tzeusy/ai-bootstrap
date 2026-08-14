@@ -230,9 +230,28 @@ class CleanupScanTests(unittest.TestCase):
             fixture_path = root / "fixture.json"
             calls_path = root / "calls.jsonl"
             fixture_path.write_text(json.dumps(fixture), encoding="utf-8")
+            normalizer = None
+            if "normalizer_stdout" in fixture:
+                normalizer = root / "normalizer.py"
+                normalizer.write_text(
+                    "\n".join(
+                        (
+                            "import json",
+                            "import os",
+                            "import sys",
+                            "fixture = json.loads(open(os.environ['CLEANUP_FIXTURE'], encoding='utf-8').read())",
+                            "print(fixture['normalizer_stdout'])",
+                            "raise SystemExit(int(fixture.get('normalizer_exit', 0)))",
+                        )
+                    ),
+                    encoding="utf-8",
+                )
             install_fakes(fake_bin)
+            argv = [sys.executable, str(SCRIPT), "--repo-root", str(repo_root), "--now", now]
+            if normalizer is not None:
+                argv.extend(["--normalizer", str(normalizer)])
             result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--repo-root", str(repo_root), "--now", now],
+                argv,
                 capture_output=True,
                 text=True,
                 env=fake_bin.env(
@@ -405,6 +424,103 @@ class CleanupScanTests(unittest.TestCase):
         self.assertEqual(review["original_id"], original_id)
         self.assertEqual(review["recommendation"], "dispatch-canonical-review")
 
+    def test_nonzero_normalizer_discards_even_valid_stdout_as_partial_manual_triage(self) -> None:
+        normalizer_payload = {
+            "errors": [],
+            "findings": [],
+            "generated_at": "2026-08-14T04:00:00Z",
+            "schema": "beads-pr-review-normalization/v1",
+            "self_heal_candidates": [
+                {
+                    "canonical_review_id": None,
+                    "context_status": "resolved",
+                    "cooldown_until": "2026-08-14T04:05:00Z",
+                    "original_id": "aib-swr.1",
+                    "pr_number": 41,
+                    "recommendation": "self-heal-original-and-review-wiring",
+                }
+            ],
+            "status": "success",
+        }
+        fixture = {
+            "in_progress": [],
+            "blocked": [],
+            "review_running": [],
+            "normalizer_stdout": json.dumps(normalizer_payload),
+            "normalizer_exit": 9,
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertEqual(payload["pr_review"]["status"], "partial")
+        self.assertEqual(payload["pr_review"]["findings"], [])
+        self.assertEqual(payload["pr_review"]["self_heal_candidates"], [])
+        self.assertIn({"code": "normalizer-failed", "scope": "pr-review"}, payload["errors"])
+
+    def test_cleanup_rejects_bool_pr_number_from_normalizer_evidence(self) -> None:
+        normalizer_payload = {
+            "errors": [],
+            "findings": [],
+            "schema": "beads-pr-review-normalization/v1",
+            "self_heal_candidates": [
+                {
+                    "canonical_review_id": None,
+                    "context_status": "resolved",
+                    "cooldown_until": "2026-08-14T04:05:00Z",
+                    "original_id": "aib-swr.1",
+                    "pr_number": True,
+                    "recommendation": "self-heal-original-and-review-wiring",
+                }
+            ],
+            "status": "success",
+        }
+        fixture = {
+            "in_progress": [],
+            "blocked": [],
+            "review_running": [],
+            "normalizer_stdout": json.dumps(normalizer_payload),
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertEqual(payload["pr_review"]["status"], "partial")
+        candidate = payload["pr_review"]["self_heal_candidates"][0]
+        self.assertEqual(candidate["context_status"], "invalid-pr-number")
+        self.assertIsNone(candidate["pr_number"])
+        self.assertEqual(candidate["recommendation"], "manual-triage")
+        self.assertIn({"code": "invalid-pr-number", "scope": "pr-review"}, payload["pr_review"]["errors"])
+
+    def test_worktree_correlation_preserves_opaque_ids_containing_review(self) -> None:
+        issue_id = "aib-release-review-preserve"
+        fixture = {
+            "in_progress": [],
+            "blocked": [],
+            "review_running": [],
+            "shows": {issue_id: [bead(issue_id, "closed")]},
+            "worktrees_raw": f"worktree /safe/parallel-agents/{issue_id}\\n",
+            "worktree_dirs": [issue_id],
+            "remote_branches": [issue_id],
+            "blocked_pr_review": [],
+            "blocked_pr_review_tasks": [],
+            "open_prs": [],
+        }
+
+        result, calls, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        worktree = json.loads(result.stdout)["worktrees"][0]
+        self.assertEqual(worktree["worktree_id"], issue_id)
+        self.assertEqual(worktree["issue_id"], issue_id)
+        self.assertEqual(worktree["issue_status"], "closed")
+        self.assertEqual(worktree["recommendation"], "cleanup-eligible-after-verification")
+        self.assertIn(["show", issue_id, "--json"], [call["argv"] for call in calls if call["tool"] == "bd"])
+
     def test_failed_git_evidence_never_recommends_releasing_a_stale_claim(self) -> None:
         secret = "TOKEN=top-secret /private/absolute/path Traceback"
         fixture = {
@@ -512,7 +628,7 @@ class CleanupScanTests(unittest.TestCase):
         for forbidden in ("TOKEN=top-secret", "/private/absolute/path", "Traceback"):
             self.assertNotIn(forbidden, fatal.stdout + fatal.stderr)
 
-    def test_no_fake_command_observes_a_mutation_capability(self) -> None:
+    def test_fake_commands_match_strict_read_only_argv_allowlists(self) -> None:
         fixture = {
             "in_progress": [],
             "blocked": [],
@@ -521,21 +637,40 @@ class CleanupScanTests(unittest.TestCase):
             "blocked_pr_review_tasks": [],
             "open_prs": [],
         }
-        result, calls, _ = self.run_fixture(fixture)
+        result, calls, repo_root = self.run_fixture(fixture)
         self.assertEqual(result.returncode, 0, result.stderr)
-
-        def is_mutation(call: dict[str, object]) -> bool:
+        allowed = {
+            "bd": {
+                (
+                    "-C",
+                    repo_root,
+                    "list",
+                    "--status=blocked",
+                    "--label",
+                    "pr-review",
+                    "--json",
+                    "--limit",
+                    "0",
+                ),
+                ("-C", repo_root, "list", "--label", "pr-review-task", "--json", "--limit", "0"),
+                ("-C", repo_root, "list", "--status=in_progress", "--json", "--limit", "0"),
+                ("-C", repo_root, "list", "--status=blocked", "--json", "--limit", "0"),
+                ("-C", repo_root, "list", "--label", "review-running", "--json", "--limit", "0"),
+                ("-C", repo_root, "worktree", "list"),
+                ("-C", repo_root, "dolt", "status"),
+                ("-C", repo_root, "doctor"),
+            },
+            "gh": {("pr", "list", "--state", "open", "--json", "number,headRefName,createdAt")},
+            "git": set(),
+        }
+        self.assertTrue(calls)
+        for call in calls:
             tool = call["tool"]
             argv = call["argv"]
-            assert isinstance(tool, str)
-            assert isinstance(argv, list)
-            if tool == "bd":
-                return any(token in {"update", "close", "create"} for token in argv) or argv[:2] == ["dep", "add"] or argv[:2] == ["worktree", "remove"]
-            if tool == "git":
-                return "push" in argv or "branch" in argv
-            return argv[:2] in (["pr", "merge"], ["pr", "comment"])
-
-        self.assertFalse([call for call in calls if is_mutation(call)], calls)
+            self.assertIsInstance(tool, str)
+            self.assertIsInstance(argv, list)
+            self.assertIn(tool, allowed, call)
+            self.assertIn(tuple(argv), allowed[tool], call)
 
     def test_invalid_bootstrap_never_echoes_a_secret_or_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

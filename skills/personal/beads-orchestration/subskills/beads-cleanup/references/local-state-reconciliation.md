@@ -56,8 +56,10 @@ The scanner reports `bd dolt status` and `bd doctor` as `healthy` or
 ## Pass 5b: Coordinator Worktrees And Branches
 
 Only inspect worktrees under `.worktrees/parallel-agents/`. The scanner emits
-safe worktree IDs rather than paths and correlates them with the base Bead,
-remote branch, and unpublished-work evidence.
+safe worktree IDs rather than paths and looks each opaque ID up as-is in
+Beads before correlating it with remote-branch and unpublished-work evidence.
+Never truncate an ID based on a name fragment such as `-review-`; an unknown
+exact ID is manual triage.
 
 | Bead state and evidence | Report recommendation |
 |---|---|

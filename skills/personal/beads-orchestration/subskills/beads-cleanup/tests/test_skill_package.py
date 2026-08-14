@@ -104,8 +104,12 @@ class BeadsCleanupPackageTests(unittest.TestCase):
         self.assertIn("Pass 4: Blocked Beads Whose Blockers Are Closed", local_state)
         self.assertIn("Pass 5a: Dolt Health", local_state)
         self.assertIn("Pass 6: Stale `review-running` Labels", local_state)
+        self.assertIn("opaque ID", local_state)
+        self.assertIn("Never truncate an ID", local_state)
         self.assertIn("Pass 2: Blocked Original Beads With `pr-review`", pr_recon)
         self.assertIn("Pass 3: Blocked `pr-review-task` Review Beads", pr_recon)
+        self.assertIn("partial\nmanual-triage", pr_recon)
+        self.assertIn("parsed creation\nchronology", pr_recon)
         self.assertIn("## Beads Cleanup Report", reporting)
         self.assertIn("| Metric | Count |", reporting)
 

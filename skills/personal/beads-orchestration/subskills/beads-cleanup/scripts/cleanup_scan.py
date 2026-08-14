@@ -151,6 +151,10 @@ def sanitize_id(value: object) -> str | None:
     return value if isinstance(value, str) and BEAD_ID_RE.fullmatch(value) else None
 
 
+def valid_pr_number(value: object) -> bool:
+    return type(value) is int and value > 0
+
+
 def sanitize_timestamp(value: object) -> str | None:
     timestamp = parse_time(value)
     return format_time(timestamp) if timestamp else None
@@ -174,7 +178,7 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
 
     valid_statuses = {"success", "empty", "partial", "fatal"}
     status = payload.get("status") if payload.get("status") in valid_statuses else "partial"
-    errors = []
+    errors: list[dict[str, str]] = []
     for item in payload.get("errors") if isinstance(payload.get("errors"), list) else []:
         if isinstance(item, dict):
             errors.append(
@@ -191,17 +195,26 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
         kind = item.get("kind") if item.get("kind") in {"original", "review-task"} else "review-task"
         state = item.get("pr_state") if item.get("pr_state") in {"OPEN", "CLOSED", "MERGED"} else None
         number = item.get("pr_number")
+        cooldown = sanitize_timestamp(item.get("cooldown_until"))
+        invalid_evidence = ""
+        if number is not None and not valid_pr_number(number):
+            invalid_evidence = "invalid-pr-number"
+        elif item.get("cooldown_until") is not None and cooldown is None:
+            invalid_evidence = "invalid-cooldown-until"
+        if invalid_evidence:
+            report_error(errors, invalid_evidence, "pr-review")
+            status = "partial"
         findings.append(
             {
                 "canonical_review_id": sanitize_id(item.get("canonical_review_id")),
-                "context_status": safe_code(item.get("context_status"), "command-failed"),
-                "cooldown_until": sanitize_timestamp(item.get("cooldown_until")),
+                "context_status": invalid_evidence or safe_code(item.get("context_status"), "command-failed"),
+                "cooldown_until": None if invalid_evidence else cooldown,
                 "duplicate_of": sanitize_id(item.get("duplicate_of")),
                 "kind": kind,
                 "original_id": sanitize_id(item.get("original_id")),
-                "pr_number": number if isinstance(number, int) and number > 0 else None,
+                "pr_number": number if valid_pr_number(number) else None,
                 "pr_state": state,
-                "recommendation": safe_code(item.get("recommendation"), "manual-triage"),
+                "recommendation": "manual-triage" if invalid_evidence else safe_code(item.get("recommendation"), "manual-triage"),
                 "review_id": sanitize_id(item.get("review_id")),
             }
         )
@@ -211,14 +224,23 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
         if not isinstance(item, dict):
             continue
         number = item.get("pr_number")
+        cooldown = sanitize_timestamp(item.get("cooldown_until"))
+        invalid_evidence = ""
+        if number is not None and not valid_pr_number(number):
+            invalid_evidence = "invalid-pr-number"
+        elif item.get("cooldown_until") is not None and cooldown is None:
+            invalid_evidence = "invalid-cooldown-until"
+        if invalid_evidence:
+            report_error(errors, invalid_evidence, "pr-review")
+            status = "partial"
         self_heal.append(
             {
                 "canonical_review_id": sanitize_id(item.get("canonical_review_id")),
-                "context_status": safe_code(item.get("context_status"), "command-failed"),
-                "cooldown_until": sanitize_timestamp(item.get("cooldown_until")),
+                "context_status": invalid_evidence or safe_code(item.get("context_status"), "command-failed"),
+                "cooldown_until": None if invalid_evidence else cooldown,
                 "original_id": sanitize_id(item.get("original_id")),
-                "pr_number": number if isinstance(number, int) and number > 0 else None,
-                "recommendation": safe_code(item.get("recommendation"), "manual-triage"),
+                "pr_number": number if valid_pr_number(number) else None,
+                "recommendation": "manual-triage" if invalid_evidence else safe_code(item.get("recommendation"), "manual-triage"),
             }
         )
 
@@ -239,7 +261,7 @@ def normalizer_report(args: argparse.Namespace, repo_root: Path) -> dict[str, An
         [sys.executable, str(args.normalizer), "--repo-root", str(repo_root), "--now", args.now],
         repo_root,
     )
-    if result is None:
+    if result is None or result.returncode != 0:
         return sanitize_normalizer(None)
     try:
         return sanitize_normalizer(json.loads(result.stdout))
@@ -256,10 +278,6 @@ def worktree_ids(result: subprocess.CompletedProcess[str] | None) -> tuple[list[
     for match in AGENT_BRANCH_RE.finditer(result.stdout):
         names.add(match.group(1))
     return sorted(names), None
-
-
-def base_issue_id(worktree_id: str) -> str:
-    return re.split(r"-(?:coord|stalefix|revive|review|clean[0-9]*)-", worktree_id, maxsplit=1)[0]
 
 
 def scan_claims(
@@ -409,7 +427,7 @@ def scan_worktrees(
         return []
     findings = []
     for worktree_id in names:
-        issue_id = base_issue_id(worktree_id)
+        issue_id = worktree_id
         payload, error = command_json(["bd", "show", issue_id, "--json"], repo_root)
         record = first_record(payload) if error is None else None
         status = bead_status(record) if isinstance(record, dict) else None
