@@ -14,6 +14,7 @@ paths into its report.
 
 import argparse
 import json
+import os
 import stat
 import subprocess
 import sys
@@ -98,6 +99,16 @@ CODEX_SKILL_READ_FUNCTION = "read_file"
 MAX_RECORD_BYTES = 1_048_576
 MAX_JSON_DEPTH = 64
 MAX_CONTAINER_MEMBERS = 1_024
+_SOURCE_DESCRIPTOR_FLAGS = (
+    getattr(os, "O_NOFOLLOW", None),
+    getattr(os, "O_DIRECTORY", None),
+    getattr(os, "O_NONBLOCK", None),
+)
+_SOURCE_DESCRIPTORS_SUPPORTED = (
+    all(isinstance(flag, int) and flag != 0 for flag in _SOURCE_DESCRIPTOR_FLAGS)
+    and os.open in os.supports_dir_fd
+    and os.scandir in os.supports_fd
+)
 _CANDIDATE_NAMES = tuple(profile[0] for profile in CANDIDATE_PROFILES)
 _CANDIDATE_BYTES = tuple(name.encode("ascii") for name in _CANDIDATE_NAMES)
 
@@ -240,6 +251,33 @@ class ScanOutcome:
     def __getitem__(self, name: str) -> int:
         """Keep direct extractor checks focused on primary aggregate counters."""
         return int(self.primary_counts[name])
+
+
+@dataclass(frozen=True)
+class SourceIdentity:
+    """The stable filesystem identity required for a source-bound descriptor."""
+
+    device: int
+    inode: int
+    file_type: int
+
+
+@dataclass(frozen=True)
+class BoundDirectory:
+    """A source-root-relative directory path with every ancestor identity."""
+
+    parts: Tuple[str, ...]
+    identities: Tuple[SourceIdentity, ...]
+
+
+@dataclass(frozen=True)
+class BoundTranscript:
+    """A discovered regular JSONL file that must reopen to its original inode."""
+
+    root: Path
+    parent: BoundDirectory
+    name: str
+    identity: SourceIdentity
 
 
 def _span_matches(data: bytes, span: Optional[JsonSpan], expected: bytes) -> bool:
@@ -927,17 +965,138 @@ def _extract_codex_record(data: bytes) -> Sequence[str]:
     return (name,) if name is not None else ()
 
 
+def _source_identity(metadata: os.stat_result) -> SourceIdentity:
+    """Keep only inode identity and file type needed to bind source handles."""
+    return SourceIdentity(
+        device=int(metadata.st_dev),
+        inode=int(metadata.st_ino),
+        file_type=stat.S_IFMT(metadata.st_mode),
+    )
+
+
+def _matches_identity(metadata: os.stat_result, expected: SourceIdentity, expected_type: int) -> bool:
+    """Require the discovered inode and expected regular-file or directory type."""
+    return expected.file_type == expected_type and _source_identity(metadata) == expected
+
+
+def _source_descriptors_supported() -> bool:
+    """Require the non-following descriptor primitives; never fall back to paths."""
+    return _SOURCE_DESCRIPTORS_SUPPORTED
+
+
+def _open_nonfollowing(path: Any, directory: bool, dir_fd: Optional[int] = None) -> int:
+    """Open one source path component without following links or blocking on swaps."""
+    if not _source_descriptors_supported():
+        raise OSError("non-following source descriptors are unavailable")
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+    if directory:
+        flags |= os.O_DIRECTORY
+    if dir_fd is None:
+        return os.open(path, flags)
+    return os.open(path, flags, dir_fd=dir_fd)
+
+
+def _snapshot_root(root: Path) -> BoundDirectory:
+    """Bind the configured source root before traversal can inspect a child."""
+    root_fd = _open_nonfollowing(root, directory=True)
+    try:
+        identity = _source_identity(os.fstat(root_fd))
+        if identity.file_type != stat.S_IFDIR:
+            raise OSError("configured source is not a directory")
+        return BoundDirectory((), (identity,))
+    finally:
+        os.close(root_fd)
+
+
+def _open_bound_directory(root: Path, directory: BoundDirectory) -> int:
+    """Reopen every ancestor below a non-following root and verify its identity."""
+    if len(directory.identities) != len(directory.parts) + 1:
+        raise OSError("source directory identity is incomplete")
+    directory_fd = _open_nonfollowing(root, directory=True)
+    try:
+        if not _matches_identity(os.fstat(directory_fd), directory.identities[0], stat.S_IFDIR):
+            raise OSError("configured source identity changed")
+        for part, expected in zip(directory.parts, directory.identities[1:]):
+            child_fd = _open_nonfollowing(part, directory=True, dir_fd=directory_fd)
+            try:
+                if not _matches_identity(os.fstat(child_fd), expected, stat.S_IFDIR):
+                    raise OSError("nested source identity changed")
+            except OSError:
+                os.close(child_fd)
+                raise
+            previous_fd = directory_fd
+            directory_fd = child_fd
+            try:
+                os.close(previous_fd)
+            except OSError:
+                os.close(directory_fd)
+                raise
+        return directory_fd
+    except OSError:
+        try:
+            os.close(directory_fd)
+        except OSError:
+            pass
+        raise
+
+
+def _binary_handle_from_fd(fd: int, expected: Optional[SourceIdentity]) -> Any:
+    """Validate a non-following descriptor before any transcript bytes are read."""
+    try:
+        metadata = os.fstat(fd)
+        if stat.S_IFMT(metadata.st_mode) != stat.S_IFREG:
+            raise OSError("source is not a regular file")
+        if expected is not None and not _matches_identity(metadata, expected, stat.S_IFREG):
+            raise OSError("source file identity changed")
+        return os.fdopen(fd, "rb")
+    except OSError:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        raise
+
+
+def _open_bound_transcript(transcript: BoundTranscript) -> Any:
+    """Open only the discovered regular file through identity-bound directories."""
+    parent_fd = _open_bound_directory(transcript.root, transcript.parent)
+    try:
+        file_fd = _open_nonfollowing(transcript.name, directory=False, dir_fd=parent_fd)
+    finally:
+        os.close(parent_fd)
+    return _binary_handle_from_fd(file_fd, transcript.identity)
+
+
+def _open_unbound_transcript(entry_path: Path) -> Any:
+    """Keep direct extractor tests non-following even without an inventory snapshot."""
+    parent_fd = _open_nonfollowing(entry_path.parent, directory=True)
+    try:
+        file_fd = _open_nonfollowing(entry_path.name, directory=False, dir_fd=parent_fd)
+    finally:
+        os.close(parent_fd)
+    return _binary_handle_from_fd(file_fd, None)
+
+
+def _open_transcript(entry: Any) -> Any:
+    """Select the only supported source handles; path fallback remains non-following."""
+    if isinstance(entry, BoundTranscript):
+        return _open_bound_transcript(entry)
+    if isinstance(entry, Path):
+        return _open_unbound_transcript(entry)
+    raise OSError("source handle is invalid")
+
+
 def _scan_records(
-    files: Sequence[Path],
-    sensitivity_files: Sequence[Path],
+    files: Sequence[Any],
+    sensitivity_files: Sequence[Any],
     extractor: Callable[[bytes], Sequence[str]],
 ) -> ScanOutcome:
     """Read bounded raw records once, count safe names, and surface every input failure."""
     outcome = ScanOutcome(Counter(), Counter())
     sensitivity = set(sensitivity_files)
-    for entry_path in files:
+    for entry in files:
         try:
-            with entry_path.open("rb") as handle:
+            with _open_transcript(entry) as handle:
                 while True:
                     raw_line = handle.readline(MAX_RECORD_BYTES + 1)
                     if not raw_line:
@@ -959,72 +1118,107 @@ def _scan_records(
                         outcome.input_errors += 1
                         continue
                     outcome.primary_counts.update(names)
-                    if entry_path in sensitivity:
+                    if entry in sensitivity:
                         outcome.sensitivity_counts.update(names)
         except OSError:
             outcome.input_errors += 1
     return outcome
 
 
-def scan_claude(files: Sequence[Path], sensitivity_files: Sequence[Path] = ()) -> ScanOutcome:
+def scan_claude(files: Sequence[Any], sensitivity_files: Sequence[Any] = ()) -> ScanOutcome:
     """Count only verified Claude event fields without decoding record bodies."""
     return _scan_records(files, sensitivity_files, _extract_claude_record)
 
 
-def scan_codex(files: Sequence[Path], sensitivity_files: Sequence[Path] = ()) -> ScanOutcome:
+def scan_codex(files: Sequence[Any], sensitivity_files: Sequence[Any] = ()) -> ScanOutcome:
     """Count only verified Codex read_file paths without decoding arguments objects."""
     return _scan_records(files, sensitivity_files, _extract_codex_record)
 
 
-def _discover_jsonl_files(root: Path) -> Tuple[List[Tuple[datetime, Path]], int]:
-    """Recursively retain JSONL handles while recording every traversal failure."""
-    candidates: List[Tuple[datetime, Path]] = []
+def _discover_jsonl_files(root: Path, root_directory: BoundDirectory) -> Tuple[List[Tuple[datetime, BoundTranscript]], int]:
+    """Discover only non-link JSONL sources whose queued ancestors stay bound."""
+    candidates: List[Tuple[datetime, BoundTranscript]] = []
     input_errors = 0
-    pending = [root]
+    pending = [root_directory]
     while pending:
         directory = pending.pop()
         try:
-            for entry_path in directory.iterdir():
-                try:
-                    entry_lstat = entry_path.lstat()
-                    if stat.S_ISLNK(entry_lstat.st_mode):
-                        continue
-                    entry_stat = entry_path.stat()
-                except OSError:
-                    input_errors += 1
-                    continue
-                if stat.S_ISDIR(entry_stat.st_mode):
-                    pending.append(entry_path)
-                elif stat.S_ISREG(entry_stat.st_mode) and entry_path.suffix == ".jsonl":
-                    try:
-                        observed = datetime.fromtimestamp(entry_stat.st_mtime, tz=UTC)
-                    except (OSError, OverflowError, ValueError):
-                        input_errors += 1
-                        continue
-                    candidates.append((observed, entry_path))
+            directory_fd = _open_bound_directory(root, directory)
         except OSError:
             input_errors += 1
+            continue
+        try:
+            scan_fd = os.dup(directory_fd)
+        except OSError:
+            input_errors += 1
+            try:
+                os.close(directory_fd)
+            except OSError:
+                pass
+            continue
+        try:
+            with os.scandir(scan_fd) as entries:
+                for entry in entries:
+                    try:
+                        entry_stat = entry.stat(follow_symlinks=False)
+                        entry_identity = _source_identity(entry_stat)
+                    except (OSError, TypeError, ValueError):
+                        input_errors += 1
+                        continue
+                    if entry_identity.file_type == stat.S_IFLNK:
+                        input_errors += 1
+                    elif entry_identity.file_type == stat.S_IFDIR:
+                        pending.append(
+                            BoundDirectory(
+                                directory.parts + (entry.name,),
+                                directory.identities + (entry_identity,),
+                            )
+                        )
+                    elif entry_identity.file_type == stat.S_IFREG and entry.name.endswith(".jsonl"):
+                        try:
+                            observed = datetime.fromtimestamp(entry_stat.st_mtime, tz=UTC)
+                        except (OSError, OverflowError, ValueError):
+                            input_errors += 1
+                            continue
+                        candidates.append(
+                            (
+                                observed,
+                                BoundTranscript(root, directory, entry.name, entry_identity),
+                            )
+                        )
+        except (OSError, TypeError, ValueError, NotImplementedError):
+            input_errors += 1
+        finally:
+            try:
+                os.close(scan_fd)
+            except OSError:
+                pass
+            try:
+                os.close(directory_fd)
+            except OSError:
+                input_errors += 1
     return candidates, input_errors
 
 
-def transcript_window(root: Path, as_of: datetime, primary_start: datetime, sensitivity_start: datetime) -> Tuple[Dict[str, Any], List[Path], List[Path]]:
+def transcript_window(root: Path, as_of: datetime, primary_start: datetime, sensitivity_start: datetime) -> Tuple[Dict[str, Any], List[BoundTranscript], List[BoundTranscript]]:
     """Return only aggregate availability metadata plus file handles for scanning."""
     input_errors = 0
-    candidates: List[Tuple[datetime, Path]] = []
+    candidates: List[Tuple[datetime, BoundTranscript]] = []
     try:
-        available = stat.S_ISDIR(root.stat().st_mode)
+        root_directory = _snapshot_root(root)
+        available = True
     except OSError:
         available = False
         input_errors += 1
     if available:
-        discovered, discovery_errors = _discover_jsonl_files(root)
+        discovered, discovery_errors = _discover_jsonl_files(root, root_directory)
         input_errors += discovery_errors
-        candidates = [(observed, entry_path) for observed, entry_path in discovered if observed <= as_of]
+        candidates = [(observed, transcript) for observed, transcript in discovered if observed <= as_of]
 
     candidates.sort(key=lambda item: item[0])
     earliest = candidates[0][0] if candidates else None
-    primary = [entry_path for observed, entry_path in candidates if observed >= primary_start]
-    sensitivity = [entry_path for observed, entry_path in candidates if observed >= sensitivity_start]
+    primary = [transcript for observed, transcript in candidates if observed >= primary_start]
+    sensitivity = [transcript for observed, transcript in candidates if observed >= sensitivity_start]
     metadata = {
         "available": bool(available and input_errors == 0),
         "files_available": len(candidates),
