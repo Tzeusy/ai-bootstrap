@@ -17,6 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+      - name: Run audit behavioral regressions
+        run: uv run --script skills/personal/th-tooling/subskills/audit-skill-hygiene/tests/test_skill_usage_audit.py
       - name: Self-test the audit script
         run: uv run skills/personal/th-engineering/subskills/skill-standards/tests/run_tests.py
       - name: Audit personal skill packages
