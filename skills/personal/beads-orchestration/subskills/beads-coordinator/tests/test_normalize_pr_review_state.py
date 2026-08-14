@@ -907,6 +907,136 @@ class NormalizePrReviewStateTests(unittest.TestCase):
             )
         )
 
+    def test_malformed_original_reference_in_one_scope_manualizes_the_collection(self) -> None:
+        malformed_original_id = "aib-swr.1"
+        valid_original_id = "aib-swr.2"
+        malformed_review_id = "aib-review.1"
+        valid_review_id = "aib-review.2"
+        valid_pr = {
+            **pr_payload("OPEN"),
+            "number": 42,
+            "url": "https://github.com/owner/repo/pull/42",
+            "headRefName": f"agent/{valid_original_id}",
+        }
+        fixture = {
+            "blocked_pr_review": [
+                {
+                    "id": malformed_original_id,
+                    "labels": ["pr-review"],
+                    "external_ref": "gh-pr:0",
+                    "status": "blocked",
+                },
+                original_bead(valid_original_id, 42),
+                review_task(malformed_review_id, malformed_original_id),
+                review_task(valid_review_id, valid_original_id),
+            ],
+            "resolver_payloads": {
+                malformed_review_id: {
+                    "ok": True,
+                    "original_id": malformed_original_id,
+                    "pr_number": 41,
+                },
+                valid_review_id: {"ok": True, "original_id": valid_original_id, "pr_number": 42},
+            },
+            "shows": {valid_original_id: [original_bead(valid_original_id, 42)]},
+            "prs": {"42": valid_pr},
+            "open_prs": [
+                {
+                    "number": 42,
+                    "headRefName": f"agent/{valid_original_id}",
+                    "createdAt": "2026-08-14T03:00:00Z",
+                }
+            ],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertIn({"code": "invalid-pr-number", "scope": "original-context"}, payload["errors"])
+        self.assertTrue(payload["findings"])
+        self.assertTrue(
+            all(finding["recommendation"] == "manual-triage" for finding in payload["findings"])
+        )
+        self.assertTrue(
+            all(finding["canonical_review_id"] is None for finding in payload["findings"])
+        )
+        self.assertTrue(payload["self_heal_candidates"])
+        self.assertTrue(
+            all(
+                candidate["recommendation"] == "manual-triage"
+                for candidate in payload["self_heal_candidates"]
+            )
+        )
+        self.assertTrue(
+            all(
+                candidate["canonical_review_id"] is None
+                for candidate in payload["self_heal_candidates"]
+            )
+        )
+
+    def test_original_lookup_failure_in_one_scope_manualizes_the_collection(self) -> None:
+        failed_original_id = "aib-swr.1"
+        valid_original_id = "aib-swr.2"
+        failed_review_id = "aib-review.1"
+        valid_review_id = "aib-review.2"
+        valid_pr = {
+            **pr_payload("OPEN"),
+            "number": 42,
+            "url": "https://github.com/owner/repo/pull/42",
+            "headRefName": f"agent/{valid_original_id}",
+        }
+        fixture = {
+            "blocked_pr_review": [
+                {"id": failed_original_id, "labels": ["pr-review"], "status": "blocked"},
+                original_bead(valid_original_id, 42),
+                review_task(failed_review_id, failed_original_id),
+                review_task(valid_review_id, valid_original_id),
+            ],
+            "resolver_payloads": {
+                failed_review_id: {"ok": True, "original_id": failed_original_id, "pr_number": 41},
+                valid_review_id: {"ok": True, "original_id": valid_original_id, "pr_number": 42},
+            },
+            "shows": {valid_original_id: [original_bead(valid_original_id, 42)]},
+            "prs": {"42": valid_pr},
+            "open_prs": [
+                {
+                    "number": 42,
+                    "headRefName": f"agent/{valid_original_id}",
+                    "createdAt": "2026-08-14T03:00:00Z",
+                }
+            ],
+            "failures": {"bd-show:aib-swr.1": "read failed"},
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertIn({"code": "command-failed", "scope": "original-context"}, payload["errors"])
+        self.assertTrue(payload["findings"])
+        self.assertTrue(
+            all(finding["recommendation"] == "manual-triage" for finding in payload["findings"])
+        )
+        self.assertTrue(
+            all(finding["canonical_review_id"] is None for finding in payload["findings"])
+        )
+        self.assertTrue(payload["self_heal_candidates"])
+        self.assertTrue(
+            all(
+                candidate["recommendation"] == "manual-triage"
+                for candidate in payload["self_heal_candidates"]
+            )
+        )
+        self.assertTrue(
+            all(
+                candidate["canonical_review_id"] is None
+                for candidate in payload["self_heal_candidates"]
+            )
+        )
+
     def test_resolver_bool_pr_number_is_invalid_manual_triage(self) -> None:
         review_id = "aib-review.1"
         fixture = {

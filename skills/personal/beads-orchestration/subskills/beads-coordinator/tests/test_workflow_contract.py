@@ -12,6 +12,7 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 LOOP = SKILL_ROOT / "references" / "coordinator-loop.md"
 SAFETY = SKILL_ROOT / "references" / "runtime-and-safety.md"
 NORMALIZER = SKILL_ROOT / "scripts" / "normalize_pr_review_state.py"
+SKILL_AUDIT_WORKFLOW = SKILL_ROOT.parents[4] / ".github" / "workflows" / "skill-audit.yml"
 
 
 class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
@@ -122,6 +123,22 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         self.assertIn("parsed creation chronology", contents)
         self.assertIn("partial manual triage", contents)
         self.assertIn("never choose by raw timestamp text", contents)
+
+    def test_pr_ci_runs_only_the_report_only_fake_command_suites(self) -> None:
+        contents = SKILL_AUDIT_WORKFLOW.read_text(encoding="utf-8")
+        marker = "      - name: Run report-only Beads safety suites"
+        self.assertIn(marker, contents)
+        step = contents.split(marker, 1)[1].split(
+            "      - name:", 1
+        )[0]
+        for command in (
+            "uv run skills/personal/beads-orchestration/subskills/beads-coordinator/tests/test_normalize_pr_review_state.py",
+            "uv run skills/personal/beads-orchestration/subskills/beads-cleanup/tests/test_cleanup_scan.py",
+            "uv run skills/personal/beads-orchestration/subskills/beads-pr-reviewer-worker/tests/test_scripts.py",
+        ):
+            self.assertIn(command, step)
+        self.assertNotIn("bd ", step)
+        self.assertNotIn("gh ", step)
 
 
 if __name__ == "__main__":
