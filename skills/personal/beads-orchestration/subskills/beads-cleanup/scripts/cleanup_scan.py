@@ -187,6 +187,8 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
                     "scope": safe_code(item.get("scope"), "pr-review"),
                 }
             )
+    if errors:
+        status = "partial"
 
     findings = []
     for item in payload.get("findings") if isinstance(payload.get("findings"), list) else []:
