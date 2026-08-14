@@ -16,6 +16,10 @@ Immediately before any coordinator action, re-verify the current PR, Beads,
 assignee, and heartbeat state. Scan findings are evidence, not authorization.
 A nonzero delegated normalizer or malformed PR evidence is a partial
 manual-triage result even when its stdout parses.
+A zero-exit delegated envelope must provide list-shaped `errors`, `findings`,
+and `self_heal_candidates` collections whose status matches its evidence.
+Otherwise cleanup downgrades the nested and outer reports to partial manual
+triage and preserves no actionable recommendation.
 
 ## Pass 2: Blocked Original Beads With `pr-review`
 

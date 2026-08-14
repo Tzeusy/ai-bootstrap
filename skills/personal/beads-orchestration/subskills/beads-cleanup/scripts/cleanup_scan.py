@@ -177,9 +177,22 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
         }
 
     valid_statuses = {"success", "empty", "partial", "fatal"}
-    status = payload.get("status") if payload.get("status") in valid_statuses else "partial"
+    supplied_status = payload.get("status")
+    status_is_valid = isinstance(supplied_status, str) and supplied_status in valid_statuses
+    status = supplied_status if status_is_valid else "partial"
     errors: list[dict[str, str]] = []
-    for item in payload.get("errors") if isinstance(payload.get("errors"), list) else []:
+    collections: dict[str, list[Any]] = {}
+    for field in ("errors", "findings", "self_heal_candidates"):
+        value = payload.get(field)
+        if isinstance(value, list):
+            collections[field] = value
+        else:
+            collections[field] = []
+            report_error(errors, "invalid-normalizer-envelope", "pr-review")
+    if not status_is_valid:
+        report_error(errors, "invalid-normalizer-envelope", "pr-review")
+
+    for item in collections["errors"]:
         if isinstance(item, dict):
             errors.append(
                 {
@@ -187,12 +200,13 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
                     "scope": safe_code(item.get("scope"), "pr-review"),
                 }
             )
-    if errors:
-        status = "partial"
+        else:
+            report_error(errors, "invalid-normalizer-envelope", "pr-review")
 
     findings = []
-    for item in payload.get("findings") if isinstance(payload.get("findings"), list) else []:
+    for item in collections["findings"]:
         if not isinstance(item, dict):
+            report_error(errors, "invalid-normalizer-envelope", "pr-review")
             continue
         kind = item.get("kind") if item.get("kind") in {"original", "review-task"} else "review-task"
         state = item.get("pr_state") if item.get("pr_state") in {"OPEN", "CLOSED", "MERGED"} else None
@@ -222,8 +236,9 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
         )
 
     self_heal = []
-    for item in payload.get("self_heal_candidates") if isinstance(payload.get("self_heal_candidates"), list) else []:
+    for item in collections["self_heal_candidates"]:
         if not isinstance(item, dict):
+            report_error(errors, "invalid-normalizer-envelope", "pr-review")
             continue
         number = item.get("pr_number")
         cooldown = sanitize_timestamp(item.get("cooldown_until"))
@@ -245,6 +260,22 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
                 "recommendation": "manual-triage" if invalid_evidence else safe_code(item.get("recommendation"), "manual-triage"),
             }
         )
+
+    if status == "empty" and (errors or findings or self_heal):
+        report_error(errors, "inconsistent-normalizer-status", "pr-review")
+    elif status == "success" and errors:
+        report_error(errors, "inconsistent-normalizer-status", "pr-review")
+    elif status in {"partial", "fatal"} and not errors:
+        report_error(errors, "inconsistent-normalizer-status", "pr-review")
+    elif status == "fatal" and (findings or self_heal):
+        report_error(errors, "inconsistent-normalizer-status", "pr-review")
+
+    if errors:
+        status = "partial"
+        for item in findings:
+            item["recommendation"] = "manual-triage"
+        for item in self_heal:
+            item["recommendation"] = "manual-triage"
 
     findings.sort(key=lambda item: (str(item["original_id"] or ""), str(item["review_id"] or "")))
     self_heal.sort(key=lambda item: (str(item["original_id"] or ""), int(item["pr_number"] or 0)))

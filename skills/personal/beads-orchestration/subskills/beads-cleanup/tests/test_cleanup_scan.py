@@ -501,7 +501,16 @@ class CleanupScanTests(unittest.TestCase):
             "errors": [{"code": "invalid-pr-created-at", "scope": "pr-state"}],
             "findings": [],
             "schema": "beads-pr-review-normalization/v1",
-            "self_heal_candidates": [],
+            "self_heal_candidates": [
+                {
+                    "canonical_review_id": None,
+                    "context_status": "resolved",
+                    "cooldown_until": "2026-08-14T04:05:00Z",
+                    "original_id": "aib-swr.1",
+                    "pr_number": 41,
+                    "recommendation": "self-heal-original-and-review-wiring",
+                }
+            ],
             "status": "success",
         }
         fixture = {
@@ -518,7 +527,92 @@ class CleanupScanTests(unittest.TestCase):
         self.assertEqual(payload["status"], "partial")
         self.assertEqual(payload["pr_review"]["status"], "partial")
         self.assertIn({"code": "invalid-pr-created-at", "scope": "pr-state"}, payload["pr_review"]["errors"])
+        self.assertEqual(payload["pr_review"]["self_heal_candidates"][0]["recommendation"], "manual-triage")
         self.assertIn({"code": "normalizer-failed", "scope": "pr-review"}, payload["errors"])
+
+    def test_empty_normalizer_with_actionable_candidate_is_partial_manual_triage(self) -> None:
+        normalizer_payload = {
+            "errors": [],
+            "findings": [],
+            "schema": "beads-pr-review-normalization/v1",
+            "self_heal_candidates": [
+                {
+                    "canonical_review_id": None,
+                    "context_status": "resolved",
+                    "cooldown_until": "2026-08-14T04:05:00Z",
+                    "original_id": "aib-swr.1",
+                    "pr_number": 41,
+                    "recommendation": "self-heal-original-and-review-wiring",
+                }
+            ],
+            "status": "empty",
+        }
+        fixture = {
+            "in_progress": [],
+            "blocked": [],
+            "review_running": [],
+            "normalizer_stdout": json.dumps(normalizer_payload),
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertEqual(payload["pr_review"]["status"], "partial")
+        candidate = payload["pr_review"]["self_heal_candidates"][0]
+        self.assertEqual(candidate["recommendation"], "manual-triage")
+        self.assertIn({"code": "inconsistent-normalizer-status", "scope": "pr-review"}, payload["pr_review"]["errors"])
+        self.assertIn({"code": "normalizer-failed", "scope": "pr-review"}, payload["errors"])
+
+    def test_malformed_or_missing_normalizer_collections_fail_closed(self) -> None:
+        cases = {
+            "missing-errors": {
+                "findings": [],
+                "schema": "beads-pr-review-normalization/v1",
+                "self_heal_candidates": [],
+                "status": "success",
+            },
+            "malformed-findings": {
+                "errors": [],
+                "findings": {},
+                "schema": "beads-pr-review-normalization/v1",
+                "self_heal_candidates": [],
+                "status": "success",
+            },
+            "missing-self-heal-candidates": {
+                "errors": [],
+                "findings": [],
+                "schema": "beads-pr-review-normalization/v1",
+                "status": "empty",
+            },
+            "malformed-status": {
+                "errors": [],
+                "findings": [],
+                "schema": "beads-pr-review-normalization/v1",
+                "self_heal_candidates": [],
+                "status": [],
+            },
+        }
+        for name, normalizer_payload in cases.items():
+            with self.subTest(name=name):
+                fixture = {
+                    "in_progress": [],
+                    "blocked": [],
+                    "review_running": [],
+                    "normalizer_stdout": json.dumps(normalizer_payload),
+                }
+
+                result, _, _ = self.run_fixture(fixture)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], "partial")
+                self.assertEqual(payload["pr_review"]["status"], "partial")
+                self.assertIn({"code": "invalid-normalizer-envelope", "scope": "pr-review"}, payload["pr_review"]["errors"])
+                self.assertEqual(payload["pr_review"]["findings"], [])
+                self.assertEqual(payload["pr_review"]["self_heal_candidates"], [])
+                self.assertIn({"code": "normalizer-failed", "scope": "pr-review"}, payload["errors"])
 
     def test_worktree_correlation_preserves_opaque_ids_containing_review(self) -> None:
         issue_id = "aib-release-review-preserve"
