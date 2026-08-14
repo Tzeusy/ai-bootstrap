@@ -24,9 +24,8 @@ def load_gate_module():
 
 
 class SuccessorAttemptGateTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls.gate = load_gate_module()
+    def setUp(self) -> None:
+        self.gate = load_gate_module()
 
     def valid_request(self):
         return self.gate.SuccessorAttemptGateRequest(
@@ -47,25 +46,75 @@ class SuccessorAttemptGateTests(unittest.TestCase):
             "fresh-independent-high-risk-privacy-accounting-review",
         )
 
+    def assert_denial(self, decision, code: str) -> None:
+        self.assertIsInstance(decision, self.gate.CandidateReviewDecision)
+        self.assertEqual(decision.status, "candidate-denied")
+        self.assertEqual(decision.execution_authority, "none")
+        self.assertEqual(decision.required_next_gate, self.gate.REQUIRED_NEXT_GATE)
+        self.assertEqual(decision.denial_code, code)
+
     def test_rejects_a_reset_of_the_consumed_predecessor_attempt(self) -> None:
         reset_predecessor = replace(self.gate.PREDECESSOR_GATE, attempt_consumed=False)
         request = replace(self.valid_request(), predecessor=reset_predecessor)
 
-        with self.assertRaisesRegex(self.gate.PredecessorBindingRejected, "predecessor-binding"):
-            self.gate.bind_successor_attempt_gate(request)
+        self.assert_denial(
+            self.gate.bind_successor_attempt_gate(request),
+            "predecessor-binding",
+        )
 
     def test_rejects_a_different_predecessor_head_or_gate_identifier(self) -> None:
         different_head = replace(
             self.gate.PREDECESSOR_GATE,
             exact_head="0" * 40,
         )
-        with self.assertRaisesRegex(self.gate.PredecessorBindingRejected, "predecessor-binding"):
-            self.gate.bind_successor_attempt_gate(replace(self.valid_request(), predecessor=different_head))
-
-        with self.assertRaisesRegex(self.gate.PredecessorBindingRejected, "successor-gate-id"):
+        self.assert_denial(
             self.gate.bind_successor_attempt_gate(
+                replace(self.valid_request(), predecessor=different_head)
+            ),
+            "predecessor-binding",
+        )
+
+        different_gate_protocol = self.gate.SuccessorAttemptGateProtocol()
+        self.assert_denial(
+            different_gate_protocol.bind(
                 replace(self.valid_request(), successor_gate_id="aib-alo-attempt-0003")
-            )
+            ),
+            "successor-gate-id",
+        )
+
+    def test_duplicate_valid_request_is_denied_after_the_one_shot_binding(self) -> None:
+        request = self.valid_request()
+
+        accepted = self.gate.bind_successor_attempt_gate(request)
+        duplicate = self.gate.bind_successor_attempt_gate(request)
+
+        self.assertEqual(accepted.status, "candidate-review-required")
+        self.assertEqual(accepted.execution_authority, "none")
+        self.assert_denial(duplicate, "attempt-already-consumed")
+
+    def test_none_and_malformed_requests_return_schema_valid_denials(self) -> None:
+        protocol = self.gate.SuccessorAttemptGateProtocol()
+
+        self.assert_denial(protocol.bind(None), "request-schema")
+        self.assert_denial(protocol.bind(self.valid_request()), "attempt-already-consumed")
+
+        malformed_request_protocol = self.gate.SuccessorAttemptGateProtocol()
+        self.assert_denial(malformed_request_protocol.bind(object()), "request-schema")
+
+        malformed_protocol = self.gate.SuccessorAttemptGateProtocol()
+        malformed_request = self.gate.SuccessorAttemptGateRequest(
+            successor_gate_id=self.gate.SUCCESSOR_GATE_ID,
+            predecessor=object(),
+        )
+        self.assert_denial(malformed_protocol.bind(malformed_request), "predecessor-schema")
+
+    def test_malformed_gate_identifier_is_a_denial_not_an_exception(self) -> None:
+        request = self.gate.SuccessorAttemptGateRequest(
+            successor_gate_id=None,
+            predecessor=self.gate.PREDECESSOR_GATE,
+        )
+
+        self.assert_denial(self.gate.bind_successor_attempt_gate(request), "successor-gate-id")
 
     def test_module_offers_no_target_or_execution_surface(self) -> None:
         source = GATE_PATH.read_text(encoding="utf-8")

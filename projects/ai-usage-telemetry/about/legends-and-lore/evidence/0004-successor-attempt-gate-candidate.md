@@ -29,20 +29,33 @@ The bound state is immutable within the protocol: `attempt_consumed=True`,
 `disposition="unresolved"`, `starts=0`, and `completions=0`. A request is
 accepted only when its complete frozen predecessor value is equal to that
 fixed record and its gate ID is exactly
-`aib-g0k-successor-attempt-gate-0004`. Any changed head, digest, consumed flag,
-result, count, or identifier raises `PredecessorBindingRejected`. The protocol
-therefore cannot reset, replace, or bypass the consumed predecessor attempt.
+`aib-g0k-successor-attempt-gate-0004`. That fixed gate ID is the one attempt
+identity. Each protocol instance starts as `proposed` and has exactly one
+terminal transition: a valid binding becomes `reviewed-candidate`; malformed,
+tampered, or mismatched input becomes `denied`. Either terminal state denies
+every retry. The protocol therefore cannot reset, replace, or bypass the
+consumed predecessor attempt.
 
 ## Candidate-only decision
 
-`bind_successor_attempt_gate()` is a pure in-memory function. It accepts only
-the fixed binding and produces one safe result:
+`bind_successor_attempt_gate()` is the default one-shot in-memory protocol;
+tests may construct a fresh `SuccessorAttemptGateProtocol` only to prove state
+transitions with fake data. It accepts only the fixed binding and produces a
+schema-valid, content-free decision:
 
 | Result field | Fixed value |
 |---|---|
 | `status` | `candidate-review-required` |
 | `execution_authority` | `none` |
 | `required_next_gate` | `fresh-independent-high-risk-privacy-accounting-review` |
+| accepted `denial_code` | `none` |
+
+Malformed request/predecessor shapes, any changed binding field, and every
+duplicate or retry return `status="candidate-denied"`, retain the canonical
+predecessor fields and `execution_authority="none"`, and carry only an
+allowlisted denial code (for example `request-schema`, `predecessor-schema`,
+`predecessor-binding`, or `attempt-already-consumed`). They never echo input
+content or raise an input-derived exception.
 
 There is deliberately no command-line entrypoint, process control, filesystem
 inspection, source access, credential handling, socket use, or target-launch
@@ -51,10 +64,11 @@ new attempt or confer any authority to act on a target.
 
 ## Test-first, no-target verification
 
-The focused test was written before the module existed and was observed to
-fail with `FileNotFoundError` for
-`0004/successor_attempt_gate_0004.py`. After the minimal pure implementation,
-the same four fake-data tests passed:
+The original focused test was written before the module existed and was
+observed to fail with `FileNotFoundError` for
+`0004/successor_attempt_gate_0004.py`. The current seven fake-data regressions
+cover exact immutable binding, predecessor reset/head/identifier mismatch,
+one-shot duplicate denial, and `None` or malformed request/predecessor denial:
 
 ```text
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest \
@@ -62,11 +76,12 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest \
 ```
 
 The tests prove exact predecessor binding, rejection of a consumed-flag reset,
-rejection of a different predecessor head or gate ID, and the absence of
-process/socket/target execution surfaces. They use only in-memory frozen values
-and this candidate package's source text. No predecessor artifact, target,
-source, credential, sink, namespace, loopback endpoint, or external control
-was invoked while producing this package.
+rejection of a different predecessor head or gate ID, one-shot retry denial,
+controlled malformed-input denials, and the absence of process/socket/target
+execution surfaces. They use only in-memory frozen values and this candidate
+package's source text. No predecessor artifact, target, source, credential,
+sink, namespace, loopback endpoint, or external control was invoked while
+producing this package.
 
 ## Review hold
 

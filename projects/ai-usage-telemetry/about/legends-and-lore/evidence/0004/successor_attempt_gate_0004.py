@@ -5,10 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-class PredecessorBindingRejected(ValueError):
-    """Raised when a candidate tries to replace or weaken the predecessor gate."""
-
-
 @dataclass(frozen=True)
 class PredecessorGate:
     issue_id: str
@@ -57,28 +53,64 @@ class CandidateReviewDecision:
     status: str
     execution_authority: str
     required_next_gate: str
+    denial_code: str
 
 
-def _require(condition: bool, code: str) -> None:
-    if not condition:
-        raise PredecessorBindingRejected(code)
-
-
-def bind_successor_attempt_gate(request: SuccessorAttemptGateRequest) -> CandidateReviewDecision:
-    """Bind a successor review request to the one fixed consumed predecessor."""
-
-    _require(request.successor_gate_id == SUCCESSOR_GATE_ID, "successor-gate-id")
-    _require(request.predecessor == PREDECESSOR_GATE, "predecessor-binding")
-    _require(PREDECESSOR_GATE.attempt_consumed, "predecessor-not-consumed")
-    _require(PREDECESSOR_GATE.disposition == "unresolved", "predecessor-disposition")
-    _require(PREDECESSOR_GATE.starts == 0, "predecessor-start-count")
-    _require(PREDECESSOR_GATE.completions == 0, "predecessor-completion-count")
-
+def _decision(status: str, denial_code: str) -> CandidateReviewDecision:
     return CandidateReviewDecision(
         predecessor_commit=PREDECESSOR_GATE.exact_head,
         predecessor_attempt_consumed=PREDECESSOR_GATE.attempt_consumed,
         predecessor_disposition=PREDECESSOR_GATE.disposition,
-        status="candidate-review-required",
+        status=status,
         execution_authority="none",
         required_next_gate=REQUIRED_NEXT_GATE,
+        denial_code=denial_code,
     )
+
+
+def _rejection_code(request: object) -> str | None:
+    if not isinstance(request, SuccessorAttemptGateRequest):
+        return "request-schema"
+    if not isinstance(request.successor_gate_id, str) or request.successor_gate_id != SUCCESSOR_GATE_ID:
+        return "successor-gate-id"
+    if not isinstance(request.predecessor, PredecessorGate):
+        return "predecessor-schema"
+    if request.predecessor != PREDECESSOR_GATE:
+        return "predecessor-binding"
+    if not PREDECESSOR_GATE.attempt_consumed:
+        return "predecessor-not-consumed"
+    if PREDECESSOR_GATE.disposition != "unresolved":
+        return "predecessor-disposition"
+    if PREDECESSOR_GATE.starts != 0:
+        return "predecessor-start-count"
+    if PREDECESSOR_GATE.completions != 0:
+        return "predecessor-completion-count"
+    return None
+
+
+class SuccessorAttemptGateProtocol:
+    """One-shot, in-memory candidate binding with a terminal denial state."""
+
+    def __init__(self) -> None:
+        self._state = "proposed"
+
+    def bind(self, request: object) -> CandidateReviewDecision:
+        if self._state != "proposed":
+            return _decision("candidate-denied", "attempt-already-consumed")
+
+        rejection_code = _rejection_code(request)
+        if rejection_code is not None:
+            self._state = "denied"
+            return _decision("candidate-denied", rejection_code)
+
+        self._state = "reviewed-candidate"
+        return _decision("candidate-review-required", "none")
+
+
+_DEFAULT_PROTOCOL = SuccessorAttemptGateProtocol()
+
+
+def bind_successor_attempt_gate(request: object) -> CandidateReviewDecision:
+    """Bind exactly one candidate review request to the fixed predecessor."""
+
+    return _DEFAULT_PROTOCOL.bind(request)
