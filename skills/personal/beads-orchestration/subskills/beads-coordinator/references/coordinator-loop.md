@@ -87,6 +87,10 @@ valid original identity. If any active context is missing or invalid, Step 0
 does not form a partial graph or canonical set; it reports partial manual
 triage and suppresses dispatch, wiring, and self-heal actions throughout the
 collection.
+The same collection-wide hold applies when any active scope lacks a valid
+creation timestamp: canonical selection and every recommendation require a
+complete inventory, task lookup, resolved context, relation graph, and parsed
+chronology for the whole active collection.
 
 The same total pure relation-graph validation applies across the complete
 resolved review-task collection before canonical selection or any
