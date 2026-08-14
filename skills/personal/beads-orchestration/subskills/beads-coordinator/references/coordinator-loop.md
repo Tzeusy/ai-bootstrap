@@ -95,6 +95,12 @@ Before that selection, every blocked original must resolve to the requested
 bead and provide a valid `gh-pr:<N>` reference. A lookup or reference failure
 in any original scope makes the whole collection partial/manual, so no sibling
 canonical ID, dispatch, wiring, or self-heal recommendation survives.
+PR metadata is collection evidence too: every resolved PR number must yield a
+valid `gh pr view` record before canonical dispatch or any wiring/self-heal
+recommendation survives. A metadata failure makes the collection partial and
+all wiring candidates manual. The only retained exception is a lone otherwise
+complete `command-failed` PR lookup, reported solely as existing no-action
+`skip-command-failure` findings.
 
 The same total pure relation-graph validation applies across the complete
 resolved review-task collection before canonical selection or any
