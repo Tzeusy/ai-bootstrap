@@ -126,6 +126,109 @@ class SuccessorAttemptGateTests(unittest.TestCase):
 
         self.assert_denial(self.gate.bind_successor_attempt_gate(request), "successor-gate-id")
 
+    def test_hostile_identity_scalar_subclasses_are_terminal_denials(self) -> None:
+        class HostileString(str):
+            def __eq__(self, other):
+                raise AssertionError("identity string must not be compared")
+
+            def __ne__(self, other):
+                raise AssertionError("identity string must not be compared")
+
+            def __hash__(self):
+                raise AssertionError("identity string must not be hashed")
+
+        class HostileInteger(int):
+            def __eq__(self, other):
+                raise AssertionError("identity integer must not be compared")
+
+        identity_scalar_cases = (
+            (
+                replace(
+                    self.valid_request(),
+                    successor_gate_id=HostileString(self.gate.SUCCESSOR_GATE_ID),
+                ),
+                self.gate.CANDIDATE_ATTEMPT_STATE,
+                "successor-gate-id",
+            ),
+            (
+                replace(
+                    self.valid_request(),
+                    predecessor=replace(
+                        self.gate.PREDECESSOR_GATE,
+                        issue_id=HostileString(self.gate.PREDECESSOR_GATE.issue_id),
+                    ),
+                ),
+                self.gate.CANDIDATE_ATTEMPT_STATE,
+                "predecessor-binding",
+            ),
+            (
+                replace(
+                    self.valid_request(),
+                    predecessor=replace(
+                        self.gate.PREDECESSOR_GATE,
+                        pull_request_number=HostileInteger(
+                            self.gate.PREDECESSOR_GATE.pull_request_number
+                        ),
+                    ),
+                ),
+                self.gate.CANDIDATE_ATTEMPT_STATE,
+                "predecessor-binding",
+            ),
+            (
+                replace(
+                    self.valid_request(),
+                    predecessor=replace(
+                        self.gate.PREDECESSOR_GATE,
+                        exact_head=HostileString(self.gate.PREDECESSOR_GATE.exact_head),
+                    ),
+                ),
+                self.gate.CANDIDATE_ATTEMPT_STATE,
+                "predecessor-binding",
+            ),
+            (
+                replace(
+                    self.valid_request(),
+                    predecessor=replace(
+                        self.gate.PREDECESSOR_GATE,
+                        candidate_record_sha256=HostileString(
+                            self.gate.PREDECESSOR_GATE.candidate_record_sha256
+                        ),
+                    ),
+                ),
+                self.gate.CANDIDATE_ATTEMPT_STATE,
+                "predecessor-binding",
+            ),
+            (
+                replace(
+                    self.valid_request(),
+                    predecessor=replace(
+                        self.gate.PREDECESSOR_GATE,
+                        artifact_sha256=(
+                            HostileString(self.gate.PREDECESSOR_GATE.artifact_sha256[0]),
+                            *self.gate.PREDECESSOR_GATE.artifact_sha256[1:],
+                        ),
+                    ),
+                ),
+                self.gate.CANDIDATE_ATTEMPT_STATE,
+                "predecessor-binding",
+            ),
+            (
+                self.valid_request(),
+                replace(
+                    self.gate.CANDIDATE_ATTEMPT_STATE,
+                    successor_gate_id=HostileString(self.gate.SUCCESSOR_GATE_ID),
+                ),
+                "candidate-state-binding",
+            ),
+        )
+
+        for request, state, expected_code in identity_scalar_cases:
+            with self.subTest(expected_code=expected_code):
+                self.assert_denial(
+                    self.gate.bind_successor_attempt_gate(request, state),
+                    expected_code,
+                )
+
     def test_schema_valid_tampered_candidate_state_is_content_free_and_denied(self) -> None:
         reset_state = replace(
             self.gate.CANDIDATE_ATTEMPT_STATE,

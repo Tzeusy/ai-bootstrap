@@ -137,7 +137,7 @@ def _rejection_code(request: object) -> str | None:
         return "request-schema"
     if not hasattr(request, "successor_gate_id") or not hasattr(request, "predecessor"):
         return "request-schema"
-    if not isinstance(request.successor_gate_id, str) or request.successor_gate_id != SUCCESSOR_GATE_ID:
+    if type(request.successor_gate_id) is not str or request.successor_gate_id != SUCCESSOR_GATE_ID:
         return "successor-gate-id"
     if not _is_complete_predecessor_gate(request.predecessor):
         return "predecessor-schema"
