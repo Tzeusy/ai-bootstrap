@@ -466,6 +466,101 @@ class UsageAuditTests(unittest.TestCase):
             env=env,
         )
 
+    def make_established_zero_usage_audit_inputs(self, tmp: str) -> tuple[Path, dict, Path, Path]:
+        """Build only synthetic, otherwise coverage-complete audit inputs."""
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        source = write_skill(repo, "skills/personal/systematic-debugging")
+        manifest = write_manifest(
+            repo,
+            [{"name": "systematic-debugging", "source": str(source.relative_to(repo)), "ownership": "repo"}],
+        )
+        write_skill(repo, "skills/superpowers/skills/test-driven-development")
+        self.seed_old_repo_history(repo)
+        catalog = AUDIT_MODULE.load_catalog_manifest(repo, manifest)
+        claude_dir = repo / "transcripts" / "claude"
+        codex_dir = repo / "transcripts" / "codex"
+        claude_dir.mkdir(parents=True)
+        codex_dir.mkdir(parents=True)
+        for transcript_dir in (claude_dir, codex_dir):
+            marker = transcript_dir / "history.jsonl"
+            marker.write_text("\n", encoding="utf-8")
+            set_mtime(marker, AS_OF_DATETIME - timedelta(days=100))
+        return repo, catalog, claude_dir, codex_dir
+
+    def test_actual_audit_path_discovers_normal_nested_transcripts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, catalog, claude_dir, codex_dir = self.make_established_zero_usage_audit_inputs(tmp)
+            nested_event = claude_dir / "normal-nested" / "recent.jsonl"
+            nested_event.parent.mkdir()
+            nested_event.write_text(claude_skill_event("writing-plans") + "\n", encoding="utf-8")
+            set_mtime(nested_event, AS_OF_DATETIME - timedelta(days=5))
+
+            report = AUDIT_MODULE.build_report(
+                repo,
+                catalog,
+                claude_dir,
+                codex_dir,
+                AS_OF_DATETIME,
+                90,
+                30,
+            )
+
+            claude_coverage = report["coverage"]["claude"]
+            self.assertTrue(claude_coverage["available"])
+            self.assertTrue(claude_coverage["coverage_complete"])
+            self.assertEqual(claude_coverage["input_errors"], 0)
+            self.assertEqual(claude_coverage["files_available"], 2)
+            self.assertEqual(claude_coverage["files_scanned_primary"], 1)
+            self.assertTrue(report["coverage"]["complete"])
+            self.assertEqual(matrix_row(report, "systematic-debugging")["disposition"], "candidate-follow-up")
+
+    def test_nested_traversal_denial_fails_coverage_closed_in_actual_audit_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, catalog, claude_dir, codex_dir = self.make_established_zero_usage_audit_inputs(tmp)
+            denied_dir = claude_dir / "synthetic-denied"
+            denied_event = denied_dir / "recent.jsonl"
+            denied_dir.mkdir()
+            denied_event.write_text(claude_skill_event("writing-plans") + "\n", encoding="utf-8")
+            set_mtime(denied_event, AS_OF_DATETIME - timedelta(days=5))
+
+            original_iterdir = Path.iterdir
+            original_rglob = Path.rglob
+
+            def suppress_nested_denial(path: Path, pattern: str) -> object:
+                if path == claude_dir and pattern == "*.jsonl":
+                    return iter((claude_dir / "history.jsonl",))
+                return original_rglob(path, pattern)
+
+            def deny_nested_directory(path: Path) -> object:
+                if path == denied_dir:
+                    raise PermissionError("synthetic nested traversal denial")
+                return original_iterdir(path)
+
+            with mock.patch.object(Path, "rglob", new=suppress_nested_denial), mock.patch.object(
+                Path, "iterdir", new=deny_nested_directory
+            ):
+                report = AUDIT_MODULE.build_report(
+                    repo,
+                    catalog,
+                    claude_dir,
+                    codex_dir,
+                    AS_OF_DATETIME,
+                    90,
+                    30,
+                )
+
+            claude_coverage = report["coverage"]["claude"]
+            row = matrix_row(report, "systematic-debugging")
+            self.assertFalse(claude_coverage["available"])
+            self.assertFalse(claude_coverage["input_complete"])
+            self.assertFalse(claude_coverage["coverage_complete"])
+            self.assertEqual(claude_coverage["input_errors"], 1)
+            self.assertFalse(report["coverage"]["complete"])
+            self.assertEqual(row["counts"]["primary"]["total"], 0)
+            self.assertEqual(row["disposition"], "insufficient-evidence")
+            self.assertEqual(row["protection_reason"], "incomplete-history")
+
     def run_audit(self, repo: Path, manifest: Path, claude_dir: Path, codex_dir: Path) -> subprocess.CompletedProcess:
         return subprocess.run(
             [
