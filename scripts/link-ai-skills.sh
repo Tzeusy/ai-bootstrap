@@ -8,17 +8,44 @@
 
 set -euo pipefail
 
-if [ "$#" -ne 1 ]; then
+usage() {
     printf 'Usage: %s <ai-bootstrap-dir>\n' "$(basename "$0")" >&2
-    exit 2
-fi
+    printf '       %s --catalog-manifest <ai-bootstrap-dir>\n' "$(basename "$0")" >&2
+}
 
-if [ ! -d "$1" ]; then
-    printf 'Missing AI bootstrap directory: %s\n' "$1" >&2
+mode="link"
+case "${1-}" in
+    --catalog-manifest)
+        if [ "$#" -ne 2 ]; then
+            usage
+            exit 2
+        fi
+        mode="catalog-manifest"
+        ai_bootstrap_arg="$2"
+        ;;
+    --help|-h)
+        if [ "$#" -ne 1 ]; then
+            usage
+            exit 2
+        fi
+        usage
+        exit 0
+        ;;
+    *)
+        if [ "$#" -ne 1 ]; then
+            usage
+            exit 2
+        fi
+        ai_bootstrap_arg="$1"
+        ;;
+esac
+
+if [ ! -d "$ai_bootstrap_arg" ]; then
+    printf 'Missing AI bootstrap directory: %s\n' "$ai_bootstrap_arg" >&2
     exit 1
 fi
 
-ai_bootstrap_dir="$(cd "$1" && pwd -P)"
+ai_bootstrap_dir="$(cd "$ai_bootstrap_arg" && pwd -P)"
 skills_dir="$ai_bootstrap_dir/skills"
 codex_dir="$ai_bootstrap_dir/.codex"
 codex_skills_dir="$codex_dir/skills"
@@ -65,6 +92,105 @@ skill_path_depth() {
     done
 
     printf '%s\n' "$depth"
+}
+
+# Skills excluded from every tool catalog by name. For personal skills, prefer
+# moving the directory into skills/archive/ (pruned below); this list exists
+# for upstream submodules that cannot be moved.
+skill_catalog_exclude=(
+    "writing-skills"    # duplicates skill-creator + th-engineering skill-standards
+)
+
+# Pick one canonical source directory for each catalog name. Shallower paths
+# win regardless of find traversal order; equal-depth collisions use a stable
+# lexical tiebreaker. Directories named subskills are deliberately pruned.
+declare -A skill_map=()
+
+build_skill_map() {
+    local skill_file skill_dir skill_name excluded existing_dir candidate_depth existing_depth
+
+    skill_map=()
+    while IFS= read -r -d '' skill_file; do
+        skill_dir="$(dirname "$skill_file")"
+        skill_name="$(basename "$skill_dir")"
+
+        for excluded in "${skill_catalog_exclude[@]}"; do
+            [ "$skill_name" = "$excluded" ] && continue 2
+        done
+
+        existing_dir="${skill_map[$skill_name]-}"
+        if [ -z "$existing_dir" ]; then
+            skill_map["$skill_name"]="$skill_dir"
+            continue
+        fi
+
+        candidate_depth="$(skill_path_depth "$skill_dir")"
+        existing_depth="$(skill_path_depth "$existing_dir")"
+        if ((candidate_depth < existing_depth)) || { ((candidate_depth == existing_depth)) && [[ "$skill_dir" < "$existing_dir" ]]; }; then
+            skill_map["$skill_name"]="$skill_dir"
+        fi
+    done < <(find "$skills_dir" \
+        -type d \( -name .git -o -name node_modules -o -name tests \
+            -o -name fixtures -o -name assets -o -name subskills \
+            -o -name archive \) -prune \
+        -o -type f -name "SKILL.md" -print0)
+}
+
+skill_ownership() {
+    local skill_dir="$1"
+    local candidate_dir="$skill_dir"
+
+    while [ "$candidate_dir" != "$skills_dir" ]; do
+        if [ -e "$candidate_dir/.git" ]; then
+            printf 'submodule\n'
+            return
+        fi
+        candidate_dir="$(dirname "$candidate_dir")"
+    done
+
+    printf 'repo\n'
+}
+
+emit_catalog_manifest() {
+    local skill_name skill_dir relative_dir ownership
+
+    {
+        for skill_name in "${!skill_map[@]}"; do
+            skill_dir="${skill_map[$skill_name]}"
+            relative_dir="${skill_dir#"$ai_bootstrap_dir"/}"
+            ownership="$(skill_ownership "$skill_dir")"
+            printf '%s\0%s\0%s\0' "$skill_name" "$relative_dir" "$ownership"
+        done
+    } | python3 -c '
+import json
+import sys
+
+fields = sys.stdin.buffer.read().split(b"\0")
+if fields and fields[-1] == b"":
+    fields.pop()
+if len(fields) % 3:
+    raise SystemExit("catalog manifest generation failed")
+entries = [
+    {
+        "name": fields[index].decode("utf-8"),
+        "source": fields[index + 1].decode("utf-8"),
+        "ownership": fields[index + 2].decode("utf-8"),
+    }
+    for index in range(0, len(fields), 3)
+]
+print(json.dumps({
+    "schema_version": 1,
+    "selection_rule": "shallowest path, then lexical path",
+    "excluded_names": sys.argv[1:],
+    "surfaces": [
+        ".claude/skills",
+        ".codex/skills",
+        ".gemini/skills",
+        ".gemini/antigravity/skills",
+    ],
+    "skills": sorted(entries, key=lambda entry: entry["name"]),
+}, indent=2, sort_keys=True))
+' "${skill_catalog_exclude[@]}"
 }
 
 copy_frontmatter() {
@@ -237,47 +363,18 @@ remove_stale_codex_skill() {
     fi
 }
 
+build_skill_map
+
+if [ "$mode" = "catalog-manifest" ]; then
+    emit_catalog_manifest
+    exit 0
+fi
+
 mkdir -p \
     "$codex_skills_dir" \
     "$gemini_skills_dir" \
     "$gemini_antigravity_skills_dir" \
     "$claude_skills_dir"
-
-# Skills excluded from every tool catalog by name. For personal skills, prefer
-# moving the directory into skills/archive/ (pruned below); this list exists
-# for upstream submodules that cannot be moved.
-skill_catalog_exclude=(
-    "writing-skills"    # duplicates skill-creator + th-engineering skill-standards
-)
-
-# Pick one canonical source directory for each catalog name. Shallower paths
-# win regardless of find traversal order; equal-depth collisions use a stable
-# lexical tiebreaker. Directories named subskills are deliberately pruned.
-declare -A skill_map
-while IFS= read -r -d '' skill_file; do
-    skill_dir="$(dirname "$skill_file")"
-    skill_name="$(basename "$skill_dir")"
-
-    for excluded in "${skill_catalog_exclude[@]}"; do
-        [ "$skill_name" = "$excluded" ] && continue 2
-    done
-
-    existing_dir="${skill_map[$skill_name]-}"
-    if [ -z "$existing_dir" ]; then
-        skill_map["$skill_name"]="$skill_dir"
-        continue
-    fi
-
-    candidate_depth="$(skill_path_depth "$skill_dir")"
-    existing_depth="$(skill_path_depth "$existing_dir")"
-    if ((candidate_depth < existing_depth)) || { ((candidate_depth == existing_depth)) && [[ "$skill_dir" < "$existing_dir" ]]; }; then
-        skill_map["$skill_name"]="$skill_dir"
-    fi
-done < <(find "$skills_dir" \
-    -type d \( -name .git -o -name node_modules -o -name tests \
-        -o -name fixtures -o -name assets -o -name subskills \
-        -o -name archive \) -prune \
-    -o -type f -name "SKILL.md" -print0)
 
 declare -A expected_skills
 for skill_name in "${!skill_map[@]}"; do
