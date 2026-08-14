@@ -799,6 +799,114 @@ class NormalizePrReviewStateTests(unittest.TestCase):
             self.assertIsNone(finding["duplicate_of"])
             self.assertEqual(finding["recommendation"], "manual-triage")
 
+    def test_invalid_chronology_in_one_scope_manualizes_the_complete_collection(self) -> None:
+        first_original_id = "aib-swr.1"
+        second_original_id = "aib-swr.2"
+        invalid_review_id = "aib-review.1"
+        valid_review_id = "aib-review.2"
+        second_pr = {
+            **pr_payload("OPEN"),
+            "number": 42,
+            "url": "https://github.com/owner/repo/pull/42",
+            "headRefName": f"agent/{second_original_id}",
+        }
+        fixture = {
+            "blocked_pr_review": [
+                original_bead(first_original_id, 41),
+                original_bead(second_original_id, 42),
+                review_task(invalid_review_id, first_original_id, created_at="not-a-timestamp"),
+                review_task(valid_review_id, second_original_id, created_at="2026-08-14T03:00:00Z"),
+            ],
+            "resolver_payloads": {
+                invalid_review_id: {"ok": True, "original_id": first_original_id, "pr_number": 41},
+                valid_review_id: {"ok": True, "original_id": second_original_id, "pr_number": 42},
+            },
+            "shows": {
+                first_original_id: [original_bead(first_original_id, 41)],
+                second_original_id: [original_bead(second_original_id, 42)],
+            },
+            "prs": {"41": pr_payload("OPEN"), "42": second_pr},
+            "open_prs": [
+                {
+                    "number": 41,
+                    "headRefName": f"agent/{first_original_id}",
+                    "createdAt": "2026-08-14T03:00:00Z",
+                },
+                {
+                    "number": 42,
+                    "headRefName": f"agent/{second_original_id}",
+                    "createdAt": "2026-08-14T03:00:00Z",
+                },
+            ],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertIn({"code": "invalid-created-at", "scope": "review-context"}, payload["errors"])
+        self.assertTrue(payload["findings"])
+        self.assertTrue(
+            all(finding["recommendation"] == "manual-triage" for finding in payload["findings"])
+        )
+        self.assertTrue(
+            all(finding["canonical_review_id"] is None for finding in payload["findings"])
+        )
+        self.assertTrue(payload["self_heal_candidates"])
+        self.assertTrue(
+            all(
+                candidate["recommendation"] == "manual-triage"
+                for candidate in payload["self_heal_candidates"]
+            )
+        )
+
+    def test_mixed_resolver_command_failure_manualizes_the_complete_collection(self) -> None:
+        original_id = "aib-swr.1"
+        valid_review_id = "aib-review.1"
+        failed_review_id = "aib-review.2"
+        fixture = {
+            "blocked_pr_review": [
+                original_bead(original_id, 41),
+                review_task(valid_review_id, original_id),
+                review_task(failed_review_id, original_id),
+            ],
+            "resolver_payloads": {
+                valid_review_id: {"ok": True, "original_id": original_id, "pr_number": 41},
+                failed_review_id: {"ok": False, "error_code": "command-failed"},
+            },
+            "shows": {original_id: [original_bead(original_id, 41)]},
+            "prs": {"41": pr_payload("OPEN")},
+            "open_prs": [
+                {
+                    "number": 41,
+                    "headRefName": f"agent/{original_id}",
+                    "createdAt": "2026-08-14T03:00:00Z",
+                }
+            ],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertIn({"code": "command-failed", "scope": "review-context"}, payload["errors"])
+        self.assertTrue(payload["findings"])
+        self.assertTrue(
+            all(finding["recommendation"] == "manual-triage" for finding in payload["findings"])
+        )
+        self.assertTrue(
+            all(finding["canonical_review_id"] is None for finding in payload["findings"])
+        )
+        self.assertTrue(payload["self_heal_candidates"])
+        self.assertTrue(
+            all(
+                candidate["recommendation"] == "manual-triage"
+                for candidate in payload["self_heal_candidates"]
+            )
+        )
+
     def test_resolver_bool_pr_number_is_invalid_manual_triage(self) -> None:
         review_id = "aib-review.1"
         fixture = {
@@ -1123,6 +1231,12 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                     "open_prs": [],
                     "failures": {"gh-pr-view:41": failure} if failure else {},
                 }
+                if failure:
+                    fixture["resolver_payload"] = {
+                        "ok": True,
+                        "original_id": original_id,
+                        "pr_number": 41,
+                    }
                 result, _, repo_root = self.run_fixture(fixture)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 payload = json.loads(result.stdout)

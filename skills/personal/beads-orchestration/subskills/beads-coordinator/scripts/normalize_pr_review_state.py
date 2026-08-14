@@ -327,6 +327,21 @@ def recommendation_for_pr_error(error: str | None) -> str:
     return "skip-command-failure" if error == "command-failed" else "manual-triage"
 
 
+def manualize_incomplete_collection(
+    findings: list[dict[str, Any]],
+    candidates: list[dict[str, Any]],
+    *,
+    collection_complete: bool,
+) -> None:
+    """Ensure incomplete Step-0 evidence cannot leave an actionable recommendation."""
+    if collection_complete:
+        return
+    for finding in findings:
+        finding["recommendation"] = "manual-triage"
+    for candidate in candidates:
+        candidate["recommendation"] = "manual-triage"
+
+
 def finding_sort_key(finding: dict[str, Any]) -> tuple[str, str, int, str]:
     return (
         str(finding.get("original_id") or ""),
@@ -569,7 +584,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             report_error(errors, relation_error, "review-context")
             task_lookup_complete = False
 
-    canonical_by_key: dict[tuple[str, int], str] = {}
+    chronological_canonical_by_key: dict[tuple[str, int], str] = {}
     invalid_task_keys: set[tuple[str, int]] = set()
     tasks_by_key: dict[tuple[str, int], list[str]] = {}
     if active_contexts_complete and relation_graph_complete:
@@ -589,7 +604,19 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                     break
                 chronology.append((created_at, review_id))
             if key not in invalid_task_keys:
-                canonical_by_key[key] = min(chronology, key=lambda item: (item[0], item[1]))[1]
+                chronological_canonical_by_key[key] = min(chronology, key=lambda item: (item[0], item[1]))[1]
+
+    chronology_complete = (
+        active_contexts_complete and relation_graph_complete and not invalid_task_keys
+    )
+    collection_complete = (
+        inventory_complete
+        and task_lookup_complete
+        and active_contexts_complete
+        and relation_graph_complete
+        and chronology_complete
+    )
+    canonical_by_key = chronological_canonical_by_key if collection_complete else {}
 
     pr_cache: dict[int, tuple[dict[str, Any] | None, str | None]] = {}
     findings: list[dict[str, Any]] = []
@@ -639,7 +666,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                     cooldown=None,
                     recommendation=(
                         "manual-triage"
-                        if not active_contexts_complete or not relation_graph_complete
+                        if not collection_complete
                         else recommendation_for_pr_error(pr_error)
                     ),
                 )
@@ -647,7 +674,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             continue
         state = pr["state"]
         cooldown = cooldown_until(pr, now)
-        if not active_contexts_complete or not relation_graph_complete:
+        if not collection_complete:
             recommendation = "manual-triage"
         elif state == "MERGED":
             recommendation = "close-original-and-reviews"
@@ -723,13 +750,19 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         pr_number = context["pr_number"]
         key = (original_id, pr_number)
         canonical = canonical_by_key.get(key)
-        if key in invalid_task_keys or canonical is None:
+        if key in invalid_task_keys or not collection_complete or canonical is None:
             findings.append(
                 task_finding(
                     review_id=review_id,
                     original_id=original_id,
                     pr_number=pr_number,
-                    context_status="invalid-created-at" if key in invalid_task_keys else "missing-canonical-review",
+                    context_status=(
+                        "invalid-created-at"
+                        if key in invalid_task_keys
+                        else "incomplete-review-collection"
+                        if not collection_complete
+                        else "missing-canonical-review"
+                    ),
                     canonical_review_id=None,
                     duplicate_of=None,
                     pr_state=None,
@@ -786,14 +819,14 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         repo_root=repo_root,
         now=now,
         canonical_by_key=canonical_by_key,
-        task_lookup_complete=task_lookup_complete,
+        task_lookup_complete=collection_complete,
         errors=errors,
     )
-    if not inventory_complete or (active_contexts_complete and not relation_graph_complete):
-        for finding in findings:
-            finding["recommendation"] = "manual-triage"
-        for candidate in self_heal:
-            candidate["recommendation"] = "manual-triage"
+    manualize_incomplete_collection(
+        findings,
+        self_heal,
+        collection_complete=collection_complete,
+    )
     findings.sort(key=finding_sort_key)
     errors.sort(key=lambda item: (item["scope"], item["code"]))
     status = "partial" if errors else "empty" if not findings and not self_heal else "success"
