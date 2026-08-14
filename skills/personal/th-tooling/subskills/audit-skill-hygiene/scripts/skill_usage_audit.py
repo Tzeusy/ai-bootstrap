@@ -14,13 +14,13 @@ paths into its report.
 
 import argparse
 import json
-import re
 import subprocess
 import sys
 from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 
 UTC = timezone.utc
@@ -93,17 +93,12 @@ CANDIDATE_PROFILES: Tuple[Tuple[str, str, str], ...] = (
     ),
 )
 
-CLAUDE_SLASH_EVENT_RE = re.compile(
-    r"^\s*<command-message>.*?</command-message>\s*"
-    r"<command-name>/?([A-Za-z0-9:_-]+)</command-name>"
-    r"(?:\s*<command-args>.*?</command-args>)?\s*$",
-    re.DOTALL,
-)
-CODEX_SKILL_READ_PATH_RE = re.compile(
-    r"^(?:(?:[A-Za-z]:)?[\\/])?(?:[A-Za-z0-9._~:-]+[\\/])*"
-    r"skills(?:[\\/][A-Za-z0-9._-]+)*[\\/]([A-Za-z0-9_-]+)[\\/]SKILL\.md$"
-)
 CODEX_SKILL_READ_FUNCTION = "read_file"
+MAX_RECORD_BYTES = 1_048_576
+MAX_JSON_DEPTH = 64
+MAX_CONTAINER_MEMBERS = 1_024
+_CANDIDATE_NAMES = tuple(profile[0] for profile in CANDIDATE_PROFILES)
+_CANDIDATE_BYTES = tuple(name.encode("ascii") for name in _CANDIDATE_NAMES)
 
 
 def default_repo_root() -> Path:
@@ -217,87 +212,773 @@ def frontmatter_tokens(skill_dir: Optional[Path]) -> Optional[int]:
     return chars // 4
 
 
-def json_records(files: Sequence[Path]) -> Iterator[Any]:
-    """Yield valid JSONL records while discarding malformed content immediately."""
+@dataclass(frozen=True)
+class JsonSpan:
+    """A byte range inside one bounded JSONL record, never a decoded value."""
+
+    start: int
+    end: int
+
+
+class JsonInputError(ValueError):
+    """A malformed or over-bounded input record that must hold coverage open."""
+
+
+@dataclass
+class ScanOutcome:
+    """Aggregate counters plus fail-closed source-read evidence."""
+
+    primary_counts: Counter
+    sensitivity_counts: Counter
+    input_errors: int = 0
+
+    @property
+    def input_complete(self) -> bool:
+        return self.input_errors == 0
+
+    def __getitem__(self, name: str) -> int:
+        """Keep direct extractor checks focused on primary aggregate counters."""
+        return int(self.primary_counts[name])
+
+
+def _span_matches(data: bytes, span: Optional[JsonSpan], expected: bytes) -> bool:
+    """Compare only a small registered JSON string without decoding raw input."""
+    if span is None or span.end - span.start != len(expected) + 2:
+        return False
+    return data[span.start + 1 : span.end - 1] == expected
+
+
+def _candidate_from_span(data: bytes, span: Optional[JsonSpan]) -> Optional[str]:
+    for name, encoded in zip(_CANDIDATE_NAMES, _CANDIDATE_BYTES):
+        if _span_matches(data, span, encoded):
+            return name
+    return None
+
+
+class JsonCursor:
+    """Validate JSON syntax while retaining only spans for registered fields."""
+
+    def __init__(self, data: bytes, start: int = 0, end: Optional[int] = None) -> None:
+        self.data = data
+        self.position = start
+        self.end = len(data) if end is None else end
+
+    def finish(self) -> None:
+        self._skip_whitespace()
+        if self.position != self.end:
+            raise JsonInputError("trailing input")
+
+    def parse_value(self, depth: int = 0) -> JsonSpan:
+        if depth > MAX_JSON_DEPTH:
+            raise JsonInputError("maximum JSON depth exceeded")
+        self._skip_whitespace()
+        start = self.position
+        if start >= self.end:
+            raise JsonInputError("missing JSON value")
+        value = self.data[self.position]
+        if value == ord('"'):
+            self._parse_string()
+        elif value == ord("{"):
+            self._skip_object(depth + 1)
+        elif value == ord("["):
+            self._skip_array(depth + 1)
+        elif value in b"-0123456789":
+            self._skip_number()
+        elif self.data.startswith(b"true", self.position):
+            self.position += 4
+        elif self.data.startswith(b"false", self.position):
+            self.position += 5
+        elif self.data.startswith(b"null", self.position):
+            self.position += 4
+        else:
+            raise JsonInputError("invalid JSON value")
+        return JsonSpan(start, self.position)
+
+    def parse_object_fields(self, wanted: Sequence[bytes], depth: int = 0) -> Dict[bytes, JsonSpan]:
+        """Capture only whitelisted object values and skip everything else."""
+        if depth > MAX_JSON_DEPTH:
+            raise JsonInputError("maximum JSON depth exceeded")
+        self._skip_whitespace()
+        self._expect(ord("{"))
+        self._skip_whitespace()
+        fields: Dict[bytes, JsonSpan] = {}
+        if self._consume(ord("}")):
+            return fields
+        members = 0
+        while True:
+            if members >= MAX_CONTAINER_MEMBERS:
+                raise JsonInputError("too many object members")
+            key = self._parse_string()
+            known_key = next((item for item in wanted if _span_matches(self.data, key, item)), None)
+            self._skip_whitespace()
+            self._expect(ord(":"))
+            value = self.parse_value(depth + 1)
+            if known_key is not None:
+                if known_key in fields:
+                    raise JsonInputError("duplicate registered field")
+                fields[known_key] = value
+            members += 1
+            self._skip_whitespace()
+            if self._consume(ord("}")):
+                return fields
+            self._expect(ord(","))
+            self._skip_whitespace()
+
+    def _skip_object(self, depth: int) -> None:
+        self._expect(ord("{"))
+        self._skip_whitespace()
+        if self._consume(ord("}")):
+            return
+        members = 0
+        while True:
+            if members >= MAX_CONTAINER_MEMBERS:
+                raise JsonInputError("too many object members")
+            self._parse_string()
+            self._skip_whitespace()
+            self._expect(ord(":"))
+            self.parse_value(depth + 1)
+            members += 1
+            self._skip_whitespace()
+            if self._consume(ord("}")):
+                return
+            self._expect(ord(","))
+            self._skip_whitespace()
+
+    def _skip_array(self, depth: int) -> None:
+        self._expect(ord("["))
+        self._skip_whitespace()
+        if self._consume(ord("]")):
+            return
+        members = 0
+        while True:
+            if members >= MAX_CONTAINER_MEMBERS:
+                raise JsonInputError("too many array members")
+            self.parse_value(depth + 1)
+            members += 1
+            self._skip_whitespace()
+            if self._consume(ord("]")):
+                return
+            self._expect(ord(","))
+            self._skip_whitespace()
+
+    def _parse_string(self) -> JsonSpan:
+        start = self.position
+        self._expect(ord('"'))
+        while self.position < self.end:
+            value = self.data[self.position]
+            if value == ord('"'):
+                self.position += 1
+                return JsonSpan(start, self.position)
+            if value < 0x20:
+                raise JsonInputError("control character in JSON string")
+            if value != ord("\\"):
+                self.position += 1
+                continue
+            self.position += 1
+            if self.position >= self.end:
+                raise JsonInputError("unterminated JSON escape")
+            escaped = self.data[self.position]
+            self.position += 1
+            if escaped in b'"\\/bfnrt':
+                continue
+            if escaped != ord("u") or self.position + 4 > self.end:
+                raise JsonInputError("invalid JSON escape")
+            if any(byte not in b"0123456789abcdefABCDEF" for byte in self.data[self.position : self.position + 4]):
+                raise JsonInputError("invalid unicode escape")
+            self.position += 4
+        raise JsonInputError("unterminated JSON string")
+
+    def _skip_number(self) -> None:
+        if self._consume(ord("-")) and self.position >= self.end:
+            raise JsonInputError("invalid JSON number")
+        if self._consume(ord("0")):
+            pass
+        elif self.position < self.end and self.data[self.position] in b"123456789":
+            while self.position < self.end and self.data[self.position] in b"0123456789":
+                self.position += 1
+        else:
+            raise JsonInputError("invalid JSON number")
+        if self._consume(ord(".")):
+            start = self.position
+            while self.position < self.end and self.data[self.position] in b"0123456789":
+                self.position += 1
+            if self.position == start:
+                raise JsonInputError("invalid JSON number")
+        if self.position < self.end and self.data[self.position] in b"eE":
+            self.position += 1
+            if self.position < self.end and self.data[self.position] in b"+-":
+                self.position += 1
+            start = self.position
+            while self.position < self.end and self.data[self.position] in b"0123456789":
+                self.position += 1
+            if self.position == start:
+                raise JsonInputError("invalid JSON number")
+
+    def _skip_whitespace(self) -> None:
+        while self.position < self.end and self.data[self.position] in b" \t\r\n":
+            self.position += 1
+
+    def _expect(self, expected: int) -> None:
+        if self.position >= self.end or self.data[self.position] != expected:
+            raise JsonInputError("unexpected JSON token")
+        self.position += 1
+
+    def _consume(self, expected: int) -> bool:
+        if self.position < self.end and self.data[self.position] == expected:
+            self.position += 1
+            return True
+        return False
+
+
+def _object_fields(data: bytes, span: Optional[JsonSpan], wanted: Sequence[bytes]) -> Optional[Dict[bytes, JsonSpan]]:
+    if span is None or span.start >= span.end or data[span.start] != ord("{"):
+        return None
+    cursor = JsonCursor(data, span.start, span.end)
+    fields = cursor.parse_object_fields(wanted)
+    cursor.finish()
+    return fields
+
+
+def _array_spans(data: bytes, span: Optional[JsonSpan]) -> Optional[List[JsonSpan]]:
+    if span is None or span.start >= span.end or data[span.start] != ord("["):
+        return None
+    cursor = JsonCursor(data, span.start, span.end)
+    cursor._expect(ord("["))
+    cursor._skip_whitespace()
+    entries: List[JsonSpan] = []
+    if cursor._consume(ord("]")):
+        cursor.finish()
+        return entries
+    while True:
+        if len(entries) >= MAX_CONTAINER_MEMBERS:
+            raise JsonInputError("too many array members")
+        entries.append(cursor.parse_value())
+        cursor._skip_whitespace()
+        if cursor._consume(ord("]")):
+            cursor.finish()
+            return entries
+        cursor._expect(ord(","))
+        cursor._skip_whitespace()
+
+
+def _root_object_fields(data: bytes, wanted: Sequence[bytes]) -> Optional[Dict[bytes, JsonSpan]]:
+    """Validate the complete record before inspecting its registered envelope."""
+    cursor = JsonCursor(data)
+    span = cursor.parse_value()
+    cursor.finish()
+    return _object_fields(data, span, wanted)
+
+
+class JsonStringReader:
+    """Read one JSON string's encoded bytes one scalar at a time, without joining it."""
+
+    def __init__(self, data: bytes, span: JsonSpan) -> None:
+        self.data = data
+        self.position = span.start + 1
+        self.end = span.end - 1
+        self.buffered: Optional[int] = None
+
+    def read(self) -> Optional[int]:
+        if self.buffered is not None:
+            value = self.buffered
+            self.buffered = None
+            return value
+        if self.position >= self.end:
+            return None
+        value = self.data[self.position]
+        self.position += 1
+        if value != ord("\\"):
+            return value
+        if self.position >= self.end:
+            raise JsonInputError("unterminated JSON escape")
+        escaped = self.data[self.position]
+        self.position += 1
+        escapes = {
+            ord('"'): ord('"'),
+            ord("\\"): ord("\\"),
+            ord("/"): ord("/"),
+            ord("b"): 0x08,
+            ord("f"): 0x0C,
+            ord("n"): 0x0A,
+            ord("r"): 0x0D,
+            ord("t"): 0x09,
+        }
+        if escaped in escapes:
+            return escapes[escaped]
+        if escaped != ord("u") or self.position + 4 > self.end:
+            raise JsonInputError("invalid JSON escape")
+        digits = self.data[self.position : self.position + 4]
+        if any(byte not in b"0123456789abcdefABCDEF" for byte in digits):
+            raise JsonInputError("invalid unicode escape")
+        self.position += 4
+        codepoint = int(digits, 16)
+        return codepoint if codepoint <= 0x7F else 0x80
+
+    def peek(self) -> Optional[int]:
+        if self.buffered is None:
+            self.buffered = self.read()
+        return self.buffered
+
+
+def _consume_ascii(reader: JsonStringReader, expected: bytes) -> bool:
+    return all(reader.read() == value for value in expected)
+
+
+def _skip_string_whitespace(reader: JsonStringReader) -> None:
+    while reader.peek() in (ord(" "), ord("\t"), ord("\r"), ord("\n")):
+        reader.read()
+
+
+def _skip_until(reader: JsonStringReader, end_marker: bytes) -> bool:
+    matched = 0
+    while True:
+        value = reader.read()
+        if value is None:
+            return False
+        if value == end_marker[matched]:
+            matched += 1
+            if matched == len(end_marker):
+                return True
+        else:
+            matched = 1 if value == end_marker[0] else 0
+
+
+def _candidate_until_tag(reader: JsonStringReader, end_tag: bytes) -> Optional[str]:
+    active = (1 << len(_CANDIDATE_BYTES)) - 1
+    length = 0
+    while True:
+        value = reader.read()
+        if value is None:
+            return None
+        if value == ord("<"):
+            if not _consume_ascii(reader, end_tag[1:]):
+                return None
+            break
+        for index, candidate in enumerate(_CANDIDATE_BYTES):
+            if active & (1 << index) and (length >= len(candidate) or candidate[length] != value):
+                active &= ~(1 << index)
+        length += 1
+    for index, candidate in enumerate(_CANDIDATE_BYTES):
+        if active & (1 << index) and length == len(candidate):
+            return _CANDIDATE_NAMES[index]
+    return None
+
+
+def _slash_command_from_span(data: bytes, span: Optional[JsonSpan]) -> Optional[str]:
+    if span is None or span.start >= span.end or data[span.start] != ord('"'):
+        return None
+    reader = JsonStringReader(data, span)
+    _skip_string_whitespace(reader)
+    if not _consume_ascii(reader, b"<command-message>"):
+        return None
+    if not _skip_until(reader, b"</command-message>"):
+        return None
+    _skip_string_whitespace(reader)
+    if not _consume_ascii(reader, b"<command-name>/"):
+        return None
+    name = _candidate_until_tag(reader, b"</command-name>")
+    if name is None:
+        return None
+    _skip_string_whitespace(reader)
+    if reader.peek() == ord("<"):
+        if not _consume_ascii(reader, b"<command-args>"):
+            return None
+        if not _skip_until(reader, b"</command-args>"):
+            return None
+        _skip_string_whitespace(reader)
+    return name if reader.read() is None else None
+
+
+class EmbeddedJsonCursor:
+    """Parse the JSON object encoded in Codex read_file arguments without joining it."""
+
+    def __init__(self, reader: JsonStringReader) -> None:
+        self.reader = reader
+
+    def parse_path(self) -> Optional[str]:
+        self._skip_whitespace()
+        self._expect(ord("{"))
+        self._skip_whitespace()
+        found_path = False
+        path: Optional[str] = None
+        if self._consume(ord("}")):
+            self._finish()
+            return None
+        members = 0
+        while True:
+            if members >= MAX_CONTAINER_MEMBERS:
+                raise JsonInputError("too many object members")
+            key = self._read_string_match(((b"path", "path"),))
+            self._skip_whitespace()
+            self._expect(ord(":"))
+            self._skip_whitespace()
+            if key == "path":
+                if found_path:
+                    raise JsonInputError("duplicate registered field")
+                found_path = True
+                if self._peek() == ord('"'):
+                    path = self._read_path_candidate()
+                else:
+                    self._skip_value()
+            else:
+                self._skip_value()
+            members += 1
+            self._skip_whitespace()
+            if self._consume(ord("}")):
+                self._finish()
+                return path
+            self._expect(ord(","))
+            self._skip_whitespace()
+
+    def _skip_value(self, depth: int = 0) -> None:
+        if depth > MAX_JSON_DEPTH:
+            raise JsonInputError("maximum JSON depth exceeded")
+        self._skip_whitespace()
+        value = self._peek()
+        if value == ord('"'):
+            self._read_string_match(())
+        elif value == ord("{"):
+            self._skip_object(depth + 1)
+        elif value == ord("["):
+            self._skip_array(depth + 1)
+        elif value in (ord("-"), ord("0"), ord("1"), ord("2"), ord("3"), ord("4"), ord("5"), ord("6"), ord("7"), ord("8"), ord("9")):
+            self._skip_number()
+        elif value == ord("t"):
+            self._expect_literal(b"true")
+        elif value == ord("f"):
+            self._expect_literal(b"false")
+        elif value == ord("n"):
+            self._expect_literal(b"null")
+        else:
+            raise JsonInputError("invalid JSON value")
+
+    def _skip_object(self, depth: int) -> None:
+        self._expect(ord("{"))
+        self._skip_whitespace()
+        if self._consume(ord("}")):
+            return
+        members = 0
+        while True:
+            if members >= MAX_CONTAINER_MEMBERS:
+                raise JsonInputError("too many object members")
+            self._read_string_match(())
+            self._skip_whitespace()
+            self._expect(ord(":"))
+            self._skip_value(depth + 1)
+            members += 1
+            self._skip_whitespace()
+            if self._consume(ord("}")):
+                return
+            self._expect(ord(","))
+            self._skip_whitespace()
+
+    def _skip_array(self, depth: int) -> None:
+        self._expect(ord("["))
+        self._skip_whitespace()
+        if self._consume(ord("]")):
+            return
+        members = 0
+        while True:
+            if members >= MAX_CONTAINER_MEMBERS:
+                raise JsonInputError("too many array members")
+            self._skip_value(depth + 1)
+            members += 1
+            self._skip_whitespace()
+            if self._consume(ord("]")):
+                return
+            self._expect(ord(","))
+            self._skip_whitespace()
+
+    def _read_string_match(self, targets: Sequence[Tuple[bytes, str]]) -> Optional[str]:
+        self._expect(ord('"'))
+        active = (1 << len(targets)) - 1
+        length = 0
+        while True:
+            value = self.reader.read()
+            if value is None:
+                raise JsonInputError("unterminated JSON string")
+            if value == ord('"'):
+                for index, (candidate, result) in enumerate(targets):
+                    if active & (1 << index) and length == len(candidate):
+                        return result
+                return None
+            if value == ord("\\"):
+                value = self._read_escape()
+            elif value < 0x20:
+                raise JsonInputError("control character in JSON string")
+            for index, (candidate, _result) in enumerate(targets):
+                if active & (1 << index) and (length >= len(candidate) or candidate[length] != value):
+                    active &= ~(1 << index)
+            length += 1
+
+    def _read_path_candidate(self) -> Optional[str]:
+        self._expect(ord('"'))
+        matcher = SafePathMatcher()
+        while True:
+            value = self.reader.read()
+            if value is None:
+                raise JsonInputError("unterminated JSON string")
+            if value == ord('"'):
+                return matcher.finish()
+            if value == ord("\\"):
+                value = self._read_escape()
+            elif value < 0x20:
+                raise JsonInputError("control character in JSON string")
+            matcher.push(value)
+
+    def _read_escape(self) -> int:
+        escaped = self.reader.read()
+        if escaped is None:
+            raise JsonInputError("unterminated JSON escape")
+        escapes = {
+            ord('"'): ord('"'),
+            ord("\\"): ord("\\"),
+            ord("/"): ord("/"),
+            ord("b"): 0x08,
+            ord("f"): 0x0C,
+            ord("n"): 0x0A,
+            ord("r"): 0x0D,
+            ord("t"): 0x09,
+        }
+        if escaped in escapes:
+            return escapes[escaped]
+        if escaped != ord("u"):
+            raise JsonInputError("invalid JSON escape")
+        digits = [self.reader.read() for _ in range(4)]
+        if any(value is None or value not in b"0123456789abcdefABCDEF" for value in digits):
+            raise JsonInputError("invalid unicode escape")
+        codepoint = int(bytes(digits), 16)
+        return codepoint if codepoint <= 0x7F else 0x80
+
+    def _skip_number(self) -> None:
+        if self._consume(ord("-")) and self._peek() is None:
+            raise JsonInputError("invalid JSON number")
+        if self._consume(ord("0")):
+            pass
+        elif self._peek() in (ord("1"), ord("2"), ord("3"), ord("4"), ord("5"), ord("6"), ord("7"), ord("8"), ord("9")):
+            while self._peek() in (ord("0"), ord("1"), ord("2"), ord("3"), ord("4"), ord("5"), ord("6"), ord("7"), ord("8"), ord("9")):
+                self.reader.read()
+        else:
+            raise JsonInputError("invalid JSON number")
+        if self._consume(ord(".")):
+            start = self._peek()
+            if start not in (ord("0"), ord("1"), ord("2"), ord("3"), ord("4"), ord("5"), ord("6"), ord("7"), ord("8"), ord("9")):
+                raise JsonInputError("invalid JSON number")
+            while self._peek() in (ord("0"), ord("1"), ord("2"), ord("3"), ord("4"), ord("5"), ord("6"), ord("7"), ord("8"), ord("9")):
+                self.reader.read()
+        if self._peek() in (ord("e"), ord("E")):
+            self.reader.read()
+            if self._peek() in (ord("+"), ord("-")):
+                self.reader.read()
+            if self._peek() not in (ord("0"), ord("1"), ord("2"), ord("3"), ord("4"), ord("5"), ord("6"), ord("7"), ord("8"), ord("9")):
+                raise JsonInputError("invalid JSON number")
+            while self._peek() in (ord("0"), ord("1"), ord("2"), ord("3"), ord("4"), ord("5"), ord("6"), ord("7"), ord("8"), ord("9")):
+                self.reader.read()
+
+    def _skip_whitespace(self) -> None:
+        while self._peek() in (ord(" "), ord("\t"), ord("\r"), ord("\n")):
+            self.reader.read()
+
+    def _finish(self) -> None:
+        self._skip_whitespace()
+        if self._peek() is not None:
+            raise JsonInputError("trailing input")
+
+    def _expect(self, expected: int) -> None:
+        if self.reader.read() != expected:
+            raise JsonInputError("unexpected JSON token")
+
+    def _consume(self, expected: int) -> bool:
+        if self._peek() == expected:
+            self.reader.read()
+            return True
+        return False
+
+    def _expect_literal(self, expected: bytes) -> None:
+        for value in expected:
+            self._expect(value)
+
+    def _peek(self) -> Optional[int]:
+        return self.reader.peek()
+
+
+class SafePathMatcher:
+    """Recognize only an allowed SKILL.md path and retain its known catalog name."""
+
+    def __init__(self) -> None:
+        self.after_skills = False
+        self.at_start = True
+        self.invalid = False
+        self.last_candidate: Optional[str] = None
+        self.last_was_skill_file = False
+        self.terminal_candidate: Optional[str] = None
+        self._reset_component()
+
+    def push(self, value: int) -> None:
+        if value in (ord("/"), ord("\\")):
+            if self.component_length == 0:
+                if self.at_start:
+                    self.at_start = False
+                    return
+                self.invalid = True
+                return
+            self._finish_component()
+            self.at_start = False
+            self._reset_component()
+            return
+        self.at_start = False
+        allowed = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-"
+        if not self.after_skills:
+            allowed += b"~:"
+        if value not in allowed:
+            self.invalid = True
+        for index, candidate in enumerate(_CANDIDATE_BYTES):
+            if self.candidate_mask & (1 << index) and (
+                self.component_length >= len(candidate) or candidate[self.component_length] != value
+            ):
+                self.candidate_mask &= ~(1 << index)
+        if self.component_length >= len(b"skills") or b"skills"[self.component_length] != value:
+            self.skills_matches = False
+        if self.component_length >= len(b"SKILL.md") or b"SKILL.md"[self.component_length] != value:
+            self.skill_file_matches = False
+        self.component_length += 1
+
+    def finish(self) -> Optional[str]:
+        if self.component_length == 0:
+            self.invalid = True
+        else:
+            self._finish_component()
+        if self.invalid or not self.after_skills or not self.last_was_skill_file:
+            return None
+        return self.terminal_candidate
+
+    def _reset_component(self) -> None:
+        self.component_length = 0
+        self.candidate_mask = (1 << len(_CANDIDATE_BYTES)) - 1
+        self.skills_matches = True
+        self.skill_file_matches = True
+
+    def _finish_component(self) -> None:
+        if not self.after_skills:
+            if self.skills_matches and self.component_length == len(b"skills"):
+                self.after_skills = True
+            return
+        is_skill_file = self.skill_file_matches and self.component_length == len(b"SKILL.md")
+        if is_skill_file:
+            self.terminal_candidate = self.last_candidate
+            self.last_was_skill_file = True
+            return
+        self.last_candidate = None
+        for index, candidate in enumerate(_CANDIDATE_BYTES):
+            if self.candidate_mask & (1 << index) and self.component_length == len(candidate):
+                self.last_candidate = _CANDIDATE_NAMES[index]
+                break
+        self.last_was_skill_file = False
+
+
+def _extract_claude_record(data: bytes) -> Sequence[str]:
+    root = _root_object_fields(data, (b"type", b"message"))
+    if root is None:
+        return ()
+    record_type = root.get(b"type")
+    message = _object_fields(data, root.get(b"message"), (b"role", b"content"))
+    if message is None:
+        return ()
+    if _span_matches(data, record_type, b"assistant") and _span_matches(data, message.get(b"role"), b"assistant"):
+        blocks = _array_spans(data, message.get(b"content"))
+        if blocks is None:
+            return ()
+        counted: List[str] = []
+        for block in blocks:
+            block_fields = _object_fields(data, block, (b"type", b"name", b"input"))
+            if block_fields is None:
+                continue
+            if not _span_matches(data, block_fields.get(b"type"), b"tool_use"):
+                continue
+            if not _span_matches(data, block_fields.get(b"name"), b"Skill"):
+                continue
+            tool_input = _object_fields(data, block_fields.get(b"input"), (b"skill",))
+            skill = _candidate_from_span(data, tool_input.get(b"skill") if tool_input is not None else None)
+            if skill is not None:
+                counted.append(skill)
+        return counted
+    if _span_matches(data, record_type, b"user") and _span_matches(data, message.get(b"role"), b"user"):
+        name = _slash_command_from_span(data, message.get(b"content"))
+        return (name,) if name is not None else ()
+    return ()
+
+
+def _extract_codex_record(data: bytes) -> Sequence[str]:
+    root = _root_object_fields(data, (b"type", b"payload"))
+    if root is None or not _span_matches(data, root.get(b"type"), b"response_item"):
+        return ()
+    payload = _object_fields(data, root.get(b"payload"), (b"type", b"name", b"arguments"))
+    if payload is None:
+        return ()
+    if not _span_matches(data, payload.get(b"type"), b"function_call"):
+        return ()
+    if not _span_matches(data, payload.get(b"name"), CODEX_SKILL_READ_FUNCTION.encode("ascii")):
+        return ()
+    arguments = payload.get(b"arguments")
+    if arguments is None or data[arguments.start] != ord('"'):
+        return ()
+    name = EmbeddedJsonCursor(JsonStringReader(data, arguments)).parse_path()
+    return (name,) if name is not None else ()
+
+
+def _scan_records(
+    files: Sequence[Path],
+    sensitivity_files: Sequence[Path],
+    extractor: Callable[[bytes], Sequence[str]],
+) -> ScanOutcome:
+    """Read bounded raw records once, count safe names, and surface every input failure."""
+    outcome = ScanOutcome(Counter(), Counter())
+    sensitivity = set(sensitivity_files)
     for entry_path in files:
         try:
-            with entry_path.open(encoding="utf-8", errors="ignore") as handle:
-                for line in handle:
-                    try:
-                        yield json.loads(line)
-                    except json.JSONDecodeError:
+            with entry_path.open("rb") as handle:
+                while True:
+                    raw_line = handle.readline(MAX_RECORD_BYTES + 1)
+                    if not raw_line:
+                        break
+                    record = raw_line[:-1] if raw_line.endswith(b"\n") else raw_line
+                    if record.endswith(b"\r"):
+                        record = record[:-1]
+                    if len(record) > MAX_RECORD_BYTES:
+                        outcome.input_errors += 1
+                        while raw_line and not raw_line.endswith(b"\n"):
+                            raw_line = handle.readline(MAX_RECORD_BYTES + 1)
                         continue
+                    if not record:
+                        outcome.input_errors += 1
+                        continue
+                    try:
+                        names = extractor(record)
+                    except JsonInputError:
+                        outcome.input_errors += 1
+                        continue
+                    outcome.primary_counts.update(names)
+                    if entry_path in sensitivity:
+                        outcome.sensitivity_counts.update(names)
         except OSError:
-            continue
+            outcome.input_errors += 1
+    return outcome
 
 
-def scan_claude(files: Sequence[Path]) -> Counter:
-    """Count only top-level Claude Skill and slash-command event schemas."""
-    counts: Counter = Counter()
-    for record in json_records(files):
-        if not isinstance(record, dict):
-            continue
-        message = record.get("message")
-        if not isinstance(message, dict):
-            continue
-        if record.get("type") == "assistant" and message.get("role") == "assistant":
-            content = message.get("content")
-            if not isinstance(content, list):
-                continue
-            for block in content:
-                if not isinstance(block, dict):
-                    continue
-                if block.get("type") != "tool_use" or block.get("name") != "Skill":
-                    continue
-                tool_input = block.get("input")
-                if not isinstance(tool_input, dict):
-                    continue
-                skill = tool_input.get("skill")
-                if isinstance(skill, str):
-                    counts[skill] += 1
-            continue
-        if record.get("type") == "user" and message.get("role") == "user":
-            content = message.get("content")
-            if not isinstance(content, str):
-                continue
-            match = CLAUDE_SLASH_EVENT_RE.fullmatch(content)
-            if match:
-                counts[match.group(1)] += 1
-    return counts
+def scan_claude(files: Sequence[Path], sensitivity_files: Sequence[Path] = ()) -> ScanOutcome:
+    """Count only verified Claude event fields without decoding record bodies."""
+    return _scan_records(files, sensitivity_files, _extract_claude_record)
 
 
-def scan_codex(files: Sequence[Path]) -> Counter:
-    """Count only Codex response_item read_file calls with a JSON path field."""
-    counts: Counter = Counter()
-    for record in json_records(files):
-        if not isinstance(record, dict) or record.get("type") != "response_item":
-            continue
-        payload = record.get("payload")
-        if not isinstance(payload, dict):
-            continue
-        if payload.get("type") != "function_call" or payload.get("name") != CODEX_SKILL_READ_FUNCTION:
-            continue
-        arguments = payload.get("arguments")
-        if not isinstance(arguments, str):
-            continue
-        try:
-            read_arguments = json.loads(arguments)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(read_arguments, dict):
-            continue
-        skill_path = read_arguments.get("path")
-        if not isinstance(skill_path, str):
-            continue
-        match = CODEX_SKILL_READ_PATH_RE.fullmatch(skill_path)
-        if match:
-            counts[match.group(1)] += 1
-    return counts
+def scan_codex(files: Sequence[Path], sensitivity_files: Sequence[Path] = ()) -> ScanOutcome:
+    """Count only verified Codex read_file paths without decoding arguments objects."""
+    return _scan_records(files, sensitivity_files, _extract_codex_record)
 
 
 def transcript_window(root: Path, as_of: datetime, primary_start: datetime, sensitivity_start: datetime) -> Tuple[Dict[str, Any], List[Path], List[Path]]:
     """Return only aggregate availability metadata plus file handles for scanning."""
     available = root.is_dir()
+    input_errors = 0
     candidates: List[Tuple[datetime, Path]] = []
     if available:
         try:
@@ -306,11 +987,13 @@ def transcript_window(root: Path, as_of: datetime, primary_start: datetime, sens
                 try:
                     observed = datetime.fromtimestamp(entry_path.stat().st_mtime, tz=UTC)
                 except OSError:
+                    input_errors += 1
                     continue
                 if observed <= as_of:
                     candidates.append((observed, entry_path))
         except OSError:
             available = False
+            input_errors += 1
             candidates = []
 
     candidates.sort(key=lambda item: item[0])
@@ -318,14 +1001,30 @@ def transcript_window(root: Path, as_of: datetime, primary_start: datetime, sens
     primary = [entry_path for observed, entry_path in candidates if observed >= primary_start]
     sensitivity = [entry_path for observed, entry_path in candidates if observed >= sensitivity_start]
     metadata = {
-        "available": available,
+        "available": bool(available and input_errors == 0),
         "files_available": len(candidates),
         "files_scanned_primary": len(primary),
         "files_scanned_sensitivity": len(sensitivity),
         "earliest_available": timestamp_text(earliest),
-        "coverage_complete": bool(available and earliest is not None and earliest <= primary_start),
+        "input_errors": input_errors,
+        "input_complete": input_errors == 0,
+        "coverage_complete": bool(
+            available and input_errors == 0 and earliest is not None and earliest <= primary_start
+        ),
     }
     return metadata, primary, sensitivity
+
+
+def _apply_scan_coverage(metadata: Mapping[str, Any], scan: ScanOutcome) -> Dict[str, Any]:
+    """Turn raw-read failures into aggregate-only availability and coverage holds."""
+    updated = dict(metadata)
+    input_errors = int(updated["input_errors"]) + scan.input_errors
+    input_complete = input_errors == 0
+    updated["input_errors"] = input_errors
+    updated["input_complete"] = input_complete
+    updated["available"] = bool(updated["available"] and input_complete)
+    updated["coverage_complete"] = bool(updated["coverage_complete"] and input_complete)
+    return updated
 
 
 def source_freshness(repo_root: Path, source: Optional[str], ownership: str, primary_start: datetime) -> str:
@@ -397,11 +1096,15 @@ def build_report(repo_root: Path, catalog: Mapping[str, Mapping[str, str]], clau
     codex_coverage, codex_primary, codex_sensitivity = transcript_window(
         codex_dir, as_of, primary_start, sensitivity_start
     )
+    claude_scan = scan_claude(claude_primary, claude_sensitivity)
+    codex_scan = scan_codex(codex_primary, codex_sensitivity)
+    claude_coverage = _apply_scan_coverage(claude_coverage, claude_scan)
+    codex_coverage = _apply_scan_coverage(codex_coverage, codex_scan)
     coverage_complete = bool(claude_coverage["coverage_complete"] and codex_coverage["coverage_complete"])
-    claude_primary_counts = scan_claude(claude_primary)
-    codex_primary_counts = scan_codex(codex_primary)
-    claude_sensitivity_counts = scan_claude(claude_sensitivity)
-    codex_sensitivity_counts = scan_codex(codex_sensitivity)
+    claude_primary_counts = claude_scan.primary_counts
+    codex_primary_counts = codex_scan.primary_counts
+    claude_sensitivity_counts = claude_scan.sensitivity_counts
+    codex_sensitivity_counts = codex_scan.sensitivity_counts
 
     matrix: List[Dict[str, Any]] = []
     for name, trigger, overlap in CANDIDATE_PROFILES:

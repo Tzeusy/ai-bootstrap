@@ -14,6 +14,7 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -164,6 +165,202 @@ class CatalogManifestTests(unittest.TestCase):
 
 
 class UsageAuditTests(unittest.TestCase):
+    def test_actual_audit_path_never_decodes_synthetic_content_or_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            manifest = self.make_complete_catalog(repo)
+            self.seed_old_repo_history(repo)
+            catalog = AUDIT_MODULE.load_catalog_manifest(repo, manifest)
+            claude_dir = repo / "transcripts" / "claude"
+            codex_dir = repo / "transcripts" / "codex"
+            claude_dir.mkdir(parents=True)
+            codex_dir.mkdir(parents=True)
+            shutil.copyfile(FIXTURES / "claude-events.jsonl", claude_dir / "events.jsonl")
+            shutil.copyfile(FIXTURES / "codex-events.jsonl", codex_dir / "events.jsonl")
+            for source in (claude_dir, codex_dir):
+                marker = source / "history.jsonl"
+                marker.write_text("\n", encoding="utf-8")
+                set_mtime(marker, AS_OF_DATETIME - timedelta(days=100))
+            for event_file in (claude_dir / "events.jsonl", codex_dir / "events.jsonl"):
+                set_mtime(event_file, AS_OF_DATETIME - timedelta(days=5))
+
+            with mock.patch.object(
+                AUDIT_MODULE.json,
+                "loads",
+                side_effect=AssertionError("transcript values must not reach json decoding"),
+            ):
+                report = AUDIT_MODULE.build_report(
+                    repo,
+                    catalog,
+                    claude_dir,
+                    codex_dir,
+                    AS_OF_DATETIME,
+                    90,
+                    30,
+                )
+
+            rendered = AUDIT_MODULE.render_text(report)
+            self.assertTrue(report["coverage"]["complete"])
+            self.assertEqual(matrix_row(report, "test-driven-development")["counts"]["primary"]["total"], 2)
+            self.assertEqual(matrix_row(report, "brainstorming")["counts"]["primary"]["claude"], 1)
+            for sentinel in (
+                "SYNTHETIC_CONTENT_SENTINEL_AIB_C4M",
+                "SYNTHETIC_CREDENTIAL_SENTINEL_AIB_C4M",
+            ):
+                self.assertNotIn(sentinel, rendered)
+
+    def test_failed_open_source_fails_coverage_closed_in_actual_audit_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            source = write_skill(repo, "skills/personal/systematic-debugging")
+            manifest = write_manifest(
+                repo,
+                [{"name": "systematic-debugging", "source": str(source.relative_to(repo)), "ownership": "repo"}],
+            )
+            write_skill(repo, "skills/superpowers/skills/test-driven-development")
+            self.seed_old_repo_history(repo)
+            catalog = AUDIT_MODULE.load_catalog_manifest(repo, manifest)
+            claude_dir = repo / "transcripts" / "claude"
+            codex_dir = repo / "transcripts" / "codex"
+            claude_dir.mkdir(parents=True)
+            codex_dir.mkdir(parents=True)
+            claude_history = claude_dir / "history.jsonl"
+            failed_open = claude_dir / "unreadable.jsonl"
+            codex_history = codex_dir / "history.jsonl"
+            claude_history.write_text("\n", encoding="utf-8")
+            failed_open.write_text(claude_skill_event("writing-plans") + "\n", encoding="utf-8")
+            codex_history.write_text("\n", encoding="utf-8")
+            set_mtime(claude_history, AS_OF_DATETIME - timedelta(days=100))
+            set_mtime(failed_open, AS_OF_DATETIME - timedelta(days=5))
+            set_mtime(codex_history, AS_OF_DATETIME - timedelta(days=100))
+
+            original_open = Path.open
+
+            def fail_one_transcript(path: Path, *args: object, **kwargs: object) -> object:
+                if path == failed_open:
+                    raise OSError("synthetic failed-open")
+                return original_open(path, *args, **kwargs)
+
+            with mock.patch.object(Path, "open", new=fail_one_transcript):
+                report = AUDIT_MODULE.build_report(
+                    repo,
+                    catalog,
+                    claude_dir,
+                    codex_dir,
+                    AS_OF_DATETIME,
+                    90,
+                    30,
+                )
+
+            row = matrix_row(report, "systematic-debugging")
+            self.assertFalse(report["coverage"]["claude"]["available"])
+            self.assertFalse(report["coverage"]["claude"]["coverage_complete"])
+            self.assertFalse(report["coverage"]["complete"])
+            self.assertEqual(row["counts"]["primary"]["total"], 0)
+            self.assertEqual(row["disposition"], "insufficient-evidence")
+            self.assertEqual(row["protection_reason"], "incomplete-history")
+
+    def test_failed_metadata_read_fails_coverage_closed_in_actual_audit_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            source = write_skill(repo, "skills/personal/systematic-debugging")
+            manifest = write_manifest(
+                repo,
+                [{"name": "systematic-debugging", "source": str(source.relative_to(repo)), "ownership": "repo"}],
+            )
+            write_skill(repo, "skills/superpowers/skills/test-driven-development")
+            self.seed_old_repo_history(repo)
+            catalog = AUDIT_MODULE.load_catalog_manifest(repo, manifest)
+            claude_dir = repo / "transcripts" / "claude"
+            codex_dir = repo / "transcripts" / "codex"
+            claude_dir.mkdir(parents=True)
+            codex_dir.mkdir(parents=True)
+            claude_history = claude_dir / "history.jsonl"
+            unreadable_metadata = claude_dir / "unstatable.jsonl"
+            codex_history = codex_dir / "history.jsonl"
+            claude_history.write_text("\n", encoding="utf-8")
+            unreadable_metadata.write_text(claude_skill_event("writing-plans") + "\n", encoding="utf-8")
+            codex_history.write_text("\n", encoding="utf-8")
+            set_mtime(claude_history, AS_OF_DATETIME - timedelta(days=100))
+            set_mtime(unreadable_metadata, AS_OF_DATETIME - timedelta(days=5))
+            set_mtime(codex_history, AS_OF_DATETIME - timedelta(days=100))
+
+            original_stat = Path.stat
+
+            def fail_one_stat(path: Path, *args: object, **kwargs: object) -> os.stat_result:
+                if path == unreadable_metadata:
+                    raise OSError("synthetic failed-stat")
+                return original_stat(path, *args, **kwargs)
+
+            with mock.patch.object(Path, "stat", new=fail_one_stat):
+                report = AUDIT_MODULE.build_report(
+                    repo,
+                    catalog,
+                    claude_dir,
+                    codex_dir,
+                    AS_OF_DATETIME,
+                    90,
+                    30,
+                )
+
+            row = matrix_row(report, "systematic-debugging")
+            self.assertFalse(report["coverage"]["claude"]["available"])
+            self.assertFalse(report["coverage"]["claude"]["coverage_complete"])
+            self.assertFalse(report["coverage"]["complete"])
+            self.assertEqual(row["counts"]["primary"]["total"], 0)
+            self.assertEqual(row["disposition"], "insufficient-evidence")
+            self.assertEqual(row["protection_reason"], "incomplete-history")
+
+    def test_malformed_record_fails_coverage_closed_in_actual_audit_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            source = write_skill(repo, "skills/personal/systematic-debugging")
+            manifest = write_manifest(
+                repo,
+                [{"name": "systematic-debugging", "source": str(source.relative_to(repo)), "ownership": "repo"}],
+            )
+            write_skill(repo, "skills/superpowers/skills/test-driven-development")
+            self.seed_old_repo_history(repo)
+            catalog = AUDIT_MODULE.load_catalog_manifest(repo, manifest)
+            claude_dir = repo / "transcripts" / "claude"
+            codex_dir = repo / "transcripts" / "codex"
+            claude_dir.mkdir(parents=True)
+            codex_dir.mkdir(parents=True)
+            claude_history = claude_dir / "history.jsonl"
+            malformed = claude_dir / "malformed.jsonl"
+            codex_history = codex_dir / "history.jsonl"
+            claude_history.write_text("\n", encoding="utf-8")
+            malformed.write_bytes(
+                claude_skill_event("writing-plans").encode("utf-8") + b" synthetic-trailing-bytes\n"
+            )
+            codex_history.write_text("\n", encoding="utf-8")
+            set_mtime(claude_history, AS_OF_DATETIME - timedelta(days=100))
+            set_mtime(malformed, AS_OF_DATETIME - timedelta(days=5))
+            set_mtime(codex_history, AS_OF_DATETIME - timedelta(days=100))
+
+            report = AUDIT_MODULE.build_report(
+                repo,
+                catalog,
+                claude_dir,
+                codex_dir,
+                AS_OF_DATETIME,
+                90,
+                30,
+            )
+
+            row = matrix_row(report, "systematic-debugging")
+            self.assertFalse(report["coverage"]["claude"]["available"])
+            self.assertFalse(report["coverage"]["claude"]["coverage_complete"])
+            self.assertEqual(report["coverage"]["claude"]["input_errors"], 1)
+            self.assertFalse(report["coverage"]["complete"])
+            self.assertEqual(row["counts"]["primary"]["total"], 0)
+            self.assertEqual(row["disposition"], "insufficient-evidence")
+            self.assertEqual(row["protection_reason"], "incomplete-history")
+
     def test_real_extractors_ignore_skill_like_decoys_in_unverified_event_fields(self) -> None:
         claude_fixture = FIXTURES / "claude-events.jsonl"
         codex_fixture = FIXTURES / "codex-events.jsonl"
@@ -205,6 +402,35 @@ class UsageAuditTests(unittest.TestCase):
         self.assertEqual(codex_counts["test-driven-development"], 1)
         self.assertEqual(claude_counts["systematic-debugging"], 0)
         self.assertEqual(codex_counts["systematic-debugging"], 0)
+
+    def test_codex_read_file_skips_false_and_null_unregistered_arguments(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            transcript = Path(tmp) / "codex-events.jsonl"
+            transcript.write_text(
+                json.dumps(
+                    {
+                        "type": "response_item",
+                        "payload": {
+                            "type": "function_call",
+                            "name": "read_file",
+                            "arguments": json.dumps(
+                                {
+                                    "path": "skills/superpowers/skills/test-driven-development/SKILL.md",
+                                    "cache": False,
+                                    "optional": None,
+                                }
+                            ),
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            outcome = AUDIT_MODULE.scan_codex([transcript])
+
+            self.assertEqual(outcome["test-driven-development"], 1)
+            self.assertTrue(outcome.input_complete)
 
     def make_complete_catalog(self, repo: Path) -> Path:
         entries = []
