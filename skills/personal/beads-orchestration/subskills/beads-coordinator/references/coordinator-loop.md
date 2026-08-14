@@ -83,10 +83,14 @@ ID; a mismatched record is partial manual triage. A review task whose resolved
 original ID is its own review ID is self-referential and must fail closed before
 canonical selection, dispatch, or wiring.
 
-The same pure relation-graph validation applies across all resolved review
-tasks before canonical selection. A reciprocal or longer task-to-original
-cycle is `cyclic-review-relation`: it emits partial manual triage and permits
-no dispatch or wiring recommendation.
+The same total pure relation-graph validation applies across the complete
+resolved review-task collection before canonical selection or any
+recommendation. Malformed relation entries, self-links, duplicate review-ID
+left sides, and reuse of a review ID as an original role all emit partial
+manual triage. A reciprocal or longer task-to-original cycle is
+`cyclic-review-relation` and likewise permits no dispatch or wiring
+recommendation. Distinct review tasks may still point to the same original for
+valid canonical-plus-duplicate dedupe.
 
 Before discovering new work, and whenever a worker frees a slot, check
 (projected — never dump the unfiltered JSON into context; see
