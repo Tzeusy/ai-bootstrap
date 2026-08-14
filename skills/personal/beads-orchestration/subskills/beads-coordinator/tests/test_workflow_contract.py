@@ -107,6 +107,12 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         self.assertIn("immediately before an actual mutation", contents)
         self.assertIn("sole PR-state mutator", contents)
 
+    def test_review_deduplication_uses_parsed_chronology_and_fails_closed(self) -> None:
+        contents = LOOP.read_text(encoding="utf-8")
+        self.assertIn("parsed creation chronology", contents)
+        self.assertIn("partial manual triage", contents)
+        self.assertIn("never choose by raw timestamp text", contents)
+
 
 if __name__ == "__main__":
     unittest.main()

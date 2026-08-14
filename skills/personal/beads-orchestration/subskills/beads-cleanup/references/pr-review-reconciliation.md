@@ -14,6 +14,8 @@ IDs.
 
 Immediately before any coordinator action, re-verify the current PR, Beads,
 assignee, and heartbeat state. Scan findings are evidence, not authorization.
+A nonzero delegated normalizer or malformed PR evidence is a partial
+manual-triage result even when its stdout parses.
 
 ## Pass 2: Blocked Original Beads With `pr-review`
 
@@ -31,8 +33,10 @@ manual-triage finding.
 ## Pass 3: Blocked `pr-review-task` Review Beads
 
 The canonical normalizer includes all non-closed review tasks, including active
-ones, when selecting the oldest deterministic canonical task. It preserves
-dotted child IDs and reports duplicates without changing them.
+ones, when selecting the oldest deterministic canonical task by parsed creation
+chronology. Invalid creation timestamps fail closed to partial manual triage;
+it never compares raw timestamp text. It preserves dotted child IDs and reports
+duplicates without changing them.
 
 | PR state | Report recommendation for coordinator Step 0 |
 |---|---|

@@ -129,6 +129,10 @@ def record_id(record: dict[str, Any]) -> str | None:
     return candidate if isinstance(candidate, str) and BEAD_ID_RE.fullmatch(candidate) else None
 
 
+def valid_pr_number(value: object) -> bool:
+    return type(value) is int and value > 0
+
+
 def pr_number_from_ref(value: object) -> int | None:
     match = re.fullmatch(r"gh-pr:([0-9]+)", value if isinstance(value, str) else "")
     return int(match.group(1)) if match else None
@@ -180,8 +184,8 @@ def resolve_review_task(
     pr_number = payload.get("pr_number")
     if not isinstance(original_id, str) or not BEAD_ID_RE.fullmatch(original_id):
         return None, "invalid-original-id"
-    if not isinstance(pr_number, int) or pr_number < 1:
-        return None, "missing-pr-number"
+    if not valid_pr_number(pr_number):
+        return None, "invalid-pr-number"
     return {"original_id": original_id, "pr_number": pr_number}, None
 
 
@@ -192,17 +196,24 @@ def view_pr(
 ) -> tuple[dict[str, Any] | None, str | None]:
     if pr_number not in cache:
         payload, error = command_json(
-            ["gh", "pr", "view", str(pr_number), "--json", "state,mergedAt,createdAt"],
+            ["gh", "pr", "view", str(pr_number), "--json", "number,state,mergedAt,createdAt"],
             repo_root,
         )
         if error:
             cache[pr_number] = (None, error)
         elif not isinstance(payload, dict) or not isinstance(payload.get("state"), str):
             cache[pr_number] = (None, "invalid-pr-payload")
+        elif not valid_pr_number(payload.get("number")) or payload["number"] != pr_number:
+            cache[pr_number] = (None, "invalid-pr-number")
         elif payload["state"] not in PR_STATES:
             cache[pr_number] = (None, "invalid-pr-state")
         else:
-            cache[pr_number] = (payload, None)
+            created_at = parse_time(payload.get("createdAt"))
+            if created_at is None:
+                cache[pr_number] = (None, "invalid-pr-created-at")
+            else:
+                payload["createdAt"] = format_time(created_at)
+                cache[pr_number] = (payload, None)
     return cache[pr_number]
 
 
@@ -307,10 +318,37 @@ def self_heal_candidates(
             continue
         branch = item.get("headRefName")
         number = item.get("number")
-        if not isinstance(branch, str) or not branch.startswith("agent/") or not isinstance(number, int):
+        if not isinstance(branch, str) or not branch.startswith("agent/"):
             continue
         original_id = branch.removeprefix("agent/")
         if not BEAD_ID_RE.fullmatch(original_id):
+            continue
+        if not valid_pr_number(number):
+            report_error(errors, "invalid-pr-number", "open-prs")
+            candidates.append(
+                {
+                    "canonical_review_id": None,
+                    "context_status": "invalid-pr-number",
+                    "cooldown_until": None,
+                    "original_id": original_id,
+                    "pr_number": None,
+                    "recommendation": "manual-triage",
+                }
+            )
+            continue
+        created_at = parse_time(item.get("createdAt"))
+        if created_at is None:
+            report_error(errors, "invalid-pr-created-at", "open-prs")
+            candidates.append(
+                {
+                    "canonical_review_id": None,
+                    "context_status": "invalid-pr-created-at",
+                    "cooldown_until": None,
+                    "original_id": original_id,
+                    "pr_number": number,
+                    "recommendation": "manual-triage",
+                }
+            )
             continue
         original_payload, original_error = command_json(["bd", "show", original_id, "--json"], repo_root)
         original = first_record(original_payload) if original_error is None else None
@@ -346,18 +384,17 @@ def self_heal_candidates(
         else:
             recommendation = "self-heal-original-and-review-wiring"
 
-        created_at = parse_time(item.get("createdAt"))
         candidates.append(
             {
                 "canonical_review_id": canonical,
                 "context_status": "resolved",
-                "cooldown_until": format_time(created_at + COOLDOWN) if created_at else None,
+                "cooldown_until": format_time(created_at + COOLDOWN),
                 "original_id": original_id,
                 "pr_number": number,
                 "recommendation": recommendation,
             }
         )
-    return sorted(candidates, key=lambda item: (str(item["original_id"]), int(item["pr_number"])))
+    return sorted(candidates, key=lambda item: (str(item["original_id"]), int(item["pr_number"] or 0)))
 
 
 def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
@@ -445,6 +482,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             task_lookup_complete = False
 
     canonical_by_key: dict[tuple[str, int], str] = {}
+    invalid_task_keys: set[tuple[str, int]] = set()
     tasks_by_key: dict[tuple[str, int], list[str]] = {}
     for review_id, context in task_contexts.items():
         if context is None:
@@ -452,13 +490,17 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         key = (context["original_id"], context["pr_number"])
         tasks_by_key.setdefault(key, []).append(review_id)
     for key, review_ids in tasks_by_key.items():
-        canonical_by_key[key] = min(
-            review_ids,
-            key=lambda review_id: (
-                str(tasks[review_id].get("created_at") or "9999-12-31T23:59:59Z"),
-                review_id,
-            ),
-        )
+        chronology: list[tuple[datetime, str]] = []
+        for review_id in review_ids:
+            created_at = parse_time(tasks[review_id].get("created_at"))
+            if created_at is None:
+                invalid_task_keys.add(key)
+                report_error(errors, "invalid-created-at", "review-context")
+                task_lookup_complete = False
+                break
+            chronology.append((created_at, review_id))
+        if key not in invalid_task_keys:
+            canonical_by_key[key] = min(chronology, key=lambda item: (item[0], item[1]))[1]
 
     pr_cache: dict[int, tuple[dict[str, Any] | None, str | None]] = {}
     findings: list[dict[str, Any]] = []
@@ -554,7 +596,23 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             continue
         original_id = context["original_id"]
         pr_number = context["pr_number"]
-        canonical = canonical_by_key[(original_id, pr_number)]
+        key = (original_id, pr_number)
+        canonical = canonical_by_key.get(key)
+        if key in invalid_task_keys or canonical is None:
+            findings.append(
+                task_finding(
+                    review_id=review_id,
+                    original_id=original_id,
+                    pr_number=pr_number,
+                    context_status="invalid-created-at" if key in invalid_task_keys else "missing-canonical-review",
+                    canonical_review_id=None,
+                    duplicate_of=None,
+                    pr_state=None,
+                    cooldown=None,
+                    recommendation="manual-triage",
+                )
+            )
+            continue
         duplicate_of = canonical if review_id != canonical else None
         pr, pr_error = view_pr(pr_number, pr_cache, repo_root)
         if pr is None:
