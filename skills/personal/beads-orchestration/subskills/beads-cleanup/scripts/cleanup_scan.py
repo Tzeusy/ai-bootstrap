@@ -233,7 +233,12 @@ def finding_action_is_consistent(
     if recommendation in {"dispatch-canonical-review", "wait-for-cooldown"}:
         return canonical_review_id is not None and cooldown_until is not None
     if recommendation == "dedupe-review-task":
-        return canonical_review_id is not None and duplicate_of == canonical_review_id
+        return (
+            canonical_review_id is not None
+            and duplicate_of == canonical_review_id
+            and review_id != canonical_review_id
+            and duplicate_of != review_id
+        )
     return recommendation != "self-heal-review-wiring" or canonical_review_id is None
 
 
@@ -255,6 +260,23 @@ def self_heal_action_is_consistent(
     if recommendation in {"self-heal-original-and-review-wiring", "self-heal-review-wiring"}:
         return canonical_review_id is None
     return False
+
+
+def has_matching_canonical_review_finding(
+    candidate: dict[str, Any], findings: list[dict[str, Any]]
+) -> bool:
+    """Require wiring actions to be backed by their resolved canonical task."""
+    canonical_review_id = candidate["canonical_review_id"]
+    return any(
+        finding["kind"] == "review-task"
+        and finding["context_status"] == "resolved"
+        and finding["canonical_review_id"] == canonical_review_id
+        and finding["review_id"] == canonical_review_id
+        and finding["duplicate_of"] is None
+        and finding["original_id"] == candidate["original_id"]
+        and finding["pr_number"] == candidate["pr_number"]
+        for finding in findings
+    )
 
 
 def sanitize_normalizer(payload: object) -> dict[str, Any]:
@@ -419,6 +441,17 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
                 "recommendation": "manual-triage" if invalid_evidence else recommendation,
             }
         )
+
+    for candidate in self_heal:
+        if candidate["recommendation"] not in {"review-wiring-current", "self-heal-original-wiring"}:
+            continue
+        if has_matching_canonical_review_finding(candidate, findings):
+            continue
+        report_error(errors, "invalid-normalizer-evidence", "pr-review")
+        status = "partial"
+        candidate["context_status"] = "invalid-normalizer-evidence"
+        candidate["cooldown_until"] = None
+        candidate["recommendation"] = "manual-triage"
 
     if status == "success" and not errors and not findings and not self_heal:
         status = "empty"
