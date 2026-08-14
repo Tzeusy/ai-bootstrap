@@ -326,11 +326,26 @@ class NormalizePrReviewStateTests(unittest.TestCase):
         self.assertEqual(result.stderr, "")
 
     def test_fake_commands_match_strict_read_only_argv_allowlists(self) -> None:
+        original_id = "aib-swr.1"
+        self_heal_id = "aib-self-heal.1"
         result, calls, repo_root = self.run_fixture(
             {
-                "blocked_pr_review": [],
+                "blocked_pr_review": [
+                    {"id": original_id, "labels": ["pr-review"], "status": "blocked"},
+                ],
                 "blocked_pr_review_tasks": [],
-                "open_prs": [],
+                "shows": {
+                    original_id: [original_bead(original_id, 41)],
+                    self_heal_id: [{"id": self_heal_id, "status": "open", "external_ref": "", "labels": []}],
+                },
+                "prs": {"41": pr_payload("OPEN")},
+                "open_prs": [
+                    {
+                        "number": 42,
+                        "headRefName": f"agent/{self_heal_id}",
+                        "createdAt": "2026-08-14T03:00:00Z",
+                    }
+                ],
             }
         )
 
@@ -349,11 +364,21 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                     "0",
                 ),
                 ("-C", repo_root, "list", "--label", "pr-review-task", "--json", "--limit", "0"),
+                ("show", original_id, "--json"),
+                ("show", self_heal_id, "--json"),
             },
-            "gh": {("pr", "list", "--state", "open", "--json", "number,headRefName,createdAt")},
+            "gh": {
+                ("pr", "list", "--state", "open", "--json", "number,headRefName,createdAt"),
+                ("pr", "view", "41", "--json", "number,state,mergedAt,createdAt"),
+            },
             "git": set(),
         }
         self.assertTrue(calls)
+        observed = {
+            tool: {tuple(call["argv"]) for call in calls if call["tool"] == tool}
+            for tool in allowed
+        }
+        self.assertEqual(observed, allowed)
         for call in calls:
             tool = call["tool"]
             argv = call["argv"]
@@ -361,6 +386,97 @@ class NormalizePrReviewStateTests(unittest.TestCase):
             self.assertIsInstance(argv, list)
             self.assertIn(tool, allowed, call)
             self.assertIn(tuple(argv), allowed[tool], call)
+
+    def test_mismatched_original_show_identity_is_partial_manual_triage(self) -> None:
+        original_id = "aib-swr.1"
+        returned_id = "aib-other.1"
+        fixture = {
+            "blocked_pr_review": [
+                {"id": original_id, "labels": ["pr-review"], "status": "blocked"},
+            ],
+            "shows": {original_id: [original_bead(returned_id, 41)]},
+            "prs": {"41": pr_payload("OPEN")},
+            "open_prs": [],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        finding = payload["findings"][0]
+        self.assertEqual(finding["context_status"], "mismatched-record-id")
+        self.assertEqual(finding["recommendation"], "manual-triage")
+        self.assertIn({"code": "mismatched-record-id", "scope": "original-context"}, payload["errors"])
+
+    def test_open_branch_self_heal_rejects_mismatched_original_show_identity(self) -> None:
+        original_id = "aib-swr.1"
+        returned_id = "aib-other.1"
+        fixture = {
+            "blocked_pr_review": [],
+            "shows": {
+                original_id: [{"id": returned_id, "status": "open", "external_ref": "", "labels": []}],
+            },
+            "open_prs": [
+                {
+                    "number": 41,
+                    "headRefName": f"agent/{original_id}",
+                    "createdAt": "2026-08-14T03:00:00Z",
+                }
+            ],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        candidate = payload["self_heal_candidates"][0]
+        self.assertEqual(candidate["context_status"], "mismatched-record-id")
+        self.assertEqual(candidate["recommendation"], "manual-triage")
+        self.assertIn({"code": "mismatched-record-id", "scope": "self-heal"}, payload["errors"])
+
+    def test_self_referential_review_task_never_reaches_dispatch_or_wiring(self) -> None:
+        review_id = "aib-review.1"
+        cases = {
+            "distinct-control": (
+                "aib-swr.1",
+                "success",
+                "dispatch-canonical-review",
+                "review-wiring-current",
+            ),
+            "self-referential": (review_id, "partial", "manual-triage", "manual-triage"),
+        }
+        for name, (original_id, expected_status, expected_recommendation, expected_self_heal) in cases.items():
+            with self.subTest(name=name):
+                fixture = {
+                    "blocked_pr_review": [review_task(review_id, original_id)],
+                    "resolver_payload": {"ok": True, "original_id": original_id, "pr_number": 41},
+                    "prs": {"41": pr_payload("OPEN")},
+                    "shows": {original_id: [original_bead(original_id, 41)]},
+                    "open_prs": [
+                        {
+                            "number": 41,
+                            "headRefName": f"agent/{original_id}",
+                            "createdAt": "2026-08-14T03:00:00Z",
+                        }
+                    ],
+                }
+
+                result, _, _ = self.run_fixture(fixture)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                finding = payload["findings"][0]
+                self.assertEqual(payload["status"], expected_status)
+                self.assertEqual(finding["recommendation"], expected_recommendation)
+                self.assertEqual(payload["self_heal_candidates"][0]["recommendation"], expected_self_heal)
+                if name == "self-referential":
+                    self.assertEqual(finding["context_status"], "self-referential-review-id")
+                    self.assertIn(
+                        {"code": "self-referential-review-id", "scope": "review-context"},
+                        payload["errors"],
+                    )
 
     def test_preserves_dotted_child_and_reports_open_pr_cooldown(self) -> None:
         original_id = "aib-swr.1"

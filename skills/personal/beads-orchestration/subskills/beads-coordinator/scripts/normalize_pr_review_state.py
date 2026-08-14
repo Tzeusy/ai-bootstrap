@@ -129,6 +129,15 @@ def record_id(record: dict[str, Any]) -> str | None:
     return candidate if isinstance(candidate, str) and BEAD_ID_RE.fullmatch(candidate) else None
 
 
+def requested_record(payload: object, issue_id: str) -> tuple[dict[str, Any] | None, str | None]:
+    record = first_record(payload)
+    if record is None:
+        return None, "invalid-json"
+    if record_id(record) != issue_id:
+        return None, "mismatched-record-id"
+    return record, None
+
+
 def valid_pr_number(value: object) -> bool:
     return type(value) is int and value > 0
 
@@ -147,8 +156,7 @@ def load_original(record: dict[str, Any], repo_root: Path) -> tuple[dict[str, An
     payload, error = command_json(["bd", "show", issue_id, "--json"], repo_root)
     if error:
         return None, error
-    original = first_record(payload)
-    return (original, None) if original else (None, "invalid-json")
+    return requested_record(payload, issue_id)
 
 
 def resolver_error(result: subprocess.CompletedProcess[str] | None) -> str:
@@ -351,13 +359,16 @@ def self_heal_candidates(
             )
             continue
         original_payload, original_error = command_json(["bd", "show", original_id, "--json"], repo_root)
-        original = first_record(original_payload) if original_error is None else None
+        if original_error is None:
+            original, identity_error = requested_record(original_payload, original_id)
+        else:
+            original, identity_error = None, original_error
         if original is None:
-            report_error(errors, original_error or "invalid-json", "self-heal")
+            report_error(errors, identity_error or "invalid-json", "self-heal")
             candidates.append(
                 {
                     "canonical_review_id": None,
-                    "context_status": "command-failed",
+                    "context_status": identity_error or "invalid-json",
                     "cooldown_until": None,
                     "original_id": original_id,
                     "pr_number": number,
@@ -481,6 +492,9 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     task_context_errors: dict[str, str] = {}
     for review_id in sorted(tasks):
         context, error = resolve_review_task(review_id, args.resolver, repo_root)
+        if context is not None and context["original_id"] == review_id:
+            context = None
+            error = "self-referential-review-id"
         task_contexts[review_id] = context
         if error:
             task_context_errors[review_id] = error

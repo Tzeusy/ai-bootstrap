@@ -722,6 +722,111 @@ class CleanupScanTests(unittest.TestCase):
                 )
                 self.assertIn({"code": "normalizer-failed", "scope": "pr-review"}, payload["errors"])
 
+    def test_cleanup_rejects_self_or_equivocal_source_relations(self) -> None:
+        original_id = "aib-swr.1"
+        review_id = "aib-review.1"
+        canonical_finding = {
+            "canonical_review_id": review_id,
+            "context_status": "resolved",
+            "cooldown_until": "2026-08-14T04:05:00Z",
+            "duplicate_of": None,
+            "kind": "review-task",
+            "original_id": original_id,
+            "pr_number": 41,
+            "pr_state": "OPEN",
+            "recommendation": "dispatch-canonical-review",
+            "review_id": review_id,
+        }
+        canonical_candidate = {
+            "canonical_review_id": review_id,
+            "context_status": "resolved",
+            "cooldown_until": "2026-08-14T04:05:00Z",
+            "original_id": original_id,
+            "pr_number": 41,
+            "recommendation": "review-wiring-current",
+        }
+        cases = {
+            "valid-control": ([canonical_finding], [canonical_candidate], "success"),
+            "original-canonical-self": (
+                [
+                    {
+                        **canonical_finding,
+                        "canonical_review_id": original_id,
+                        "kind": "original",
+                        "review_id": None,
+                    }
+                ],
+                [],
+                "partial",
+            ),
+            "review-id-self-and-actionable-candidate": (
+                [
+                    {
+                        **canonical_finding,
+                        "canonical_review_id": original_id,
+                        "review_id": original_id,
+                    }
+                ],
+                [{**canonical_candidate, "canonical_review_id": original_id}],
+                "partial",
+            ),
+            "review-canonical-equals-original": (
+                [{**canonical_finding, "canonical_review_id": original_id}],
+                [],
+                "partial",
+            ),
+            "duplicate-target-equals-original": (
+                [
+                    {
+                        **canonical_finding,
+                        "duplicate_of": original_id,
+                        "recommendation": "manual-triage",
+                    }
+                ],
+                [],
+                "partial",
+            ),
+        }
+        for name, (findings, candidates, expected_status) in cases.items():
+            with self.subTest(name=name):
+                fixture = {
+                    "in_progress": [],
+                    "blocked": [],
+                    "review_running": [],
+                    "normalizer_stdout": json.dumps(
+                        {
+                            "errors": [],
+                            "findings": findings,
+                            "schema": "beads-pr-review-normalization/v1",
+                            "self_heal_candidates": candidates,
+                            "status": "success",
+                        }
+                    ),
+                }
+
+                result, _, _ = self.run_fixture(fixture)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], expected_status)
+                self.assertEqual(payload["pr_review"]["status"], expected_status)
+                if name == "valid-control":
+                    self.assertEqual(
+                        payload["pr_review"]["self_heal_candidates"][0]["recommendation"],
+                        "review-wiring-current",
+                    )
+                    self.assertEqual(payload["pr_review"]["errors"], [])
+                    continue
+                for finding in payload["pr_review"]["findings"]:
+                    self.assertEqual(finding["recommendation"], "manual-triage")
+                for candidate in payload["pr_review"]["self_heal_candidates"]:
+                    self.assertEqual(candidate["recommendation"], "manual-triage")
+                self.assertIn(
+                    {"code": "invalid-normalizer-evidence", "scope": "pr-review"},
+                    payload["pr_review"]["errors"],
+                )
+                self.assertIn({"code": "normalizer-failed", "scope": "pr-review"}, payload["errors"])
+
     def test_empty_success_normalizer_derives_an_empty_nested_report(self) -> None:
         fixture = {
             "in_progress": [],
@@ -1034,40 +1139,59 @@ class CleanupScanTests(unittest.TestCase):
 
     def test_fake_commands_match_strict_read_only_argv_allowlists(self) -> None:
         fixture = {
-            "in_progress": [],
-            "blocked": [],
+            "in_progress": [
+                bead("aib-claim", "in_progress", notes=heartbeat("2026-08-14T03:00:00Z")),
+            ],
+            "blocked": [bead("aib-blocker", "blocked")],
             "review_running": [],
-            "blocked_pr_review": [],
-            "blocked_pr_review_tasks": [],
-            "open_prs": [],
+            "dependencies": {"aib-blocker": [{"depends_on_id": "aib-dependency"}]},
+            "shows": {
+                "aib-dependency": [bead("aib-dependency", "closed")],
+                "aib-worktree": [bead("aib-worktree", "closed")],
+            },
+            "normalizer_stdout": json.dumps(
+                {
+                    "errors": [],
+                    "findings": [],
+                    "schema": "beads-pr-review-normalization/v1",
+                    "self_heal_candidates": [],
+                    "status": "empty",
+                }
+            ),
+            "remote_branches": ["aib-claim", "aib-worktree"],
+            "worktree_dirs": ["aib-claim", "aib-worktree"],
+            "worktrees_raw": "branch refs/heads/agent/aib-worktree\n",
         }
         result, calls, repo_root = self.run_fixture(fixture)
         self.assertEqual(result.returncode, 0, result.stderr)
+        claim_worktree = f"{repo_root}/.worktrees/parallel-agents/aib-claim"
+        listed_worktree = f"{repo_root}/.worktrees/parallel-agents/aib-worktree"
         allowed = {
             "bd": {
-                (
-                    "-C",
-                    repo_root,
-                    "list",
-                    "--status=blocked",
-                    "--label",
-                    "pr-review",
-                    "--json",
-                    "--limit",
-                    "0",
-                ),
-                ("-C", repo_root, "list", "--label", "pr-review-task", "--json", "--limit", "0"),
                 ("-C", repo_root, "list", "--status=in_progress", "--json", "--limit", "0"),
                 ("-C", repo_root, "list", "--status=blocked", "--json", "--limit", "0"),
                 ("-C", repo_root, "list", "--label", "review-running", "--json", "--limit", "0"),
                 ("-C", repo_root, "worktree", "list"),
                 ("-C", repo_root, "dolt", "status"),
                 ("-C", repo_root, "doctor"),
+                ("dep", "list", "aib-blocker", "--json"),
+                ("show", "aib-dependency", "--json"),
+                ("show", "aib-worktree", "--json"),
             },
-            "gh": {("pr", "list", "--state", "open", "--json", "number,headRefName,createdAt")},
-            "git": set(),
+            "gh": set(),
+            "git": {
+                ("ls-remote", "--heads", "origin", "agent/aib-claim"),
+                ("-C", claim_worktree, "log", "--oneline", "origin/HEAD..HEAD"),
+                ("ls-remote", "--heads", "origin", "agent/aib-worktree"),
+                ("-C", listed_worktree, "log", "--oneline", "origin/HEAD..HEAD"),
+            },
         }
         self.assertTrue(calls)
+        observed = {
+            tool: {tuple(call["argv"]) for call in calls if call["tool"] == tool}
+            for tool in allowed
+        }
+        self.assertEqual(observed, allowed)
         for call in calls:
             tool = call["tool"]
             argv = call["argv"]

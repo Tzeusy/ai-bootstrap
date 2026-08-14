@@ -31,6 +31,9 @@ review ID to the canonical review ID. `review-wiring-current` and
 `self-heal-original-wiring` candidates must cross-link to a matching resolved
 canonical `pr-review-task` finding for the same original ID and PR. Any failed
 cross-link is invalid normalizer evidence and remains partial manual triage.
+A source relation that is self or equivocal—including an original ID reused as
+a review, canonical-review, or duplicate ID—adds
+`invalid-normalizer-evidence` and preserves only partial manual triage.
 
 ## Pass 2: Blocked Original Beads With `pr-review`
 
