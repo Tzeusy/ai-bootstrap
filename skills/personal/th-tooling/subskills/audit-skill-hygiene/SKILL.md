@@ -55,9 +55,15 @@ archive, bootstrap, or otherwise alter any skill surface.
 
 ## What counts as usage
 
-- Claude: structured `Skill` calls and explicit slash-command event tags.
-- Codex: a `SKILL.md` path found inside a structured `function_call` record.
-- Raw catalog mentions never count.
+- Claude Skill: an `assistant` record whose assistant message contains a
+  `tool_use` block named `Skill` with a string `input.skill`.
+- Claude slash: a `user` record whose user-message string has the complete
+  command-message, command-name, and optional command-args event shape.
+- Codex: a `response_item` whose `function_call` payload is the `read_file`
+  function and whose JSON `arguments.path` is a `SKILL.md` path.
+
+Raw catalog mentions, prose tags, command arguments, and unrelated record
+values never count.
 
 Transcript records are streamed only to aggregate counters. Reports retain no
 transcript body, identifier, filename, project label, or absolute path. The

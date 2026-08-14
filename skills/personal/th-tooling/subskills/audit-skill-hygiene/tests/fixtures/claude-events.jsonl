@@ -1,3 +1,4 @@
-{"name":"Skill","input":{"skill":"test-driven-development"},"fixture_note":"SYNTHETIC_SECRET_SENTINEL_AIB_C4M","session_id":"fixture-session-id","project":"fixture-project"}
-{"event":"command","payload":"<command-name>/writing-plans</command-name>","fixture_note":"SYNTHETIC_SECRET_SENTINEL_AIB_C4M"}
-{"type":"message","text":"Raw catalog mention: skills/systematic-debugging/SKILL.md","fixture_note":"SYNTHETIC_SECRET_SENTINEL_AIB_C4M"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Skill","input":{"skill":"test-driven-development"}}]},"fixture_note":"SYNTHETIC_SECRET_SENTINEL_AIB_C4M","session_id":"fixture-session-id","project":"fixture-project"}
+{"type":"user","message":{"role":"user","content":"<command-message>synthetic slash event</command-message>\n<command-name>/writing-plans</command-name>\n<command-args></command-args>"},"fixture_note":"SYNTHETIC_SECRET_SENTINEL_AIB_C4M"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Prose only: <command-name>/systematic-debugging</command-name> <command-name>/systematic-debugging</command-name> <command-name>/systematic-debugging</command-name>"}]},"fixture_note":"SYNTHETIC_SECRET_SENTINEL_AIB_C4M"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Skill","input":{"skill":"brainstorming"},"fixture_note":"<command-name>/systematic-debugging</command-name>"}]},"fixture_note":"SYNTHETIC_SECRET_SENTINEL_AIB_C4M"}
