@@ -23,7 +23,7 @@ CANONICAL_COORDINATOR_SCRIPTS = (
 if str(CANONICAL_COORDINATOR_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(CANONICAL_COORDINATOR_SCRIPTS))
 
-from review_relation_graph import review_relation_error  # noqa: E402
+from review_relation_graph import normalized_finding_relation_error  # noqa: E402
 
 
 SCHEMA = "beads-cleanup-scan/v1"
@@ -336,9 +336,14 @@ def has_matching_canonical_review_finding(
 
 
 def collection_roles_are_unambiguous(
-    findings: list[dict[str, Any]], candidates: list[dict[str, Any]]
+    findings: list[dict[str, Any]],
+    candidates: list[dict[str, Any]],
+    *,
+    relation_error: str | None,
 ) -> bool:
     """Reject actionable evidence that binds one identity to conflicting roles."""
+    if relation_error is not None:
+        return False
     original_scopes: dict[str, tuple[str, int]] = {}
     review_scopes: dict[str, tuple[str, int]] = {}
     canonical_scopes: dict[str, tuple[str, int]] = {}
@@ -415,10 +420,6 @@ def collection_roles_are_unambiguous(
         canonical_scope = canonical_scopes.get(review_id)
         if canonical_scope is not None and canonical_scope != review_scope:
             return False
-    if review_relation_error(
-        (review_id, review_scope[0]) for review_id, review_scope in review_scopes.items()
-    ) is not None:
-        return False
     if any(canonical_finding_scopes.get(review_id) != scope for review_id, scope in canonical_scopes.items()):
         return False
     review_roles = set(review_scopes) | set(canonical_scopes)
@@ -463,6 +464,12 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
         else:
             report_error(errors, "invalid-normalizer-envelope", "pr-review")
 
+    relation_error = normalized_finding_relation_error(collections["findings"])
+    relation_graph_complete = relation_error is None
+    if relation_error:
+        report_error(errors, "invalid-normalizer-evidence", "pr-review")
+        status = "partial"
+
     findings = []
     for item in collections["findings"]:
         if not isinstance(item, dict):
@@ -486,7 +493,9 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
         )
         context_status = safe_code(item.get("context_status"), "command-failed")
         invalid_evidence = ""
-        if number is None:
+        if not relation_graph_complete:
+            invalid_evidence = "invalid-normalizer-evidence"
+        elif number is None:
             invalid_evidence = "invalid-normalizer-evidence"
         elif not valid_pr_number(number):
             invalid_evidence = "invalid-pr-number"
@@ -559,7 +568,9 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
         )
         context_status = safe_code(item.get("context_status"), "command-failed")
         invalid_evidence = ""
-        if number is None:
+        if not relation_graph_complete:
+            invalid_evidence = "invalid-normalizer-evidence"
+        elif number is None:
             invalid_evidence = "invalid-normalizer-evidence"
         elif not valid_pr_number(number):
             invalid_evidence = "invalid-pr-number"
@@ -610,7 +621,11 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
         candidate["cooldown_until"] = None
         candidate["recommendation"] = "manual-triage"
 
-    if not collection_roles_are_unambiguous(findings, self_heal):
+    if not collection_roles_are_unambiguous(
+        findings,
+        self_heal,
+        relation_error=relation_error,
+    ):
         report_error(errors, "invalid-normalizer-evidence", "pr-review")
         status = "partial"
 

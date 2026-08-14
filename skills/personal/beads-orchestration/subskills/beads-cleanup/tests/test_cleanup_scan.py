@@ -1057,6 +1057,24 @@ class CleanupScanTests(unittest.TestCase):
                 [],
                 "partial",
             ),
+            "acyclic-cross-role-sibling-reuse": (
+                [
+                    canonical_finding,
+                    {
+                        **canonical_finding,
+                        "canonical_review_id": duplicate_review_id,
+                        "original_id": canonical_review_id,
+                        "review_id": duplicate_review_id,
+                    },
+                ],
+                [],
+                "partial",
+            ),
+            "duplicate-relation-lhs": (
+                [canonical_finding, dict(canonical_finding)],
+                [],
+                "partial",
+            ),
             "two-canonicals-for-one-original": (
                 [
                     canonical_finding,
@@ -1294,9 +1312,13 @@ class CleanupScanTests(unittest.TestCase):
                 else:
                     self.assertEqual(payload["worktrees"][0]["recommendation"], "manual-triage")
 
-    def test_default_delegated_cleanup_chain_uses_exact_fake_read_argv_sequence(self) -> None:
+    def test_delegated_cleanup_normalizer_resolver_reads_have_exact_order_and_count(self) -> None:
         original_id = "aib-swr.1"
         review_id = "aib-review.1"
+        claim_id = "aib-claim"
+        blocker_id = "aib-blocker"
+        dependency_id = "aib-dependency"
+        worktree_id = "aib-worktree"
         original = {
             "id": original_id,
             "labels": ["pr-review"],
@@ -1331,14 +1353,25 @@ class CleanupScanTests(unittest.TestCase):
             "createdAt": "2026-08-14T03:00:00Z",
         }
         fixture = {
-            "in_progress": [],
-            "blocked": [],
+            "in_progress": [
+                bead(claim_id, "in_progress", notes=heartbeat("2026-08-14T03:00:00Z")),
+            ],
+            "blocked": [bead(blocker_id, "blocked")],
             "review_running": [],
+            "dependencies": {blocker_id: [{"depends_on_id": dependency_id}]},
             "blocked_pr_review": [original],
             "blocked_pr_review_tasks": [review_task],
-            "shows": {review_id: [review_show], original_id: [original]},
+            "shows": {
+                review_id: [review_show],
+                original_id: [original],
+                dependency_id: [bead(dependency_id, "closed")],
+                worktree_id: [bead(worktree_id, "closed")],
+            },
             "prs": {"41": pr},
             "open_prs": [],
+            "remote_branches": [claim_id, worktree_id],
+            "worktree_dirs": [claim_id, worktree_id],
+            "worktrees_raw": f"branch refs/heads/agent/{worktree_id}\n",
         }
 
         result, calls, repo_root = self.run_fixture(fixture)
@@ -1346,6 +1379,8 @@ class CleanupScanTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "success")
+        claim_worktree = f"{repo_root}/.worktrees/parallel-agents/{claim_id}"
+        listed_worktree = f"{repo_root}/.worktrees/parallel-agents/{worktree_id}"
         expected = [
             {
                 "tool": "bd",
@@ -1386,6 +1421,16 @@ class CleanupScanTests(unittest.TestCase):
             {"tool": "bd", "argv": ["-C", repo_root, "worktree", "list"]},
             {"tool": "bd", "argv": ["-C", repo_root, "dolt", "status"]},
             {"tool": "bd", "argv": ["-C", repo_root, "doctor"]},
+            {"tool": "git", "argv": ["ls-remote", "--heads", "origin", f"agent/{claim_id}"]},
+            {"tool": "git", "argv": ["-C", claim_worktree, "log", "--oneline", "origin/HEAD..HEAD"]},
+            {"tool": "bd", "argv": ["dep", "list", blocker_id, "--json"]},
+            {"tool": "bd", "argv": ["show", dependency_id, "--json"]},
+            {"tool": "bd", "argv": ["show", worktree_id, "--json"]},
+            {"tool": "git", "argv": ["ls-remote", "--heads", "origin", f"agent/{worktree_id}"]},
+            {
+                "tool": "git",
+                "argv": ["-C", listed_worktree, "log", "--oneline", "origin/HEAD..HEAD"],
+            },
         ]
         self.assertEqual(calls, expected)
 
@@ -1520,69 +1565,6 @@ class CleanupScanTests(unittest.TestCase):
         self.assertEqual(json.loads(fatal.stdout)["status"], "fatal")
         for forbidden in ("TOKEN=top-secret", "/private/absolute/path", "Traceback"):
             self.assertNotIn(forbidden, fatal.stdout + fatal.stderr)
-
-    def test_fake_commands_match_strict_read_only_argv_allowlists(self) -> None:
-        fixture = {
-            "in_progress": [
-                bead("aib-claim", "in_progress", notes=heartbeat("2026-08-14T03:00:00Z")),
-            ],
-            "blocked": [bead("aib-blocker", "blocked")],
-            "review_running": [],
-            "dependencies": {"aib-blocker": [{"depends_on_id": "aib-dependency"}]},
-            "shows": {
-                "aib-dependency": [bead("aib-dependency", "closed")],
-                "aib-worktree": [bead("aib-worktree", "closed")],
-            },
-            "normalizer_stdout": json.dumps(
-                {
-                    "errors": [],
-                    "findings": [],
-                    "schema": "beads-pr-review-normalization/v1",
-                    "self_heal_candidates": [],
-                    "status": "empty",
-                }
-            ),
-            "remote_branches": ["aib-claim", "aib-worktree"],
-            "worktree_dirs": ["aib-claim", "aib-worktree"],
-            "worktrees_raw": "branch refs/heads/agent/aib-worktree\n",
-        }
-        result, calls, repo_root = self.run_fixture(fixture)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        claim_worktree = f"{repo_root}/.worktrees/parallel-agents/aib-claim"
-        listed_worktree = f"{repo_root}/.worktrees/parallel-agents/aib-worktree"
-        allowed = {
-            "bd": {
-                ("-C", repo_root, "list", "--status=in_progress", "--json", "--limit", "0"),
-                ("-C", repo_root, "list", "--status=blocked", "--json", "--limit", "0"),
-                ("-C", repo_root, "list", "--label", "review-running", "--json", "--limit", "0"),
-                ("-C", repo_root, "worktree", "list"),
-                ("-C", repo_root, "dolt", "status"),
-                ("-C", repo_root, "doctor"),
-                ("dep", "list", "aib-blocker", "--json"),
-                ("show", "aib-dependency", "--json"),
-                ("show", "aib-worktree", "--json"),
-            },
-            "gh": set(),
-            "git": {
-                ("ls-remote", "--heads", "origin", "agent/aib-claim"),
-                ("-C", claim_worktree, "log", "--oneline", "origin/HEAD..HEAD"),
-                ("ls-remote", "--heads", "origin", "agent/aib-worktree"),
-                ("-C", listed_worktree, "log", "--oneline", "origin/HEAD..HEAD"),
-            },
-        }
-        self.assertTrue(calls)
-        observed = {
-            tool: {tuple(call["argv"]) for call in calls if call["tool"] == tool}
-            for tool in allowed
-        }
-        self.assertEqual(observed, allowed)
-        for call in calls:
-            tool = call["tool"]
-            argv = call["argv"]
-            self.assertIsInstance(tool, str)
-            self.assertIsInstance(argv, list)
-            self.assertIn(tool, allowed, call)
-            self.assertIn(tuple(argv), allowed[tool], call)
 
     def test_invalid_bootstrap_never_echoes_a_secret_or_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

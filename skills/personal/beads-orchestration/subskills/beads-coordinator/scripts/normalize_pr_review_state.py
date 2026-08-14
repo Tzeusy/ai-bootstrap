@@ -549,9 +549,6 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     task_context_errors: dict[str, str] = {}
     for review_id in sorted(tasks):
         context, error = resolve_review_task(review_id, args.resolver, repo_root)
-        if context is not None and context["original_id"] == review_id:
-            context = None
-            error = "self-referential-review-id"
         task_contexts[review_id] = context
         if error:
             task_context_errors[review_id] = error
@@ -559,9 +556,11 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             task_lookup_complete = False
 
     relation_error = review_relation_error(
-        (review_id, context["original_id"])
-        for review_id, context in task_contexts.items()
-        if context is not None
+        [
+            (review_id, context["original_id"])
+            for review_id, context in task_contexts.items()
+            if context is not None
+        ]
     )
     relation_graph_complete = relation_error is None
     if relation_error:
@@ -642,7 +641,9 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             continue
         state = pr["state"]
         cooldown = cooldown_until(pr, now)
-        if state == "MERGED":
+        if not relation_graph_complete:
+            recommendation = "manual-triage"
+        elif state == "MERGED":
             recommendation = "close-original-and-reviews"
         elif state == "CLOSED":
             recommendation = "reopen-original-for-retriage"
@@ -679,6 +680,21 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                     pr_state=None,
                     cooldown=None,
                     recommendation="skip-command-failure" if context_error == "command-failed" else "manual-triage",
+                )
+            )
+            continue
+        if not relation_graph_complete:
+            findings.append(
+                task_finding(
+                    review_id=review_id,
+                    original_id=context["original_id"],
+                    pr_number=context["pr_number"],
+                    context_status=relation_error or "invalid-review-relation",
+                    canonical_review_id=None,
+                    duplicate_of=None,
+                    pr_state=None,
+                    cooldown=None,
+                    recommendation="manual-triage",
                 )
             )
             continue

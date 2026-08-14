@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -19,6 +20,16 @@ from pathlib import Path
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = SKILL_ROOT / "scripts" / "normalize_pr_review_state.py"
+RELATION_GRAPH = SKILL_ROOT / "scripts" / "review_relation_graph.py"
+
+
+def relation_error(relations: object) -> str | None:
+    """Load the canonical pure seam directly without running external commands."""
+    spec = importlib.util.spec_from_file_location("review_relation_graph", RELATION_GRAPH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.review_relation_error(relations)
 
 
 class FakeBinDir:
@@ -515,6 +526,85 @@ class NormalizePrReviewStateTests(unittest.TestCase):
         self.assertTrue(payload["findings"])
         self.assertTrue(all(item["recommendation"] == "manual-triage" for item in payload["findings"]))
 
+    def test_relation_validator_is_total_and_enforces_global_role_binding(self) -> None:
+        original_id = "aib-swr.1"
+        first_review_id = "aib-review.1"
+        second_review_id = "aib-review.2"
+        third_review_id = "aib-review.3"
+        cases = {
+            "missing-collection": (None, "invalid-review-relation"),
+            "string-collection": (first_review_id, "invalid-review-relation"),
+            "malformed-tuple": ([(first_review_id, original_id, "extra")], "invalid-review-relation"),
+            "non-tuple-item": ([{"review_id": first_review_id}], "invalid-review-relation"),
+            "invalid-id": ([(first_review_id, None)], "invalid-review-relation"),
+            "self-relation": ([(first_review_id, first_review_id)], "self-referential-review-id"),
+            "duplicate-lhs": (
+                [(first_review_id, original_id), (first_review_id, original_id)],
+                "ambiguous-review-relation",
+            ),
+            "acyclic-cross-role-reuse": (
+                [(first_review_id, original_id), (second_review_id, first_review_id)],
+                "cross-role-review-relation",
+            ),
+            "reciprocal-cycle": (
+                [(first_review_id, second_review_id), (second_review_id, first_review_id)],
+                "cyclic-review-relation",
+            ),
+            "three-node-cycle": (
+                [
+                    (first_review_id, second_review_id),
+                    (second_review_id, third_review_id),
+                    (third_review_id, first_review_id),
+                ],
+                "cyclic-review-relation",
+            ),
+            "valid-distinct-dedupe": (
+                [(first_review_id, original_id), (second_review_id, original_id)],
+                None,
+            ),
+        }
+
+        for name, (relations, expected_error) in cases.items():
+            with self.subTest(name=name):
+                self.assertEqual(relation_error(relations), expected_error)
+
+    def test_global_relation_validation_blocks_acyclic_cross_role_before_dispatch(self) -> None:
+        original_id = "aib-swr.1"
+        first_review_id = "aib-review.1"
+        second_review_id = "aib-review.2"
+        fixture = {
+            "blocked_pr_review": [
+                review_task(first_review_id, original_id),
+                review_task(second_review_id, first_review_id),
+            ],
+            "resolver_payloads": {
+                first_review_id: {
+                    "ok": True,
+                    "original_id": original_id,
+                    "pr_number": 41,
+                },
+                second_review_id: {
+                    "ok": True,
+                    "original_id": first_review_id,
+                    "pr_number": 41,
+                },
+            },
+            "prs": {"41": pr_payload("OPEN")},
+            "open_prs": [],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertIn(
+            {"code": "cross-role-review-relation", "scope": "review-context"},
+            payload["errors"],
+        )
+        self.assertTrue(payload["findings"])
+        self.assertTrue(all(item["recommendation"] == "manual-triage" for item in payload["findings"]))
+
     def test_resolver_identity_must_match_the_discovered_review_task(self) -> None:
         original_id = "aib-swr.1"
         review_id = "aib-review.1"
@@ -579,6 +669,24 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                 [original],
                 [task, dict(task)],
                 "duplicate-record",
+                "blocked-pr-review-task",
+            ),
+            "missing-original-inventory": (
+                None,
+                [task],
+                "invalid-json",
+                "blocked-pr-review",
+            ),
+            "missing-task-inventory": (
+                [original],
+                None,
+                "invalid-json",
+                "blocked-pr-review-task",
+            ),
+            "invalid-task-inventory-item": (
+                [original],
+                ["not-a-record"],
+                "invalid-record",
                 "blocked-pr-review-task",
             ),
         }

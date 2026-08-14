@@ -118,8 +118,11 @@ class BeadsCleanupPackageTests(unittest.TestCase):
         self.assertIn("malformed `pr-review-task` inventory", pr_recon)
         self.assertIn("singleton and must\necho its requested ID", pr_recon)
         self.assertIn("collection-wide role binding", pr_recon)
-        self.assertIn("canonical pure relation-graph validator", pr_recon)
+        self.assertIn("canonical total pure relation-graph validator", pr_recon)
         self.assertIn("reciprocal or longer", pr_recon)
+        self.assertIn("before\nit preserves any nested recommendation", pr_recon)
+        self.assertIn("duplicate review-ID left sides", pr_recon)
+        self.assertIn("same original", pr_recon)
         self.assertIn("## Beads Cleanup Report", reporting)
         self.assertIn("| Metric | Count |", reporting)
 
