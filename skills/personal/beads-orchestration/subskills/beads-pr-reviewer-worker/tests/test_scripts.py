@@ -411,6 +411,52 @@ sys.exit(1)
         payload = json.loads(result.stderr)
         self.assertEqual(payload["error_code"], "malformed-original-id")
 
+    def test_repeated_original_marker_candidates_fail_as_ambiguous(self) -> None:
+        description = (
+            "Original implementation bead: aib-swr.1\n"
+            "Original implementation bead: aib-swr.2\n"
+            "https://github.com/owner/repo/pull/99"
+        )
+        with FakeBinDir() as fbd:
+            # The first child exists so the old re.search implementation would
+            # succeed by silently selecting it instead of reporting ambiguity.
+            self._make_bins(
+                fbd,
+                description=description,
+                original_id="aib-swr.1",
+            )
+            result = run_script(
+                "resolve_review_context.py",
+                ["--issue-id", "aib-xyz"],
+                env=fbd.env(),
+            )
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stderr)
+        self.assertEqual(payload["error_code"], "ambiguous-original-id")
+        self.assertEqual(payload["candidates"], ["aib-swr.1", "aib-swr.2"])
+
+    def test_repeated_original_marker_occurrences_fail_even_with_same_id(self) -> None:
+        description = (
+            "Original implementation bead: aib-swr.1\n"
+            "Original implementation bead: aib-swr.1\n"
+            "https://github.com/owner/repo/pull/99"
+        )
+        with FakeBinDir() as fbd:
+            self._make_bins(
+                fbd,
+                description=description,
+                original_id="aib-swr.1",
+            )
+            result = run_script(
+                "resolve_review_context.py",
+                ["--issue-id", "aib-xyz"],
+                env=fbd.env(),
+            )
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stderr)
+        self.assertEqual(payload["error_code"], "ambiguous-original-id")
+        self.assertEqual(payload["candidates"], ["aib-swr.1", "aib-swr.1"])
+
     def test_success_resolves_context_from_review_target_marker(self) -> None:
         description = "REVIEW TARGET BEAD: aib-abc\nhttps://github.com/owner/repo/pull/99"
         with FakeBinDir() as fbd:
@@ -457,10 +503,7 @@ sys.exit(1)
         self.assertEqual(payload["error_code"], "missing-original-id")
 
     def test_ambiguous_original_id_fails(self) -> None:
-        # Both patterns match but yield different IDs — the real ambiguity case.
-        # resolve_review_context uses re.search per-pattern, so repeating the
-        # same pattern line only captures the first match; to get two distinct
-        # IDs we need to trigger both regex patterns.
+        # Different marker families name different candidates, which is ambiguous.
         description = ("Original implementation bead: aib-abc\n"
                        "Review target bead: aib-def\n"
                        "https://github.com/owner/repo/pull/99")

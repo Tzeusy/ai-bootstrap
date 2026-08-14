@@ -49,25 +49,22 @@ def extract_original_id(description):
     matches = []
     malformed = []
     for pattern in MARKER_PATTERNS:
-        match = re.search(pattern, description or "")
-        if not match:
-            continue
-
-        candidate = match.group(1)
-        if BEAD_ID_RE.fullmatch(candidate):
-            matches.append(candidate)
-            continue
-
-        if candidate[-1:] in TRAILING_ID_PUNCTUATION:
-            candidate_without_punctuation = candidate[:-1]
-            if BEAD_ID_RE.fullmatch(candidate_without_punctuation):
-                matches.append(candidate_without_punctuation)
+        for match in re.finditer(pattern, description or ""):
+            candidate = match.group(1)
+            if BEAD_ID_RE.fullmatch(candidate):
+                matches.append(candidate)
                 continue
 
-        if "-" in candidate:
-            malformed.append(candidate)
+            if candidate[-1:] in TRAILING_ID_PUNCTUATION:
+                candidate_without_punctuation = candidate[:-1]
+                if BEAD_ID_RE.fullmatch(candidate_without_punctuation):
+                    matches.append(candidate_without_punctuation)
+                    continue
 
-    return sorted(set(matches)), sorted(set(malformed))
+            if "-" in candidate:
+                malformed.append(candidate)
+
+    return sorted(matches), sorted(set(malformed))
 
 
 def extract_pr_number(description):
