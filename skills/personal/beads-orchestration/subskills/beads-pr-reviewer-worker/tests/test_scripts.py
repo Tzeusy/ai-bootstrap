@@ -411,6 +411,52 @@ sys.exit(1)
         payload = json.loads(result.stderr)
         self.assertEqual(payload["error_code"], "malformed-original-id")
 
+    def test_rejects_malformed_dotted_marker_before_dependency_fallback(self) -> None:
+        description = (
+            "Original implementation bead: aib.swr.1\n"
+            "https://github.com/owner/repo/pull/99"
+        )
+        with FakeBinDir() as fbd:
+            # The dependency target exists so a malformed marker must fail
+            # before the resolver can silently select this different bead.
+            self._make_bins(
+                fbd,
+                description=description,
+                original_id="aib-swr",
+                review_dependencies=[{"depends_on_id": "aib-swr", "type": "blocks"}],
+            )
+            result = run_script(
+                "resolve_review_context.py",
+                ["--issue-id", "aib-xyz"],
+                env=fbd.env(),
+            )
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stderr)
+        self.assertEqual(payload["error_code"], "malformed-original-id")
+        self.assertEqual(payload["candidates"], ["aib.swr.1"])
+
+    def test_rejects_explicit_plain_marker_before_dependency_fallback(self) -> None:
+        description = (
+            "Original implementation bead: aib\n"
+            "https://github.com/owner/repo/pull/99"
+        )
+        with FakeBinDir() as fbd:
+            self._make_bins(
+                fbd,
+                description=description,
+                original_id="aib-swr",
+                review_dependencies=[{"depends_on_id": "aib-swr", "type": "blocks"}],
+            )
+            result = run_script(
+                "resolve_review_context.py",
+                ["--issue-id", "aib-xyz"],
+                env=fbd.env(),
+            )
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stderr)
+        self.assertEqual(payload["error_code"], "malformed-original-id")
+        self.assertEqual(payload["candidates"], ["aib"])
+
     def test_repeated_original_marker_candidates_fail_as_ambiguous(self) -> None:
         description = (
             "Original implementation bead: aib-swr.1\n"
