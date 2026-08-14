@@ -68,6 +68,7 @@ State these hold for the entire run; the references elaborate, never override.
 | [`references/runtime-and-safety.md`](references/runtime-and-safety.md) | dispatch or mutate safely | Model-selection tables, atomic `--claim` + stall-heartbeat model + thresholds, mutation safety, closure rule, runtime dispatch notes, quality gates |
 | [`references/epic-coordination.md`](references/epic-coordination.md) | the bead is an epic or a worker hits a hard blocker | Epic classification, independent dispatch, Team Lead mode + prompt, blocker handling |
 | [`references/commands.md`](references/commands.md) | a quick command lookup | `bd` quick reference, claim/heartbeat checklist, session-completion checklist |
+| [`scripts/normalize_pr_review_state.py`](scripts/normalize_pr_review_state.py) | inspect Step 0 candidates | Compact `beads-pr-review-normalization/v1` findings for blocked originals/review tasks, cooldowns, duplicates, and self-heal candidates; report-only, never a mutator |
 | [`../../references/decision-autonomy.md`](../../references/decision-autonomy.md) | a worker reports a decision-shaped blocker, or blocked/human-flagged beads accumulate | Decision protocol, hard-gate list, decision record, escalation format, decision sweep |
 | [`../../references/token-efficiency.md`](../../references/token-efficiency.md) | once, before the first query loop | Output projection rules, gate-log routing, targeted-test policy, model right-sizing |
 

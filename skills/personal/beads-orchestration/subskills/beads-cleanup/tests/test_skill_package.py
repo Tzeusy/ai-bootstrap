@@ -15,6 +15,7 @@ OPENAI_YAML = SKILL_ROOT / "agents" / "openai.yaml"
 LOCAL_STATE = SKILL_ROOT / "references" / "local-state-reconciliation.md"
 PR_RECON = SKILL_ROOT / "references" / "pr-review-reconciliation.md"
 REPORTING = SKILL_ROOT / "references" / "reporting.md"
+CLEANUP_SCAN = SKILL_ROOT / "scripts" / "cleanup_scan.py"
 
 
 class BeadsCleanupPackageTests(unittest.TestCase):
@@ -65,6 +66,35 @@ class BeadsCleanupPackageTests(unittest.TestCase):
     def test_expected_reference_files_exist(self) -> None:
         for path in (LOCAL_STATE, PR_RECON, REPORTING):
             self.assertTrue(path.exists(), path)
+
+    def test_report_only_cleanup_scanner_is_linked_through_the_owning_contracts(self) -> None:
+        contents = SKILL_MD.read_text(encoding="utf-8")
+        local_state = LOCAL_STATE.read_text(encoding="utf-8")
+        pr_recon = PR_RECON.read_text(encoding="utf-8")
+        reporting = REPORTING.read_text(encoding="utf-8")
+        self.assertTrue(CLEANUP_SCAN.exists(), CLEANUP_SCAN)
+        self.assertIn("scripts/cleanup_scan.py", contents)
+        self.assertIn("scripts/cleanup_scan.py", local_state)
+        self.assertIn("scripts/cleanup_scan.py", pr_recon)
+        self.assertIn("scripts/cleanup_scan.py", reporting)
+        self.assertIn("report-only", contents.lower())
+        self.assertIn("fresh", local_state.lower())
+
+    def test_cleanup_contract_reserves_all_mutation_authority_for_the_coordinator(self) -> None:
+        documents = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in (SKILL_MD, LOCAL_STATE, PR_RECON, REPORTING)
+        )
+        self.assertIn("coordinator is the sole mutation authority", documents.lower())
+        for forbidden in (
+            "bd update",
+            "bd close",
+            "bd worktree remove",
+            "git push origin --delete",
+            "git branch -d",
+            "git branch -D",
+        ):
+            self.assertNotIn(forbidden, documents)
 
     def test_references_cover_cleanup_passes_and_report(self) -> None:
         local_state = LOCAL_STATE.read_text(encoding="utf-8")
