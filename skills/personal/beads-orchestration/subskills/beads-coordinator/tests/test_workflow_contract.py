@@ -11,6 +11,8 @@ from pathlib import Path
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 LOOP = SKILL_ROOT / "references" / "coordinator-loop.md"
 SAFETY = SKILL_ROOT / "references" / "runtime-and-safety.md"
+WRITER = SKILL_ROOT.parent / "beads-writer" / "SKILL.md"
+TOKEN_EFFICIENCY = SKILL_ROOT.parents[1] / "references" / "token-efficiency.md"
 NORMALIZER = SKILL_ROOT / "scripts" / "normalize_pr_review_state.py"
 SKILL_AUDIT_WORKFLOW = SKILL_ROOT.parents[4] / ".github" / "workflows" / "skill-audit.yml"
 
@@ -38,6 +40,28 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         self.assertIn("exact head sha", contents)
         self.assertIn("auth", contents)
         self.assertIn("data loss", contents)
+
+    def test_codex_model_selection_matches_complexity_and_design_policy(self) -> None:
+        contents = SAFETY.read_text(encoding="utf-8")
+        self.assertIn("| Strategy | Claude | Codex / ChatGPT | Gemini |", contents)
+        for row in (
+            "| `EPIC_COMPLEXITY_MODEL` | Opus 4.8 | 5.6 Sol Medium | gemini-3-pro |",
+            "| `HIGH_COMPLEXITY_MODEL` | Sonnet 5 | 5.6 Sol Medium | gemini-3-pro |",
+            "| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5 | 5.6 Luna Max | gemini-3-pro |",
+            "| `LOW_COMPLEXITY_MODEL` | 4.5 Haiku | 5.6 Luna Max | gemini-3-flash-preview |",
+            "| `DESIGN_AND_SPECIFICATION_MODEL` | Sonnet 5 | 5.6 Sol High | gemini-3-pro |",
+        ):
+            self.assertIn(row, contents)
+        for binding in (
+            "| 5.6 Luna Max | `gpt-5.6-luna` | `max` |",
+            "| 5.6 Sol Medium | `gpt-5.6-sol` | `medium` |",
+            "| 5.6 Sol High | `gpt-5.6-sol` | `high` |",
+        ):
+            self.assertIn(binding, contents)
+        self.assertIn("Design/specification override", contents)
+        self.assertIn("before the complexity-label fast path", contents)
+        for path in (WRITER, TOKEN_EFFICIENCY):
+            self.assertIn("design/specification override", path.read_text(encoding="utf-8"))
 
     def test_refresh_is_event_driven_with_safety_sweep(self) -> None:
         contents = LOOP.read_text(encoding="utf-8").lower()

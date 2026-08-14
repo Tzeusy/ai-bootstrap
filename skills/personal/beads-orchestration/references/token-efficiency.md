@@ -49,7 +49,9 @@ an efficiency rule conflict, safety wins.
   down, escalate on evidence: a wrong-too-weak dispatch costs one redispatch; a
   habitually-too-strong dispatch taxes every bead.
 - If the bead carries a `complexity:<tier>` label (stamped by `beads-writer`),
-  use it directly instead of re-deriving complexity from the description.
+  use it directly instead of re-deriving complexity from the description,
+  unless the design/specification override or Reconciliation Floor in
+  `../subskills/beads-coordinator/references/runtime-and-safety.md` applies.
 
 ## Reference loading
 
