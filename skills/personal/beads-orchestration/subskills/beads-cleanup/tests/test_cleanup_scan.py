@@ -530,6 +530,78 @@ class CleanupScanTests(unittest.TestCase):
         self.assertEqual(payload["pr_review"]["self_heal_candidates"][0]["recommendation"], "manual-triage")
         self.assertIn({"code": "normalizer-failed", "scope": "pr-review"}, payload["errors"])
 
+    def test_cleanup_preserves_only_a_lone_pr_state_command_failure_skip(self) -> None:
+        original_id = "aib-swr.1"
+        review_id = "aib-review.1"
+        skipped_findings = [
+            {
+                "canonical_review_id": None,
+                "context_status": "command-failed",
+                "cooldown_until": None,
+                "duplicate_of": None,
+                "kind": "original",
+                "original_id": original_id,
+                "pr_number": 41,
+                "pr_state": None,
+                "recommendation": "skip-command-failure",
+                "review_id": None,
+            },
+            {
+                "canonical_review_id": None,
+                "context_status": "command-failed",
+                "cooldown_until": None,
+                "duplicate_of": None,
+                "kind": "review-task",
+                "original_id": original_id,
+                "pr_number": 41,
+                "pr_state": None,
+                "recommendation": "skip-command-failure",
+                "review_id": review_id,
+            },
+        ]
+        cases = {
+            "lone-pr-state-failure": (
+                [{"code": "command-failed", "scope": "pr-state"}],
+                "skip-command-failure",
+            ),
+            "mixed-open-pr-failure": (
+                [
+                    {"code": "command-failed", "scope": "pr-state"},
+                    {"code": "command-failed", "scope": "open-prs"},
+                ],
+                "manual-triage",
+            ),
+        }
+        for name, (errors, expected_recommendation) in cases.items():
+            with self.subTest(name=name):
+                fixture = {
+                    "in_progress": [],
+                    "blocked": [],
+                    "review_running": [],
+                    "normalizer_stdout": json.dumps(
+                        {
+                            "errors": errors,
+                            "findings": skipped_findings,
+                            "schema": "beads-pr-review-normalization/v1",
+                            "self_heal_candidates": [],
+                            "status": "partial",
+                        }
+                    ),
+                }
+
+                result, _, _ = self.run_fixture(fixture)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], "partial")
+                self.assertEqual(payload["pr_review"]["status"], "partial")
+                self.assertTrue(
+                    all(
+                        finding["recommendation"] == expected_recommendation
+                        for finding in payload["pr_review"]["findings"]
+                    )
+                )
+
     def test_empty_normalizer_with_actionable_candidate_is_partial_manual_triage(self) -> None:
         normalizer_payload = {
             "errors": [],

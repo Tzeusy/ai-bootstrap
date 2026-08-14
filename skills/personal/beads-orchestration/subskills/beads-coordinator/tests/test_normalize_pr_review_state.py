@@ -1462,6 +1462,90 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                     recommendation,
                 )
 
+    def test_open_pr_discovery_finalizes_collection_actionability(self) -> None:
+        original_id = "aib-swr.1"
+        canonical_review_id = "aib-review.1"
+        duplicate_review_id = "aib-review.2"
+        base_fixture = {
+            "blocked_pr_review": [
+                original_bead(original_id, 41),
+                review_task(canonical_review_id, original_id),
+                review_task(duplicate_review_id, original_id),
+            ],
+            "resolver_payloads": {
+                canonical_review_id: {
+                    "ok": True,
+                    "original_id": original_id,
+                    "pr_number": 41,
+                },
+                duplicate_review_id: {
+                    "ok": True,
+                    "original_id": original_id,
+                    "pr_number": 41,
+                },
+            },
+            "shows": {original_id: [original_bead(original_id, 41)]},
+            "prs": {"41": pr_payload("OPEN")},
+            "open_prs": [
+                {
+                    "number": 41,
+                    "headRefName": f"agent/{original_id}",
+                    "createdAt": "2026-08-14T03:00:00Z",
+                }
+            ],
+        }
+        cases = {
+            "open-pr-list-failure": ({"gh-pr-list": "read failed"}, False),
+            "mixed-pr-state-and-open-pr-failure": (
+                {"gh-pr-view:41": "read failed", "gh-pr-list": "read failed"},
+                False,
+            ),
+            "valid-dedupe-control": ({}, True),
+        }
+        for name, (failures, actionable) in cases.items():
+            with self.subTest(name=name):
+                result, _, _ = self.run_fixture({**base_fixture, "failures": failures})
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                if not actionable:
+                    self.assertEqual(payload["status"], "partial")
+                    self.assertIn(
+                        {"code": "command-failed", "scope": "open-prs"},
+                        payload["errors"],
+                    )
+                    if name == "mixed-pr-state-and-open-pr-failure":
+                        self.assertIn(
+                            {"code": "command-failed", "scope": "pr-state"},
+                            payload["errors"],
+                        )
+                    self.assertTrue(payload["findings"])
+                    self.assertTrue(
+                        all(
+                            finding["recommendation"] == "manual-triage"
+                            for finding in payload["findings"]
+                        )
+                    )
+                    self.assertTrue(
+                        all(
+                            candidate["recommendation"] == "manual-triage"
+                            for candidate in payload["self_heal_candidates"]
+                        )
+                    )
+                    continue
+
+                self.assertEqual(payload["status"], "success")
+                duplicate = next(
+                    finding
+                    for finding in payload["findings"]
+                    if finding["review_id"] == duplicate_review_id
+                )
+                self.assertEqual(duplicate["recommendation"], "dedupe-review-task")
+                self.assertEqual(
+                    payload["self_heal_candidates"][0]["recommendation"],
+                    "review-wiring-current",
+                )
+
     def test_unknown_pr_state_is_sanitized_to_a_partial_manual_triage_finding(self) -> None:
         secret_state = "TOKEN=top-secret /private/absolute/path Traceback"
         original_id = "aib-swr.1"

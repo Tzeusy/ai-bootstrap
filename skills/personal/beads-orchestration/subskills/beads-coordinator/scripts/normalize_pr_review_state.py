@@ -364,22 +364,25 @@ def self_heal_candidates(
     canonical_by_key: dict[tuple[str, int], str],
     task_lookup_complete: bool,
     errors: list[dict[str, str]],
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], bool]:
+    """Discover open-PR candidates and report whether their evidence is complete."""
     payload, error = command_json(
         ["gh", "pr", "list", "--state", "open", "--json", "number,headRefName,createdAt"],
         repo_root,
     )
     if error:
         report_error(errors, error, "open-prs")
-        return []
+        return [], False
     if not isinstance(payload, list):
         report_error(errors, "invalid-json", "open-prs")
-        return []
+        return [], False
 
     candidates: list[dict[str, Any]] = []
+    discovery_complete = True
     for item in payload:
         if not isinstance(item, dict):
             report_error(errors, "invalid-record", "open-prs")
+            discovery_complete = False
             continue
         branch = item.get("headRefName")
         number = item.get("number")
@@ -390,6 +393,7 @@ def self_heal_candidates(
             continue
         if not valid_pr_number(number):
             report_error(errors, "invalid-pr-number", "open-prs")
+            discovery_complete = False
             candidates.append(
                 {
                     "canonical_review_id": None,
@@ -404,6 +408,7 @@ def self_heal_candidates(
         created_at = parse_time(item.get("createdAt"))
         if created_at is None:
             report_error(errors, "invalid-pr-created-at", "open-prs")
+            discovery_complete = False
             candidates.append(
                 {
                     "canonical_review_id": None,
@@ -422,6 +427,7 @@ def self_heal_candidates(
             original, identity_error = None, original_error
         if original is None:
             report_error(errors, identity_error or "invalid-json", "self-heal")
+            discovery_complete = False
             candidates.append(
                 {
                     "canonical_review_id": None,
@@ -462,7 +468,10 @@ def self_heal_candidates(
                 "recommendation": recommendation,
             }
         )
-    return sorted(candidates, key=lambda item: (str(item["original_id"]), int(item["pr_number"] or 0)))
+    return (
+        sorted(candidates, key=lambda item: (str(item["original_id"]), int(item["pr_number"] or 0))),
+        discovery_complete,
+    )
 
 
 def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
@@ -663,9 +672,9 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             pr_metadata_errors[pr_number] = pr_error
             report_error(errors, pr_error, "pr-state")
     pr_metadata_complete = not pr_metadata_errors
-    collection_complete = structural_collection_complete and pr_metadata_complete
-    # The legacy singleton command failure is a report-only skip, never an action.
-    preserve_lone_pr_metadata_skip = (
+    pre_discovery_collection_complete = structural_collection_complete and pr_metadata_complete
+    # The explicitly allowed singleton command failure is a report-only skip, never an action.
+    provisional_lone_pr_metadata_skip = (
         structural_collection_complete
         and len(pr_numbers) == 1
         and len(pr_metadata_errors) == 1
@@ -676,7 +685,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             key: min(chronology, key=lambda item: (item[0], item[1]))[1]
             for key, chronology in chronology_by_key.items()
         }
-        if collection_complete
+        if pre_discovery_collection_complete
         else {}
     )
 
@@ -724,7 +733,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                     cooldown=None,
                     recommendation=(
                         recommendation_for_pr_error(pr_error)
-                        if preserve_lone_pr_metadata_skip
+                        if provisional_lone_pr_metadata_skip
                         else "manual-triage"
                     ),
                 )
@@ -732,7 +741,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             continue
         state = pr["state"]
         cooldown = cooldown_until(pr, now)
-        if not collection_complete:
+        if not pre_discovery_collection_complete:
             recommendation = "manual-triage"
         elif state == "MERGED":
             recommendation = "close-original-and-reviews"
@@ -820,14 +829,14 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                     cooldown=None,
                     recommendation=(
                         "skip-command-failure"
-                        if preserve_lone_pr_metadata_skip
+                        if provisional_lone_pr_metadata_skip
                         else "manual-triage"
                     ),
                 )
             )
             continue
         canonical = canonical_by_key.get(key)
-        if key in invalid_task_keys or not collection_complete or canonical is None:
+        if key in invalid_task_keys or not pre_discovery_collection_complete or canonical is None:
             findings.append(
                 task_finding(
                     review_id=review_id,
@@ -837,7 +846,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                         "invalid-created-at"
                         if key in invalid_task_keys
                         else "incomplete-review-collection"
-                        if not collection_complete
+                        if not pre_discovery_collection_complete
                         else "missing-canonical-review"
                     ),
                     canonical_review_id=None,
@@ -892,12 +901,16 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             )
         )
 
-    self_heal = self_heal_candidates(
+    self_heal, open_pr_discovery_complete = self_heal_candidates(
         repo_root=repo_root,
         now=now,
         canonical_by_key=canonical_by_key,
-        task_lookup_complete=collection_complete,
+        task_lookup_complete=pre_discovery_collection_complete,
         errors=errors,
+    )
+    collection_complete = pre_discovery_collection_complete and open_pr_discovery_complete
+    preserve_lone_pr_metadata_skip = (
+        provisional_lone_pr_metadata_skip and open_pr_discovery_complete
     )
     manualize_incomplete_collection(
         findings,
