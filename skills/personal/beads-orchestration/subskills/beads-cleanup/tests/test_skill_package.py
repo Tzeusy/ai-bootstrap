@@ -110,6 +110,7 @@ class BeadsCleanupPackageTests(unittest.TestCase):
         self.assertIn("Pass 3: Blocked `pr-review-task` Review Beads", pr_recon)
         self.assertIn("partial\nmanual-triage", pr_recon)
         self.assertIn("parsed creation\nchronology", pr_recon)
+        self.assertIn("list-shaped `errors`, `findings`,\nand `self_heal_candidates`", pr_recon)
         self.assertIn("## Beads Cleanup Report", reporting)
         self.assertIn("| Metric | Count |", reporting)
 
