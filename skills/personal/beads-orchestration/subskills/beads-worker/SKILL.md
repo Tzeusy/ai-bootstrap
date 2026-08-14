@@ -70,6 +70,8 @@ not to replace local judgment.
   Exact bootstrap rules, guidance discovery order, and push/PR failure routing.
 - [`references/worker-report.md`](references/worker-report.md)
   Report-generation rules, examples, and JSON entry schemas.
+- [`references/known-errors.md`](references/known-errors.md)
+  Known worker errors and workarounds to check before re-deriving a recovery.
 
 ## Optional Project-Level Craft-And-Care Gate
 
