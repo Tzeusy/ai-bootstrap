@@ -236,14 +236,17 @@ class UsageAuditTests(unittest.TestCase):
             set_mtime(failed_open, AS_OF_DATETIME - timedelta(days=5))
             set_mtime(codex_history, AS_OF_DATETIME - timedelta(days=100))
 
-            original_open = Path.open
+            original_open = AUDIT_MODULE.os.open
+            failed = False
 
-            def fail_one_transcript(path: Path, *args: object, **kwargs: object) -> object:
-                if path == failed_open:
+            def fail_one_transcript(path: object, flags: int, *args: object, **kwargs: object) -> object:
+                nonlocal failed
+                if path == failed_open.name and kwargs.get("dir_fd") is not None:
+                    failed = True
                     raise OSError("synthetic failed-open")
-                return original_open(path, *args, **kwargs)
+                return original_open(path, flags, *args, **kwargs)
 
-            with mock.patch.object(Path, "open", new=fail_one_transcript):
+            with mock.patch.object(AUDIT_MODULE.os, "open", new=fail_one_transcript):
                 report = AUDIT_MODULE.build_report(
                     repo,
                     catalog,
@@ -254,6 +257,7 @@ class UsageAuditTests(unittest.TestCase):
                     30,
                 )
 
+            self.assertTrue(failed)
             row = matrix_row(report, "systematic-debugging")
             self.assertFalse(report["coverage"]["claude"]["available"])
             self.assertFalse(report["coverage"]["claude"]["coverage_complete"])
@@ -288,14 +292,19 @@ class UsageAuditTests(unittest.TestCase):
             set_mtime(unreadable_metadata, AS_OF_DATETIME - timedelta(days=5))
             set_mtime(codex_history, AS_OF_DATETIME - timedelta(days=100))
 
-            original_stat = Path.stat
+            target_metadata = unreadable_metadata.stat()
+            original_fstat = AUDIT_MODULE.os.fstat
+            failed = False
 
-            def fail_one_stat(path: Path, *args: object, **kwargs: object) -> os.stat_result:
-                if path == unreadable_metadata:
+            def fail_one_stat(fd: int) -> os.stat_result:
+                nonlocal failed
+                metadata = original_fstat(fd)
+                if (metadata.st_dev, metadata.st_ino) == (target_metadata.st_dev, target_metadata.st_ino):
+                    failed = True
                     raise OSError("synthetic failed-stat")
-                return original_stat(path, *args, **kwargs)
+                return metadata
 
-            with mock.patch.object(Path, "stat", new=fail_one_stat):
+            with mock.patch.object(AUDIT_MODULE.os, "fstat", new=fail_one_stat):
                 report = AUDIT_MODULE.build_report(
                     repo,
                     catalog,
@@ -306,6 +315,7 @@ class UsageAuditTests(unittest.TestCase):
                     30,
                 )
 
+            self.assertTrue(failed)
             row = matrix_row(report, "systematic-debugging")
             self.assertFalse(report["coverage"]["claude"]["available"])
             self.assertFalse(report["coverage"]["claude"]["coverage_complete"])
@@ -524,22 +534,20 @@ class UsageAuditTests(unittest.TestCase):
             denied_event.write_text(claude_skill_event("writing-plans") + "\n", encoding="utf-8")
             set_mtime(denied_event, AS_OF_DATETIME - timedelta(days=5))
 
-            original_iterdir = Path.iterdir
-            original_rglob = Path.rglob
+            denied_metadata = denied_dir.stat()
+            original_scandir = AUDIT_MODULE.os.scandir
+            denied = False
 
-            def suppress_nested_denial(path: Path, pattern: str) -> object:
-                if path == claude_dir and pattern == "*.jsonl":
-                    return iter((claude_dir / "history.jsonl",))
-                return original_rglob(path, pattern)
+            def deny_nested_directory(path: object) -> object:
+                nonlocal denied
+                if isinstance(path, int):
+                    metadata = os.fstat(path)
+                    if (metadata.st_dev, metadata.st_ino) == (denied_metadata.st_dev, denied_metadata.st_ino):
+                        denied = True
+                        raise PermissionError("synthetic nested traversal denial")
+                return original_scandir(path)
 
-            def deny_nested_directory(path: Path) -> object:
-                if path == denied_dir:
-                    raise PermissionError("synthetic nested traversal denial")
-                return original_iterdir(path)
-
-            with mock.patch.object(Path, "rglob", new=suppress_nested_denial), mock.patch.object(
-                Path, "iterdir", new=deny_nested_directory
-            ):
+            with mock.patch.object(AUDIT_MODULE.os, "scandir", new=deny_nested_directory):
                 report = AUDIT_MODULE.build_report(
                     repo,
                     catalog,
@@ -550,6 +558,7 @@ class UsageAuditTests(unittest.TestCase):
                     30,
                 )
 
+            self.assertTrue(denied)
             claude_coverage = report["coverage"]["claude"]
             row = matrix_row(report, "systematic-debugging")
             self.assertFalse(claude_coverage["available"])
@@ -560,6 +569,87 @@ class UsageAuditTests(unittest.TestCase):
             self.assertEqual(row["counts"]["primary"]["total"], 0)
             self.assertEqual(row["disposition"], "insufficient-evidence")
             self.assertEqual(row["protection_reason"], "incomplete-history")
+
+    def assert_synthetic_swap_fails_coverage_closed(self, report: dict) -> None:
+        claude_coverage = report["coverage"]["claude"]
+        row = matrix_row(report, "systematic-debugging")
+        self.assertEqual(row["counts"]["primary"]["total"], 0)
+        self.assertFalse(claude_coverage["available"])
+        self.assertFalse(claude_coverage["input_complete"])
+        self.assertFalse(claude_coverage["coverage_complete"])
+        self.assertEqual(claude_coverage["input_errors"], 1)
+        self.assertFalse(report["coverage"]["complete"])
+        self.assertEqual(row["disposition"], "insufficient-evidence")
+        self.assertEqual(row["protection_reason"], "incomplete-history")
+
+    def test_file_symlink_swap_fails_coverage_closed_in_actual_audit_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, catalog, claude_dir, codex_dir = self.make_established_zero_usage_audit_inputs(tmp)
+            queued_event = claude_dir / "queued-file.jsonl"
+            outside_event = Path(tmp) / "synthetic-outside-file.jsonl"
+            queued_event.write_text(claude_skill_event("writing-plans") + "\n", encoding="utf-8")
+            outside_event.write_text(claude_skill_event("systematic-debugging") + "\n", encoding="utf-8")
+            set_mtime(queued_event, AS_OF_DATETIME - timedelta(days=5))
+            swapped = False
+            original_scan = AUDIT_MODULE.scan_claude
+
+            def swap_before_scan(files: object, sensitivity_files: object = ()) -> object:
+                nonlocal swapped
+                queued_event.unlink()
+                queued_event.symlink_to(outside_event)
+                swapped = True
+                return original_scan(files, sensitivity_files)
+
+            with mock.patch.object(AUDIT_MODULE, "scan_claude", new=swap_before_scan):
+                report = AUDIT_MODULE.build_report(
+                    repo,
+                    catalog,
+                    claude_dir,
+                    codex_dir,
+                    AS_OF_DATETIME,
+                    90,
+                    30,
+                )
+
+            self.assertTrue(swapped)
+            self.assert_synthetic_swap_fails_coverage_closed(report)
+
+    def test_queued_directory_symlink_swap_fails_coverage_closed_in_actual_audit_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, catalog, claude_dir, codex_dir = self.make_established_zero_usage_audit_inputs(tmp)
+            queued_directory = claude_dir / "queued-directory"
+            queued_event = queued_directory / "recent.jsonl"
+            moved_directory = claude_dir / "moved-directory"
+            outside_directory = Path(tmp) / "synthetic-outside-directory"
+            outside_event = outside_directory / "recent.jsonl"
+            queued_directory.mkdir()
+            outside_directory.mkdir()
+            queued_event.write_text(claude_skill_event("writing-plans") + "\n", encoding="utf-8")
+            outside_event.write_text(claude_skill_event("systematic-debugging") + "\n", encoding="utf-8")
+            set_mtime(queued_event, AS_OF_DATETIME - timedelta(days=5))
+            swapped = False
+            original_scan = AUDIT_MODULE.scan_claude
+
+            def swap_before_scan(files: object, sensitivity_files: object = ()) -> object:
+                nonlocal swapped
+                queued_directory.rename(moved_directory)
+                queued_directory.symlink_to(outside_directory, target_is_directory=True)
+                swapped = True
+                return original_scan(files, sensitivity_files)
+
+            with mock.patch.object(AUDIT_MODULE, "scan_claude", new=swap_before_scan):
+                report = AUDIT_MODULE.build_report(
+                    repo,
+                    catalog,
+                    claude_dir,
+                    codex_dir,
+                    AS_OF_DATETIME,
+                    90,
+                    30,
+                )
+
+            self.assertTrue(swapped)
+            self.assert_synthetic_swap_fails_coverage_closed(report)
 
     def run_audit(self, repo: Path, manifest: Path, claude_dir: Path, codex_dir: Path) -> subprocess.CompletedProcess:
         return subprocess.run(
