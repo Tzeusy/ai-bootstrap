@@ -82,6 +82,11 @@ Each `bd show` response for an original must echo the requested original bead
 ID; a mismatched record is partial manual triage. A review task whose resolved
 original ID is its own review ID is self-referential and must fail closed before
 canonical selection, dispatch, or wiring.
+Before relation validation, every active review-task context must resolve a
+valid original identity. If any active context is missing or invalid, Step 0
+does not form a partial graph or canonical set; it reports partial manual
+triage and suppresses dispatch, wiring, and self-heal actions throughout the
+collection.
 
 The same total pure relation-graph validation applies across the complete
 resolved review-task collection before canonical selection or any

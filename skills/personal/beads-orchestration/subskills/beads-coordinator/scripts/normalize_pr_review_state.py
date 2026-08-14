@@ -555,22 +555,24 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             report_error(errors, error, "review-context")
             task_lookup_complete = False
 
-    relation_error = review_relation_error(
-        [
-            (review_id, context["original_id"])
-            for review_id, context in task_contexts.items()
-            if context is not None
-        ]
+    active_contexts_complete = not task_context_errors and all(
+        context is not None for context in task_contexts.values()
     )
-    relation_graph_complete = relation_error is None
-    if relation_error:
-        report_error(errors, relation_error, "review-context")
-        task_lookup_complete = False
+    relation_error: str | None = None
+    relation_graph_complete = False
+    if active_contexts_complete:
+        relation_error = review_relation_error(
+            [(review_id, context["original_id"]) for review_id, context in task_contexts.items()]
+        )
+        relation_graph_complete = relation_error is None
+        if relation_error:
+            report_error(errors, relation_error, "review-context")
+            task_lookup_complete = False
 
     canonical_by_key: dict[tuple[str, int], str] = {}
     invalid_task_keys: set[tuple[str, int]] = set()
     tasks_by_key: dict[tuple[str, int], list[str]] = {}
-    if relation_graph_complete:
+    if active_contexts_complete and relation_graph_complete:
         for review_id, context in task_contexts.items():
             if context is None:
                 continue
@@ -635,13 +637,17 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                     canonical_review_id=canonical,
                     pr_state=None,
                     cooldown=None,
-                    recommendation=recommendation_for_pr_error(pr_error),
+                    recommendation=(
+                        "manual-triage"
+                        if not active_contexts_complete or not relation_graph_complete
+                        else recommendation_for_pr_error(pr_error)
+                    ),
                 )
             )
             continue
         state = pr["state"]
         cooldown = cooldown_until(pr, now)
-        if not relation_graph_complete:
+        if not active_contexts_complete or not relation_graph_complete:
             recommendation = "manual-triage"
         elif state == "MERGED":
             recommendation = "close-original-and-reviews"
@@ -668,7 +674,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     for review_id in sorted(tasks):
         context = task_contexts[review_id]
         if context is None:
-            context_error = task_context_errors[review_id]
+            context_error = task_context_errors.get(review_id, "invalid-review-context")
             findings.append(
                 task_finding(
                     review_id=review_id,
@@ -680,6 +686,21 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                     pr_state=None,
                     cooldown=None,
                     recommendation="skip-command-failure" if context_error == "command-failed" else "manual-triage",
+                )
+            )
+            continue
+        if not active_contexts_complete:
+            findings.append(
+                task_finding(
+                    review_id=review_id,
+                    original_id=context["original_id"],
+                    pr_number=context["pr_number"],
+                    context_status="incomplete-review-context",
+                    canonical_review_id=None,
+                    duplicate_of=None,
+                    pr_state=None,
+                    cooldown=None,
+                    recommendation="manual-triage",
                 )
             )
             continue
@@ -768,7 +789,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         task_lookup_complete=task_lookup_complete,
         errors=errors,
     )
-    if not inventory_complete or not relation_graph_complete:
+    if not inventory_complete or (active_contexts_complete and not relation_graph_complete):
         for finding in findings:
             finding["recommendation"] = "manual-triage"
         for candidate in self_heal:
