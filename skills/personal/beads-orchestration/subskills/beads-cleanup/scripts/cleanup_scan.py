@@ -23,6 +23,30 @@ STALL_THRESHOLD = timedelta(minutes=30)
 BEAD_ID_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)+(?:\.[0-9]+)*\Z")
 SAFE_CODE_RE = re.compile(r"[a-z0-9][a-z0-9-]*\Z")
 BEAD_STATUSES = frozenset({"open", "in_progress", "blocked", "closed"})
+PR_STATES = frozenset({"OPEN", "CLOSED", "MERGED"})
+FINDING_RECOMMENDATIONS = frozenset(
+    {
+        "close-original-and-reviews",
+        "close-review-and-original",
+        "close-review-reopen-original",
+        "dedupe-review-task",
+        "dispatch-canonical-review",
+        "manual-triage",
+        "reopen-original-for-retriage",
+        "self-heal-review-wiring",
+        "skip-command-failure",
+        "wait-for-cooldown",
+    }
+)
+SELF_HEAL_RECOMMENDATIONS = frozenset(
+    {
+        "manual-triage",
+        "review-wiring-current",
+        "self-heal-original-and-review-wiring",
+        "self-heal-original-wiring",
+        "self-heal-review-wiring",
+    }
+)
 HEARTBEAT_RE = re.compile(r"\[beads-heartbeat\].*?last_heartbeat_at=([^\s]+)", re.DOTALL)
 WORKTREE_RE = re.compile(r"(?:^|/)parallel-agents/([a-z][a-z0-9]*(?:-[a-z0-9]+)+(?:\.[0-9]+)*)\b")
 AGENT_BRANCH_RE = re.compile(r"\bagent/([a-z][a-z0-9]*(?:-[a-z0-9]+)+(?:\.[0-9]+)*)\b")
@@ -165,6 +189,74 @@ def bead_status(record: dict[str, Any]) -> str | None:
     return value if isinstance(value, str) and value in BEAD_STATUSES else None
 
 
+def valid_optional_id(value: object) -> bool:
+    return value is None or sanitize_id(value) is not None
+
+
+def valid_context_status(value: object) -> bool:
+    return isinstance(value, str) and safe_code(value, "command-failed") == value
+
+
+def finding_action_is_consistent(
+    *,
+    kind: str,
+    context_status: str,
+    original_id: str | None,
+    pr_number: object,
+    pr_state: str | None,
+    canonical_review_id: str | None,
+    duplicate_of: str | None,
+    review_id: str | None,
+    cooldown_until: str | None,
+    recommendation: str,
+) -> bool:
+    if recommendation == "manual-triage":
+        return True
+    if recommendation == "skip-command-failure":
+        return context_status == "command-failed" and pr_state is None
+    if context_status != "resolved" or original_id is None or not valid_pr_number(pr_number):
+        return False
+    if kind == "review-task" and review_id is None:
+        return False
+    expected = {
+        "close-original-and-reviews": ("original", "MERGED"),
+        "close-review-and-original": ("review-task", "MERGED"),
+        "close-review-reopen-original": ("review-task", "CLOSED"),
+        "dedupe-review-task": ("review-task", "OPEN"),
+        "dispatch-canonical-review": (None, "OPEN"),
+        "reopen-original-for-retriage": ("original", "CLOSED"),
+        "self-heal-review-wiring": ("original", "OPEN"),
+        "wait-for-cooldown": (None, "OPEN"),
+    }.get(recommendation)
+    if expected is None or pr_state != expected[1] or (expected[0] is not None and kind != expected[0]):
+        return False
+    if recommendation in {"dispatch-canonical-review", "wait-for-cooldown"}:
+        return canonical_review_id is not None and cooldown_until is not None
+    if recommendation == "dedupe-review-task":
+        return canonical_review_id is not None and duplicate_of == canonical_review_id
+    return recommendation != "self-heal-review-wiring" or canonical_review_id is None
+
+
+def self_heal_action_is_consistent(
+    *,
+    context_status: str,
+    original_id: str | None,
+    pr_number: object,
+    canonical_review_id: str | None,
+    cooldown_until: str | None,
+    recommendation: str,
+) -> bool:
+    if recommendation == "manual-triage":
+        return True
+    if context_status != "resolved" or original_id is None or not valid_pr_number(pr_number) or cooldown_until is None:
+        return False
+    if recommendation in {"review-wiring-current", "self-heal-original-wiring"}:
+        return canonical_review_id is not None
+    if recommendation in {"self-heal-original-and-review-wiring", "self-heal-review-wiring"}:
+        return canonical_review_id is None
+    return False
+
+
 def sanitize_normalizer(payload: object) -> dict[str, Any]:
     """Keep only the canonical normalizer's safe, compact public fields."""
     if not isinstance(payload, dict) or payload.get("schema") != NORMALIZER_SCHEMA:
@@ -208,30 +300,70 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
         if not isinstance(item, dict):
             report_error(errors, "invalid-normalizer-envelope", "pr-review")
             continue
-        kind = item.get("kind") if item.get("kind") in {"original", "review-task"} else "review-task"
-        state = item.get("pr_state") if item.get("pr_state") in {"OPEN", "CLOSED", "MERGED"} else None
+        raw_kind = item.get("kind")
+        kind = raw_kind if isinstance(raw_kind, str) and raw_kind in {"original", "review-task"} else "review-task"
+        raw_state = item.get("pr_state")
+        state = raw_state if isinstance(raw_state, str) and raw_state in PR_STATES else None
         number = item.get("pr_number")
         cooldown = sanitize_timestamp(item.get("cooldown_until"))
+        canonical_review_id = sanitize_id(item.get("canonical_review_id"))
+        duplicate_of = sanitize_id(item.get("duplicate_of"))
+        original_id = sanitize_id(item.get("original_id"))
+        review_id = sanitize_id(item.get("review_id"))
+        raw_recommendation = item.get("recommendation")
+        recommendation = (
+            raw_recommendation
+            if isinstance(raw_recommendation, str) and raw_recommendation in FINDING_RECOMMENDATIONS
+            else "manual-triage"
+        )
+        context_status = safe_code(item.get("context_status"), "command-failed")
         invalid_evidence = ""
-        if number is not None and not valid_pr_number(number):
+        if number is None:
+            invalid_evidence = "invalid-normalizer-evidence"
+        elif not valid_pr_number(number):
             invalid_evidence = "invalid-pr-number"
         elif item.get("cooldown_until") is not None and cooldown is None:
             invalid_evidence = "invalid-cooldown-until"
+        elif (
+            raw_kind != kind
+            or not valid_context_status(item.get("context_status"))
+            or not valid_optional_id(item.get("canonical_review_id"))
+            or not valid_optional_id(item.get("duplicate_of"))
+            or not valid_optional_id(item.get("original_id"))
+            or not valid_optional_id(item.get("review_id"))
+            or (raw_state is not None and state is None)
+            or raw_recommendation != recommendation
+            or (kind == "original" and (original_id is None or review_id is not None or duplicate_of is not None))
+            or (kind == "review-task" and review_id is None)
+            or not finding_action_is_consistent(
+                kind=kind,
+                context_status=context_status,
+                original_id=original_id,
+                pr_number=number,
+                pr_state=state,
+                canonical_review_id=canonical_review_id,
+                duplicate_of=duplicate_of,
+                review_id=review_id,
+                cooldown_until=cooldown,
+                recommendation=recommendation,
+            )
+        ):
+            invalid_evidence = "invalid-normalizer-evidence"
         if invalid_evidence:
             report_error(errors, invalid_evidence, "pr-review")
             status = "partial"
         findings.append(
             {
-                "canonical_review_id": sanitize_id(item.get("canonical_review_id")),
-                "context_status": invalid_evidence or safe_code(item.get("context_status"), "command-failed"),
+                "canonical_review_id": canonical_review_id,
+                "context_status": invalid_evidence or context_status,
                 "cooldown_until": None if invalid_evidence else cooldown,
-                "duplicate_of": sanitize_id(item.get("duplicate_of")),
+                "duplicate_of": duplicate_of,
                 "kind": kind,
-                "original_id": sanitize_id(item.get("original_id")),
+                "original_id": original_id,
                 "pr_number": number if valid_pr_number(number) else None,
                 "pr_state": state,
-                "recommendation": "manual-triage" if invalid_evidence else safe_code(item.get("recommendation"), "manual-triage"),
-                "review_id": sanitize_id(item.get("review_id")),
+                "recommendation": "manual-triage" if invalid_evidence else recommendation,
+                "review_id": review_id,
             }
         )
 
@@ -242,26 +374,55 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
             continue
         number = item.get("pr_number")
         cooldown = sanitize_timestamp(item.get("cooldown_until"))
+        canonical_review_id = sanitize_id(item.get("canonical_review_id"))
+        original_id = sanitize_id(item.get("original_id"))
+        raw_recommendation = item.get("recommendation")
+        recommendation = (
+            raw_recommendation
+            if isinstance(raw_recommendation, str) and raw_recommendation in SELF_HEAL_RECOMMENDATIONS
+            else "manual-triage"
+        )
+        context_status = safe_code(item.get("context_status"), "command-failed")
         invalid_evidence = ""
-        if number is not None and not valid_pr_number(number):
+        if number is None:
+            invalid_evidence = "invalid-normalizer-evidence"
+        elif not valid_pr_number(number):
             invalid_evidence = "invalid-pr-number"
         elif item.get("cooldown_until") is not None and cooldown is None:
             invalid_evidence = "invalid-cooldown-until"
+        elif (
+            not valid_context_status(item.get("context_status"))
+            or not valid_optional_id(item.get("canonical_review_id"))
+            or not valid_optional_id(item.get("original_id"))
+            or raw_recommendation != recommendation
+            or original_id is None
+            or not self_heal_action_is_consistent(
+                context_status=context_status,
+                original_id=original_id,
+                pr_number=number,
+                canonical_review_id=canonical_review_id,
+                cooldown_until=cooldown,
+                recommendation=recommendation,
+            )
+        ):
+            invalid_evidence = "invalid-normalizer-evidence"
         if invalid_evidence:
             report_error(errors, invalid_evidence, "pr-review")
             status = "partial"
         self_heal.append(
             {
-                "canonical_review_id": sanitize_id(item.get("canonical_review_id")),
-                "context_status": invalid_evidence or safe_code(item.get("context_status"), "command-failed"),
+                "canonical_review_id": canonical_review_id,
+                "context_status": invalid_evidence or context_status,
                 "cooldown_until": None if invalid_evidence else cooldown,
-                "original_id": sanitize_id(item.get("original_id")),
+                "original_id": original_id,
                 "pr_number": number if valid_pr_number(number) else None,
-                "recommendation": "manual-triage" if invalid_evidence else safe_code(item.get("recommendation"), "manual-triage"),
+                "recommendation": "manual-triage" if invalid_evidence else recommendation,
             }
         )
 
-    if status == "empty" and (errors or findings or self_heal):
+    if status == "success" and not errors and not findings and not self_heal:
+        status = "empty"
+    elif status == "empty" and (errors or findings or self_heal):
         report_error(errors, "inconsistent-normalizer-status", "pr-review")
     elif status == "success" and errors:
         report_error(errors, "inconsistent-normalizer-status", "pr-review")

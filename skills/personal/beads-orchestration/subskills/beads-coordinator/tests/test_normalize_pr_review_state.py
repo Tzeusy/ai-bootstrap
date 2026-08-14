@@ -598,6 +598,45 @@ class NormalizePrReviewStateTests(unittest.TestCase):
         for forbidden in ("TOKEN=top-secret", "/private/absolute/path", "Traceback", repo_root):
             self.assertNotIn(forbidden, result.stdout + result.stderr)
 
+    def test_malformed_pr_review_task_inventory_blocks_self_heal(self) -> None:
+        original_id = "aib-swr.1"
+        malformed_inventories = {
+            "non-record": ["malformed-task-inventory-record"],
+            "missing-task-label": [
+                {
+                    "created_at": "2026-08-14T03:00:00Z",
+                    "id": "aib-review.1",
+                    "labels": ["pr-review"],
+                    "status": "blocked",
+                }
+            ],
+        }
+        for name, inventory in malformed_inventories.items():
+            with self.subTest(name=name):
+                fixture = {
+                    "blocked_pr_review": [],
+                    "pr_review_tasks_all": inventory,
+                    "shows": {original_id: [original_bead(original_id, 41)]},
+                    "open_prs": [
+                        {
+                            "number": 41,
+                            "headRefName": f"agent/{original_id}",
+                            "createdAt": "2026-08-14T03:00:00Z",
+                        }
+                    ],
+                }
+
+                result, _, _ = self.run_fixture(fixture)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], "partial")
+                self.assertEqual(payload["self_heal_candidates"][0]["recommendation"], "manual-triage")
+                self.assertIn(
+                    {"code": "invalid-record", "scope": "blocked-pr-review-task"},
+                    payload["errors"],
+                )
+
     def test_resolver_context_failures_are_safe_and_do_not_fall_back(self) -> None:
         cases = {
             "missing": ("No explicit original marker or dependency", "missing-original-id"),
