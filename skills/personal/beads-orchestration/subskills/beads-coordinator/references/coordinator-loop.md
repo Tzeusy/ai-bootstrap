@@ -70,6 +70,9 @@ recommendations are **not authorization**: Step 0 remains the sole PR-state
 mutator, and it must freshly verify the exact `gh`/Beads state, assignee, and
 heartbeat immediately before an actual mutation. A `partial` or `fatal` scan is a
 report-only triage result, never a reason to guess or mutate.
+A list-shaped but malformed `pr-review-task` inventory is incomplete evidence:
+the normalizer reports partial manual triage and keeps every self-heal candidate
+at `manual-triage` until it can collect a clean task inventory.
 
 Before discovering new work, and whenever a worker frees a slot, check
 (projected — never dump the unfiltered JSON into context; see

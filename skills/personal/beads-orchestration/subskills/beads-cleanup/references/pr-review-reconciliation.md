@@ -20,6 +20,12 @@ A zero-exit delegated envelope must provide list-shaped `errors`, `findings`,
 and `self_heal_candidates` collections whose status matches its evidence.
 Otherwise cleanup downgrades the nested and outer reports to partial manual
 triage and preserves no actionable recommendation.
+Each retained finding or candidate must also pass its type-appropriate opaque
+identity, positive PR number, PR-state, and recommendation semantics. Missing,
+malformed, or incompatible evidence adds the sanitized
+`invalid-normalizer-evidence` error and preserves only `manual-triage`. A
+well-shaped `success` envelope with no sanitized findings or candidates is
+normalized to `empty`, never retained as a misleading success-without-work.
 
 ## Pass 2: Blocked Original Beads With `pr-review`
 
@@ -41,6 +47,9 @@ ones, when selecting the oldest deterministic canonical task by parsed creation
 chronology. Invalid creation timestamps fail closed to partial manual triage;
 it never compares raw timestamp text. It preserves dotted child IDs and reports
 duplicates without changing them.
+A list-shaped but malformed `pr-review-task` inventory is still incomplete:
+the normalizer reports partial manual triage and gives every self-heal candidate
+the `manual-triage` recommendation until a clean inventory can be collected.
 
 | PR state | Report recommendation for coordinator Step 0 |
 |---|---|

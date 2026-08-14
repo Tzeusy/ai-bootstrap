@@ -446,15 +446,21 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             1,
         )
 
-    task_lookup_complete = task_error is None
     records_by_id: dict[str, dict[str, Any]] = {}
-    for record in (pr_review_records or []) + (task_records or []):
+    for record in pr_review_records or []:
         issue_id = record_id(record)
         if issue_id is None:
             report_error(errors, "invalid-record", "blocked-pr-review")
             continue
-        if issue_id not in records_by_id or "pr-review-task" in labels(record):
-            records_by_id[issue_id] = record
+        records_by_id[issue_id] = record
+    task_lookup_complete = task_error is None
+    for record in task_records or []:
+        issue_id = record_id(record)
+        if issue_id is None or "pr-review-task" not in labels(record):
+            report_error(errors, "invalid-record", "blocked-pr-review-task")
+            task_lookup_complete = False
+            continue
+        records_by_id[issue_id] = record
 
     originals: dict[str, dict[str, Any]] = {}
     tasks: dict[str, dict[str, Any]] = {}
