@@ -496,6 +496,30 @@ class CleanupScanTests(unittest.TestCase):
         self.assertEqual(candidate["recommendation"], "manual-triage")
         self.assertIn({"code": "invalid-pr-number", "scope": "pr-review"}, payload["pr_review"]["errors"])
 
+    def test_error_bearing_success_normalizer_is_partial_manual_triage(self) -> None:
+        normalizer_payload = {
+            "errors": [{"code": "invalid-pr-created-at", "scope": "pr-state"}],
+            "findings": [],
+            "schema": "beads-pr-review-normalization/v1",
+            "self_heal_candidates": [],
+            "status": "success",
+        }
+        fixture = {
+            "in_progress": [],
+            "blocked": [],
+            "review_running": [],
+            "normalizer_stdout": json.dumps(normalizer_payload),
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        self.assertEqual(payload["pr_review"]["status"], "partial")
+        self.assertIn({"code": "invalid-pr-created-at", "scope": "pr-state"}, payload["pr_review"]["errors"])
+        self.assertIn({"code": "normalizer-failed", "scope": "pr-review"}, payload["errors"])
+
     def test_worktree_correlation_preserves_opaque_ids_containing_review(self) -> None:
         issue_id = "aib-release-review-preserve"
         fixture = {
