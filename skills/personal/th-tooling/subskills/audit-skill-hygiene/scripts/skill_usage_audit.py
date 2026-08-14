@@ -14,6 +14,7 @@ paths into its report.
 
 import argparse
 import json
+import stat
 import subprocess
 import sys
 from collections import Counter
@@ -975,26 +976,50 @@ def scan_codex(files: Sequence[Path], sensitivity_files: Sequence[Path] = ()) ->
     return _scan_records(files, sensitivity_files, _extract_codex_record)
 
 
-def transcript_window(root: Path, as_of: datetime, primary_start: datetime, sensitivity_start: datetime) -> Tuple[Dict[str, Any], List[Path], List[Path]]:
-    """Return only aggregate availability metadata plus file handles for scanning."""
-    available = root.is_dir()
-    input_errors = 0
+def _discover_jsonl_files(root: Path) -> Tuple[List[Tuple[datetime, Path]], int]:
+    """Recursively retain JSONL handles while recording every traversal failure."""
     candidates: List[Tuple[datetime, Path]] = []
-    if available:
+    input_errors = 0
+    pending = [root]
+    while pending:
+        directory = pending.pop()
         try:
-            iterator = root.rglob("*.jsonl")
-            for entry_path in iterator:
+            for entry_path in directory.iterdir():
                 try:
-                    observed = datetime.fromtimestamp(entry_path.stat().st_mtime, tz=UTC)
+                    entry_lstat = entry_path.lstat()
+                    if stat.S_ISLNK(entry_lstat.st_mode):
+                        continue
+                    entry_stat = entry_path.stat()
                 except OSError:
                     input_errors += 1
                     continue
-                if observed <= as_of:
+                if stat.S_ISDIR(entry_stat.st_mode):
+                    pending.append(entry_path)
+                elif stat.S_ISREG(entry_stat.st_mode) and entry_path.suffix == ".jsonl":
+                    try:
+                        observed = datetime.fromtimestamp(entry_stat.st_mtime, tz=UTC)
+                    except (OSError, OverflowError, ValueError):
+                        input_errors += 1
+                        continue
                     candidates.append((observed, entry_path))
         except OSError:
-            available = False
             input_errors += 1
-            candidates = []
+    return candidates, input_errors
+
+
+def transcript_window(root: Path, as_of: datetime, primary_start: datetime, sensitivity_start: datetime) -> Tuple[Dict[str, Any], List[Path], List[Path]]:
+    """Return only aggregate availability metadata plus file handles for scanning."""
+    input_errors = 0
+    candidates: List[Tuple[datetime, Path]] = []
+    try:
+        available = stat.S_ISDIR(root.stat().st_mode)
+    except OSError:
+        available = False
+        input_errors += 1
+    if available:
+        discovered, discovery_errors = _discover_jsonl_files(root)
+        input_errors += discovery_errors
+        candidates = [(observed, entry_path) for observed, entry_path in discovered if observed <= as_of]
 
     candidates.sort(key=lambda item: item[0])
     earliest = candidates[0][0] if candidates else None
