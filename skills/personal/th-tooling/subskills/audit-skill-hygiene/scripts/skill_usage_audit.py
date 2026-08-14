@@ -93,8 +93,17 @@ CANDIDATE_PROFILES: Tuple[Tuple[str, str, str], ...] = (
     ),
 )
 
-CLAUDE_COMMAND_RE = re.compile(r"<command-name>/?([A-Za-z0-9:_-]+)</command-name>")
-CODEX_SKILL_PATH_RE = re.compile(r"(?:^|[\\/])([A-Za-z0-9_-]+)[\\/]SKILL\.md(?:$|[?\"'\s])")
+CLAUDE_SLASH_EVENT_RE = re.compile(
+    r"^\s*<command-message>.*?</command-message>\s*"
+    r"<command-name>/?([A-Za-z0-9:_-]+)</command-name>"
+    r"(?:\s*<command-args>.*?</command-args>)?\s*$",
+    re.DOTALL,
+)
+CODEX_SKILL_READ_PATH_RE = re.compile(
+    r"^(?:(?:[A-Za-z]:)?[\\/])?(?:[A-Za-z0-9._~:-]+[\\/])*"
+    r"skills(?:[\\/][A-Za-z0-9._-]+)*[\\/]([A-Za-z0-9_-]+)[\\/]SKILL\.md$"
+)
+CODEX_SKILL_READ_FUNCTION = "read_file"
 
 
 def default_repo_root() -> Path:
@@ -208,27 +217,6 @@ def frontmatter_tokens(skill_dir: Optional[Path]) -> Optional[int]:
     return chars // 4
 
 
-def walk_objects(value: Any) -> Iterator[Mapping[str, Any]]:
-    if isinstance(value, dict):
-        yield value
-        for child in value.values():
-            yield from walk_objects(child)
-    elif isinstance(value, list):
-        for child in value:
-            yield from walk_objects(child)
-
-
-def walk_strings(value: Any) -> Iterator[str]:
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, dict):
-        for child in value.values():
-            yield from walk_strings(child)
-    elif isinstance(value, list):
-        for child in value:
-            yield from walk_strings(child)
-
-
 def json_records(files: Sequence[Path]) -> Iterator[Any]:
     """Yield valid JSONL records while discarding malformed content immediately."""
     for entry_path in files:
@@ -244,28 +232,66 @@ def json_records(files: Sequence[Path]) -> Iterator[Any]:
 
 
 def scan_claude(files: Sequence[Path]) -> Counter:
-    """Count only Claude Skill calls and explicit slash-command event tags."""
+    """Count only top-level Claude Skill and slash-command event schemas."""
     counts: Counter = Counter()
     for record in json_records(files):
-        for item in walk_objects(record):
-            if item.get("name") == "Skill" and isinstance(item.get("input"), dict):
-                skill = item["input"].get("skill")
+        if not isinstance(record, dict):
+            continue
+        message = record.get("message")
+        if not isinstance(message, dict):
+            continue
+        if record.get("type") == "assistant" and message.get("role") == "assistant":
+            content = message.get("content")
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") != "tool_use" or block.get("name") != "Skill":
+                    continue
+                tool_input = block.get("input")
+                if not isinstance(tool_input, dict):
+                    continue
+                skill = tool_input.get("skill")
                 if isinstance(skill, str):
                     counts[skill] += 1
-        for text in walk_strings(record):
-            counts.update(CLAUDE_COMMAND_RE.findall(text))
+            continue
+        if record.get("type") == "user" and message.get("role") == "user":
+            content = message.get("content")
+            if not isinstance(content, str):
+                continue
+            match = CLAUDE_SLASH_EVENT_RE.fullmatch(content)
+            if match:
+                counts[match.group(1)] += 1
     return counts
 
 
 def scan_codex(files: Sequence[Path]) -> Counter:
-    """Count SKILL.md reads only within Codex function_call records."""
+    """Count only Codex response_item read_file calls with a JSON path field."""
     counts: Counter = Counter()
     for record in json_records(files):
-        for item in walk_objects(record):
-            if item.get("type") != "function_call":
-                continue
-            for text in walk_strings(item):
-                counts.update(CODEX_SKILL_PATH_RE.findall(text))
+        if not isinstance(record, dict) or record.get("type") != "response_item":
+            continue
+        payload = record.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("type") != "function_call" or payload.get("name") != CODEX_SKILL_READ_FUNCTION:
+            continue
+        arguments = payload.get("arguments")
+        if not isinstance(arguments, str):
+            continue
+        try:
+            read_arguments = json.loads(arguments)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(read_arguments, dict):
+            continue
+        skill_path = read_arguments.get("path")
+        if not isinstance(skill_path, str):
+            continue
+        match = CODEX_SKILL_READ_PATH_RE.fullmatch(skill_path)
+        if match:
+            counts[match.group(1)] += 1
     return counts
 
 

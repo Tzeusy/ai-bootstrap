@@ -76,6 +76,18 @@ def matrix_row(report: dict, name: str) -> dict:
     return next(row for row in report["decision_matrix"] if row["name"] == name)
 
 
+def claude_skill_event(name: str) -> str:
+    return json.dumps(
+        {
+            "type": "assistant",
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "tool_use", "name": "Skill", "input": {"skill": name}}],
+            },
+        }
+    )
+
+
 class CatalogManifestTests(unittest.TestCase):
     def test_manifest_reuses_linker_selection_without_creating_tool_homes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -200,7 +212,7 @@ class UsageAuditTests(unittest.TestCase):
             check=False,
         )
 
-    def test_report_counts_structured_events_and_redacts_fixture_metadata(self) -> None:
+    def test_report_counts_only_verified_event_fields_and_redacts_fixture_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp) / "repo"
             repo.mkdir()
@@ -227,11 +239,13 @@ class UsageAuditTests(unittest.TestCase):
             self.assertEqual(test_driven["counts"]["primary"]["claude"], 1)
             self.assertEqual(test_driven["counts"]["primary"]["codex"], 1)
             self.assertEqual(matrix_row(report, "writing-plans")["counts"]["primary"]["claude"], 1)
+            self.assertEqual(matrix_row(report, "brainstorming")["counts"]["primary"]["claude"], 1)
             self.assertEqual(
                 matrix_row(report, "dispatching-parallel-agents")["counts"]["primary"]["codex"],
                 1,
             )
             self.assertEqual(matrix_row(report, "systematic-debugging")["counts"]["primary"]["total"], 0)
+            self.assertEqual(matrix_row(report, "systematic-debugging")["disposition"], "candidate-follow-up")
             self.assertEqual(matrix_row(report, "subagent-driven-development")["ownership"], "submodule")
             self.assertEqual(matrix_row(report, "subagent-driven-development")["freshness"], "unknown-age")
             self.assertTrue(report["coverage"]["complete"])
@@ -331,10 +345,10 @@ class UsageAuditTests(unittest.TestCase):
             events.write_text(
                 "\n".join(
                     [
-                        '{"name":"Skill","input":{"skill":"dispatching-parallel-agents"}}',
-                        '{"name":"Skill","input":{"skill":"dispatching-parallel-agents"}}',
-                        '{"name":"Skill","input":{"skill":"dispatching-parallel-agents"}}',
-                        '{"name":"Skill","input":{"skill":"writing-plans"}}',
+                        claude_skill_event("dispatching-parallel-agents"),
+                        claude_skill_event("dispatching-parallel-agents"),
+                        claude_skill_event("dispatching-parallel-agents"),
+                        claude_skill_event("writing-plans"),
                     ]
                 )
                 + "\n",
