@@ -86,14 +86,62 @@ def _decision(status: str, denial_code: str) -> CandidateReviewDecision:
     )
 
 
+def _is_complete_predecessor_gate(value: object) -> bool:
+    if type(value) is not PredecessorGate:
+        return False
+    return all(
+        hasattr(value, field)
+        for field in (
+            "issue_id",
+            "pull_request_number",
+            "exact_head",
+            "candidate_record_sha256",
+            "artifact_sha256",
+            "attempt_consumed",
+            "disposition",
+            "starts",
+            "completions",
+        )
+    )
+
+
+def _matches_predecessor_gate(value: object) -> bool:
+    if not _is_complete_predecessor_gate(value):
+        return False
+    assert type(value) is PredecessorGate
+    return (
+        type(value.issue_id) is str
+        and value.issue_id == PREDECESSOR_GATE.issue_id
+        and type(value.pull_request_number) is int
+        and value.pull_request_number == PREDECESSOR_GATE.pull_request_number
+        and type(value.exact_head) is str
+        and value.exact_head == PREDECESSOR_GATE.exact_head
+        and type(value.candidate_record_sha256) is str
+        and value.candidate_record_sha256 == PREDECESSOR_GATE.candidate_record_sha256
+        and type(value.artifact_sha256) is tuple
+        and all(type(digest) is str for digest in value.artifact_sha256)
+        and value.artifact_sha256 == PREDECESSOR_GATE.artifact_sha256
+        and type(value.attempt_consumed) is bool
+        and value.attempt_consumed is PREDECESSOR_GATE.attempt_consumed
+        and type(value.disposition) is str
+        and value.disposition == PREDECESSOR_GATE.disposition
+        and type(value.starts) is int
+        and value.starts == PREDECESSOR_GATE.starts
+        and type(value.completions) is int
+        and value.completions == PREDECESSOR_GATE.completions
+    )
+
+
 def _rejection_code(request: object) -> str | None:
-    if not isinstance(request, SuccessorAttemptGateRequest):
+    if type(request) is not SuccessorAttemptGateRequest:
+        return "request-schema"
+    if not hasattr(request, "successor_gate_id") or not hasattr(request, "predecessor"):
         return "request-schema"
     if not isinstance(request.successor_gate_id, str) or request.successor_gate_id != SUCCESSOR_GATE_ID:
         return "successor-gate-id"
-    if not isinstance(request.predecessor, PredecessorGate):
+    if not _is_complete_predecessor_gate(request.predecessor):
         return "predecessor-schema"
-    if request.predecessor != PREDECESSOR_GATE:
+    if not _matches_predecessor_gate(request.predecessor):
         return "predecessor-binding"
     if not PREDECESSOR_GATE.attempt_consumed:
         return "predecessor-not-consumed"
@@ -107,9 +155,27 @@ def _rejection_code(request: object) -> str | None:
 
 
 def _candidate_state_rejection_code(state: object) -> str | None:
-    if not isinstance(state, CandidateAttemptState):
+    if type(state) is not CandidateAttemptState:
         return "candidate-state-schema"
-    if state != CANDIDATE_ATTEMPT_STATE:
+    if not all(
+        hasattr(state, field)
+        for field in (
+            "predecessor",
+            "successor_gate_id",
+            "candidate_attempt_consumed",
+            "disposition",
+        )
+    ):
+        return "candidate-state-schema"
+    if (
+        not _matches_predecessor_gate(state.predecessor)
+        or type(state.successor_gate_id) is not str
+        or state.successor_gate_id != SUCCESSOR_GATE_ID
+        or type(state.candidate_attempt_consumed) is not bool
+        or state.candidate_attempt_consumed is not True
+        or type(state.disposition) is not str
+        or state.disposition != "consumed-without-launch"
+    ):
         return "candidate-state-binding"
     return None
 

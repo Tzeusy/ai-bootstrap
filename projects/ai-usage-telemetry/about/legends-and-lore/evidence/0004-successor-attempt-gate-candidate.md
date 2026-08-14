@@ -52,8 +52,10 @@ state-creation path:
 | `required_next_gate` | `fresh-independent-high-risk-privacy-accounting-review` |
 | exact bound request/state `denial_code` | `attempt-already-consumed` |
 
-Malformed request/predecessor or candidate-state shapes, any changed binding
-field, and every duplicate, fresh-instance, restart, or reload retry return
+Malformed request/predecessor or candidate-state shapes (including partial
+`object.__new__` typed dataclass instances with any required field missing),
+any changed binding field, and every duplicate, fresh-instance, restart, or
+reload retry return
 `status="candidate-denied"`, retain the canonical predecessor fields and
 `execution_authority="none"`, and carry only an allowlisted denial code (for
 example `request-schema`, `predecessor-schema`, `predecessor-binding`,
@@ -70,10 +72,10 @@ new attempt or confer any authority to act on a target.
 
 The original focused test was written before the module existed and was
 observed to fail with `FileNotFoundError` for
-`0004/successor_attempt_gate_0004.py`. The current ten fake-data regressions
+`0004/successor_attempt_gate_0004.py`. The current twelve fake-data regressions
 cover exact immutable binding, predecessor reset/head/identifier mismatch,
 fresh-load and restart retry denial, candidate-state reset/tamper denial, and
-`None` or malformed request/predecessor/state denial:
+`None`, missing-field, or malformed request/predecessor/state denial:
 
 ```text
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest \

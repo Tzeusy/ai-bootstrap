@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import fields, replace
 import importlib.util
 from pathlib import Path
 import sys
@@ -46,6 +46,13 @@ class SuccessorAttemptGateTests(unittest.TestCase):
         self.assertEqual(decision.execution_authority, "none")
         self.assertEqual(decision.required_next_gate, self.gate.REQUIRED_NEXT_GATE)
         self.assertEqual(decision.denial_code, code)
+
+    def partial_instance(self, complete_instance, missing_field: str):
+        partial = object.__new__(type(complete_instance))
+        for field in fields(complete_instance):
+            if field.name != missing_field:
+                object.__setattr__(partial, field.name, getattr(complete_instance, field.name))
+        return partial
 
     def test_rejects_a_reset_of_the_consumed_predecessor_attempt(self) -> None:
         reset_predecessor = replace(self.gate.PREDECESSOR_GATE, attempt_consumed=False)
@@ -144,6 +151,72 @@ class SuccessorAttemptGateTests(unittest.TestCase):
         self.assert_denial(
             self.gate.bind_successor_attempt_gate(self.valid_request(), object()),
             "candidate-state-schema",
+        )
+
+    def test_partial_typed_inputs_are_terminal_content_free_denials(self) -> None:
+        for field in fields(self.valid_request()):
+            self.assert_denial(
+                self.gate.bind_successor_attempt_gate(
+                    self.partial_instance(self.valid_request(), field.name)
+                ),
+                "request-schema",
+            )
+
+        for field in fields(self.gate.PREDECESSOR_GATE):
+            request = replace(
+                self.valid_request(),
+                predecessor=self.partial_instance(self.gate.PREDECESSOR_GATE, field.name),
+            )
+            self.assert_denial(
+                self.gate.bind_successor_attempt_gate(request),
+                "predecessor-schema",
+            )
+
+        for field in fields(self.gate.CANDIDATE_ATTEMPT_STATE):
+            self.assert_denial(
+                self.gate.bind_successor_attempt_gate(
+                    self.valid_request(),
+                    self.partial_instance(self.gate.CANDIDATE_ATTEMPT_STATE, field.name),
+                ),
+                "candidate-state-schema",
+            )
+
+        self.assert_denial(
+            self.gate.bind_successor_attempt_gate(
+                self.valid_request(),
+                replace(
+                    self.gate.CANDIDATE_ATTEMPT_STATE,
+                    predecessor=self.partial_instance(
+                        self.gate.PREDECESSOR_GATE,
+                        "exact_head",
+                    ),
+                ),
+            ),
+            "candidate-state-binding",
+        )
+
+    def test_tampered_typed_inputs_are_terminal_content_free_denials(self) -> None:
+        self.assert_denial(
+            self.gate.bind_successor_attempt_gate(
+                replace(self.valid_request(), successor_gate_id=object())
+            ),
+            "successor-gate-id",
+        )
+        self.assert_denial(
+            self.gate.bind_successor_attempt_gate(
+                replace(self.valid_request(), predecessor=replace(
+                    self.gate.PREDECESSOR_GATE,
+                    artifact_sha256=(object(),),
+                ))
+            ),
+            "predecessor-binding",
+        )
+        self.assert_denial(
+            self.gate.bind_successor_attempt_gate(
+                self.valid_request(),
+                replace(self.gate.CANDIDATE_ATTEMPT_STATE, disposition=object()),
+            ),
+            "candidate-state-binding",
         )
 
     def test_module_exposes_no_resettable_protocol_surface(self) -> None:
