@@ -61,7 +61,12 @@ def extract_original_id(description):
                     matches.append(candidate_without_punctuation)
                     continue
 
-            if "-" in candidate:
+            # The whitespace marker form also matches generic prose such as
+            # "original implementation bead before merging". A colon-delimited
+            # marker or an ID-like invalid token is explicit and must fail closed.
+            marker_prefix = match.group(0)[:-len(candidate)]
+            candidate_core = candidate.rstrip(TRAILING_ID_PUNCTUATION)
+            if ":" in marker_prefix or "-" in candidate_core or "." in candidate_core:
                 malformed.append(candidate)
 
     return sorted(matches), sorted(set(malformed))
