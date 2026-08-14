@@ -412,6 +412,8 @@ class JsonCursor:
                 raise JsonInputError("control character in JSON string")
             if value != ord("\\"):
                 self.position += 1
+                if value >= 0x80:
+                    self._consume_utf8_sequence(value)
                 continue
             self.position += 1
             if self.position >= self.end:
@@ -426,6 +428,39 @@ class JsonCursor:
                 raise JsonInputError("invalid unicode escape")
             self.position += 4
         raise JsonInputError("unterminated JSON string")
+
+    def _consume_utf8_sequence(self, leading: int) -> None:
+        """Validate one raw UTF-8 scalar without decoding or retaining it."""
+        if 0xC2 <= leading <= 0xDF:
+            self._consume_utf8_continuation()
+        elif leading == 0xE0:
+            self._consume_utf8_continuation(0xA0)
+            self._consume_utf8_continuation()
+        elif 0xE1 <= leading <= 0xEC or 0xEE <= leading <= 0xEF:
+            self._consume_utf8_continuation()
+            self._consume_utf8_continuation()
+        elif leading == 0xED:
+            self._consume_utf8_continuation(0x80, 0x9F)
+            self._consume_utf8_continuation()
+        elif leading == 0xF0:
+            self._consume_utf8_continuation(0x90)
+            self._consume_utf8_continuation()
+            self._consume_utf8_continuation()
+        elif 0xF1 <= leading <= 0xF3:
+            self._consume_utf8_continuation()
+            self._consume_utf8_continuation()
+            self._consume_utf8_continuation()
+        elif leading == 0xF4:
+            self._consume_utf8_continuation(0x80, 0x8F)
+            self._consume_utf8_continuation()
+            self._consume_utf8_continuation()
+        else:
+            raise JsonInputError("invalid UTF-8 in JSON string")
+
+    def _consume_utf8_continuation(self, lower: int = 0x80, upper: int = 0xBF) -> None:
+        if self.position >= self.end or not lower <= self.data[self.position] <= upper:
+            raise JsonInputError("invalid UTF-8 in JSON string")
+        self.position += 1
 
     def _skip_number(self) -> None:
         if self._consume(ord("-")) and self.position >= self.end:
