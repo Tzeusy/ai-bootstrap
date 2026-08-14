@@ -371,6 +371,85 @@ class UsageAuditTests(unittest.TestCase):
             self.assertEqual(row["disposition"], "insufficient-evidence")
             self.assertEqual(row["protection_reason"], "incomplete-history")
 
+    def test_invalid_utf8_in_skipped_string_fails_coverage_closed_in_actual_audit_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, catalog, claude_dir, codex_dir = self.make_established_zero_usage_audit_inputs(tmp)
+            malformed = claude_dir / "invalid-utf8-skipped.jsonl"
+            malformed.write_bytes(
+                b'{"type":"assistant","message":{'
+                b'"role":"assistant","content":[{"type":"tool_use","name":"Skill",'
+                b'"input":{"skill":"writing-plans"}}],"unregistered":"\x80"}}\n'
+            )
+            set_mtime(malformed, AS_OF_DATETIME - timedelta(days=5))
+
+            report = AUDIT_MODULE.build_report(
+                repo,
+                catalog,
+                claude_dir,
+                codex_dir,
+                AS_OF_DATETIME,
+                90,
+                30,
+            )
+
+            claude_coverage = report["coverage"]["claude"]
+            row = matrix_row(report, "systematic-debugging")
+            self.assertFalse(claude_coverage["available"])
+            self.assertFalse(claude_coverage["input_complete"])
+            self.assertFalse(claude_coverage["coverage_complete"])
+            self.assertEqual(claude_coverage["input_errors"], 1)
+            self.assertFalse(report["coverage"]["complete"])
+            self.assertEqual(row["counts"]["primary"]["total"], 0)
+            self.assertEqual(row["disposition"], "insufficient-evidence")
+            self.assertEqual(row["protection_reason"], "incomplete-history")
+
+    def test_valid_unicode_in_skipped_string_preserves_actual_audit_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, catalog, claude_dir, codex_dir = self.make_established_zero_usage_audit_inputs(tmp)
+            valid = claude_dir / "valid-unicode-skipped.jsonl"
+            valid.write_bytes(
+                (
+                    json.dumps(
+                        {
+                            "type": "assistant",
+                            "message": {
+                                "role": "assistant",
+                                "content": [
+                                    {
+                                        "type": "tool_use",
+                                        "name": "Skill",
+                                        "input": {"skill": "systematic-debugging"},
+                                    }
+                                ],
+                                "unregistered": "synthetic unicode ☃",
+                            },
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                ).encode("utf-8")
+            )
+            set_mtime(valid, AS_OF_DATETIME - timedelta(days=5))
+
+            report = AUDIT_MODULE.build_report(
+                repo,
+                catalog,
+                claude_dir,
+                codex_dir,
+                AS_OF_DATETIME,
+                90,
+                30,
+            )
+
+            claude_coverage = report["coverage"]["claude"]
+            row = matrix_row(report, "systematic-debugging")
+            self.assertTrue(claude_coverage["available"])
+            self.assertTrue(claude_coverage["input_complete"])
+            self.assertTrue(claude_coverage["coverage_complete"])
+            self.assertEqual(claude_coverage["input_errors"], 0)
+            self.assertTrue(report["coverage"]["complete"])
+            self.assertEqual(row["counts"]["primary"]["total"], 1)
+
     def test_real_extractors_ignore_skill_like_decoys_in_unverified_event_fields(self) -> None:
         claude_fixture = FIXTURES / "claude-events.jsonl"
         codex_fixture = FIXTURES / "codex-events.jsonl"
