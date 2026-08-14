@@ -1377,6 +1377,91 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                     for forbidden in ("TOKEN=secret", "/private/path", "Traceback", repo_root):
                         self.assertNotIn(forbidden, result.stdout + result.stderr)
 
+    def test_pr_metadata_failure_manualizes_self_heal_but_preserves_lone_skip(self) -> None:
+        original_id = "aib-swr.1"
+        review_id = "aib-review.1"
+        cases = {
+            "review-wiring-current": (
+                [original_bead(original_id, 41)],
+                "review-wiring-current",
+            ),
+            "self-heal-original-wiring": (
+                [{"id": original_id, "labels": [], "external_ref": "", "status": "open"}],
+                "self-heal-original-wiring",
+            ),
+        }
+        for name, (shown_original, prior_recommendation) in cases.items():
+            with self.subTest(name=name):
+                fixture = {
+                    "blocked_pr_review": [original_bead(original_id, 41), review_task(review_id, original_id)],
+                    "resolver_payload": {"ok": True, "original_id": original_id, "pr_number": 41},
+                    "shows": {original_id: shown_original},
+                    "prs": {"41": pr_payload("OPEN")},
+                    "open_prs": [
+                        {
+                            "number": 41,
+                            "headRefName": f"agent/{original_id}",
+                            "createdAt": "2026-08-14T03:00:00Z",
+                        }
+                    ],
+                    "failures": {"gh-pr-view:41": "read failed"},
+                }
+
+                result, _, _ = self.run_fixture(fixture)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], "partial")
+                self.assertIn({"code": "command-failed", "scope": "pr-state"}, payload["errors"])
+                self.assertTrue(
+                    all(
+                        finding["recommendation"] == "skip-command-failure"
+                        for finding in payload["findings"]
+                    )
+                )
+                candidate = payload["self_heal_candidates"][0]
+                self.assertEqual(candidate["recommendation"], "manual-triage")
+                self.assertNotEqual(candidate["recommendation"], prior_recommendation)
+
+    def test_pr_metadata_success_preserves_self_heal_wiring_recommendations(self) -> None:
+        original_id = "aib-swr.1"
+        review_id = "aib-review.1"
+        cases = {
+            "review-wiring-current": (
+                [original_bead(original_id, 41)],
+                "review-wiring-current",
+            ),
+            "self-heal-original-wiring": (
+                [{"id": original_id, "labels": [], "external_ref": "", "status": "open"}],
+                "self-heal-original-wiring",
+            ),
+        }
+        for name, (shown_original, recommendation) in cases.items():
+            with self.subTest(name=name):
+                fixture = {
+                    "blocked_pr_review": [original_bead(original_id, 41), review_task(review_id, original_id)],
+                    "resolver_payload": {"ok": True, "original_id": original_id, "pr_number": 41},
+                    "shows": {original_id: shown_original},
+                    "prs": {"41": pr_payload("OPEN")},
+                    "open_prs": [
+                        {
+                            "number": 41,
+                            "headRefName": f"agent/{original_id}",
+                            "createdAt": "2026-08-14T03:00:00Z",
+                        }
+                    ],
+                }
+
+                result, _, _ = self.run_fixture(fixture)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], "success")
+                self.assertEqual(
+                    payload["self_heal_candidates"][0]["recommendation"],
+                    recommendation,
+                )
+
     def test_unknown_pr_state_is_sanitized_to_a_partial_manual_triage_finding(self) -> None:
         secret_state = "TOKEN=top-secret /private/absolute/path Traceback"
         original_id = "aib-swr.1"

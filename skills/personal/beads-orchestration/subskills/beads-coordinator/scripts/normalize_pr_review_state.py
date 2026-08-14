@@ -332,11 +332,17 @@ def manualize_incomplete_collection(
     candidates: list[dict[str, Any]],
     *,
     collection_complete: bool,
+    preserve_lone_pr_metadata_skip: bool,
 ) -> None:
     """Ensure incomplete Step-0 evidence cannot leave an actionable recommendation."""
     if collection_complete:
         return
     for finding in findings:
+        if (
+            preserve_lone_pr_metadata_skip
+            and finding.get("recommendation") == "skip-command-failure"
+        ):
+            continue
         finding["recommendation"] = "manual-triage"
     for candidate in candidates:
         candidate["recommendation"] = "manual-triage"
@@ -632,13 +638,38 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     chronology_complete = (
         active_contexts_complete and relation_graph_complete and not invalid_task_keys
     )
-    collection_complete = (
+    structural_collection_complete = (
         inventory_complete
         and task_lookup_complete
         and original_contexts_complete
         and active_contexts_complete
         and relation_graph_complete
         and chronology_complete
+    )
+
+    pr_cache: dict[int, tuple[dict[str, Any] | None, str | None]] = {}
+    pr_numbers = {
+        pr_number
+        for _, pr_number, context_error in original_contexts.values()
+        if pr_number is not None and context_error is None
+    }
+    pr_numbers.update(
+        context["pr_number"] for context in task_contexts.values() if context is not None
+    )
+    pr_metadata_errors: dict[int, str] = {}
+    for pr_number in sorted(pr_numbers):
+        _, pr_error = view_pr(pr_number, pr_cache, repo_root)
+        if pr_error:
+            pr_metadata_errors[pr_number] = pr_error
+            report_error(errors, pr_error, "pr-state")
+    pr_metadata_complete = not pr_metadata_errors
+    collection_complete = structural_collection_complete and pr_metadata_complete
+    # The legacy singleton command failure is a report-only skip, never an action.
+    preserve_lone_pr_metadata_skip = (
+        structural_collection_complete
+        and len(pr_numbers) == 1
+        and len(pr_metadata_errors) == 1
+        and all(error == "command-failed" for error in pr_metadata_errors.values())
     )
     canonical_by_key = (
         {
@@ -649,7 +680,6 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         else {}
     )
 
-    pr_cache: dict[int, tuple[dict[str, Any] | None, str | None]] = {}
     findings: list[dict[str, Any]] = []
 
     for original_id in sorted(originals):
@@ -693,9 +723,9 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                     pr_state=None,
                     cooldown=None,
                     recommendation=(
-                        "manual-triage"
-                        if not collection_complete
-                        else recommendation_for_pr_error(pr_error)
+                        recommendation_for_pr_error(pr_error)
+                        if preserve_lone_pr_metadata_skip
+                        else "manual-triage"
                     ),
                 )
             )
@@ -777,6 +807,25 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         original_id = context["original_id"]
         pr_number = context["pr_number"]
         key = (original_id, pr_number)
+        if pr_number in pr_metadata_errors:
+            findings.append(
+                task_finding(
+                    review_id=review_id,
+                    original_id=original_id,
+                    pr_number=pr_number,
+                    context_status=pr_metadata_errors[pr_number],
+                    canonical_review_id=None,
+                    duplicate_of=None,
+                    pr_state=None,
+                    cooldown=None,
+                    recommendation=(
+                        "skip-command-failure"
+                        if preserve_lone_pr_metadata_skip
+                        else "manual-triage"
+                    ),
+                )
+            )
+            continue
         canonical = canonical_by_key.get(key)
         if key in invalid_task_keys or not collection_complete or canonical is None:
             findings.append(
@@ -854,6 +903,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         findings,
         self_heal,
         collection_complete=collection_complete,
+        preserve_lone_pr_metadata_skip=preserve_lone_pr_metadata_skip,
     )
     findings.sort(key=finding_sort_key)
     errors.sort(key=lambda item: (item["scope"], item["code"]))
