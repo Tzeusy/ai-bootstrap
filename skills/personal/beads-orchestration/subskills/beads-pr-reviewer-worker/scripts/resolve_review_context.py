@@ -10,7 +10,13 @@ import subprocess
 import sys
 
 
-BEAD_ID_PATTERN = r"[a-z][a-z0-9]*(?:-[a-z0-9]+)+"
+BEAD_ID_PATTERN = r"[a-z][a-z0-9]*(?:-[a-z0-9]+)+(?:\.[0-9]+)*"
+BEAD_ID_RE = re.compile(rf"{BEAD_ID_PATTERN}")
+MARKER_PATTERNS = [
+    r"\b(?i:original implementation bead)(?:\s*:\s*|\s+)(\S+)",
+    r"\b(?i:review target bead):\s*(\S+)",
+]
+TRAILING_ID_PUNCTUATION = ".,;:)"
 
 
 def fail(code, message, **extra):
@@ -40,17 +46,30 @@ def first_record(payload):
 
 
 def extract_original_id(description):
-    patterns = [
-        rf"\b(?i:original implementation bead)(?:\s*:\s*|\s+)({BEAD_ID_PATTERN})(?![a-z0-9-])",
-        rf"\b(?i:review target bead):\s*({BEAD_ID_PATTERN})(?![a-z0-9-])",
-    ]
     matches = []
-    for pattern in patterns:
-        match = re.search(pattern, description or "")
-        if match:
-            matches.append(match.group(1))
-    matches = [match for match in matches if match]
-    return sorted(set(matches))
+    malformed = []
+    for pattern in MARKER_PATTERNS:
+        for match in re.finditer(pattern, description or ""):
+            candidate = match.group(1)
+            if BEAD_ID_RE.fullmatch(candidate):
+                matches.append(candidate)
+                continue
+
+            if candidate[-1:] in TRAILING_ID_PUNCTUATION:
+                candidate_without_punctuation = candidate[:-1]
+                if BEAD_ID_RE.fullmatch(candidate_without_punctuation):
+                    matches.append(candidate_without_punctuation)
+                    continue
+
+            # The whitespace marker form also matches generic prose such as
+            # "original implementation bead before merging". A colon-delimited
+            # marker or an ID-like invalid token is explicit and must fail closed.
+            marker_prefix = match.group(0)[:-len(candidate)]
+            candidate_core = candidate.rstrip(TRAILING_ID_PUNCTUATION)
+            if ":" in marker_prefix or "-" in candidate_core or "." in candidate_core:
+                malformed.append(candidate)
+
+    return sorted(matches), sorted(set(malformed))
 
 
 def extract_pr_number(description):
@@ -68,7 +87,13 @@ def main():
         review = first_record(review_payload)
         review_description = review.get("description") or ""
 
-        extracted_ids = extract_original_id(review_description)
+        extracted_ids, malformed_ids = extract_original_id(review_description)
+        if malformed_ids:
+            fail(
+                "malformed-original-id",
+                "invalid original bead id found in review-bead description",
+                candidates=malformed_ids,
+            )
         if len(extracted_ids) > 1:
             fail("ambiguous-original-id", "multiple original bead ids found in review-bead description", candidates=extracted_ids)
 
