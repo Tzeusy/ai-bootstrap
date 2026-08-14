@@ -37,12 +37,22 @@ def run_json(cmd):
     return json.loads(run(cmd))
 
 
-def first_record(payload):
-    if isinstance(payload, list):
-        if not payload:
-            raise RuntimeError("empty JSON payload")
-        return payload[0]
-    return payload
+class EvidenceError(Exception):
+    """A compact, safe failure for malformed read-only tracker evidence."""
+
+    def __init__(self, code, message):
+        super().__init__(message)
+        self.code = code
+
+
+def requested_record(payload, issue_id):
+    """Require ``bd show`` to return exactly the requested singleton record."""
+    if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+        raise EvidenceError("invalid-show-response", "bd show did not return one record")
+    record = payload[0]
+    if record.get("id") != issue_id:
+        raise EvidenceError("mismatched-record-id", "bd show returned a different record")
+    return record
 
 
 def extract_original_id(description):
@@ -84,7 +94,7 @@ def main():
 
     try:
         review_payload = run_json(["bd", "show", args.issue_id, "--json"])
-        review = first_record(review_payload)
+        review = requested_record(review_payload, args.issue_id)
         review_description = review.get("description") or ""
 
         extracted_ids, malformed_ids = extract_original_id(review_description)
@@ -119,7 +129,9 @@ def main():
                 pr_bearing = []
                 for target in dep_targets:
                     try:
-                        target_bead = first_record(run_json(["bd", "show", target, "--json"]))
+                        target_bead = requested_record(run_json(["bd", "show", target, "--json"]), target)
+                    except EvidenceError:
+                        raise
                     except RuntimeError:
                         continue
                     if re.fullmatch(r"gh-pr:[0-9]+", target_bead.get("external_ref") or ""):
@@ -155,7 +167,7 @@ def main():
             fail("missing-original-id", "unable to resolve original implementation bead")
 
         original_payload = run_json(["bd", "show", original_id, "--json"])
-        original = first_record(original_payload)
+        original = requested_record(original_payload, original_id)
         external_ref = original.get("external_ref") or ""
         pr_number = ""
         match = re.fullmatch(r"gh-pr:([0-9]+)", external_ref)
@@ -199,6 +211,8 @@ def main():
         }
         json.dump(output, sys.stdout, indent=2, sort_keys=True)
         sys.stdout.write("\n")
+    except EvidenceError as exc:
+        fail(exc.code, str(exc))
     except RuntimeError as exc:
         fail("command-failed", str(exc))
     except Exception as exc:

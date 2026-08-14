@@ -1,181 +1,83 @@
 # Local State Reconciliation
 
-Load this file when the cleanup pass needs to reconcile local Beads and git
-state: stale `in_progress` claims, dependency unblocking, Dolt/worktree health,
-and stale `review-running` locks.
+Load this file when cleanup needs to inspect stale `in_progress` claims,
+dependency state, Dolt/worktree health, or `review-running` locks.
 
-## Preconditions
+## Boundary
 
-- Run from the target repository root, or prefix `bd -C <rig-path>` to `bd list`
-  and `bd ready` when operating from outside the target rig.
-- Before any `bd` mutation, inspect the bead's `assignee` and stall heartbeat
-  using `../beads-coordinator/references/runtime-and-safety.md`.
-- If a bead is assigned to another actor whose heartbeat is still fresh (within
-  the stall threshold), skip mutation and record the bead as manual triage.
-- Append a note for every mutation.
-- Never mutate `.beads/dolt/` manually.
+**The coordinator is the sole mutation authority.** This cleanup pass only
+collects evidence and emits recommendations. It never changes Beads, Git,
+GitHub, worktrees, branches, or Dolt.
+
+Start with the report-only [`cleanup_scan.py`](../scripts/cleanup_scan.py):
+
+```bash
+# from the beads-cleanup package directory
+uv run scripts/cleanup_scan.py --repo-root "${REPO_ROOT}"
+```
+
+Treat every finding as stale. The coordinator must re-check the live command
+result, assignee, and heartbeat immediately before acting. A `partial` or
+`fatal` report is manual triage, never permission to infer state.
 
 ## Pass 1: Stale `in_progress` Beads
 
-```bash
-PROG_JSON=$(bd list --status=in_progress --json --limit 0)
-```
+Interpret each `claims` finding using the stall heartbeat, remote-branch, and
+unpublished-work fields.
 
-For each `in_progress` bead:
+| Evidence | Report recommendation |
+|---|---|
+| Fresh heartbeat | `preserve-live-claim` |
+| Git probe failed or worktree evidence is unavailable | `manual-triage` |
+| Unpublished work exists | `preserve-unpublished-work` |
+| Stale heartbeat with complete negative evidence | `release-claim-candidate` for coordinator verification |
+| Missing or malformed heartbeat | `manual-triage` |
 
-1. Inspect `assignee` and the stall heartbeat. Staleness is judged by an expired
-   heartbeat timestamp (past the stall threshold) together with the `assignee`,
-   not by any lease token. If the bead is assigned to another actor whose
-   heartbeat is still fresh, leave it alone and record it as manual triage.
-2. Check for a live worktree:
-
-```bash
-WORKTREE_PATH="${REPO_ROOT}/.worktrees/parallel-agents/${ISSUE_ID}"
-if [ -d "${WORKTREE_PATH}" ]; then
-  WORKTREE_EXISTS=true
-else
-  WORKTREE_EXISTS=false
-fi
-```
-
-3. Check for a pushed worker branch:
-
-```bash
-BRANCH_EXISTS=$(git ls-remote --heads origin "agent/${ISSUE_ID}" | wc -l)
-```
-
-4. When a worktree exists but the worker may be stalled, inspect whether it has
-   meaningful unpublished commits:
-
-```bash
-git -C "${WORKTREE_PATH}" log --oneline origin/HEAD..HEAD
-```
-
-5. Apply this decision matrix:
-
-| Worktree exists | Remote branch | Labels | Action |
-|---|---|---|---|
-| yes | yes | `direct-merge` | Do not close here. Record it for coordinator-style merge handling after confirming the bead is not held by a live actor (fresh heartbeat). |
-| yes | yes | `pr-review` | Defer to PR reconciliation in `pr-review-reconciliation.md`. |
-| yes | yes | none | Treat as stalled only when the heartbeat is expired past the stall threshold and no worker activity remains. Then `bd update <id> --status open --append-notes "Cleanup: released stale in_progress claim (no active worker evidence)"`, then remove the worktree. |
-| yes | no | any | If meaningful commits exist, push `agent/<id>` first if safe, then release to `open`. If no commits exist, remove the worktree and release to `open`. |
-| no | yes | `direct-merge` | Record for coordinator-style merge handling. |
-| no | yes | `pr-review` | Defer to PR reconciliation. |
-| no | yes | none | `bd update <id> --status open --append-notes "Cleanup: released stale claim (no worktree, remote branch exists)"` |
-| no | no | any | `bd update <id> --status open --append-notes "Cleanup: released orphaned in_progress claim (no worktree, no branch)"` |
-
-If a bead still carries `review-running` but has no active worktree, remove the
-label after confirming it is not held by a live actor (fresh heartbeat):
-
-```bash
-bd update <id> --remove-label review-running \
-  --append-notes "Cleanup: removed stale review-running label during in_progress reconciliation"
-```
+Never turn a failed Git probe into a release recommendation. If another actor
+has a fresh heartbeat, report manual triage and leave ownership unchanged.
 
 ## Pass 4: Blocked Beads Whose Blockers Are Closed
 
-```bash
-ALL_BLOCKED=$(bd list --status=blocked --json --limit 0)
-```
+Use `blockers` findings to distinguish complete dependency evidence from
+unknown or malformed dependency state:
 
-For each blocked bead not already handled by PR reconciliation:
-
-1. Confirm the bead is not held by a live actor (no fresh heartbeat from another
-   `assignee`).
-2. Read dependencies:
-
-```bash
-DEPS_JSON=$(bd dep list <id> --json)
-```
-
-3. Inspect each blocking dependency:
-
-```bash
-for dep_id in $(echo "${DEPS_JSON}" | jq -r '.[].depends_on_id'); do
-  DEP_STATUS=$(bd show "${dep_id}" --json | jq -r '.[0].status // .status')
-done
-```
-
-4. If all blockers are closed, reopen the bead:
-
-```bash
-bd update <id> --status open \
-  --append-notes "Cleanup: all blocking dependencies are closed, unblocking"
-```
+| Dependency result | Report recommendation |
+|---|---|
+| Every dependency is closed | `unblock-candidate` for coordinator verification |
+| Any dependency remains open | `remain-blocked` |
+| Query or status is incomplete | `manual-triage` |
 
 ## Pass 5a: Dolt Health
 
-Validate the Beads database before branch or worktree cleanup:
-
-```bash
-bd dolt status
-bd doctor
-```
-
-If Dolt is unhealthy, record it in the report and continue only with the
-non-DB-destructive portions of cleanup. Do not try to repair `.beads/dolt/`
-manually inside this skill.
+The scanner reports `bd dolt status` and `bd doctor` as `healthy` or
+`unhealthy`. Report unhealthy Dolt as manual triage. Do not try to repair
+`.beads/dolt/` manually.
 
 ## Pass 5b: Coordinator Worktrees And Branches
 
-```bash
-bd worktree list
-```
+Only inspect worktrees under `.worktrees/parallel-agents/`. The scanner emits
+safe worktree IDs rather than paths and looks each opaque ID up as-is in
+Beads before correlating it with remote-branch and unpublished-work evidence.
+Never truncate an ID based on a name fragment such as `-review-`; an unknown
+exact ID is manual triage.
 
-Only inspect worktrees under `.worktrees/parallel-agents/`.
-
-1. Extract the base bead ID from the worktree directory name:
-
-```bash
-BASE_ID=$(echo "${WT_NAME}" | sed -E 's/(-coord-|-stalefix-|-revive-|-review-|-clean[0-9]*).*//')
-```
-
-2. Look up the bead:
-
-```bash
-bd show "${BASE_ID}" --json
-```
-
-3. Reconcile using this table. Note: a merged PR's `agent/<id>` branch normally
-   still exists here, because the reviewer merges without `--delete-branch` and
-   the coordinator deletes the branch post-closure. So for a closed bead, the
-   branch surviving is expected, not evidence of unpublished work — cleanup may
-   delete it as the post-closure cleanup the coordinator would otherwise do.
-
-| Bead state | Action |
+| Bead state and evidence | Report recommendation |
 |---|---|
-| closed | Remove the worktree, then delete the local and remote `agent/<id>` branches (this finishes the coordinator's post-closure branch cleanup). The squash-merged branch contains no unpublished work; preserve only if it carries commits absent from the merged result. |
-| open | Remove the worktree only. Preserve the branch if it may still contain useful commits. |
-| missing | Remove the worktree. Delete local and remote worker branches if they still exist and no unpublished work needs to be preserved. |
-| in_progress or blocked | Leave the worktree alone unless other evidence proves it is stale and not held by a live actor (no fresh heartbeat). |
+| Closed with complete evidence | `cleanup-eligible-after-verification` |
+| Open | `preserve-branch-worktree` |
+| In progress or blocked | `preserve-active-worktree` |
+| Unpublished work, failed Git probe, or unknown state | preserve or `manual-triage` |
 
-Typical removal commands:
-
-```bash
-bd worktree remove ".worktrees/parallel-agents/${WT_NAME}" --force 2>/dev/null || true
-git branch -d "agent/${WT_NAME}" 2>/dev/null || true
-git push origin --delete "agent/${WT_NAME}" 2>/dev/null || true
-```
+The coordinator re-verifies and owns any lifecycle or repository change.
 
 ## Pass 6: Stale `review-running` Labels
 
-```bash
-bd list --label review-running --json --limit 0
-```
+`review_locks` distinguishes a live reviewer from a candidate stale lock:
 
-For each bead with `review-running`:
+- fresh `in_progress` heartbeat with a worktree: `preserve-review-lock`
+- stale or missing liveness evidence: `release-review-lock-candidate` for
+  coordinator verification
+- malformed state: `manual-triage`
 
-- If status is not `in_progress`, or no active worktree exists, and the bead is
-  not held by a live actor (no fresh heartbeat), remove the label:
-
-```bash
-bd update <id> --remove-label review-running \
-  --append-notes "Cleanup: removed stale review-running label (no active worker)"
-```
-
-- If a live worker or fresh heartbeat still exists, leave it alone.
-
-This `review-running` release is a **liveness repair** of a stale lock label —
-it is not PR-state reconciliation. Cleanup never closes, reopens, or otherwise
-mutates PR-review bead state in response to PR outcome; that is the coordinator's
-Step 0 alone.
+This is still a report-only liveness observation. The coordinator owns every
+resulting change.

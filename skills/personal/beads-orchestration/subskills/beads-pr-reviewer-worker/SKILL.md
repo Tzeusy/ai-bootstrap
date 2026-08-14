@@ -82,6 +82,9 @@ Use the bundled helpers in `scripts/` for deterministic read-only operations:
 
 - [`scripts/resolve_review_context.py`](scripts/resolve_review_context.py)
   Resolves the original bead, PR number, repo, branches, and current PR state.
+  Every `bd show` response it uses must contain exactly one record whose `id`
+  matches the requested ID; empty, multiple, non-record, or foreign responses
+  fail closed rather than selecting a first record.
 - [`scripts/prepare_pr_branch.py`](scripts/prepare_pr_branch.py)
   Fetches base/head, checks out the PR head branch, rebases onto latest base,
   strips `.beads/` divergence, and reports whether cleanup changed the branch.
