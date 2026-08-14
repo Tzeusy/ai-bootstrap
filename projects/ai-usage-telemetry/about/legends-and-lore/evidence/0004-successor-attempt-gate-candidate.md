@@ -72,7 +72,7 @@ new attempt or confer any authority to act on a target.
 
 The original focused test was written before the module existed and was
 observed to fail with `FileNotFoundError` for
-`0004/successor_attempt_gate_0004.py`. The current twelve fake-data regressions
+`0004/successor_attempt_gate_0004.py`. The current thirteen fake-data regressions
 cover exact immutable binding, predecessor reset/head/identifier mismatch,
 fresh-load and restart retry denial, candidate-state reset/tamper denial, and
 `None`, missing-field, or malformed request/predecessor/state denial:
