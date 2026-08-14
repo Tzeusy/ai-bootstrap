@@ -101,11 +101,6 @@ def command_json(argv: list[str], repo_root: Path) -> tuple[object | None, str |
         return None, "invalid-json"
 
 
-def first_record(payload: object) -> dict[str, Any] | None:
-    candidate = payload[0] if isinstance(payload, list) and payload else payload
-    return candidate if isinstance(candidate, dict) else None
-
-
 def record_id(record: dict[str, Any]) -> str | None:
     candidate = record.get("id")
     return candidate if isinstance(candidate, str) and BEAD_ID_RE.fullmatch(candidate) else None
@@ -114,6 +109,16 @@ def record_id(record: dict[str, Any]) -> str | None:
 def labels(record: dict[str, Any]) -> set[str]:
     raw = record.get("labels")
     return {item for item in raw if isinstance(item, str)} if isinstance(raw, list) else set()
+
+
+def requested_record(payload: object, issue_id: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Require direct ``bd show`` evidence to be one record for that exact id."""
+    if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+        return None, "invalid-show-response"
+    record = payload[0]
+    if record_id(record) != issue_id:
+        return None, "mismatched-record-id"
+    return record, None
 
 
 def list_records(
@@ -321,6 +326,92 @@ def has_matching_canonical_review_finding(
     )
 
 
+def collection_roles_are_unambiguous(
+    findings: list[dict[str, Any]], candidates: list[dict[str, Any]]
+) -> bool:
+    """Reject actionable evidence that binds one identity to conflicting roles."""
+    original_scopes: dict[str, tuple[str, int]] = {}
+    review_scopes: dict[str, tuple[str, int]] = {}
+    canonical_scopes: dict[str, tuple[str, int]] = {}
+    canonical_finding_scopes: dict[str, tuple[str, int]] = {}
+    canonical_by_scope: dict[tuple[str, int], str] = {}
+    candidate_scopes: set[tuple[str, int]] = set()
+
+    def bind_original(original_id: str, scope: tuple[str, int]) -> bool:
+        existing = original_scopes.get(original_id)
+        if existing is not None and existing != scope:
+            return False
+        original_scopes[original_id] = scope
+        return True
+
+    for finding in findings:
+        if finding["recommendation"] == "manual-triage" or finding["context_status"] != "resolved":
+            continue
+        original_id = finding["original_id"]
+        pr_number = finding["pr_number"]
+        if original_id is None or not valid_pr_number(pr_number):
+            return False
+        scope = (original_id, pr_number)
+        if not bind_original(original_id, scope):
+            return False
+        if finding["kind"] != "review-task":
+            continue
+
+        review_id = finding["review_id"]
+        if review_id is None:
+            return False
+        if review_id in review_scopes:
+            return False
+        review_scopes[review_id] = scope
+
+        canonical_review_id = finding["canonical_review_id"]
+        if canonical_review_id is None:
+            continue
+        existing_scope = canonical_scopes.get(canonical_review_id)
+        if existing_scope is not None and existing_scope != scope:
+            return False
+        canonical_scopes[canonical_review_id] = scope
+        existing_canonical = canonical_by_scope.get(scope)
+        if existing_canonical is not None and existing_canonical != canonical_review_id:
+            return False
+        canonical_by_scope[scope] = canonical_review_id
+        if review_id == canonical_review_id:
+            canonical_finding_scopes[canonical_review_id] = scope
+
+    for candidate in candidates:
+        if candidate["recommendation"] == "manual-triage" or candidate["context_status"] != "resolved":
+            continue
+        original_id = candidate["original_id"]
+        pr_number = candidate["pr_number"]
+        if original_id is None or not valid_pr_number(pr_number):
+            return False
+        scope = (original_id, pr_number)
+        if not bind_original(original_id, scope) or scope in candidate_scopes:
+            return False
+        candidate_scopes.add(scope)
+
+        canonical_review_id = candidate["canonical_review_id"]
+        if canonical_review_id is None:
+            continue
+        existing_scope = canonical_scopes.get(canonical_review_id)
+        if existing_scope is not None and existing_scope != scope:
+            return False
+        canonical_scopes[canonical_review_id] = scope
+        existing_canonical = canonical_by_scope.get(scope)
+        if existing_canonical is not None and existing_canonical != canonical_review_id:
+            return False
+        canonical_by_scope[scope] = canonical_review_id
+
+    for review_id, review_scope in review_scopes.items():
+        canonical_scope = canonical_scopes.get(review_id)
+        if canonical_scope is not None and canonical_scope != review_scope:
+            return False
+    if any(canonical_finding_scopes.get(review_id) != scope for review_id, scope in canonical_scopes.items()):
+        return False
+    review_roles = set(review_scopes) | set(canonical_scopes)
+    return not (set(original_scopes) & review_roles)
+
+
 def sanitize_normalizer(payload: object) -> dict[str, Any]:
     """Keep only the canonical normalizer's safe, compact public fields."""
     if not isinstance(payload, dict) or payload.get("schema") != NORMALIZER_SCHEMA:
@@ -506,6 +597,10 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
         candidate["cooldown_until"] = None
         candidate["recommendation"] = "manual-triage"
 
+    if not collection_roles_are_unambiguous(findings, self_heal):
+        report_error(errors, "invalid-normalizer-evidence", "pr-review")
+        status = "partial"
+
     if status == "success" and not errors and not findings and not self_heal:
         status = "empty"
     elif status == "empty" and (errors or findings or self_heal):
@@ -640,11 +735,14 @@ def scan_blockers(
                 report_error(errors, "invalid-record", "blockers")
                 continue
             dep_payload, dep_error = command_json(["bd", "show", dep_id, "--json"], repo_root)
-            dep = first_record(dep_payload) if dep_error is None else None
+            if dep_error is None:
+                dep, evidence_error = requested_record(dep_payload, dep_id)
+            else:
+                dep, evidence_error = None, dep_error
             status = bead_status(dep) if isinstance(dep, dict) else None
             if status is None:
                 failed = True
-                report_error(errors, dep_error or "invalid-bead-status", "blockers")
+                report_error(errors, evidence_error or "invalid-bead-status", "blockers")
             dependencies.append({"id": dep_id, "status": status})
         dependencies.sort(key=lambda item: item["id"])
         all_closed: bool | None = None if failed or not dependencies else all(item["status"] == "closed" for item in dependencies)
@@ -709,10 +807,13 @@ def scan_worktrees(
     for worktree_id in names:
         issue_id = worktree_id
         payload, error = command_json(["bd", "show", issue_id, "--json"], repo_root)
-        record = first_record(payload) if error is None else None
+        if error is None:
+            record, evidence_error = requested_record(payload, issue_id)
+        else:
+            record, evidence_error = None, error
         status = bead_status(record) if isinstance(record, dict) else None
         if status is None:
-            report_error(errors, error or "invalid-bead-status", "worktrees")
+            report_error(errors, evidence_error or "invalid-bead-status", "worktrees")
         worktree = repo_root / ".worktrees" / "parallel-agents" / worktree_id
         exists = worktree.is_dir()
         branch, branch_error = remote_branch_exists(issue_id, repo_root)

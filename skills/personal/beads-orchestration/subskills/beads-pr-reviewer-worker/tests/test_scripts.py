@@ -288,12 +288,13 @@ class ResolveReviewContextTests(unittest.TestCase):
                    bd_list: list | None = None,
                    review_dependencies: list | None = None,
                    original_id: str = "aib-abc",
-                   pr_number: int = 99) -> None:
-        review_json = json.dumps([{
+                   pr_number: int = 99,
+                   show_payloads: dict[str, object] | None = None) -> None:
+        review_record = {
             "id": "aib-xyz",
             "description": description,
             "dependencies": review_dependencies or [],
-        }])
+        }
         bd_list_json = json.dumps(bd_list or [])
         pr_json = json.dumps({
             "number": pr_number,
@@ -307,11 +308,17 @@ class ResolveReviewContextTests(unittest.TestCase):
             "mergedAt": None,
             "headRefOid": "abc123",
         })
-        original_json = json.dumps([{
+        original_record = {
             "id": original_id,
             "description": "Implement thing",
             "external_ref": f"gh-pr:{pr_number}",
-        }])
+        }
+        show_payloads = {
+            "aib-xyz": [review_record],
+            original_id: [original_record],
+            **(show_payloads or {}),
+        }
+        show_payloads_json = json.dumps(show_payloads)
 
         bin_dir.add("bd", f"""
 import sys
@@ -320,11 +327,9 @@ import json
 argv = sys.argv[1:]
 if 'show' in argv:
     issue_id = argv[argv.index('show') + 1]
-    if issue_id == 'aib-xyz':
-        print({repr(review_json)})
-        sys.exit(0)
-    elif issue_id == {original_id!r}:
-        print({repr(original_json)})
+    payload = json.loads({repr(show_payloads_json)}).get(issue_id)
+    if payload is not None:
+        print(json.dumps(payload))
         sys.exit(0)
 
 if 'list' in argv:
@@ -367,6 +372,72 @@ sys.exit(1)
         self.assertEqual(payload["owner"], "owner")
         self.assertEqual(payload["repo"], "repo")
         self.assertEqual(payload["head_branch"], "agent/aib-abc")
+
+    def test_rejects_non_singleton_bd_show_responses_at_every_context_hop(self) -> None:
+        review_record = {
+            "id": "aib-xyz",
+            "description": "Original implementation bead: aib-abc\nhttps://github.com/owner/repo/pull/99",
+            "dependencies": [],
+        }
+        original_record = {"id": "aib-abc", "external_ref": "gh-pr:99"}
+        dependency_record = {"id": "aib-dependency", "external_ref": "gh-pr:99"}
+        cases = {
+            "review": ({"aib-xyz": [review_record, review_record]}, None),
+            "original": ({"aib-abc": [original_record, original_record]}, None),
+            "dependency": (
+                {"aib-dependency": [dependency_record, dependency_record]},
+                [{"depends_on_id": "aib-dependency", "type": "blocks"}],
+            ),
+        }
+        for name, (show_payloads, dependencies) in cases.items():
+            with self.subTest(name=name):
+                with FakeBinDir() as fbd:
+                    self._make_bins(
+                        fbd,
+                        description=(
+                            "Review PR (no marker)\nhttps://github.com/owner/repo/pull/99"
+                            if dependencies
+                            else "Original implementation bead: aib-abc\nhttps://github.com/owner/repo/pull/99"
+                        ),
+                        review_dependencies=dependencies,
+                        show_payloads=show_payloads,
+                    )
+                    result = run_script("resolve_review_context.py", ["--issue-id", "aib-xyz"], env=fbd.env())
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(json.loads(result.stderr)["error_code"], "invalid-show-response")
+
+    def test_rejects_mismatched_bd_show_identity_at_every_context_hop(self) -> None:
+        review_record = {
+            "id": "aib-other",
+            "description": "Original implementation bead: aib-abc\nhttps://github.com/owner/repo/pull/99",
+            "dependencies": [],
+        }
+        original_record = {"id": "aib-other", "external_ref": "gh-pr:99"}
+        dependency_record = {"id": "aib-other", "external_ref": "gh-pr:99"}
+        cases = {
+            "review": ({"aib-xyz": [review_record]}, None),
+            "original": ({"aib-abc": [original_record]}, None),
+            "dependency": (
+                {"aib-dependency": [dependency_record]},
+                [{"depends_on_id": "aib-dependency", "type": "blocks"}],
+            ),
+        }
+        for name, (show_payloads, dependencies) in cases.items():
+            with self.subTest(name=name):
+                with FakeBinDir() as fbd:
+                    self._make_bins(
+                        fbd,
+                        description=(
+                            "Review PR (no marker)\nhttps://github.com/owner/repo/pull/99"
+                            if dependencies
+                            else "Original implementation bead: aib-abc\nhttps://github.com/owner/repo/pull/99"
+                        ),
+                        review_dependencies=dependencies,
+                        show_payloads=show_payloads,
+                    )
+                    result = run_script("resolve_review_context.py", ["--issue-id", "aib-xyz"], env=fbd.env())
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(json.loads(result.stderr)["error_code"], "mismatched-record-id")
 
     def test_preserves_dotted_child_id_and_expected_branch(self) -> None:
         description = (

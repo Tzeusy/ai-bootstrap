@@ -113,6 +113,11 @@ class BreadsPrReviewerWorkerPackageTests(unittest.TestCase):
         self.assertIn("Risk-Tier:", contents)
         self.assertIn("Reviewer-Identity:", contents)
 
+    def test_canonical_context_resolver_requires_singleton_identity_bound_show_evidence(self) -> None:
+        contents = SKILL_MD.read_text(encoding="utf-8")
+        self.assertIn("exactly one record", contents)
+        self.assertIn("matches the requested ID", contents)
+
     def test_semantic_corrections_are_not_line_count_exceptions(self) -> None:
         contents = SKILL_MD.read_text(encoding="utf-8").lower()
         self.assertIn("semantic regardless of line count", contents)

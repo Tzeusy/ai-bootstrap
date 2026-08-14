@@ -34,6 +34,12 @@ cross-link is invalid normalizer evidence and remains partial manual triage.
 A source relation that is self or equivocal—including an original ID reused as
 a review, canonical-review, or duplicate ID—adds
 `invalid-normalizer-evidence` and preserves only partial manual triage.
+Direct `bd show` evidence for a blocker or worktree must be singleton and must
+echo its requested ID; otherwise cleanup reports partial manual triage. Cleanup
+also enforces collection-wide role binding: a review or canonical-review ID may
+map to only one original/PR scope, and each such scope may have only one
+canonical review ID. Distinct canonical-plus-duplicate review tasks remain
+valid when their IDs and roles are unambiguous.
 
 ## Pass 2: Blocked Original Beads With `pr-review`
 

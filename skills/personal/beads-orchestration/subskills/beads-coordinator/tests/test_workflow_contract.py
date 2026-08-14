@@ -108,6 +108,8 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         self.assertIn("sole PR-state mutator", contents)
         self.assertIn("echo the requested original bead\nID", contents)
         self.assertIn("self-referential", contents)
+        self.assertIn("resolver `issue_id`", contents)
+        self.assertIn("required label,\nstatus, or uniqueness", contents)
 
     def test_review_deduplication_uses_parsed_chronology_and_fails_closed(self) -> None:
         contents = LOOP.read_text(encoding="utf-8")
