@@ -1,13 +1,12 @@
 """Behavior-executing tests for the disposable Synthetic-to-SQLite thesis.
 
 These six tests deliberately exercise the thesis launcher and SQLite seam. The
-fixtures are synthetic, and the assertions never inspect thesis private tables
-directly; ``stable_view`` is the public oracle.
+fixtures are synthetic. Public accounting assertions use ``stable_view`` while
+the privacy harness scans every private table, public view, and durable DB page.
 """
 
 from __future__ import annotations
 
-import hashlib
 import importlib
 import json
 import shutil
@@ -50,7 +49,7 @@ SYNTHETIC_SPEC = (
 )
 FORBIDDEN_SENTINEL = b"THESIS_FORBIDDEN_CONTENT_SENTINEL"
 FORBIDDEN_SENTINEL_DIGEST = (
-    hashlib.sha256(FORBIDDEN_SENTINEL).hexdigest().encode("ascii")
+    b"0fe97be8663ee8538bd2b44dca59652a69847c3b9dd95ce13a3bf6267611507a"
 )
 ESCAPED_FORBIDDEN_SENTINEL = b"".join(
     f"\\u{byte:04x}".encode("ascii") for byte in FORBIDDEN_SENTINEL
@@ -186,6 +185,42 @@ else:
         text=True,
     )
     return completed.stdout.strip(), database_path
+
+
+def _run_durable_fixture_process(
+    fixture_path: Path, database_path: Path
+) -> dict[str, object]:
+    """Run one fixture in a fresh interpreter and report only public state."""
+
+    program = """
+import json
+from pathlib import Path
+import sys
+
+from thesis.harness import HarnessConfig, ThesisHarness
+
+root = Path.cwd()
+harness = ThesisHarness(HarnessConfig(
+    fixture_path=Path(sys.argv[1]),
+    manifest_path=root / "tests" / "fixtures" / "synthetic-thesis" / "manifest.json",
+    database_path=Path(sys.argv[2]),
+))
+result = harness.run_once()
+print(json.dumps({
+    "status": result.status,
+    "stable_view": harness.stable_view(),
+    "health": harness.health(),
+}, sort_keys=True))
+harness.close()
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", program, str(fixture_path), str(database_path)],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(completed.stdout)
 
 
 def _assert_real_privacy_fixture_vector(fixture_path: Path) -> None:
@@ -447,12 +482,19 @@ def test_req_synthetic_usage_spine_003_real_fixture_matrix_stays_content_free(
     assert manifest["max_record_bytes"] == 65_536
     assert manifest["max_container_depth"] == 32
     expected_lanes = manifest["capture_canaries"]
+    assert all("sha256" not in entry for entry in manifest["fixtures"].values())
+    assert all(
+        "projected_sha256" in entry for entry in manifest["fixtures"].values()
+    )
     assert result.capture_canaries is not None
     assert set(result.capture_canaries) == set(expected_lanes)
     assert len(set(result.capture_canaries.values())) == len(expected_lanes)
     assert result.capture_observations == {
         lane: (result.capture_canaries[lane],) for lane in expected_lanes
     }
+    assert result.fingerprint_calls == (1 if expected_status == "accepted" else 0)
+    assert result.sqlite_bound_parameter_calls >= 1
+    assert result.sqlite_objects_scanned == len(ThesisHarness.SQLITE_CAPTURE_OBJECTS) + 1
     captured_bytes = json.dumps(
         {
             "public_capture": result.public_capture,
@@ -469,6 +511,7 @@ def test_req_synthetic_usage_spine_003_real_fixture_matrix_stays_content_free(
     ).encode("utf-8")
     assert FORBIDDEN_SENTINEL not in captured_bytes
     assert FORBIDDEN_SENTINEL_DIGEST not in captured_bytes
+    assert ESCAPED_FORBIDDEN_SENTINEL not in captured_bytes
     assert ".splitlines(" not in (ROOT / "thesis" / "harness.py").read_text(
         encoding="utf-8"
     )
@@ -495,6 +538,10 @@ def test_req_synthetic_usage_spine_003_real_fixture_matrix_stays_content_free(
             "application_value",
             ProjectionStats(forbidden_fingerprint_calls=1),
             id="fingerprint",
+        ),
+        pytest.param("sqlite", "sqlite", ProjectionStats(), id="sqlite-parameter"),
+        pytest.param(
+            "sqlite_escaped", "sqlite", ProjectionStats(), id="sqlite-escaped"
         ),
         pytest.param("network", "network", ProjectionStats(), id="network"),
     ),
@@ -535,6 +582,24 @@ def test_req_synthetic_usage_spine_004(tmp_path: Path) -> None:
     assert replay_after_collision.status == "accepted"
     assert rescan_harness.stable_view() == EXPECTED_STABLE_VIEW
     assert rescan_harness.health() == {"stream_state": "identity_collision"}
+
+    process_database = tmp_path / "process-durable" / "thesis.sqlite3"
+    process_a = _run_durable_fixture_process(QUALIFIED, process_database)
+    process_b = _run_durable_fixture_process(
+        FIXTURES / "collision-b.jsonl", process_database
+    )
+    process_a_replay = _run_durable_fixture_process(QUALIFIED, process_database)
+    assert process_a == {
+        "health": {"stream_state": "healthy"},
+        "stable_view": EXPECTED_STABLE_VIEW,
+        "status": "accepted",
+    }
+    assert process_b["status"] == "identity_collision"
+    assert process_b["stable_view"] == EXPECTED_STABLE_VIEW
+    assert process_b["health"] == {"stream_state": "identity_collision"}
+    assert process_a_replay["status"] == "accepted"
+    assert process_a_replay["stable_view"] == EXPECTED_STABLE_VIEW
+    assert process_a_replay["health"] == {"stream_state": "identity_collision"}
 
 
 def test_req_synthetic_usage_spine_005(tmp_path: Path) -> None:

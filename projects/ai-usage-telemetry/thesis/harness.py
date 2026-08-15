@@ -22,7 +22,17 @@ from .authorization import ValidationError, validate_synthetic_authorization
 FIXTURE_ROOT = Path(__file__).parents[1] / "tests" / "fixtures" / "synthetic-thesis"
 _FORBIDDEN_MARKER = object()
 _FORBIDDEN_SENTINEL = b"THESIS_FORBIDDEN_CONTENT_SENTINEL"
-_FORBIDDEN_DIGEST = hashlib.sha256(_FORBIDDEN_SENTINEL).hexdigest()
+_FORBIDDEN_DIGEST = (
+    "0fe97be8663ee8538bd2b44dca59652a69847c3b9dd95ce13a3bf6267611507a"
+)
+_FORBIDDEN_ESCAPED_SENTINEL = b"".join(
+    f"\\u{byte:04x}".encode("ascii") for byte in _FORBIDDEN_SENTINEL
+)
+_FORBIDDEN_BYTE_SEQUENCES = (
+    _FORBIDDEN_SENTINEL,
+    _FORBIDDEN_DIGEST.encode("ascii"),
+    _FORBIDDEN_ESCAPED_SENTINEL,
+)
 
 
 class CaptureViolation(RuntimeError):
@@ -77,6 +87,9 @@ class RunResult:
     capture_canaries: dict[str, str] | None = None
     capture_observations: dict[str, tuple[str, ...]] | None = None
     framing: FramingEvidence | None = None
+    fingerprint_calls: int = 0
+    sqlite_bound_parameter_calls: int = 0
+    sqlite_objects_scanned: int = 0
 
 
 @dataclass(frozen=True)
@@ -121,6 +134,9 @@ class _CaptureAudit:
         self._forbidden_decoder_calls = 0
         self._forbidden_materializer_calls = 0
         self._forbidden_fingerprint_calls = 0
+        self._fingerprint_calls = 0
+        self._sqlite_bound_parameter_calls = 0
+        self._sqlite_objects_scanned = 0
 
     @property
     def canaries(self) -> dict[str, str]:
@@ -144,6 +160,30 @@ class _CaptureAudit:
     def canary(self, lane: str) -> str:
         return self._canaries[lane]
 
+    @property
+    def fingerprint_calls(self) -> int:
+        return self._fingerprint_calls
+
+    @property
+    def sqlite_bound_parameter_calls(self) -> int:
+        return self._sqlite_bound_parameter_calls
+
+    @property
+    def sqlite_objects_scanned(self) -> int:
+        return self._sqlite_objects_scanned
+
+    def observe_fingerprint(self, value: object) -> None:
+        self._fingerprint_calls += 1
+        self.observe("application_value", value, kind="fingerprint")
+
+    def observe_sqlite_parameter(self, value: object) -> None:
+        self._sqlite_bound_parameter_calls += 1
+        self.observe("sqlite", value)
+
+    def observe_sqlite_object(self, value: object) -> None:
+        self._sqlite_objects_scanned += 1
+        self.observe("sqlite", value)
+
     def observe(self, lane: str, value: object, *, kind: str | None = None) -> None:
         """Record a canary only when that exact value reaches its real boundary."""
 
@@ -163,14 +203,16 @@ class _CaptureAudit:
         if value is _FORBIDDEN_MARKER:
             return True
         if isinstance(value, str):
-            return (
-                _FORBIDDEN_SENTINEL.decode("ascii") in value
-                or _FORBIDDEN_DIGEST in value
+            return any(
+                forbidden.decode("ascii") in value
+                for forbidden in _FORBIDDEN_BYTE_SEQUENCES
             )
         if isinstance(value, bytes):
-            return (
-                _FORBIDDEN_SENTINEL in value
-                or _FORBIDDEN_DIGEST.encode("ascii") in value
+            return any(forbidden in value for forbidden in _FORBIDDEN_BYTE_SEQUENCES)
+        if isinstance(value, memoryview):
+            return any(
+                cls._view_contains(value, forbidden)
+                for forbidden in _FORBIDDEN_BYTE_SEQUENCES
             )
         if isinstance(value, _Record):
             return any(
@@ -194,6 +236,14 @@ class _CaptureAudit:
             return any(cls._contains_forbidden(item) for item in value)
         return False
 
+    @staticmethod
+    def _view_contains(value: memoryview, needle: bytes) -> bool:
+        stop = len(value) - len(needle) + 1
+        return any(
+            all(value[start + offset] == byte for offset, byte in enumerate(needle))
+            for start in range(max(0, stop))
+        )
+
 
 class _CaptureBoundaries:
     """Concrete no-egress capture boundaries used by the disposable thesis."""
@@ -211,6 +261,9 @@ class _CaptureBoundaries:
     def parser_instrumentation(self, value: object) -> None:
         self._audit.observe("parser_instrumentation", value, kind="decoder")
 
+    def fingerprint(self, value: object) -> None:
+        self._audit.observe_fingerprint(value)
+
     def log(self, value: object) -> None:
         self._audit.observe("log", value)
 
@@ -220,8 +273,13 @@ class _CaptureBoundaries:
     def crash(self, value: object) -> None:
         self._audit.observe("crash", value)
 
-    def sqlite(self, value: object) -> None:
-        self._audit.observe("sqlite", value)
+    def sqlite(self, query: str, parameters: tuple[Any, ...] = ()) -> None:
+        self._audit.observe("sqlite", query)
+        for parameter in parameters:
+            self._audit.observe_sqlite_parameter(parameter)
+
+    def sqlite_object(self, value: object) -> None:
+        self._audit.observe_sqlite_object(value)
 
     def sink(self, value: object) -> None:
         self._audit.observe("sink", value)
@@ -341,11 +399,10 @@ class _Projector:
             "source_time": values["sourceTime"],
         }
         if self._boundaries is not None:
-            self._boundaries.application_value(
+            self._boundaries.fingerprint(
                 _FORBIDDEN_MARKER
                 if self._mutation == "fingerprint"
                 else fingerprint_doc,
-                kind="fingerprint",
             )
         fingerprint = hashlib.sha256(
             json.dumps(fingerprint_doc, sort_keys=True, separators=(",", ":")).encode(
@@ -663,6 +720,20 @@ class ThesisHarness:
             "ledger_stream_state",
         }
     )
+    SQLITE_CAPTURE_OBJECTS = PRIVATE_BASE_TABLES | frozenset(
+        {
+            "usage_events",
+            "usage_event_amounts",
+            "logical_requests",
+            "synthetic_sequences",
+            "synthetic_aggregates",
+            "synthetic_obligations",
+            "synthetic_cursors",
+            "source_health",
+            "sink_health",
+            "ledger_health",
+        }
+    )
 
     def __init__(self, config: HarnessConfig):
         self.config = config
@@ -781,7 +852,9 @@ class ThesisHarness:
         manifest = self._manifest()
         entries = manifest["fixtures"]
         entry = entries.get(fixture_path.name)
-        if not isinstance(entry, dict) or not isinstance(entry.get("sha256"), str):
+        if not isinstance(entry, dict) or not isinstance(
+            entry.get("projected_sha256"), str
+        ):
             raise ValidationError("unregistered_fixture")
         try:
             source_file = fixture_path.open("rb")
@@ -795,15 +868,14 @@ class ThesisHarness:
         source = memoryview(mapped)
         line: memoryview | None = None
         try:
-            digest = hashlib.sha256(source).hexdigest()
-            if digest != entry["sha256"]:
-                raise ValidationError("digest_mismatch")
             line, framing = self._single_line_view(source, line_number)
             projector = _Projector(boundaries, mutation=mutation)
             try:
                 record = projector.project(line)
             except ValidationError as error:
                 raise _FramedValidationError(error.code, framing) from None
+            if record.fingerprint != entry["projected_sha256"]:
+                raise _FramedValidationError("digest_mismatch", framing)
             return (
                 record,
                 boundaries.stats if boundaries is not None else ProjectionStats(),
@@ -981,7 +1053,7 @@ class ThesisHarness:
         capture_boundaries: _CaptureBoundaries | None = None,
     ) -> sqlite3.Cursor:
         if capture_boundaries is not None:
-            capture_boundaries.sqlite(query)
+            capture_boundaries.sqlite(query, parameters)
         return self.connection.execute(query, parameters)
 
     def snapshot(self) -> dict[str, int]:
@@ -1078,6 +1150,8 @@ class ThesisHarness:
             "materializer",
             "fingerprint",
             "network",
+            "sqlite",
+            "sqlite_escaped",
         }:
             raise ValidationError("unknown_mutation")
         manifest = self._manifest()
@@ -1088,6 +1162,18 @@ class ThesisHarness:
         )
         if mutation == "network":
             boundaries.network(_FORBIDDEN_MARKER)
+        if mutation == "sqlite":
+            self._execute(
+                "SELECT ?",
+                (_FORBIDDEN_SENTINEL,),
+                capture_boundaries=boundaries,
+            ).fetchone()
+        if mutation == "sqlite_escaped":
+            self._execute(
+                "SELECT ?",
+                (_FORBIDDEN_ESCAPED_SENTINEL,),
+                capture_boundaries=boundaries,
+            ).fetchone()
         target = self.config.fixture_path if fixture_path is None else fixture_path
         try:
             record, _, framing = self._read_record(
@@ -1097,6 +1183,7 @@ class ThesisHarness:
             )
         except ValidationError as error:
             boundaries.exception(error.code)
+            self._capture_sqlite_storage(boundaries)
             public_capture = self.stable_view()
             boundaries.application_value(public_capture)
             self._stats = audit.stats
@@ -1110,8 +1197,12 @@ class ThesisHarness:
                 capture_canaries=audit.canaries,
                 capture_observations=audit.observations,
                 framing=getattr(error, "framing", None),
+                fingerprint_calls=audit.fingerprint_calls,
+                sqlite_bound_parameter_calls=audit.sqlite_bound_parameter_calls,
+                sqlite_objects_scanned=audit.sqlite_objects_scanned,
             )
         result = self._run_record(record, capture_boundaries=boundaries)
+        self._capture_sqlite_storage(boundaries)
         public_capture = self.stable_view()
         boundaries.application_value(public_capture)
         self._stats = audit.stats
@@ -1125,15 +1216,35 @@ class ThesisHarness:
             capture_canaries=audit.canaries,
             capture_observations=audit.observations,
             framing=framing,
+            fingerprint_calls=audit.fingerprint_calls,
+            sqlite_bound_parameter_calls=audit.sqlite_bound_parameter_calls,
+            sqlite_objects_scanned=audit.sqlite_objects_scanned,
         )
+
+    def _capture_sqlite_storage(self, boundaries: _CaptureBoundaries) -> None:
+        """Scan every SQLite table/view and the durable page image for canaries."""
+
+        self.connection.commit()
+        objects = self.connection.execute(
+            "SELECT type, name FROM sqlite_master "
+            "WHERE type IN ('table', 'view') ORDER BY type, name"
+        ).fetchall()
+        if {str(name) for _, name in objects} != self.SQLITE_CAPTURE_OBJECTS:
+            raise ValidationError("sqlite_capture_incomplete")
+        for _, name in objects:
+            quoted_name = '"' + str(name).replace('"', '""') + '"'
+            rows = self.connection.execute(f"SELECT * FROM {quoted_name}").fetchall()
+            boundaries.sqlite_object((name, rows))
+        boundaries.sqlite_object(self.config.database_path.read_bytes())
 
     def _sqlite_positive_control(
         self, boundaries: _CaptureBoundaries, canary: str
     ) -> None:
         """Observe a harmless SQL parameter without storing a capture artifact."""
 
-        boundaries.sqlite(canary)
-        self.connection.execute("SELECT ?", (canary,)).fetchone()
+        self._execute(
+            "SELECT ?", (canary,), capture_boundaries=boundaries
+        ).fetchone()
 
     def documented_exercise(
         self, *, elapsed_seconds: int, requested_reads: tuple[str, ...] | None = None

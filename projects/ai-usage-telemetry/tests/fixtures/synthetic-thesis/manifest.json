@@ -7,17 +7,17 @@
   "max_container_depth": 32,
   "capture_canaries": ["application_value", "parser_instrumentation", "log", "exception", "crash", "sqlite", "sink", "image", "environment", "network"],
   "fixtures": {
-    "qualified-claude.jsonl": {"sha256": "bfd489367c4a6d600a972b007d96719d45eb7072b817d855743afcce896d0bf0"},
-    "negative-requestId.jsonl": {"sha256": "02cfa0f51cc3fc3ee8b081418fa4c89b5c4ab41425668a029cd5fb9609e7292f"},
-    "negative-digest.jsonl": {"sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
-    "negative-projected_type.jsonl": {"sha256": "bb9e5fcda950ab4cc8525da377cca3e858bd29bb3b98bbccaeb51ec82b86e757"},
-    "collision-b.jsonl": {"sha256": "8652a112bc0a9dc73eed5780a0b977962b5af878a74ca2e7df77fb6d70492019"},
-    "privacy-duplicate-registered.jsonl": {"sha256": "bc4a07a6dfb5773954d118a857a64048fccf7a37d2d02a5c4b487538489318c5"},
-    "privacy-nested.jsonl": {"sha256": "0ab159fa064a74f2053b4ce3e90fb880d61cc76f807560504698dbb7361cdf0c"},
-    "privacy-escaped.jsonl": {"sha256": "b4ab2fa5f91806589a5a74cb01f6ab34c006bca1e07fc7c3468dc78e6ac60f6c"},
-    "privacy-malformed.jsonl": {"sha256": "8068671acb7617eb8a918bea2aec1d7e70fbc2d3963f725cdf12b5f8e9d3bbfb"},
-    "privacy-depth-at-limit.jsonl": {"sha256": "7d1ce64a8cad98a0ac28f3233b5dc09fbcc2044108f270ad09bc096620748f64"},
-    "privacy-depth-over-limit.jsonl": {"sha256": "aef5b6b2a1f538e8ad0c48d033c115d44ff6075d36d0680bb9131906faf59d46"},
-    "privacy-oversized-skip.jsonl": {"sha256": "cc84a19aee0828a0cca5064e8d12afc365c2225b1023c1cdec7187005114bff1"}
+    "qualified-claude.jsonl": {"projected_sha256": "abb6d40155da89a2a655fdb5c115ff9f72f6bb55ecf334007757ee4483929316"},
+    "negative-requestId.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "negative-digest.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "negative-projected_type.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "collision-b.jsonl": {"projected_sha256": "51eaef31794c5b4bf7b6f304c6b3a80547589b646a13626248bded5a2c905d56"},
+    "privacy-duplicate-registered.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "privacy-nested.jsonl": {"projected_sha256": "abb6d40155da89a2a655fdb5c115ff9f72f6bb55ecf334007757ee4483929316"},
+    "privacy-escaped.jsonl": {"projected_sha256": "abb6d40155da89a2a655fdb5c115ff9f72f6bb55ecf334007757ee4483929316"},
+    "privacy-malformed.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "privacy-depth-at-limit.jsonl": {"projected_sha256": "abb6d40155da89a2a655fdb5c115ff9f72f6bb55ecf334007757ee4483929316"},
+    "privacy-depth-over-limit.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "privacy-oversized-skip.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
   }
 }
