@@ -5,10 +5,14 @@ on:
     branches: [main]
     paths:
       - "skills/personal/**"
+      - "projects/ai-usage-telemetry/about/legends-and-lore/evidence/0004/**"
+      - "projects/ai-usage-telemetry/about/legends-and-lore/evidence/0004-successor-attempt-gate-candidate.md"
       - ".github/workflows/skill-audit.yml"
   pull_request:
     paths:
       - "skills/personal/**"
+      - "projects/ai-usage-telemetry/about/legends-and-lore/evidence/0004/**"
+      - "projects/ai-usage-telemetry/about/legends-and-lore/evidence/0004-successor-attempt-gate-candidate.md"
       - ".github/workflows/skill-audit.yml"
 
 jobs:
@@ -26,6 +30,10 @@ jobs:
           uv run skills/personal/beads-orchestration/subskills/beads-coordinator/tests/test_normalize_pr_review_state.py
           uv run skills/personal/beads-orchestration/subskills/beads-cleanup/tests/test_cleanup_scan.py
           uv run skills/personal/beads-orchestration/subskills/beads-pr-reviewer-worker/tests/test_scripts.py
+      - name: Run candidate-only successor gate regressions
+        run: >
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest
+          projects/ai-usage-telemetry/about/legends-and-lore/evidence/0004/tests/test_successor_attempt_gate_0004.py
       - name: Audit personal skill packages
         # --strict: skills/personal is warning-free as of dotfiles-hyd; keep it that way.
         run: >
