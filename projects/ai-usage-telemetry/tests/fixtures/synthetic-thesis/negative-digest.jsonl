@@ -1,0 +1,1 @@
+{"requestId":"synthetic-request-digest","messageId":"synthetic-message-001","model":"claude-synthetic-v1","sourceTime":"2026-01-02T03:04:05Z","amounts":{"input_tokens":"11","output_tokens":"7","cache_read_tokens":"3","cache_write_tokens":"2"}}
