@@ -1,6 +1,27 @@
 # Local Skill Templates
 
-Install as `.claude/skills/<name>/SKILL.md` (and `.codex/`, `.gemini/` equivalents) in the target project. Each skill is an **index** — which file to read for a task, not what the file says.
+The five pillar navigators ship as **one `doctrine` superskill**, not five top-level skills:
+
+```text
+.claude/skills/doctrine/          # (and .codex/, .gemini/ equivalents)
+  SKILL.md                        # router — the ONLY entry in the agent's global catalog
+  subskills/
+    heart-and-soul/SKILL.md
+    legends-and-lore/SKILL.md
+    spec-and-spine/SKILL.md
+    lay-and-land/SKILL.md
+    craft-and-care/SKILL.md
+```
+
+Why: every top-level skill spends its `description` in every session's context whether or not it
+fires. Five pillar skills bought five always-loaded descriptions for one capability — "consult this
+project's recorded knowledge". The router owns that trigger; subskill bodies load only after it
+selects one. Package shape and router/subskill requirements: `/th-engineering` (skill-standards,
+`references/superskills.md`).
+
+Each subskill is an **index** — which file to read for a task, not what the file says. Generate the
+whole package with `scripts/shape-init.sh [root] --skills-only --tools=claude,codex`; the templates
+below are for the manual path and for customizing what the scaffold emits.
 
 **CRITICAL FORMAT:** Every SKILL.md **MUST** begin with YAML frontmatter delimited by `---` (fields: `name`, `description`). Without it, loaders silently reject the file. Don't omit either `---` delimiter; don't start with a markdown heading.
 
@@ -9,6 +30,63 @@ Install as `.claude/skills/<name>/SKILL.md` (and `.codex/`, `.gemini/` equivalen
 **Progressive discovery mandate:** Design every pillar skill for targeted retrieval. `SKILL.md` = discovery/index layer; fan heavier/narrower content into `references/*.md`, `scripts/*`. Link support files directly from `SKILL.md` with "read when..." guidance — no hidden sidecars.
 
 Customize tables and rules for your project's domains. After customizing any generated skill, run `/th-engineering` (skill-standards) as the final rubric pass for trigger quality, grounding, metadata hygiene, progressive discovery.
+
+## Template: doctrine (router)
+
+Install at `.claude/skills/doctrine/SKILL.md`. This is the only file in the package whose
+frontmatter reaches the agent's global catalog, so its `description` must carry the whole
+capability's triggers — not a list of the five pillar names.
+
+```yaml
+---
+name: doctrine
+description: >
+  Load this project's own normative knowledge before deciding, implementing, or reviewing:
+  doctrine (why the project exists, what it refuses to do), design contracts (how subsystems are
+  specified), capability specs (what behavior is required), topology (where components live), and
+  engineering standards (the bar for changing them). Routes to one pillar; do not guess project
+  conventions from code alone. Triggers: "what does this project believe", "is this in scope",
+  "check the spec", "which RFC covers this", "where does this live", "what's the engineering bar
+  here", "how should this be tested/reviewed".
+---
+
+# Project Doctrine Router
+
+Five-pillar knowledge architecture. Each pillar's navigator lives under `subskills/`; load **at
+most one** for an ordinary task, then read only the pillar files that navigator points at.
+
+## Discover subskills
+
+```bash
+PKG="$(dirname "<absolute-path-to-this-SKILL.md>")"
+find "$PKG/subskills" -maxdepth 2 -name SKILL.md
+grep -n '^name:\|^description:' "$PKG"/subskills/*/SKILL.md
+```
+
+## Routing table
+
+| The question is... | Pillar | Load |
+|---|---|---|
+| WHY — purpose, principles, scope, what we refuse to build | Doctrine | `subskills/heart-and-soul/SKILL.md` |
+| HOW — wire-level contracts, data models, state machines, budgets | Design contracts | `subskills/legends-and-lore/SKILL.md` |
+| WHAT — normative requirements and acceptance scenarios | Capability specs | `subskills/spec-and-spine/SKILL.md` |
+| WHERE — components, boundaries, data flow, deployment | Topology | `subskills/lay-and-land/SKILL.md` |
+| WHO WE ARE WHEN WE BUILD — quality bar, tests, review, operability | Engineering standards | `subskills/craft-and-care/SKILL.md` |
+
+<!-- Add project-specific rows ONLY for genuinely separate pillars; domain detail belongs
+     inside the pillar navigator, not in this table. -->
+
+## Routing rules
+
+- One pillar per question. Crossing pillars means two sequential loads, not a bulk read.
+- Deciding what to build, prioritizing, or auditing the project → `/th-projects`. Change-level
+  engineering judgment → `/th-engineering`. This router covers *this project's* recorded knowledge.
+- No pillar fits → answer from the router, or say the project has not recorded it. Do not load a
+  subskill to browse.
+```
+
+The router must link every subskill that exists; `shape-scan.sh` reports an `[INCOMPLETE ROUTER]`
+when a pillar navigator is installed but unreachable from the table.
 
 ## Template: heart-and-soul
 
@@ -146,9 +224,9 @@ every test traces back to a normative requirement in a spec.
 
 | Need | Skill |
 |------|-------|
-| Underlying wire contracts | `/legends-and-lore` |
-| Philosophical foundations | `/heart-and-soul` |
-| Execution-quality standards | `/craft-and-care` |
+| Underlying wire contracts | `../legends-and-lore/SKILL.md` |
+| Philosophical foundations | `../heart-and-soul/SKILL.md` |
+| Execution-quality standards | `../craft-and-care/SKILL.md` |
 ```
 
 ## Template: lay-and-land
@@ -197,10 +275,10 @@ components live, how data flows, what boundaries exist, and how the system is de
 
 | Need | Skill |
 |------|-------|
-| Why a boundary exists | `/heart-and-soul` |
-| How a boundary communicates | `/legends-and-lore` |
-| What a component must do | `/spec-and-spine` |
-| How changes here should be verified and maintained | `/craft-and-care` |
+| Why a boundary exists | `../heart-and-soul/SKILL.md` |
+| How a boundary communicates | `../legends-and-lore/SKILL.md` |
+| What a component must do | `../spec-and-spine/SKILL.md` |
+| How changes here should be verified and maintained | `../craft-and-care/SKILL.md` |
 ```
 
 ## Template: craft-and-care
@@ -264,11 +342,11 @@ only the narrower standards docs the current change needs.
 
 | If the question is... | Load... |
 |-----------------------|---------|
-| Why does this trade-off matter? | `/heart-and-soul` |
-| How is this contract or subsystem designed? | `/legends-and-lore` |
-| What behavior is required? | `/spec-and-spine` |
-| Where does this component live and connect? | `/lay-and-land` |
-| What quality evidence is required before merge or ship? | `/craft-and-care` |
+| Why does this trade-off matter? | `../heart-and-soul/SKILL.md` |
+| How is this contract or subsystem designed? | `../legends-and-lore/SKILL.md` |
+| What behavior is required? | `../spec-and-spine/SKILL.md` |
+| Where does this component live and connect? | `../lay-and-land/SKILL.md` |
+| What quality evidence is required before merge or ship? | `../craft-and-care/SKILL.md` |
 
 ## Default Biases
 
@@ -287,13 +365,18 @@ security, performance discipline, or maintainability, load this pillar.
 
 ## Installation
 
-For each template:
+1. Create `.claude/skills/doctrine/SKILL.md` from the router template
+2. Create `.claude/skills/doctrine/subskills/<pillar>/SKILL.md` for each of the five pillars:
+   `heart-and-soul`, `legends-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`
+3. Replace placeholder tables with your project's actual files and domains
+4. Repeat for `.codex/skills/` and `.gemini/skills/` if using those tools (a symlink from
+   `.codex/skills` to `.claude/skills` keeps them in sync for free)
 
-1. Create `.claude/skills/<name>/SKILL.md` in the target project
-2. Replace placeholder tables with your project's actual files and domains
-3. Repeat for `.codex/skills/` and `.gemini/skills/` if using those tools
-
-All five skills should be installed: `heart-and-soul`, `legends-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`.
+Migrating a project that already has five top-level pillar skills: `git mv` each into
+`skills/doctrine/subskills/`, add the router, then repoint inbound references — agent instruction
+files (`CLAUDE.md`/`AGENTS.md`), other skills, and doctrine docs that say "`/craft-and-care`" must
+now say the doctrine router plus the pillar name, or agents will call a skill that no longer exists.
+Grep for each pillar name before declaring the migration done.
 
 The templates above are starting points — customize heavily for your project's specific domains, files, and conventions. When a pillar grows beyond a compact routing skill, split detail into targeted sub-docs or utilities instead of expanding `SKILL.md` into a monolith.
 

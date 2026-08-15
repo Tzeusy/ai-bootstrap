@@ -123,7 +123,10 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 
 - Five-pillar shape model (`about/heart-and-soul`, `about/legends-and-lore`,
   `openspec/`, `about/lay-and-land`, `about/craft-and-care`) is the single
-  normative vocabulary; subskills must not redefine it.
+  normative vocabulary; subskills must not redefine it. A project navigates
+  those pillars through one local `doctrine` superskill — router in
+  `.claude/skills/doctrine/SKILL.md`, one navigator per pillar under its
+  `subskills/` — never five top-level skills competing for the global catalog.
 - Specs are source of truth for work planning; implementation without spec
   coverage is a finding, not a baseline. The OpenSpec file format subskills
   read/write is one shared contract,

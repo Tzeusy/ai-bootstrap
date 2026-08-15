@@ -80,7 +80,7 @@ case_invalid_skill_cannot_satisfy_maturity() {
   local out skill_file
 
   cp -R "$FIXTURES_DIR/mature-layout" "$repo"
-  skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+  skill_file="$repo/.claude/skills/doctrine/subskills/heart-and-soul/SKILL.md"
   awk '{ print; if ($0 ~ /^description:/) print "metadata: not-supported" }' \
     "$skill_file" > "$skill_file.tmp"
   mv "$skill_file.tmp" "$skill_file"
@@ -97,7 +97,7 @@ case_misnamed_skill_cannot_satisfy_maturity() {
   local out skill_file
 
   cp -R "$FIXTURES_DIR/mature-layout" "$repo"
-  skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+  skill_file="$repo/.claude/skills/doctrine/subskills/heart-and-soul/SKILL.md"
   awk '
     /^name:[[:space:]]*heart-and-soul[[:space:]]*$/ {
       print "name: wrong-valid-slug"
@@ -119,7 +119,7 @@ case_duplicate_skill_name_cannot_satisfy_maturity() {
   local out skill_file
 
   cp -R "$FIXTURES_DIR/mature-layout" "$repo"
-  skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+  skill_file="$repo/.claude/skills/doctrine/subskills/heart-and-soul/SKILL.md"
   awk '
     { print }
     /^name:[[:space:]]*heart-and-soul[[:space:]]*$/ {
@@ -140,7 +140,7 @@ case_duplicate_skill_description_cannot_satisfy_maturity() {
   local out skill_file
 
   cp -R "$FIXTURES_DIR/mature-layout" "$repo"
-  skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+  skill_file="$repo/.claude/skills/doctrine/subskills/heart-and-soul/SKILL.md"
   awk '
     { print }
     /^description:/ {
@@ -161,7 +161,7 @@ case_nonscalar_skill_description_cannot_satisfy_maturity() {
   local out skill_file
 
   cp -R "$FIXTURES_DIR/mature-layout" "$repo"
-  skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+  skill_file="$repo/.claude/skills/doctrine/subskills/heart-and-soul/SKILL.md"
   awk '
     /^description:/ {
       print "description: [not, a, string]"
@@ -184,7 +184,7 @@ case_adversarial_yaml_frontmatter_cannot_satisfy_maturity() {
   for scenario in date hex boolean null spaced-name spaced-description bogus-key indented; do
     repo="$TMP_ROOT/adversarial-yaml-$scenario"
     cp -R "$FIXTURES_DIR/mature-layout" "$repo"
-    skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+    skill_file="$repo/.claude/skills/doctrine/subskills/heart-and-soul/SKILL.md"
     awk -v scenario="$scenario" '
       /^description:/ && scenario == "date" {
         print "description: 2026-08-10"
@@ -329,7 +329,7 @@ case_invalid_frontmatter_cannot_satisfy_maturity() {
     quoted-unsupported-key; do
     repo="$TMP_ROOT/canonical-rejection-$scenario"
     cp -R "$FIXTURES_DIR/mature-layout" "$repo"
-    skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+    skill_file="$repo/.claude/skills/doctrine/subskills/heart-and-soul/SKILL.md"
     write_frontmatter_rejection_skill "$skill_file" "$scenario"
 
     out="$(bash "$SCAN_SCRIPT" "$repo")"
@@ -404,11 +404,11 @@ case_canonical_yaml_strings_can_satisfy_maturity() {
     explicit-block-indent; do
     repo="$TMP_ROOT/canonical-acceptance-$scenario"
     cp -R "$FIXTURES_DIR/mature-layout" "$repo"
-    skill_file="$repo/.claude/skills/heart-and-soul/SKILL.md"
+    skill_file="$repo/.claude/skills/doctrine/subskills/heart-and-soul/SKILL.md"
     write_canonical_acceptance_skill "$skill_file" "$scenario"
 
     out="$(bash "$SCAN_SCRIPT" "$repo")"
-    assert_not_contains "$out" ".claude/skills/heart-and-soul/ [INVALID]" "$scenario canonical string metadata should remain valid"
+    assert_not_contains "$out" ".claude/skills/doctrine/subskills/heart-and-soul/ [INVALID]" "$scenario canonical string metadata should remain valid"
     assert_contains "$out" "Local skills installed: 5/5" "$scenario valid skill should count toward maturity"
     assert_contains "$out" "SHAPE_LEVEL=MATURE" "$scenario valid YAML string metadata should preserve maturity"
   done
@@ -812,6 +812,49 @@ EOF
   assert_contains "$out" "Contracts: 1 documents in about/legends-and-lore/rfcs/ (0 authored)" "template RFC should not count as authored"
 }
 
+case_fresh_scaffold_installs_doctrine_superskill() {
+  local repo="$TMP_ROOT/doctrine-superskill"
+  local out
+  bash "$INIT_SCRIPT" "$repo" --tools=claude >/dev/null
+  [ -f "$repo/.claude/skills/doctrine/SKILL.md" ] || fail "scaffold should install the doctrine router"
+  [ -f "$repo/.claude/skills/doctrine/subskills/craft-and-care/SKILL.md" ] || fail "scaffold should install pillar navigators as subskills"
+  [ -e "$repo/.claude/skills/craft-and-care" ] && fail "scaffold must not install pillar skills at the top level"
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "DOCTRINE_LAYOUT=SUPERSKILL" "scaffolded navigation should report the superskill layout"
+  assert_contains "$out" "Local skills installed: 5/5" "pillar subskills should count toward local-skill coverage"
+  assert_contains "$out" ".claude/skills/doctrine/subskills/heart-and-soul/ [VALID" "subskill path should be reported"
+}
+
+case_legacy_pillar_skills_flagged_for_consolidation() {
+  local repo="$TMP_ROOT/doctrine-legacy"
+  local out pillar
+  cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+  mkdir -p "$repo/.claude/skills"
+  for pillar in heart-and-soul legends-and-lore spec-and-spine lay-and-land craft-and-care; do
+    mv "$repo/.claude/skills/doctrine/subskills/$pillar" "$repo/.claude/skills/$pillar"
+  done
+  rm -rf "$repo/.claude/skills/doctrine"
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "DOCTRINE_LAYOUT=LEGACY" "top-level pillar skills should report the legacy layout"
+  assert_contains "$out" "[VALID, LEGACY LAYOUT]" "each legacy pillar skill should be labelled"
+  assert_contains "$out" "consolidate into one 'doctrine' superskill" "legacy layout should carry consolidation guidance"
+  assert_contains "$out" "Local skills installed: 5/5" "legacy layout still provides navigation coverage"
+}
+
+case_doctrine_router_must_link_every_subskill() {
+  local repo="$TMP_ROOT/doctrine-unlinked"
+  local out
+  cp -R "$FIXTURES_DIR/mature-layout" "$repo"
+  grep -v "subskills/craft-and-care/SKILL.md" "$repo/.claude/skills/doctrine/SKILL.md" > "$repo/.claude/skills/doctrine/SKILL.md.tmp"
+  mv "$repo/.claude/skills/doctrine/SKILL.md.tmp" "$repo/.claude/skills/doctrine/SKILL.md"
+  out="$(bash "$SCAN_SCRIPT" "$repo")"
+  assert_contains "$out" "[INCOMPLETE ROUTER] routing table missing: craft-and-care" "a router that drops a subskill link should be reported"
+  assert_contains "$out" "agents cannot discover the subskills without it" "an incomplete router should carry remediation guidance"
+}
+
+run_case "scaffold installs the doctrine superskill" case_fresh_scaffold_installs_doctrine_superskill
+run_case "legacy pillar skills are flagged for consolidation" case_legacy_pillar_skills_flagged_for_consolidation
+run_case "doctrine router must link every pillar subskill" case_doctrine_router_must_link_every_subskill
 run_case "fresh scaffold is not mature" case_fresh_scaffold_not_mature
 run_case "unsupported frontmatter keys are rejected" case_invalid_frontmatter_rejected
 run_case "invalid local skills cannot satisfy maturity" case_invalid_skill_cannot_satisfy_maturity
