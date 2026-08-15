@@ -42,7 +42,7 @@ knowledge lives, not how well one file reads).
 
 Five distinct knowledge layers, each answering a different question:
 
-| Pillar | Folder | Local Skill | Question | Content |
+| Pillar | Folder | Navigator (`doctrine` subskill) | Question | Content |
 |--------|--------|-------------|----------|---------|
 | **Doctrine** | `about/heart-and-soul/` | `heart-and-soul` | **WHY** does this exist? | Vision, principles, non-negotiables, scope boundaries, what it is NOT |
 | **Design Contracts** | `about/legends-and-lore/` | `legends-and-lore` | **HOW** will it work? | RFCs, design docs, wire contracts, state machines, reviews, trade-offs |
@@ -104,7 +104,7 @@ Bootstrapping is **consultative**, not template-filling. Extract shape from the 
    then run cross-pillar review at convergence points. Read
    [`references/review-protocol.md`](references/review-protocol.md).
 4. **Revise + present** — incorporate findings, present for validation. If "not quite right" → return to interview, don't patch.
-5. **Scaffold + install** — run `shape-init.sh` for structure, populate with reviewed docs, install local skills. Vet generated pillar skills with `/th-engineering` (skill-standards) before relying on them.
+5. **Scaffold + install** — run `shape-init.sh` for structure, populate with reviewed docs, install the `doctrine` superskill (router + five pillar subskills). Vet the generated package with `/th-engineering` (skill-standards) before relying on it.
 
 **Pillar order** (top-down, each grounds the next): heart-and-soul → craft-and-care → legends-and-lore → openspec → lay-and-land. Draft `craft-and-care` right after doctrine is coherent, before implementation planning — mandatory for all non-trivial work. Topology can start in parallel with design contracts once the architecture interview track is done.
 
@@ -193,7 +193,7 @@ Rendered visuals for the shape model (each `.svg` has an editable `.excalidraw` 
 | Consultative Bootstrapping | [`references/consultative-bootstrapping.md`](references/consultative-bootstrapping.md) | Extracting shape from a human for a new project — interview tracks, challenge patterns, synthesis rules |
 | Review Protocol | [`references/review-protocol.md`](references/review-protocol.md) | Reviewing generated docs with independent subagents — agent specs, iteration rules, anti-patterns |
 | Bootstrapping Phases | [`references/bootstrapping.md`](references/bootstrapping.md) | Step-by-step phase guide for establishing shape from scratch |
-| Local Skill Templates | [`references/local-skill-templates.md`](references/local-skill-templates.md) | Installing agent navigation skills for each pillar |
+| Local Skill Templates | [`references/local-skill-templates.md`](references/local-skill-templates.md) | Installing the `doctrine` superskill: router template, per-pillar subskill templates, migration from five top-level skills |
 | Generate Project Overview | [`references/generate-overview.md`](references/generate-overview.md) | Creating a layman-friendly about/README.md with Excalidraw diagrams |
 | Maturity Rubric | [`references/maturity-rubric.md`](references/maturity-rubric.md) | Understanding scanner thresholds and what qualifies as structured/shaped/mature |
 | Evaluation Scenarios | [`references/evaluation-scenarios.md`](references/evaluation-scenarios.md) | Testing the skill package itself across strong/weak environments and legacy/scaffolded repos |
@@ -210,13 +210,21 @@ Rendered visuals for the shape model (each `.svg` has an editable `.excalidraw` 
 
 ## Local Skill Installation
 
-Each pillar gets a local navigation skill in `.claude/skills/` (and equivalents) — an **index with selection guidance**, not a copy of pillar content. It says *which file to read* for a task, not *what the file says*. Preferred path generates correctly-formatted skills:
+Each pillar gets a local navigation skill — an **index with selection guidance**, not a copy of pillar content. It says *which file to read* for a task, not *what the file says*. All five ship as subskills of **one `doctrine` superskill**, so the project spends a single entry in the agent's global catalog instead of five always-loaded descriptions:
+
+```text
+.claude/skills/doctrine/SKILL.md                    # router (the catalog entry)
+.claude/skills/doctrine/subskills/<pillar>/SKILL.md # heart-and-soul, legends-and-lore,
+                                                    # spec-and-spine, lay-and-land, craft-and-care
+```
+
+Preferred path generates the whole package, correctly formatted:
 
 ```bash
 bash <skill-path>/scripts/shape-init.sh [project-root] --skills-only --tools=claude,codex
 ```
 
-All five pillars need one: `heart-and-soul`, `legends-and-lore`, `spec-and-spine`, `lay-and-land`, `craft-and-care`. For the manual path — per-pillar templates, the mandatory `name`/`description`-only frontmatter (scanner rejects extra keys), required progressive-discovery structure — read [`references/local-skill-templates.md`](references/local-skill-templates.md). After writing, validate with `scripts/shape-scan.sh` + `scripts/self-test.sh` + `scripts/eval-fallbacks.sh` and fix every reported issue before committing.
+For the manual path — router and per-pillar templates, the mandatory `name`/`description`-only frontmatter (scanner rejects extra keys), required progressive-discovery structure, and the migration procedure for projects still on five top-level skills — read [`references/local-skill-templates.md`](references/local-skill-templates.md). Superskill package rules live in `/th-engineering` (skill-standards, `references/superskills.md`). After writing, validate with `scripts/shape-scan.sh` (reports `DOCTRINE_LAYOUT=SUPERSKILL|LEGACY|MIXED|NONE` and flags a router that fails to link an installed subskill) + `scripts/self-test.sh` + `scripts/eval-fallbacks.sh`, and fix every reported issue before committing.
 
 ## Maintenance Expectations
 
@@ -233,6 +241,7 @@ All five pillars need one: `heart-and-soul`, `legends-and-lore`, `spec-and-spine
 - **Specs without doctrine** — requirements with no grounding get challenged endlessly. Doctrine ends debates.
 - **Doctrine without specs** — principles that never become testable requirements. Specs make doctrine actionable.
 - **Stale middle** — doctrine and code current, RFCs six months old. Design contracts must evolve.
-- **Pillar without skill** — knowledge exists but agents can't find it. Install local skills.
+- **Pillar without skill** — knowledge exists but agents can't find it. Install the `doctrine` superskill.
+- **Five top-level pillar skills** — one capability charged five always-loaded catalog descriptions. Consolidate under the `doctrine` router (`DOCTRINE_LAYOUT=LEGACY` in the scan).
 - **Self-reviewed docs** — the LLM that wrote the doc reviews it in the same context. Use independent subagents.
 - **Template-filling** — handing templates to the user instead of extracting shape through dialogue. Produces bureaucracy, not doctrine.

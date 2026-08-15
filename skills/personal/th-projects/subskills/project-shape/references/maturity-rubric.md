@@ -49,7 +49,9 @@ Any of the following keeps a project in `shaped` rather than `mature`:
 All of the following:
 
 - Five pillars are authored and maintained
-- All five local skills are installed, customized, and pass the scanner's
+- The `doctrine` superskill is installed as the agent entry point (router linking
+  every pillar subskill it ships; `DOCTRINE_LAYOUT=SUPERSKILL`)
+- All five pillar navigators are installed, customized, and pass the scanner's
   fail-closed YAML/frontmatter validation, including syntactically valid YAML,
   unique string-valued required keys, canonical metadata limits, and a `name`
   matching the expected pillar directory; an invalid or misnamed skill file

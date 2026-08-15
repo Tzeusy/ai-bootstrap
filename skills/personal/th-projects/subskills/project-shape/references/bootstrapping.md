@@ -191,17 +191,20 @@ Hand non-trivial topology mapping to a dedicated subagent. Spatial reasoning deg
 
 ## Phase 6: Local Skills
 
-**Goal**: Make the knowledge navigable by LLM agents.
+**Goal**: Make the knowledge navigable by LLM agents, at one catalog entry.
 
-### Step 1: Create skill directories
+### Step 1: Create the doctrine superskill directories
 
 ```bash
-mkdir -p .claude/skills/{heart-and-soul,legends-and-lore,spec-and-spine,lay-and-land}
-# Repeat for .codex/skills/ and .gemini/skills/ if needed
-# Note: docs/ pillars use poetic names as folder names; local skills match
+mkdir -p .claude/skills/doctrine/subskills/{heart-and-soul,legends-and-lore,spec-and-spine,lay-and-land,craft-and-care}
+# Repeat for .codex/skills/ and .gemini/skills/ if needed (or symlink them to .claude/skills)
+# Note: about/ pillars use poetic names as folder names; the pillar subskills match
 ```
 
-### Step 2: Write SKILL.md for each
+The router at `.claude/skills/doctrine/SKILL.md` is the only file whose frontmatter reaches the
+agent's global catalog; the five pillar navigators are package-local and load on demand.
+
+### Step 2: Write SKILL.md for the router and each pillar
 
 **Preferred:** Run `shape-init.sh --skills-only` which generates correctly-formatted skills automatically.
 
@@ -209,7 +212,7 @@ mkdir -p .claude/skills/{heart-and-soul,legends-and-lore,spec-and-spine,lay-and-
 
 ### Step 3: Validate format
 
-Run `shape-scan.sh` and check that all five skills show `[VALID]` frontmatter. Fix any `[INVALID]` warnings before committing.
+Run `shape-scan.sh` and check that the router and all five pillar subskills show `[VALID]` frontmatter, and that it reports `DOCTRINE_LAYOUT=SUPERSKILL`. Fix any `[INVALID]`, `[INCOMPLETE ROUTER]`, or `[LEGACY LAYOUT]` finding before committing.
 
 ### Step 4: Run package self-checks
 
@@ -224,7 +227,7 @@ Interpret the scan using `references/maturity-rubric.md`. A fully scaffolded pro
 
 ### Step 4.5: Review customized skills
 
-Run `/th-engineering` (skill-standards) on each generated pillar skill after replacing placeholders or adding support files. Especially important for `heart-and-soul`-style doctrine skills — easy to bloat into document dumps instead of navigation layers.
+Run `/th-engineering` (skill-standards) on the whole `doctrine` package after replacing placeholders or adding support files — it validates router/subskill layout as well as each SKILL.md. Especially important for `heart-and-soul`-style doctrine skills — easy to bloat into document dumps instead of navigation layers.
 
 ### Step 5: Test navigation
 
@@ -236,7 +239,7 @@ Start a new LLM session, try tasks that should trigger each skill, verify the ag
 |--------------|----------------------|
 | Idea / exploration | Doctrine only (vision.md, v1.md) |
 | Design / pre-implementation | Doctrine + Craft and Care + Design Contracts |
-| Implementation starting | All five pillars + local skills |
+| Implementation starting | All five pillars + the `doctrine` superskill |
 | Mature / multiple contributors | All five, plus regular shape health audits |
 
 ## Common Mistakes

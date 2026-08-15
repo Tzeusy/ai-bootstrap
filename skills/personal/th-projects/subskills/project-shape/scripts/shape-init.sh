@@ -8,6 +8,8 @@
 #   about/lay-and-land/    (topology / maps)
 #   about/craft-and-care/  (engineering standards / execution quality)
 #   openspec/             (capability specs — product, stays at root)
+#   .<tool>/skills/doctrine/{SKILL.md,subskills/<pillar>/SKILL.md}
+#                         (one router in the agent catalog; five pillar navigators under it)
 #
 # Idempotent: skips anything that already exists.
 set -euo pipefail
@@ -351,12 +353,73 @@ $SCAFFOLD_MARKER
 }
 
 # --- Local skill scaffolds ---
+# Pillar navigators ship as subskills of one `doctrine` superskill: the router
+# owns the single global catalog entry, subskill bodies load only on demand.
+DOCTRINE_SKILL="doctrine"
+
 install_skill() {
   local name="$1" content="$2"
   for tool in "${TOOL_LIST[@]}"; do
-    local skill_dir="$ROOT/.${tool}/skills/${name}"
+    local skill_dir="$ROOT/.${tool}/skills/${DOCTRINE_SKILL}/subskills/${name}"
     create_file "$skill_dir/SKILL.md" "$content"
   done
+}
+
+install_doctrine_router() {
+  local content="$1"
+  for tool in "${TOOL_LIST[@]}"; do
+    create_file "$ROOT/.${tool}/skills/${DOCTRINE_SKILL}/SKILL.md" "$content"
+  done
+}
+
+scaffold_doctrine_router() {
+  install_doctrine_router "---
+name: doctrine
+description: >
+  Load this project's own normative knowledge before deciding, implementing, or reviewing:
+  doctrine (why the project exists, what it refuses to do), design contracts (how subsystems
+  are specified), capability specs (what behavior is required), topology (where components
+  live), and engineering standards (the bar for changing them). Routes to one pillar; do not
+  guess project conventions from code alone. Triggers: \"what does this project believe\",
+  \"is this in scope\", \"check the spec\", \"which RFC covers this\", \"where does this live\",
+  \"what's the engineering bar here\", \"how should this be tested/reviewed\".
+---
+
+# Project Doctrine Router
+
+$SCAFFOLD_MARKER
+
+Five-pillar knowledge architecture. Each pillar's navigator lives under
+\`subskills/\`; load **at most one** for an ordinary task, then read only the
+pillar files that navigator points at.
+
+## Discover subskills
+
+\`\`\`bash
+PKG=\"\$(dirname \"<absolute-path-to-this-SKILL.md>\")\"
+find \"\$PKG/subskills\" -maxdepth 2 -name SKILL.md
+grep -n '^name:\|^description:' \"\$PKG\"/subskills/*/SKILL.md
+\`\`\`
+
+## Routing table
+
+| The question is... | Pillar | Load |
+|---|---|---|
+| WHY — purpose, principles, scope, what we refuse to build | Doctrine | [subskills/heart-and-soul/SKILL.md](subskills/heart-and-soul/SKILL.md) |
+| HOW — wire-level contracts, data models, state machines, budgets | Design contracts | [subskills/legends-and-lore/SKILL.md](subskills/legends-and-lore/SKILL.md) |
+| WHAT — normative requirements and acceptance scenarios | Capability specs | [subskills/spec-and-spine/SKILL.md](subskills/spec-and-spine/SKILL.md) |
+| WHERE — components, boundaries, data flow, deployment | Topology | [subskills/lay-and-land/SKILL.md](subskills/lay-and-land/SKILL.md) |
+| WHO WE ARE WHEN WE BUILD — quality bar, tests, review, operability | Engineering standards | [subskills/craft-and-care/SKILL.md](subskills/craft-and-care/SKILL.md) |
+
+## Routing rules
+
+- One pillar per question. Crossing pillars (\"is this in scope AND how do I test it\")
+  means two sequential loads, not a bulk read.
+- Deciding what to build, prioritizing, or auditing the project → \`/th-projects\`.
+  Change-level engineering judgment → \`/th-engineering\`. This router is for
+  *this project's* recorded knowledge only.
+- No pillar fits → answer from the router, or say the project has not recorded it.
+  Do not load a subskill to browse."
 }
 
 scaffold_skill_heart_and_soul() {
@@ -588,7 +651,8 @@ if [ "$SKILLS_ONLY" = true ]; then
   echo "Mode: skills only"
 fi
 
-# Scaffold pillars and their skills
+# Scaffold pillars and their skills (router first — it is the agent entry point)
+scaffold_doctrine_router
 for p in "${PILLAR_LIST[@]}"; do
   case "$p" in
     1) scaffold_heart_and_soul; scaffold_skill_heart_and_soul ;;
@@ -608,7 +672,7 @@ if [ "$created" -gt 0 ]; then
   echo ""
   echo "Next steps:"
   echo "  1. Fill in the TODO/placeholder content in the scaffolded files"
-  echo "  2. Customize local skill index tables with your actual files and domains"
-  echo "  3. Review each generated local skill with /th-engineering (skill-standards) before relying on it"
+  echo "  2. Customize the doctrine router's table and each pillar subskill's index with your actual files and domains"
+  echo "  3. Review the generated doctrine superskill with /th-engineering (skill-standards) before relying on it"
   echo "  4. Run shape-scan.sh to verify the result"
 fi

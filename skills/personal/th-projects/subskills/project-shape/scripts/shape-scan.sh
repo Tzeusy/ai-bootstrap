@@ -29,6 +29,12 @@ ROOT="$(cd "$ROOT" && pwd)"
 active_change_count=0
 valid_skill_names=""
 template_skill_names=""
+# Canonical navigation layout: one `doctrine` superskill whose subskills/ hold
+# the five pillar navigators. Legacy layout: five top-level pillar skills.
+DOCTRINE_SKILL="doctrine"
+superskill_pillar_names=""
+legacy_pillar_names=""
+doctrine_router_valid=0
 
 echo "=== Project Shape Scan ==="
 echo "Root: $ROOT"
@@ -270,46 +276,119 @@ mark_skill_name() {
   printf -v "$variable_name" '%s%s ' "$current_value" "$name"
 }
 
+# Validate one SKILL.md against the expected skill name.
+# Echoes a status token: VALID | TEMPLATE | INVALID:<detail> | UNVERIFIED:<detail>
+validate_skill_file() {
+  local skill_path="$1" expected_name="$2"
+  local validation_output validation_status=0
+  if ! command -v uv >/dev/null 2>&1; then
+    echo "UNVERIFIED:YAML validator unavailable: uv is required"
+    return
+  fi
+  if [ ! -f "$LOCAL_SKILL_VALIDATOR" ]; then
+    echo "UNVERIFIED:YAML validator unavailable: $LOCAL_SKILL_VALIDATOR is missing"
+    return
+  fi
+  validation_output=$(uv run --quiet --script "$LOCAL_SKILL_VALIDATOR" "$skill_path" "$expected_name" 2>&1) || validation_status=$?
+  if [ "$validation_status" -ne 0 ]; then
+    validation_output=$(printf '%s' "$validation_output" | tr '\n' ' ')
+    if [ "$validation_status" -eq 1 ] && [[ "$validation_output" == invalid\ skill\ frontmatter:* ]]; then
+      echo "INVALID:${validation_output#invalid skill frontmatter: }"
+    else
+      echo "UNVERIFIED:YAML validator unavailable (exit $validation_status): $validation_output"
+    fi
+    return
+  fi
+  if is_placeholder_file "$skill_path"; then
+    echo "TEMPLATE"
+  else
+    echo "VALID"
+  fi
+}
+
+# A pillar navigator may live in either layout. Canonical wins when both exist.
+#   canonical: <tool>/skills/doctrine/subskills/<name>/SKILL.md
+#   legacy:    <tool>/skills/<name>/SKILL.md
 check_skill() {
   local name="$1"
   local found=0
   for tool_dir in .claude .codex .gemini .opencode; do
-    local skill_path="$ROOT/$tool_dir/skills/$name/SKILL.md"
-    if [ -f "$skill_path" ]; then
-      local validation_output validation_status=0
-      if ! command -v uv >/dev/null 2>&1; then
-        echo "    - $tool_dir/skills/$name/ [UNVERIFIED] YAML validator unavailable: uv is required"
-        found=1
-        continue
-      fi
-      if [ ! -f "$LOCAL_SKILL_VALIDATOR" ]; then
-        echo "    - $tool_dir/skills/$name/ [UNVERIFIED] YAML validator unavailable: $LOCAL_SKILL_VALIDATOR is missing"
-        found=1
-        continue
-      fi
-      validation_output=$(uv run --quiet --script "$LOCAL_SKILL_VALIDATOR" "$skill_path" "$name" 2>&1) || validation_status=$?
-      if [ "$validation_status" -ne 0 ]; then
-        validation_output=$(printf '%s' "$validation_output" | tr '\n' ' ')
-        if [ "$validation_status" -eq 1 ] && [[ "$validation_output" == invalid\ skill\ frontmatter:* ]]; then
-          echo "    - $tool_dir/skills/$name/ [INVALID] ${validation_output#invalid skill frontmatter: }"
-        else
-          echo "    - $tool_dir/skills/$name/ [UNVERIFIED] YAML validator unavailable (exit $validation_status): $validation_output"
-        fi
-        found=1
-        continue
-      fi
-      if is_placeholder_file "$skill_path"; then
-        echo "    - $tool_dir/skills/$name/ [VALID, TEMPLATE] customize before relying on agent navigation"
-        mark_skill_name "$name" template_skill_names
+    local layout skill_path label status
+    for layout in superskill legacy; do
+      if [ "$layout" = superskill ]; then
+        skill_path="$ROOT/$tool_dir/skills/$DOCTRINE_SKILL/subskills/$name/SKILL.md"
+        label="$tool_dir/skills/$DOCTRINE_SKILL/subskills/$name/"
       else
-        echo "    - $tool_dir/skills/$name/ [VALID]"
+        skill_path="$ROOT/$tool_dir/skills/$name/SKILL.md"
+        label="$tool_dir/skills/$name/"
       fi
-      mark_skill_name "$name" valid_skill_names
+      [ -f "$skill_path" ] || continue
       found=1
-    fi
+      status="$(validate_skill_file "$skill_path" "$name")"
+      case "$status" in
+        VALID)
+          if [ "$layout" = superskill ]; then
+            echo "    - $label [VALID]"
+            mark_skill_name "$name" superskill_pillar_names
+          else
+            echo "    - $label [VALID, LEGACY LAYOUT] move under skills/$DOCTRINE_SKILL/subskills/"
+            mark_skill_name "$name" legacy_pillar_names
+          fi
+          mark_skill_name "$name" valid_skill_names
+          ;;
+        TEMPLATE)
+          if [ "$layout" = superskill ]; then
+            echo "    - $label [VALID, TEMPLATE] customize before relying on agent navigation"
+            mark_skill_name "$name" superskill_pillar_names
+          else
+            echo "    - $label [VALID, TEMPLATE, LEGACY LAYOUT] customize and move under skills/$DOCTRINE_SKILL/subskills/"
+            mark_skill_name "$name" legacy_pillar_names
+          fi
+          mark_skill_name "$name" template_skill_names
+          mark_skill_name "$name" valid_skill_names
+          ;;
+        INVALID:*) echo "    - $label [INVALID] ${status#INVALID:}" ;;
+        *) echo "    - $label [UNVERIFIED] ${status#UNVERIFIED:}" ;;
+      esac
+    done
   done
   if [ "$found" -eq 0 ]; then
     echo "    - No local skill installed for '$name'"
+  fi
+}
+
+# The router itself: one skill entry in the agent's global catalog, whose body
+# must link every pillar subskill it ships.
+check_doctrine_router() {
+  local found=0
+  for tool_dir in .claude .codex .gemini .opencode; do
+    local router_path="$ROOT/$tool_dir/skills/$DOCTRINE_SKILL/SKILL.md"
+    [ -f "$router_path" ] || continue
+    found=1
+    local status unlinked=""
+    status="$(validate_skill_file "$router_path" "$DOCTRINE_SKILL")"
+    case "$status" in
+      VALID|TEMPLATE)
+        local pillar
+        for pillar in $superskill_pillar_names; do
+          grep -Fq "subskills/$pillar/SKILL.md" "$router_path" || unlinked="$unlinked$pillar "
+        done
+        if [ -n "$unlinked" ]; then
+          echo "  - $tool_dir/skills/$DOCTRINE_SKILL/ [INCOMPLETE ROUTER] routing table missing: ${unlinked% }"
+        elif [ "$status" = TEMPLATE ]; then
+          echo "  - $tool_dir/skills/$DOCTRINE_SKILL/ [VALID, TEMPLATE] customize the routing table before relying on it"
+          doctrine_router_valid=1
+        else
+          echo "  - $tool_dir/skills/$DOCTRINE_SKILL/ [VALID]"
+          doctrine_router_valid=1
+        fi
+        ;;
+      INVALID:*) echo "  - $tool_dir/skills/$DOCTRINE_SKILL/ [INVALID] ${status#INVALID:}" ;;
+      *) echo "  - $tool_dir/skills/$DOCTRINE_SKILL/ [UNVERIFIED] ${status#UNVERIFIED:}" ;;
+    esac
+  done
+  if [ "$found" -eq 0 ]; then
+    echo "  - No doctrine superskill router installed"
   fi
 }
 
@@ -669,6 +748,46 @@ fi
 emit_traceability_summary "${doctrine_rules_display:-$doctrine_rules}" "$rfc_docs" "$rfc_doctrine_refs" "$spec_docs" "$spec_source_refs" "$spec_scenarios" "$topology_docs" "$topology_cross_refs" "$standards_docs" "$standards_cross_refs"
 echo ""
 
+# --- Doctrine navigation layout ---
+echo "## Doctrine Navigation (agent entry point)"
+check_doctrine_router
+
+superskill_pillars=0
+for name in $superskill_pillar_names; do
+  superskill_pillars=$((superskill_pillars + 1))
+done
+legacy_pillars=0
+for name in $legacy_pillar_names; do
+  legacy_pillars=$((legacy_pillars + 1))
+done
+
+if [ "$superskill_pillars" -gt 0 ] && [ "$legacy_pillars" -gt 0 ]; then
+  doctrine_layout="MIXED"
+elif [ "$superskill_pillars" -gt 0 ]; then
+  doctrine_layout="SUPERSKILL"
+elif [ "$legacy_pillars" -gt 0 ]; then
+  doctrine_layout="LEGACY"
+else
+  doctrine_layout="NONE"
+fi
+
+echo "  Layout: $doctrine_layout (superskill subskills: $superskill_pillars/5, top-level pillar skills: $legacy_pillars/5)"
+case "$doctrine_layout" in
+  LEGACY|MIXED)
+    echo "  Recommendation: consolidate into one '$DOCTRINE_SKILL' superskill —"
+    echo "    five top-level pillar skills spend five global catalog entries where one router does."
+    echo "    Move each SKILL.md to skills/$DOCTRINE_SKILL/subskills/<pillar>/SKILL.md, add the router,"
+    echo "    and repoint inbound '/<pillar>' references. See references/local-skill-templates.md."
+    ;;
+  SUPERSKILL)
+    if [ "$doctrine_router_valid" -eq 0 ]; then
+      echo "  Recommendation: pillar subskills are installed but the '$DOCTRINE_SKILL' router is missing,"
+      echo "    invalid, or does not link them — agents cannot discover the subskills without it."
+    fi
+    ;;
+esac
+echo ""
+
 # --- Summary ---
 echo "## Shape Summary"
 pillars=0
@@ -700,6 +819,7 @@ done
 
 echo "  Pillars present: $pillars/5"
 echo "  Local skills installed: $skills/5"
+echo "  Doctrine navigation layout: $doctrine_layout"
 echo "  Pillars needing authoring: $scaffolded_pillars/5"
 echo "  Local skill templates still uncustomized: $template_skills/5"
 
@@ -747,6 +867,7 @@ echo "  Assessment: $assessment"
 echo ""
 echo "## Machine Check"
 echo "SHAPE_LEVEL=$shape_level"
+echo "DOCTRINE_LAYOUT=$doctrine_layout"
 echo "MATURE_TRACEABILITY_GATE=$mature_traceability_gate"
 echo "ACTIVE_CHANGE_COUNT=$active_change_count"
 echo "ACTIVE_SPEC_COUNT=$spec_docs"
