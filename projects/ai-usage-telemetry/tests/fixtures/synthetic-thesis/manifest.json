@@ -1,0 +1,23 @@
+{
+  "version": "synthetic-thesis@1",
+  "synthetic": true,
+  "required_fields": ["requestId", "messageId", "model", "sourceTime", "amounts"],
+  "allowed_amounts": ["input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"],
+  "max_record_bytes": 65536,
+  "max_container_depth": 32,
+  "capture_canaries": ["application_value", "parser_instrumentation", "log", "exception", "crash", "sqlite", "sink", "image", "environment", "network"],
+  "fixtures": {
+    "qualified-claude.jsonl": {"projected_sha256": "abb6d40155da89a2a655fdb5c115ff9f72f6bb55ecf334007757ee4483929316"},
+    "negative-requestId.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "negative-digest.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "negative-projected_type.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "collision-b.jsonl": {"projected_sha256": "51eaef31794c5b4bf7b6f304c6b3a80547589b646a13626248bded5a2c905d56"},
+    "privacy-duplicate-registered.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "privacy-nested.jsonl": {"projected_sha256": "abb6d40155da89a2a655fdb5c115ff9f72f6bb55ecf334007757ee4483929316"},
+    "privacy-escaped.jsonl": {"projected_sha256": "abb6d40155da89a2a655fdb5c115ff9f72f6bb55ecf334007757ee4483929316"},
+    "privacy-malformed.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "privacy-depth-at-limit.jsonl": {"projected_sha256": "abb6d40155da89a2a655fdb5c115ff9f72f6bb55ecf334007757ee4483929316"},
+    "privacy-depth-over-limit.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "privacy-oversized-skip.jsonl": {"projected_sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+  }
+}
