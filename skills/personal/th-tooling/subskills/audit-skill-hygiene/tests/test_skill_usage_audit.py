@@ -126,8 +126,13 @@ class CatalogManifestTests(unittest.TestCase):
             manifest = json.loads(result.stdout)
             entries = {entry["name"]: entry for entry in manifest["skills"]}
             self.assertEqual(entries["shared-name"]["source"], "skills/alpha/shared-name")
+            self.assertEqual(
+                entries["shared-name"]["collision_losers"],
+                ["skills/deeper/nested/shared-name", "skills/omega/shared-name"],
+            )
             self.assertEqual(entries["vendor-skill"]["ownership"], "submodule")
-            self.assertNotIn("writing-skills", entries)
+            self.assertIn("writing-skills", entries)
+            self.assertEqual(manifest["excluded_names"], [])
             self.assertNotIn("archived-skill", entries)
             self.assertNotIn("hidden-skill", entries)
             self.assertNotIn(str(repo), result.stdout)

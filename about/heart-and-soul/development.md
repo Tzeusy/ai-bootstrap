@@ -4,7 +4,9 @@
 
 1. Prefer editing canonical shared content before touching downstream tool-specific copies.
 2. Introduce tool-specific files only when the target platform's syntax or execution model requires it.
-3. Preserve provenance. If a non-`personal/` skill came from upstream, update from upstream or fork intentionally instead of silently treating the vendored copy as wholly local authorship.
+3. Preserve provenance. If active content came from upstream, keep its source
+   revision, authorship, license, and local relationship visible inside the
+   tuned `skills/personal/` package.
 4. Preserve local-only boundaries. New runtime files belong in ignored paths unless they are deliberately portable, non-secret defaults.
 5. Keep regeneration scripts with the artifacts they justify; do not hand-edit vendored outputs without updating their regeneration path.
 6. Keep the Beads operating model explicit when touching project workflow docs. If the main execution path changes, doctrine and topology must change with it.

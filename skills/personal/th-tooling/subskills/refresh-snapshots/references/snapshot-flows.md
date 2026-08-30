@@ -19,9 +19,8 @@ command, verification, and last-verified date.
 - **Source**: `ai-bootstrap/scripts/link-ai-skills.sh`, invoked by
   `~/.dotfiles/bootstrap.sh` ("Linking shared AI skills" section).
   Discovery prunes `subskills/` (superskills install as one catalog entry)
-  and `archive/` (retired skills stay cloned but unlinked), and skips names
-  in the `skill_catalog_exclude` list (for skills inside upstream submodules
-  that cannot be archived by `git mv`; currently `writing-skills`). Codex
+  `archive/` (retired packages stay available but unlinked), and `.system`
+  (runtime-owned packages are not authored catalog input). Codex
   cannot use the direct directory symlinks because it follows them
   recursively during catalog discovery; its generated wrapper preserves the
   root frontmatter and directs Codex to read the canonical source. A
@@ -65,9 +64,9 @@ command, verification, and last-verified date.
 ## 2. Git submodules
 
 - **Snapshot**: submodule checkouts pinned to recorded pointers —
-  `~/.dotfiles` records `ai-bootstrap`; `ai-bootstrap` records skill
-  submodules (see its `.gitmodules`; archived ones live under
-  `skills/archive/`) and `.claude/plugins/marketplaces/`.
+  `~/.dotfiles` records `ai-bootstrap`; `ai-bootstrap` records only the Claude
+  marketplace under `.claude/plugins/marketplaces/`. Skill sources are local,
+  not submodules.
 - **Refresh** (to recorded pointer — safe):
   `git submodule update --init --recursive` in each repo.
 - **Advance** (moves pointers):
