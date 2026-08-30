@@ -19,8 +19,8 @@ The current operating model is **skills-first**, not `agents/`-first. Shared wor
 .codex/            # Codex config, prompts, rules, and linked skill entrypoints
 .gemini/           # Gemini CLI config plus linked skills/antigravity skills
 opencode/          # OpenCode config
-skills/            # Canonical shared skill library
-skills/personal/   # Primary home of Beads and project workflow skills
+skills/            # Canonical skill library plus pruned legacy archive
+skills/personal/   # Active authored roots for the shared operating model
 agents/            # Older agent prompts kept for reference / selective reuse
 about/             # Five-pillar project-shape docs for doctrine, contracts, topology, and standards
 openspec/          # Normative repository-shape requirements and change records
@@ -37,32 +37,32 @@ product behavior.
 
 ## Skills Layout And Provenance
 
-The `skills/` tree is intentionally split by ownership:
+The active `skills/` catalog has one authored source:
 
-- `skills/personal/` is the layer built and maintained by me.
-- These are the primary place for custom workflow logic, project-shaping methods, and Beads execution patterns.
+- `skills/personal/` contains every active root built and maintained locally.
+- These are the home for custom workflow logic, project-shaping methods, Beads execution patterns, and secret-safe BWS usage.
 - Some personal skills are original; some are maintained forks adapted to my workflow. `skills/personal/th-engineering/subskills/excalidraw-diagram/` is an example of that pattern.
 
-Everything else under top-level `skills/` should be treated as upstream-derived material:
+Inactive imports remain visibly separate:
 
-- Some directories are checked out as git submodules from open source upstreams.
-- The current submodules are `skills/superpowers`, `skills/archive/Skill_Seekers`,
-  `skills/archive/anthropic-skills`, `skills/archive/notebooklm-skill`,
-  `skills/archive/mattpocock-skills`, and
-  `.claude/plugins/marketplaces/claude-plugins-official`.
-- Every other non-`personal/` skill directory is a vendored copy of an open source skill or skill bundle.
+- `skills/archive/` contains retired, non-catalog packages retained only for
+  history-backed rollback. The linker prunes the whole directory.
+- The current submodule inventory is
+  `.claude/plugins/marketplaces/claude-plugins-official` only. No skill source
+  is a git submodule.
 
 In practice, that means:
 
 - If the workflow is specific to my operating model, it belongs in `skills/personal/`.
-- If a top-level skill came from upstream, prefer updating from upstream or forking intentionally instead of casually rewriting the vendored copy.
+- If archived upstream material is revived, move and tune it under
+  `skills/personal/` with explicit source revision, authorship, and license.
 - Tool-specific skill directories under `.claude/skills`, `.codex/skills`, and `.gemini/skills` are generated runtime views of this source tree, not the source of truth. Claude and Gemini use direct directory links. Codex uses a shallow generated wrapper per root skill because it recursively discovers `SKILL.md` files through directory symlinks; each wrapper keeps the root frontmatter and points back to the canonical source before use.
 
 ## Primary Workflow
 
 ### 1. Shared skills are canonical
 
-Each root skill lives in `skills/<name>/SKILL.md` or `skills/personal/<name>/SKILL.md`. The included `scripts/link-ai-skills.sh` installer discovers those roots while pruning `subskills/` and `archive/`; `~/.dotfiles/bootstrap.sh` calls that script on dotfiles-managed machines:
+Each active root skill lives in `skills/personal/<name>/SKILL.md`. The included `scripts/link-ai-skills.sh` installer discovers those roots while pruning `subskills/`, `archive/`, and `.system`; `~/.dotfiles/bootstrap.sh` calls that script on dotfiles-managed machines:
 
 - `~/.claude/skills/`, `~/.gemini/skills/`, and `~/.gemini/antigravity/skills/` receive direct source-directory symlinks.
 - `~/.codex/skills/` receives shallow, generated wrapper directories. The wrapper's `SKILL.md` is catalog metadata plus an instruction to read the canonical source; it deliberately contains no `subskills/` tree.

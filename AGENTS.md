@@ -106,6 +106,13 @@ here, start from `about/README.md` (or the relevant pillar README) and follow
 its routing. Reading `about/craft-and-care/` is mandatory for non-trivial
 changes.
 
-# Notes to self
+## Notes to self
 
-- Before dispatching a baseline-pinned ready bead, verify its governing paths still exist on current `main` and reconcile prior merged PRs plus later history; a stale ready record may describe work that was completed and then deliberately removed, and must not resurrect that surface.
+- Before dispatching a baseline-pinned ready bead, verify its governing paths
+  still exist on current `main` and reconcile prior merged PRs plus later
+  history; a stale ready record may describe work that was completed and then
+  deliberately removed, and must not resurrect that surface.
+- Active catalog roots live only under `skills/personal/`; the linker prunes
+  `skills/archive/`, `subskills/`, and `.system`, reports collision losers in
+  its manifest, and no skill source is a git submodule. The retained repository
+  submodule is the Claude marketplace under `.claude/plugins/marketplaces/`.

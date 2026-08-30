@@ -29,16 +29,18 @@ Scope: v1-mandatory
 
 ### Requirement: Provenance Visibility
 
-The repository MUST preserve visible provenance for shared skills so contributors can distinguish locally authored workflow logic from upstream-derived material and intentional forks.
+The repository MUST preserve visible provenance for shared skills so contributors can distinguish original local workflow logic from upstream-derived material and intentional forks within the authored catalog.
 
 ID: REQ-repository-shape-002
 Source: Doctrine rules 1, 3, and 7; RFC 0001 §Repository Layers, §Source-of-Truth Rules
 Scope: v1-mandatory
 
-#### Scenario: Upstream-derived skill tree
+#### Scenario: Upstream-derived active skill
 
-- **WHEN** a non-`personal/` skill directory is mirrored locally for installation
-- **THEN** the repository continues to identify it as upstream-derived, vendored, or intentionally forked rather than silently relabeling it as wholly local authorship
+- **WHEN** upstream-derived material remains active under `skills/personal/`
+- **THEN** its package records the source revision, authorship, license, and
+  relationship to the local adaptation rather than silently relabeling it as
+  wholly local authorship
 
 #### Scenario: Intentional fork
 
