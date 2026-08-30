@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "router": "th-engineering",
+  "cases": [
+    {
+      "id": "holistic-quality",
+      "kind": "positive",
+      "query": "Hold this implementation to the engineering bar and tell me whether it is done.",
+      "expected_routes": ["engineering-bar"]
+    },
+    {
+      "id": "readability",
+      "kind": "positive",
+      "query": "Review these functions for naming, abstraction level, and readability.",
+      "expected_routes": ["code-readability"]
+    },
+    {
+      "id": "test-quality",
+      "kind": "positive",
+      "query": "Audit these tests for weak assertions, missing failure cases, and flakiness.",
+      "expected_routes": ["test-rigor"]
+    },
+    {
+      "id": "dependencies",
+      "kind": "positive",
+      "query": "Untangle these module dependencies and check whether the new library belongs here.",
+      "expected_routes": ["dependency-hygiene"]
+    },
+    {
+      "id": "diagnosis",
+      "kind": "positive",
+      "query": "Diagnose this intermittent performance regression to root cause.",
+      "expected_routes": ["diagnosis"]
+    },
+    {
+      "id": "cleanup",
+      "kind": "positive",
+      "query": "Clean up the aliases and fallback paths left by this refactor.",
+      "expected_routes": ["cruft-cleanup"]
+    },
+    {
+      "id": "documentation",
+      "kind": "positive",
+      "query": "Document this service and verify its interface claims against the code.",
+      "expected_routes": ["documentation"]
+    },
+    {
+      "id": "skill-authoring",
+      "kind": "positive",
+      "query": "Create a repo-owned superskill that works across our Codex and Claude adapters.",
+      "expected_routes": ["skill-authoring"]
+    },
+    {
+      "id": "skill-review",
+      "kind": "positive",
+      "query": "Review this skill package for trigger quality and context efficiency.",
+      "expected_routes": ["skill-standards"]
+    },
+    {
+      "id": "diagram",
+      "kind": "positive",
+      "query": "Draw an Excalidraw architecture diagram and render it to SVG.",
+      "expected_routes": ["excalidraw-diagram"]
+    },
+    {
+      "id": "project-governance-negative",
+      "kind": "negative",
+      "query": "Prioritize the next milestone and amend the project doctrine.",
+      "expected_routes": []
+    },
+    {
+      "id": "product-ux-negative",
+      "kind": "negative",
+      "query": "Review the checkout flow's visual hierarchy and keyboard accessibility.",
+      "expected_routes": []
+    },
+    {
+      "id": "ambiguous-doc-code",
+      "kind": "ambiguous",
+      "query": "Make this error-handling module easier for maintainers to understand.",
+      "expected_routes": ["code-readability", "documentation"]
+    }
+  ]
+}
