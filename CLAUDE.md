@@ -57,11 +57,12 @@ the relevant pillar README) and follow its routing. Reading
 
 ## Architecture Overview
 
-Skills-first (see README.md). Canonical skills live in `skills/`;
-`skills/personal/` is the user-maintained layer, everything else is
-upstream-derived (submodules or vendored). Superskills (`beads-orchestration`,
-`th-projects`, `th-engineering`) are router `SKILL.md` + `subskills/` packages;
-only the router enters the global catalog. `agents/` is legacy/reference.
+Skills-first (see README.md). Active authored roots live in `skills/personal/`;
+`skills/archive/` is pruned mixed-origin history. Six router-style active roots
+(`beads-orchestration`, `th-design`, `th-engineering`, `th-projects`,
+`th-tooling`, `th-writing`) keep workflows in hidden `subskills/`; only each
+router enters the global catalog. `bws-cli-skill` is the narrow standalone
+root. `agents/` is legacy/reference.
 
 ## Conventions & Patterns
 
