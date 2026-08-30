@@ -23,6 +23,7 @@ README is a signpost for humans browsing the repo, nothing more.
 | `scripts/spec-trace-check.py` | Mechanical spec-traceability validator (`uv run`) |
 | `scripts/validate-th-projects.sh` | Package self-test — run after any change here |
 | `tests/fixtures/` | Regression fixtures consumed by the validator |
+| `evals/routing.json` | Unloaded root and mode routing cases consumed by the package validator |
 
 Subskills are internal: `bootstrap.sh` prunes `subskills/` on install so only
 the router enters a tool's global skill catalog.
