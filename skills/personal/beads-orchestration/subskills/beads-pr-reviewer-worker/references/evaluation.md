@@ -31,6 +31,7 @@ python3 scripts/discover_quality_gates.py --help || true
 python3 scripts/reply_to_review_thread.py --help
 python3 scripts/resolve_review_thread.py --help
 python3 scripts/create_inline_review_comment.py --help
+python3 scripts/emit_reviewer_report.py --help
 ```
 
 Also run syntax validation:
@@ -63,7 +64,9 @@ On a safe test PR:
 3. list threads
 4. post a reply with a stable dedupe key
 5. rerun the same reply and verify it is skipped as duplicate
-6. evaluate merge readiness with required checks available
+6. evaluate merge readiness with the reviewed head, fetched base SHA, and a
+   declared minimum required-check count; verify moved-head, stale-base,
+   undersized-check-set, and unavailable-check evidence all fail closed
 7. verify a required-check fetch failure fails closed
 8. verify a correction report records the exact reviewed head and leaves the
    implementation lane—not the reviewer—as code owner
@@ -78,3 +81,4 @@ Do not consider the skill update complete unless:
 - reviewer/coordinator status vocabularies match
 - exact-head and reviewer-independence rules match
 - the merge-readiness helper fails closed when check status is unavailable
+- the reviewer-report helper rejects an unauthorized performed merge

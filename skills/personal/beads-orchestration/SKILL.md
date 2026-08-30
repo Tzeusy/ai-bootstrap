@@ -1,88 +1,57 @@
 ---
 name: beads-orchestration
-description: Use for any Beads (`bd`) issue workflow in a Beads-backed repository — coordinating unattended execution of ready issues across parallel workers, implementing a single dispatched issue in a worktree, handling PR-review follow-up tasks, reconciling stale worker/PR/worktree state, or creating and decomposing backlog issues. Route to exactly one subskill per task.
+description: >-
+  Use for any Beads (`bd`) issue workflow in a Beads-backed repository:
+  backlog execution, one dispatched implementation, PR-review follow-up,
+  stale-state cleanup, or backlog authoring. Route to exactly one subskill.
 metadata:
   owner: tze
   authors:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-18"
-compatibility: Requires bd (beads) CLI v1.0.4+, git, and a Beads-backed repository. Execution subskills additionally require gh (authenticated), jq, python3, and git worktree support.
+  last_reviewed: "2026-08-31"
+compatibility: Requires bd v1.0.4+ and git. Execution routes also require gh, jq, Python 3, and git worktrees.
 ---
 
 # Beads Orchestration
 
-Superskill router for the Beads issue-execution fleet. Five subskills live under
-`subskills/`; each is a complete standard skill package (own `SKILL.md`,
-`references/`, `scripts/`). Subskills are **not** installed in the global skill
-catalog — discover them lazily from this package, and load **at most one**
-subskill body per task (the coordinator may additionally point dispatched
-workers at a second one; the workers load it themselves).
+Select one package-local workflow. Load only its `SKILL.md`; subskills are not
+installed in the global catalog.
 
-## Discover subskills
+| Intent | Route |
+|---|---|
+| Process ready work, claim, dispatch, and reconcile. Sole owner of execution-time `bd create/update/dep/close`. | [beads-coordinator](subskills/beads-coordinator/SKILL.md) |
+| Implement one issue after receiving `ISSUE_ID` and `WORKTREE_PATH`. | [beads-worker](subskills/beads-worker/SKILL.md) |
+| Review one existing PR from a dispatched `pr-review-task` bead. | [beads-pr-reviewer-worker](subskills/beads-pr-reviewer-worker/SKILL.md) |
+| Audit/reconcile stale claims, review state, or worktrees without running the loop. | [beads-cleanup](subskills/beads-cleanup/SKILL.md) |
+| Create, decompose, or groom backlog items outside an execution run. | [beads-writer](subskills/beads-writer/SKILL.md) |
 
-```bash
-find "$(dirname "$SKILL_PATH")/subskills" -maxdepth 2 -name SKILL.md
-rg -n "^name:|^description:" subskills/*/SKILL.md
-```
+Routing boundaries:
 
-## Routing table
+- A backlog-processing request routes to coordinator, never directly to worker.
+- Worker/reviewer requires a dispatched contract. Cleanup is preflight/recovery,
+  not a loop. Writer yields mutation authority when execution begins.
+- One-off read-only queries need no subskill. Project priority belongs to
+  `th-projects`.
+- Ambiguous author-and-execute requests need writer and coordinator as separate
+  sequential phases, never two simultaneously loaded workflows.
 
-| Task intent | Subskill | Typical trigger |
-|---|---|---|
-| Run the unattended loop: select ready issues, claim, dispatch workers, reconcile outcomes. Owns ALL `bd` lifecycle mutations. | [subskills/beads-coordinator/SKILL.md](subskills/beads-coordinator/SKILL.md) | "while true, tackle the next issue", "keep N workers processing the backlog" |
-| Implement exactly one Beads issue; requires ISSUE_ID and WORKTREE_PATH from a coordinator or operator. | [subskills/beads-worker/SKILL.md](subskills/beads-worker/SKILL.md) | Dispatched with a worker contract for one implementation bead |
-| Process one `pr-review-task` bead: triage threads, report corrections to the implementation lane, attest exact-head merge readiness. | [subskills/beads-pr-reviewer-worker/SKILL.md](subskills/beads-pr-reviewer-worker/SKILL.md) | Dispatched with a `pr-review-task` bead for an open GitHub PR |
-| Reconcile stale worker state, PR-review bookkeeping, and orphaned worktrees before dispatching new work. | [subskills/beads-cleanup/SKILL.md](subskills/beads-cleanup/SKILL.md) | Coordinator preflight; recovery after a crashed loop; "clean up stale beads state" |
-| Create or decompose backlog issues: features, bugs, epics, grooming, vague ask → actionable beads. | [subskills/beads-writer/SKILL.md](subskills/beads-writer/SKILL.md) | "file beads for X", "break this epic down", backlog grooming |
+Shared hard stops:
 
-## Routing rules
+- Coordinator is the sole mutation authority during execution. Workers report;
+  they do not mutate Beads lifecycle state.
+- Standalone beads-writer may mutate backlog state during explicit authoring;
+  it yields that authority before execution begins.
+- Worktrees are `.worktrees/parallel-agents/<id>` on `agent/<id>`; never commit
+  `.beads/`.
+- Load [decision autonomy](references/decision-autonomy.md) only for a
+  decision-shaped blocker.
+- Load [token efficiency](references/token-efficiency.md) once before the first
+  `bd`/`gh` loop; project JSON and tail verbose gate logs.
+- On unexpected `bd` behavior, grep
+  [known errors](references/known-errors.md) first:
+  `rg -i -n '<distinctive error>' references/known-errors.md`. Read only the
+  matching section; follow its maintenance contract for a genuinely new error.
 
-- **Coordinator vs. worker**: if the request is to *process the backlog*, route
-  to the coordinator — never start implementing issues yourself. Route to a
-  worker subskill only when a coordinator/operator has already supplied the
-  worker contract (ISSUE_ID, WORKTREE_PATH).
-- **Cleanup is a preflight, not a loop**: the coordinator invokes it before its
-  first cycle; route to it directly only for explicit recovery/audit asks.
-- **Writer is standalone**: backlog creation needs no worktrees and no
-  coordinator; it never dispatches execution.
-- **Fallback**: if the task is Beads-adjacent but none of the rows fit (e.g.
-  one-off `bd` queries, project prioritization), do not load a subskill — use
-  plain `bd` commands or a dedicated skill such as `th-projects`
-  (project-direction subskill).
-
-## Shared invariants (all subskills)
-
-- During an execution run, the coordinator is the **sole mutation authority**
-  for canonical lifecycle state (`bd create/update/dep/close`); dispatched
-  workers and cleanup report instead of mutating. The standalone beads-writer
-  may create/update/depend backlog items during explicit authoring before
-  dispatch, but hands mutation authority to the coordinator once execution
-  starts.
-- Worktrees live at `.worktrees/parallel-agents/<id>` on branch `agent/<id>`.
-- `.beads/` is Dolt-backed and gitignored — never commit it to code branches.
-- bd 1.0.4 has no `--rig` flag: target another project with `bd -C <path> …`.
-- **Decide, don't defer.** Engineering-judgment choices are resolved
-  autonomously per [`references/decision-autonomy.md`](references/decision-autonomy.md);
-  blocking on a human is reserved for its hard-gate list. Load that file before
-  filing or reconciling any decision-shaped blocker.
-- **Spend tokens like money.** All subskills follow
-  [`references/token-efficiency.md`](references/token-efficiency.md): project
-  JSON output through `jq` to needed fields, route verbose gate output to files
-  and read only failures, iterate on targeted tests before the single full
-  gate, and right-size worker models. Load it once per session before the
-  first `bd`/`gh` query loop.
-
-## When `bd` itself misbehaves
-
-On any unexpected `bd` error (connection failures, unknown flags, refused
-mutations, weird exit states), consult
-[`references/known-errors.md`](references/known-errors.md) **before**
-debugging from scratch — it catalogs known errors, deprecations, and
-workarounds. Search it instead of reading it whole: run
-`rg -i -n '<distinctive error text>' references/known-errors.md`, then read
-only the matching section (fall back to skimming the headers via
-`rg -n '^##' …` if the search misses). If you hit a rough edge that is not
-listed, append an entry after resolving it: that file is this skill's
-persistent memory, and an unrecorded fix gets re-debugged by the next session.
+Unloaded routing cases live in [`evals/routing.json`](evals/routing.json).

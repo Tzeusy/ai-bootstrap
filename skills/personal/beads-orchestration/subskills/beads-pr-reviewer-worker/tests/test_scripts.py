@@ -138,6 +138,8 @@ def _make_gh_evaluate(bin_dir: FakeBinDir, *, pr_state: str = "OPEN",
         "url": "https://github.com/owner/repo/pull/42",
         "baseRefName": "main",
         "headRefName": "agent/test-42",
+        "baseRefOid": "base-abc",
+        "headRefOid": "head-abc",
     })
     if check_states is None:
         checks_json = json.dumps([{"state": "SUCCESS"}])
@@ -171,6 +173,14 @@ sys.exit(1)
 """)
 
 
+def _merge_args(*extra: str) -> list[str]:
+    return [
+        "--owner", "owner", "--repo", "repo", "--pr-number", "42",
+        "--reviewed-head", "head-abc", "--expected-base-sha", "base-abc",
+        "--minimum-check-count", "1", *extra,
+    ]
+
+
 class EvaluateMergeReadinessTests(unittest.TestCase):
     def test_merge_ok_when_all_conditions_green(self) -> None:
         with FakeBinDir() as fbd:
@@ -178,7 +188,7 @@ class EvaluateMergeReadinessTests(unittest.TestCase):
                               merge_state="CLEAN", unresolved=0,
                               check_states=["SUCCESS"])
             result = run_script("evaluate_merge_readiness.py",
-                                ["--owner", "owner", "--repo", "repo", "--pr-number", "42"],
+                                _merge_args(),
                                 env=fbd.env())
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
@@ -189,7 +199,7 @@ class EvaluateMergeReadinessTests(unittest.TestCase):
         with FakeBinDir() as fbd:
             _make_gh_evaluate(fbd, unresolved=2)
             result = run_script("evaluate_merge_readiness.py",
-                                ["--owner", "owner", "--repo", "repo", "--pr-number", "42"],
+                                _merge_args(),
                                 env=fbd.env())
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
@@ -200,7 +210,7 @@ class EvaluateMergeReadinessTests(unittest.TestCase):
         with FakeBinDir() as fbd:
             _make_gh_evaluate(fbd, check_states=["FAILURE"])
             result = run_script("evaluate_merge_readiness.py",
-                                ["--owner", "owner", "--repo", "repo", "--pr-number", "42"],
+                                _merge_args(),
                                 env=fbd.env())
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
@@ -211,7 +221,7 @@ class EvaluateMergeReadinessTests(unittest.TestCase):
         with FakeBinDir() as fbd:
             _make_gh_evaluate(fbd, is_draft=True)
             result = run_script("evaluate_merge_readiness.py",
-                                ["--owner", "owner", "--repo", "repo", "--pr-number", "42"],
+                                _merge_args(),
                                 env=fbd.env())
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
@@ -222,7 +232,7 @@ class EvaluateMergeReadinessTests(unittest.TestCase):
         with FakeBinDir() as fbd:
             _make_gh_evaluate(fbd, pr_state="CLOSED")
             result = run_script("evaluate_merge_readiness.py",
-                                ["--owner", "owner", "--repo", "repo", "--pr-number", "42"],
+                                _merge_args(),
                                 env=fbd.env())
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
@@ -233,7 +243,7 @@ class EvaluateMergeReadinessTests(unittest.TestCase):
         with FakeBinDir() as fbd:
             _make_gh_evaluate(fbd, review_decision="CHANGES_REQUESTED")
             result = run_script("evaluate_merge_readiness.py",
-                                ["--owner", "owner", "--repo", "repo", "--pr-number", "42"],
+                                _merge_args(),
                                 env=fbd.env())
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
@@ -244,7 +254,7 @@ class EvaluateMergeReadinessTests(unittest.TestCase):
         with FakeBinDir() as fbd:
             _make_gh_evaluate(fbd, check_states=["PENDING"])
             result = run_script("evaluate_merge_readiness.py",
-                                ["--owner", "owner", "--repo", "repo", "--pr-number", "42"],
+                                _merge_args(),
                                 env=fbd.env())
         payload = json.loads(result.stdout)
         self.assertFalse(payload["merge_ok"])
@@ -254,7 +264,7 @@ class EvaluateMergeReadinessTests(unittest.TestCase):
         with FakeBinDir() as fbd:
             _make_gh_evaluate(fbd, check_states=["SKIPPED"])
             result = run_script("evaluate_merge_readiness.py",
-                                ["--owner", "owner", "--repo", "repo", "--pr-number", "42"],
+                                _merge_args(),
                                 env=fbd.env())
         payload = json.loads(result.stdout)
         self.assertTrue(payload["merge_ok"])
@@ -263,7 +273,7 @@ class EvaluateMergeReadinessTests(unittest.TestCase):
         with FakeBinDir() as fbd:
             _make_gh_evaluate(fbd, checks_error="fatal: unable to fetch checks")
             result = run_script("evaluate_merge_readiness.py",
-                                ["--owner", "owner", "--repo", "repo", "--pr-number", "42"],
+                                _merge_args(),
                                 env=fbd.env())
         self.assertNotEqual(result.returncode, 0)
         payload = json.loads(result.stderr)
@@ -273,9 +283,33 @@ class EvaluateMergeReadinessTests(unittest.TestCase):
         with FakeBinDir() as fbd:
             _make_gh_evaluate(fbd)
             result = run_script("evaluate_merge_readiness.py",
-                                ["--owner", "owner", "--repo", "repo", "--pr-number", "42", "--dry-run"],
+                                _merge_args("--dry-run"),
                                 env=fbd.env())
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_moved_head_and_stale_base_block_merge(self) -> None:
+        with FakeBinDir() as fbd:
+            _make_gh_evaluate(fbd)
+            result = run_script(
+                "evaluate_merge_readiness.py",
+                [
+                    "--owner", "owner", "--repo", "repo", "--pr-number", "42",
+                    "--reviewed-head", "old-head", "--expected-base-sha", "old-base",
+                ],
+                env=fbd.env(),
+            )
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["merge_ok"])
+        self.assertIn("reviewed_head=moved", payload["reasons"])
+        self.assertIn("base_sha=stale", payload["reasons"])
+
+    def test_minimum_required_check_count_blocks_empty_set(self) -> None:
+        with FakeBinDir() as fbd:
+            _make_gh_evaluate(fbd, check_states=[])
+            result = run_script("evaluate_merge_readiness.py", _merge_args(), env=fbd.env())
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["merge_ok"])
+        self.assertIn("required_check_count=0<minimum=1", payload["reasons"])
 
 
 # ---------------------------------------------------------------------------
