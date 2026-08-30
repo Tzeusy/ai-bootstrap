@@ -59,7 +59,14 @@ command, verification, and last-verified date.
        -type f -name SKILL.md -print0)
   ```
 
-- **Last verified**: 2026-08-01
+- **Verification evidence (2026-08-31)**: the focused linker exposes exactly
+  seven roots: `beads-orchestration`, `bws-cli-skill`, `th-design`,
+  `th-engineering`, `th-projects`, `th-tooling`, and `th-writing`. Claude Code
+  2.1.251 isolated `/skills` debug reports those seven project skills. Gemini
+  CLI 0.28.2 `loadSkillsFromDir` returns the same seven names for both Gemini
+  surfaces. Codex contains exactly seven shallow wrappers and no nested
+  `SKILL.md`.
+- **Last verified**: 2026-08-31
 
 ## 2. Git submodules
 
@@ -77,7 +84,12 @@ command, verification, and last-verified date.
   pointer-advancing operation, not just a restore.
 - **Verify**: `git submodule status --recursive` shows no `-` (missing) or
   `+` (drifted from recorded pointer) prefixes you did not just create.
-- **Last verified**: 2026-06-12
+- **Verification evidence (2026-08-31)**: the canonical checkout's
+  `.gitmodules` and recursive submodule status identify only
+  `.claude/plugins/marketplaces/claude-plugins-official`; the repository
+  contract passes its explicit assertion that no gitlink remains under
+  `skills/`.
+- **Last verified**: 2026-08-31
 
 ## 3. oh-my-zsh and custom plugin clones
 
