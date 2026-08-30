@@ -12,7 +12,7 @@ metadata:
     - tze
     - Claude Fable 5
   status: active
-  last_reviewed: "2026-06-12"
+  last_reviewed: "2026-08-31"
 compatibility: Usage auditing requires uv and Python 3.9+; workflows assume the ~/.dotfiles and ai-bootstrap layout.
 ---
 
