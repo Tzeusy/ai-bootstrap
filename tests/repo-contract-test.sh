@@ -62,7 +62,7 @@ fi
 echo "=== active skill catalog topology ==="
 
 manifest=$(./scripts/link-ai-skills.sh --catalog-manifest .)
-expected_skills='["beads-orchestration","bws-cli-skill","th-blogpost","th-design","th-engineering","th-projects","th-tooling","th-writing"]'
+expected_skills='["beads-orchestration","bws-cli-skill","th-design","th-engineering","th-projects","th-tooling","th-writing"]'
 
 if jq -e --argjson expected "$expected_skills" \
     '([.skills[].name] | sort) == ($expected | sort)' <<<"$manifest" >/dev/null; then
