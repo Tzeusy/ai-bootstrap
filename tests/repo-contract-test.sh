@@ -78,6 +78,18 @@ else
   _fail "catalog contains a non-personal source or stale exclusion"
 fi
 
+architecture=$(awk '/^## Architecture Overview/{f=1;next} f&&/^## /{exit} f' CLAUDE.md)
+expected_routers='`beads-orchestration`, `th-design`, `th-engineering`, `th-projects`, `th-tooling`, `th-writing`'
+compact_architecture=$(tr '\n' ' ' <<<"$architecture" | tr -s ' ')
+if [[ "$compact_architecture" == *'Active authored roots live in `skills/personal/`;'* ]] \
+    && [[ "$compact_architecture" == *'`skills/archive/` is pruned mixed-origin history.'* ]] \
+    && [[ "$compact_architecture" == *"Six router-style active roots ($expected_routers)"* ]] \
+    && [[ "$compact_architecture" == *'`bws-cli-skill` is the narrow standalone root.'* ]]; then
+  _pass "CLAUDE.md architecture matches catalog source, archive, and router topology"
+else
+  _fail "CLAUDE.md Architecture Overview drifted from the active catalog topology"
+fi
+
 skill_gitlinks=$(git ls-files -s skills | awk '$1 == 160000 {print $4}')
 if [[ -z "$skill_gitlinks" ]]; then
   _pass "no gitlink remains under skills/"
