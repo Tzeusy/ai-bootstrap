@@ -78,10 +78,15 @@ with open(path, encoding="utf-8") as handle:
     data = json.load(handle)
 
 assert data.get("schema_version") == 1, "schema_version must be 1"
+assert data.get("router") == "th-projects", "router must equal th-projects"
 cases = data.get("cases")
 assert isinstance(cases, list) and cases, "cases must be a non-empty list"
 
-required = {"id", "kind", "query", "expected_route", "expected_mode", "must_not_route", "rationale"}
+required = {"id", "kind", "query", "expected_routes", "expected_mode", "must_not_route", "rationale"}
+known_routes = {
+    "project-shape", "project-feature-request", "project-review",
+    "project-direction", "relentless-vision-pursuit", "user-questionnaire",
+}
 ids = set()
 for case in cases:
     missing = required - case.keys()
@@ -92,14 +97,27 @@ for case in cases:
     assert isinstance(case["query"], str) and case["query"].strip(), f"{case['id']}: empty query"
     assert isinstance(case["rationale"], str) and case["rationale"].strip(), f"{case['id']}: empty rationale"
     assert isinstance(case["must_not_route"], list), f"{case['id']}: must_not_route must be a list"
-    assert case["expected_route"] not in case["must_not_route"], f"{case['id']}: expected route is forbidden"
+    routes = case["expected_routes"]
+    assert isinstance(routes, list), f"{case['id']}: expected_routes must be a list"
+    assert all(isinstance(route, str) and route for route in routes), f"{case['id']}: expected_routes contains an invalid route"
+    assert len(routes) == len(set(routes)), f"{case['id']}: expected_routes contains duplicates"
+    assert set(routes) <= known_routes, f"{case['id']}: expected_routes contains unknown routes"
+    assert not set(routes) & set(case["must_not_route"]), f"{case['id']}: expected route is forbidden"
+    if case["kind"] == "positive":
+        assert len(routes) == 1, f"{case['id']}: positive case needs exactly one route"
+    elif case["kind"] == "negative":
+        assert not routes, f"{case['id']}: negative case must have no routes"
+        assert isinstance(case.get("external_route"), str), f"{case['id']}: negative case needs external_route"
+    else:
+        assert len(routes) >= 2, f"{case['id']}: ambiguous case needs at least two routes"
+        assert case.get("preferred_route") in routes, f"{case['id']}: ambiguous case needs a preferred_route from expected_routes"
 
-routes = {case["expected_route"] for case in cases}
-required_routes = {
-    "project-shape", "project-feature-request", "project-review",
-    "project-direction", "relentless-vision-pursuit", "user-questionnaire",
+positive_routes = {
+    case["expected_routes"][0]
+    for case in cases
+    if case["kind"] == "positive"
 }
-assert required_routes <= routes, f"missing root routes: {sorted(required_routes - routes)}"
+assert known_routes <= positive_routes, f"missing root routes: {sorted(known_routes - positive_routes)}"
 
 modes = {case["expected_mode"] for case in cases if case["expected_mode"]}
 required_modes = {
@@ -113,7 +131,7 @@ required_modes = {
 assert required_modes <= modes, f"missing modes: {sorted(required_modes - modes)}"
 assert any(case["kind"] == "negative" for case in cases), "negative cases required"
 assert any(case["kind"] == "ambiguous" for case in cases), "ambiguous cases required"
-print(f"validated {len(cases)} routing cases, {len(routes)} routes, {len(modes)} modes")
+print(f"validated {len(cases)} routing cases, {len(positive_routes)} positive routes, {len(modes)} modes")
 PY
   ) || rc=$?
   if [[ $rc -eq 0 ]]; then
