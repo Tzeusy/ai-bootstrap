@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "router": "th-tooling",
+  "cases": [
+    {"id":"usage","kind":"positive","query":"Measure which installed skills are actually used without changing the catalog.","expected_routes":["audit-skill-hygiene"]},
+    {"id":"dotfiles","kind":"positive","query":"Review my zsh aliases and exports for conflicts and dead configuration.","expected_routes":["dotfiles-review"]},
+    {"id":"snapshots","kind":"positive","query":"Verify that installed skill links and mirrors match canonical source.","expected_routes":["refresh-snapshots"]},
+    {"id":"retention","kind":"positive","query":"My Codex transcripts are consuming disk; propose a retention policy.","expected_routes":["transcript-retention"]},
+    {"id":"memory","kind":"positive","query":"Compact stale notes-to-self and duplicate bd memories.","expected_routes":["memory-hygiene"]},
+    {"id":"config","kind":"positive","query":"Audit MCP servers, hooks, and permission allowlists against use.","expected_routes":["config-surface-audit"]},
+    {"id":"manual-handoff","kind":"negative","query":"This diagnostic needs my sudo password; give me a script to run.","expected_routes":[]},
+    {"id":"product-code","kind":"negative","query":"Refactor this application's dependency graph and tests.","expected_routes":[]},
+    {"id":"broad-hygiene","kind":"ambiguous","query":"Run a complete harness hygiene review across disk, catalog, and configuration.","expected_routes":["audit-skill-hygiene","transcript-retention","config-surface-audit"]}
+  ]
+}
