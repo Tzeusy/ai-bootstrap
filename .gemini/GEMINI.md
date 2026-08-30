@@ -78,6 +78,9 @@ you are in Implement Mode and cite the approved plan step.
 - **Consultative architecture**: For technology or architectural decisions,
   analyze trade-offs and pose targeted clarifying questions before
   recommending a stack. Do not default to a pre-selected stack.
+- **Manual handoff**: For sudo, TTY, 2FA, or other user-only steps, follow
+  [`manual-user-handoff.md`](../skills/personal/th-tooling/references/manual-user-handoff.md)
+  and read results from disk instead of requesting paste-back.
 
 ## Project-Level Context File
 

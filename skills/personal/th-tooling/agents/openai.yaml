@@ -1,4 +1,4 @@
 interface:
   display_name: TH Tooling
-  short_description: Route AI-harness hygiene work — audit skill usage, review dotfiles, or refresh snapshot state (symlinks, submodules).
+  short_description: Route one AI-harness hygiene task to one of six local workflows.
   default_prompt: Use $th-tooling to route this harness-hygiene task to the right subskill.

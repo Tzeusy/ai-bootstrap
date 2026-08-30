@@ -13,8 +13,8 @@ metadata:
     - Claude Fable 5
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-08-14"
-compatibility: Requires uv (Python 3.9+), git, and the canonical ai-bootstrap repository; reads configured Claude and Codex transcript sources without modifying them.
+  last_reviewed: "2026-08-31"
+compatibility: Requires uv, Python 3.9+, git, and the canonical ai-bootstrap repository; structured Codex counting requires an explicitly supported event schema.
 ---
 
 # Audit Skill Hygiene
@@ -33,12 +33,17 @@ archive, bootstrap, or otherwise alter any skill surface.
    ```bash
    uv run skills/personal/th-tooling/subskills/audit-skill-hygiene/scripts/skill_usage_audit.py \
      --repo-root . \
-     --as-of 2026-08-14T00:00:00Z
+     --as-of 2026-08-31T00:00:00Z \
+     --checkpoint ~/.cache/ai-bootstrap/skill-usage-audit-v1.json
    ```
 
    The primary window is 90 days, with a 30-day sensitivity window. Override
    either only when the report records the fixed `--as-of` value alongside it.
-   Add `--json` only when a machine-readable aggregate matrix is needed.
+   Add `--json` only for a machine-readable aggregate matrix. Codex counts
+   default to unavailable because current retained events have no supported
+   structured skill-read contract. Supply
+   `--codex-event-schema structured-skill-read-v1` only for a source known to
+   emit `skills.read` calls with an exact `skill` field.
 
 2. The audit invokes the linker's read-only catalog-manifest mode. That mode
    reuses the installer's exclusions, prune list, shallowest-path selection,
@@ -48,8 +53,8 @@ archive, bootstrap, or otherwise alter any skill surface.
    is `skills/`; the managed mirror surfaces are `.claude/skills`,
    `.codex/skills`, `.gemini/skills`, and `.gemini/antigravity/skills`.
 
-3. Read the 13-row decision matrix as an evidence ledger, not an execution
-   plan. It records aggregate Claude/Codex counts for both windows, coverage,
+3. Read the manifest-derived decision matrix as an evidence ledger, not an
+   execution plan. It records aggregate Claude/Codex counts for both windows, coverage,
    catalog token cost, freshness, ownership, trigger and overlap rationale,
    and a conservative disposition.
 
@@ -59,28 +64,36 @@ archive, bootstrap, or otherwise alter any skill surface.
   `tool_use` block named `Skill` with a string `input.skill`.
 - Claude slash: a `user` record whose user-message string has the complete
   command-message, command-name, and optional command-args event shape.
-- Codex: a `response_item` whose `function_call` payload is the `read_file`
-  function and whose JSON `arguments.path` is a `SKILL.md` path.
+- Codex, only under the explicit supported schema: a `response_item` whose
+  `function_call` is `skills.read` and whose encoded arguments object contains
+  an exact manifest skill in the `skill` field. Retired `read_file` events and
+  command strings are unsupported and never mined for names.
 
 Raw catalog mentions, prose tags, command arguments, and unrelated record
 values never count.
 
 Transcript records are streamed only to aggregate counters. Reports retain no
 transcript body, identifier, filename, project label, or absolute path. The
-report exposes source availability and coverage counts so a zero is never
-mistaken for complete retention history.
+report exposes source coverage and event-schema coverage separately so an
+unavailable runtime is never rendered as zero.
+
+The optional checkpoint stores catalog names, aggregate counters, and a
+one-way fingerprint of source metadata—never transcript names, paths,
+identifiers, or content. Repeating the same fixed-window audit over unchanged
+sources traverses metadata but reads zero transcript bytes. Any source change,
+window change, catalog change, malformed checkpoint, or input failure causes a
+fresh bounded-record scan and replaces the aggregate checkpoint only after a
+successful scan.
 
 ## Interpretation rules
 
-- Incomplete history makes zero-use rows `insufficient-evidence`.
+- Incomplete source or event-schema coverage makes rows
+  `insufficient-evidence`; unavailable runtime counts are `null`/`n/a`, not 0.
 - Newly added and unknown-age skills remain protected (`retain`).
 - With complete coverage and established age: three or more uses is `retain`,
   one or two is `marginal-review`, and zero is `candidate-follow-up` only.
-- `using-superpowers` remains `measurement-limited`: native catalog injection
-  can satisfy its session-start role without a readable call.
-- `dispatching-parallel-agents` and `subagent-driven-development` retain their
-  separate contracts: independent parallel dispatch versus plan execution and
-  review checkpoints.
+- Optional trigger and overlap rationale is maintained only for current names
+  that need it; row membership always comes from the linker manifest.
 
 ## Hard stops
 

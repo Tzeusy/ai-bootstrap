@@ -31,6 +31,9 @@
 ## Safety & Secrets
 - Never commit secrets; use local-only files for sensitive data.
 - Avoid destructive commands unless explicitly requested.
+- For sudo, TTY, 2FA, or other manual steps, follow
+  [`manual-user-handoff.md`](../skills/personal/th-tooling/references/manual-user-handoff.md)
+  and read results from disk instead of asking the user to paste them.
 
 ## Repository Memory Contract
 

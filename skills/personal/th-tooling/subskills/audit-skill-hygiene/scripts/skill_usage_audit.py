@@ -13,6 +13,7 @@ paths into its report.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import stat
@@ -27,7 +28,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 UTC = timezone.utc
 
-CANDIDATE_PROFILES: Tuple[Tuple[str, str, str], ...] = (
+PROFILE_RATIONALE: Dict[str, Tuple[str, str]] = dict((name, (trigger, overlap)) for name, trigger, overlap in (
     (
         "using-superpowers",
         "Session-start discovery guard for selecting applicable workflows.",
@@ -93,9 +94,9 @@ CANDIDATE_PROFILES: Tuple[Tuple[str, str, str], ...] = (
         "Evaluate code-review feedback rigorously before changing code.",
         "Distinct from requesting-code-review, which initiates the independent review.",
     ),
-)
+))
 
-CODEX_SKILL_READ_FUNCTION = "read_file"
+CODEX_SKILL_READ_FUNCTION = "skills.read"
 MAX_RECORD_BYTES = 1_048_576
 MAX_JSON_DEPTH = 64
 MAX_CONTAINER_MEMBERS = 1_024
@@ -109,8 +110,18 @@ _SOURCE_DESCRIPTORS_SUPPORTED = (
     and os.open in os.supports_dir_fd
     and os.scandir in os.supports_fd
 )
-_CANDIDATE_NAMES = tuple(profile[0] for profile in CANDIDATE_PROFILES)
+_CANDIDATE_NAMES = tuple(PROFILE_RATIONALE)
 _CANDIDATE_BYTES = tuple(name.encode("ascii") for name in _CANDIDATE_NAMES)
+
+
+def configure_candidates(names: Sequence[str]) -> None:
+    """Install only manifest-provided names in the byte-level matchers."""
+    global _CANDIDATE_NAMES, _CANDIDATE_BYTES
+    ordered = tuple(sorted(names))
+    if not ordered or any(not name.isascii() for name in ordered):
+        raise ValueError("catalog manifest contains unsupported skill names")
+    _CANDIDATE_NAMES = ordered
+    _CANDIDATE_BYTES = tuple(name.encode("ascii") for name in ordered)
 
 
 def default_repo_root() -> Path:
@@ -181,6 +192,16 @@ def load_catalog_manifest(repo_root: Path, manifest_path: Optional[Path]) -> Dic
         raise ValueError("catalog manifest is invalid") from exc
     if not isinstance(payload, dict) or payload.get("schema_version") != 1:
         raise ValueError("catalog manifest is invalid")
+    if not isinstance(payload.get("selection_rule"), str):
+        raise ValueError("catalog manifest is invalid")
+    if not isinstance(payload.get("excluded_names"), list) or any(
+        not isinstance(name, str) for name in payload["excluded_names"]
+    ):
+        raise ValueError("catalog manifest is invalid")
+    if not isinstance(payload.get("surfaces"), list) or any(
+        not isinstance(surface, str) for surface in payload["surfaces"]
+    ):
+        raise ValueError("catalog manifest is invalid")
     entries = payload.get("skills")
     if not isinstance(entries, list):
         raise ValueError("catalog manifest is invalid")
@@ -202,6 +223,7 @@ def load_catalog_manifest(repo_root: Path, manifest_path: Optional[Path]) -> Dic
         ):
             raise ValueError("catalog manifest is invalid")
         catalog[name] = {"source": source, "ownership": ownership}
+    configure_candidates(tuple(catalog))
     return catalog
 
 
@@ -243,6 +265,9 @@ class ScanOutcome:
     primary_counts: Counter
     sensitivity_counts: Counter
     input_errors: int = 0
+    records_scanned: int = 0
+    bytes_scanned: int = 0
+    cache_hit: bool = False
 
     @property
     def input_complete(self) -> bool:
@@ -260,6 +285,8 @@ class SourceIdentity:
     device: int
     inode: int
     file_type: int
+    size: int
+    modified_ns: int
 
 
 @dataclass(frozen=True)
@@ -664,7 +691,7 @@ def _slash_command_from_span(data: bytes, span: Optional[JsonSpan]) -> Optional[
 
 
 class EmbeddedJsonCursor:
-    """Parse the JSON object encoded in Codex read_file arguments without joining it."""
+    """Parse registered fields in encoded Codex arguments without joining them."""
 
     def __init__(self, reader: JsonStringReader) -> None:
         self.reader = reader
@@ -701,6 +728,42 @@ class EmbeddedJsonCursor:
             if self._consume(ord("}")):
                 self._finish()
                 return path
+            self._expect(ord(","))
+            self._skip_whitespace()
+
+    def parse_skill(self) -> Optional[str]:
+        """Accept only an exact manifest skill in a structured ``skill`` field."""
+        self._skip_whitespace()
+        self._expect(ord("{"))
+        self._skip_whitespace()
+        found = False
+        skill: Optional[str] = None
+        if self._consume(ord("}")):
+            self._finish()
+            return None
+        members = 0
+        while True:
+            if members >= MAX_CONTAINER_MEMBERS:
+                raise JsonInputError("too many object members")
+            key = self._read_string_match(((b"skill", "skill"),))
+            self._skip_whitespace()
+            self._expect(ord(":"))
+            self._skip_whitespace()
+            if key == "skill":
+                if found:
+                    raise JsonInputError("duplicate registered field")
+                found = True
+                if self._peek() == ord('"'):
+                    skill = self._read_string_match(tuple(zip(_CANDIDATE_BYTES, _CANDIDATE_NAMES)))
+                else:
+                    self._skip_value()
+            else:
+                self._skip_value()
+            members += 1
+            self._skip_whitespace()
+            if self._consume(ord("}")):
+                self._finish()
+                return skill
             self._expect(ord(","))
             self._skip_whitespace()
 
@@ -991,12 +1054,14 @@ def _extract_codex_record(data: bytes) -> Sequence[str]:
         return ()
     if not _span_matches(data, payload.get(b"type"), b"function_call"):
         return ()
+    if _span_matches(data, payload.get(b"name"), b"read_file"):
+        raise JsonInputError("unsupported retired Codex skill event schema")
     if not _span_matches(data, payload.get(b"name"), CODEX_SKILL_READ_FUNCTION.encode("ascii")):
         return ()
     arguments = payload.get(b"arguments")
     if arguments is None or data[arguments.start] != ord('"'):
         return ()
-    name = EmbeddedJsonCursor(JsonStringReader(data, arguments)).parse_path()
+    name = EmbeddedJsonCursor(JsonStringReader(data, arguments)).parse_skill()
     return (name,) if name is not None else ()
 
 
@@ -1006,6 +1071,8 @@ def _source_identity(metadata: os.stat_result) -> SourceIdentity:
         device=int(metadata.st_dev),
         inode=int(metadata.st_ino),
         file_type=stat.S_IFMT(metadata.st_mode),
+        size=int(metadata.st_size),
+        modified_ns=int(metadata.st_mtime_ns),
     )
 
 
@@ -1147,6 +1214,8 @@ def _scan_records(
                     if not record:
                         outcome.input_errors += 1
                         continue
+                    outcome.records_scanned += 1
+                    outcome.bytes_scanned += len(raw_line)
                     try:
                         names = extractor(record)
                     except JsonInputError:
@@ -1251,6 +1320,18 @@ def transcript_window(root: Path, as_of: datetime, primary_start: datetime, sens
         candidates = [(observed, transcript) for observed, transcript in discovered if observed <= as_of]
 
     candidates.sort(key=lambda item: item[0])
+    fingerprint = hashlib.sha256()
+    for observed, transcript in candidates:
+        fingerprint.update(str(int(observed.timestamp() * 1_000_000_000)).encode("ascii"))
+        fingerprint.update(b"\0")
+        fingerprint.update("/".join(transcript.parent.parts + (transcript.name,)).encode("utf-8"))
+        fingerprint.update(b"\0")
+        fingerprint.update(str(transcript.identity.device).encode("ascii"))
+        fingerprint.update(b":")
+        fingerprint.update(str(transcript.identity.inode).encode("ascii"))
+        fingerprint.update(b":")
+        fingerprint.update(str(transcript.identity.size).encode("ascii"))
+        fingerprint.update(b"\0")
     earliest = candidates[0][0] if candidates else None
     primary = [transcript for observed, transcript in candidates if observed >= primary_start]
     sensitivity = [transcript for observed, transcript in candidates if observed >= sensitivity_start]
@@ -1265,6 +1346,7 @@ def transcript_window(root: Path, as_of: datetime, primary_start: datetime, sens
         "coverage_complete": bool(
             available and input_errors == 0 and earliest is not None and earliest <= primary_start
         ),
+        "source_fingerprint": fingerprint.hexdigest(),
     }
     return metadata, primary, sensitivity
 
@@ -1278,7 +1360,76 @@ def _apply_scan_coverage(metadata: Mapping[str, Any], scan: ScanOutcome) -> Dict
     updated["input_complete"] = input_complete
     updated["available"] = bool(updated["available"] and input_complete)
     updated["coverage_complete"] = bool(updated["coverage_complete"] and input_complete)
+    updated["records_scanned"] = scan.records_scanned
+    updated["bytes_scanned"] = scan.bytes_scanned
+    updated["checkpoint_hit"] = scan.cache_hit
     return updated
+
+
+def _checkpoint_key(
+    catalog: Mapping[str, Mapping[str, str]],
+    as_of: datetime,
+    since_days: int,
+    sensitivity_days: int,
+    codex_event_schema: str,
+) -> Dict[str, Any]:
+    catalog_hash = hashlib.sha256("\0".join(sorted(catalog)).encode("utf-8")).hexdigest()
+    return {
+        "catalog_hash": catalog_hash,
+        "as_of": timestamp_text(as_of),
+        "primary_days": since_days,
+        "sensitivity_days": sensitivity_days,
+        "codex_event_schema": codex_event_schema,
+    }
+
+
+def _load_checkpoint(path: Optional[Path], key: Mapping[str, Any]) -> Dict[str, Any]:
+    if path is None:
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, dict) or payload.get("schema_version") != 1 or payload.get("key") != dict(key):
+        return {}
+    runtimes = payload.get("runtimes")
+    return runtimes if isinstance(runtimes, dict) else {}
+
+
+def _cached_scan(
+    runtime_cache: Any, fingerprint: str, catalog: Mapping[str, Mapping[str, str]]
+) -> Optional[ScanOutcome]:
+    if not isinstance(runtime_cache, dict) or runtime_cache.get("source_fingerprint") != fingerprint:
+        return None
+    primary = runtime_cache.get("primary_counts")
+    sensitivity = runtime_cache.get("sensitivity_counts")
+    if not isinstance(primary, dict) or not isinstance(sensitivity, dict):
+        return None
+    allowed = set(catalog)
+    for counts in (primary, sensitivity):
+        if any(name not in allowed or not isinstance(value, int) or value < 0 for name, value in counts.items()):
+            return None
+    return ScanOutcome(Counter(primary), Counter(sensitivity), cache_hit=True)
+
+
+def _checkpoint_runtime(fingerprint: str, scan: ScanOutcome) -> Dict[str, Any]:
+    return {
+        "source_fingerprint": fingerprint,
+        "primary_counts": dict(sorted(scan.primary_counts.items())),
+        "sensitivity_counts": dict(sorted(scan.sensitivity_counts.items())),
+    }
+
+
+def _write_checkpoint(path: Optional[Path], key: Mapping[str, Any], runtimes: Mapping[str, Any]) -> None:
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(
+        json.dumps({"schema_version": 1, "key": dict(key), "runtimes": runtimes}, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    os.replace(temporary, path)
 
 
 def source_freshness(repo_root: Path, source: Optional[str], ownership: str, primary_start: datetime) -> str:
@@ -1318,10 +1469,13 @@ def source_freshness(repo_root: Path, source: Optional[str], ownership: str, pri
     return "new" if first_added >= primary_start else "established"
 
 
-def counts_for(name: str, claude: Counter, codex: Counter) -> Dict[str, int]:
-    claude_count = int(claude[name])
-    codex_count = int(codex[name])
-    return {"claude": claude_count, "codex": codex_count, "total": claude_count + codex_count}
+def counts_for(
+    name: str, claude: Counter, codex: Counter, claude_available: bool, codex_available: bool
+) -> Dict[str, Optional[int]]:
+    claude_count = int(claude[name]) if claude_available else None
+    codex_count = int(codex[name]) if codex_available else None
+    total = claude_count + codex_count if claude_count is not None and codex_count is not None else None
+    return {"claude": claude_count, "codex": codex_count, "total": total}
 
 
 def disposition_for(name: str, resolved: bool, coverage_complete: bool, freshness: str, primary_count: int) -> Tuple[str, Optional[str]]:
@@ -1341,7 +1495,17 @@ def disposition_for(name: str, resolved: bool, coverage_complete: bool, freshnes
     return "candidate-follow-up", "owner-review-before-any-catalog-change"
 
 
-def build_report(repo_root: Path, catalog: Mapping[str, Mapping[str, str]], claude_dir: Path, codex_dir: Path, as_of: datetime, since_days: int, sensitivity_days: int) -> Dict[str, Any]:
+def build_report(
+    repo_root: Path,
+    catalog: Mapping[str, Mapping[str, str]],
+    claude_dir: Path,
+    codex_dir: Path,
+    as_of: datetime,
+    since_days: int,
+    sensitivity_days: int,
+    checkpoint_path: Optional[Path] = None,
+    codex_event_schema: str = "structured-skill-read-v1",
+) -> Dict[str, Any]:
     primary_start = as_of - timedelta(days=since_days)
     sensitivity_start = as_of - timedelta(days=sensitivity_days)
     claude_coverage, claude_primary, claude_sensitivity = transcript_window(
@@ -1350,28 +1514,82 @@ def build_report(repo_root: Path, catalog: Mapping[str, Mapping[str, str]], clau
     codex_coverage, codex_primary, codex_sensitivity = transcript_window(
         codex_dir, as_of, primary_start, sensitivity_start
     )
-    claude_scan = scan_claude(claude_primary, claude_sensitivity)
-    codex_scan = scan_codex(codex_primary, codex_sensitivity)
+    checkpoint_key = _checkpoint_key(
+        catalog, as_of, since_days, sensitivity_days, codex_event_schema
+    )
+    checkpoint = _load_checkpoint(checkpoint_path, checkpoint_key)
+    claude_fingerprint = str(claude_coverage.pop("source_fingerprint"))
+    codex_fingerprint = str(codex_coverage.pop("source_fingerprint"))
+    claude_scan = _cached_scan(checkpoint.get("claude"), claude_fingerprint, catalog)
+    if claude_scan is None:
+        claude_scan = scan_claude(claude_primary, claude_sensitivity)
+    if codex_event_schema == "structured-skill-read-v1":
+        codex_scan = _cached_scan(checkpoint.get("codex"), codex_fingerprint, catalog)
+        if codex_scan is None:
+            codex_scan = scan_codex(codex_primary, codex_sensitivity)
+    else:
+        codex_scan = ScanOutcome(Counter(), Counter())
     claude_coverage = _apply_scan_coverage(claude_coverage, claude_scan)
     codex_coverage = _apply_scan_coverage(codex_coverage, codex_scan)
-    coverage_complete = bool(claude_coverage["coverage_complete"] and codex_coverage["coverage_complete"])
+    event_schema = {
+        "claude": {"name": "claude-structured-skill-v1", "available": True},
+        "codex": {
+            "name": codex_event_schema,
+            "available": codex_event_schema == "structured-skill-read-v1",
+        },
+    }
+    source_coverage_complete = bool(
+        claude_coverage["coverage_complete"] and codex_coverage["coverage_complete"]
+    )
+    event_schema_complete = bool(
+        event_schema["claude"]["available"] and event_schema["codex"]["available"]
+    )
+    coverage_complete = bool(source_coverage_complete and event_schema_complete)
     claude_primary_counts = claude_scan.primary_counts
     codex_primary_counts = codex_scan.primary_counts
     claude_sensitivity_counts = claude_scan.sensitivity_counts
     codex_sensitivity_counts = codex_scan.sensitivity_counts
 
+    if claude_scan.input_complete and codex_scan.input_complete:
+        _write_checkpoint(
+            checkpoint_path,
+            checkpoint_key,
+            {
+                "claude": _checkpoint_runtime(claude_fingerprint, claude_scan),
+                "codex": _checkpoint_runtime(codex_fingerprint, codex_scan),
+            },
+        )
+
     matrix: List[Dict[str, Any]] = []
-    for name, trigger, overlap in CANDIDATE_PROFILES:
-        entry = catalog.get(name)
-        resolved = entry is not None
-        source = entry["source"] if entry else None
-        ownership = entry["ownership"] if entry else "unresolved"
+    for name, entry in sorted(catalog.items()):
+        resolved = True
+        source = entry["source"]
+        ownership = entry["ownership"]
+        trigger, overlap = PROFILE_RATIONALE.get(
+            name,
+            (
+                "Current catalog entry supplied by the linker manifest.",
+                "No maintained overlap rationale; requires owner judgment if usage is marginal.",
+            ),
+        )
         skill_dir = safe_source_path(repo_root, source)
         freshness = source_freshness(repo_root, source, ownership, primary_start)
-        primary_counts = counts_for(name, claude_primary_counts, codex_primary_counts)
-        sensitivity_counts = counts_for(name, claude_sensitivity_counts, codex_sensitivity_counts)
+        primary_counts = counts_for(
+            name,
+            claude_primary_counts,
+            codex_primary_counts,
+            bool(event_schema["claude"]["available"]),
+            bool(event_schema["codex"]["available"]),
+        )
+        sensitivity_counts = counts_for(
+            name,
+            claude_sensitivity_counts,
+            codex_sensitivity_counts,
+            bool(event_schema["claude"]["available"]),
+            bool(event_schema["codex"]["available"]),
+        )
         disposition, protection_reason = disposition_for(
-            name, resolved, coverage_complete, freshness, primary_counts["total"]
+            name, resolved, coverage_complete, freshness, int(primary_counts["total"] or 0)
         )
         row: Dict[str, Any] = {
             "name": name,
@@ -1395,12 +1613,15 @@ def build_report(repo_root: Path, catalog: Mapping[str, Mapping[str, str]], clau
         "windows": {"primary_days": since_days, "sensitivity_days": sensitivity_days},
         "coverage": {
             "complete": coverage_complete,
+            "source_complete": source_coverage_complete,
+            "event_schema_complete": event_schema_complete,
             "claude": claude_coverage,
             "codex": codex_coverage,
+            "event_schema": event_schema,
         },
         "measurement_policy": {
-            "event_types": ["claude-skill", "claude-slash", "codex-function-call-skill-read"],
-            "transcript_retention": "aggregate-counters-only",
+            "event_types": ["claude-skill", "claude-slash", "codex-structured-skill-read"],
+            "transcript_retention": "aggregate-counters-and-source-fingerprints-only",
             "catalog_change_authorization": "none",
         },
         "decision_matrix": matrix,
@@ -1419,8 +1640,8 @@ def render_text(report: Mapping[str, Any]) -> str:
     for row in report["decision_matrix"]:
         lines.append(
             "{0:>7}  {1:>11}  {2:<20}  {3}".format(
-                row["counts"]["primary"]["total"],
-                row["counts"]["sensitivity"]["total"],
+                "n/a" if row["counts"]["primary"]["total"] is None else row["counts"]["primary"]["total"],
+                "n/a" if row["counts"]["sensitivity"]["total"] is None else row["counts"]["sensitivity"]["total"],
                 row["disposition"],
                 row["name"],
             )
@@ -1444,6 +1665,17 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--as-of", type=parse_utc_timestamp, required=True)
     parser.add_argument("--since-days", type=int, default=90)
     parser.add_argument("--sensitivity-days", type=int, default=30)
+    parser.add_argument(
+        "--codex-event-schema",
+        choices=("unavailable", "structured-skill-read-v1"),
+        default="unavailable",
+        help="Codex schema contract; unavailable fails counts closed instead of reporting zero",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        help="privacy-preserving aggregate checkpoint; unchanged sources are not reread",
+    )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     if args.since_days <= 0 or args.sensitivity_days <= 0:
@@ -1474,6 +1706,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         args.as_of,
         args.since_days,
         args.sensitivity_days,
+        args.checkpoint,
+        args.codex_event_schema,
     )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
