@@ -41,6 +41,7 @@ def main():
 
     try:
         run(["git", "fetch", "origin", args.base_branch, args.head_branch])
+        base_commit = run_stdout(["git", "rev-parse", f"origin/{args.base_branch}"]).strip()
         run(["git", "checkout", "-B", args.head_branch, f"origin/{args.head_branch}"])
         remote_head = run_stdout(["git", "rev-parse", f"origin/{args.head_branch}"]).strip()
         rebase = run(["git", "rebase", f"origin/{args.base_branch}"], allow_failure=True)
@@ -98,6 +99,7 @@ def main():
             "status": "ready",
             "base_branch": args.base_branch,
             "head_branch": args.head_branch,
+            "base_commit": base_commit,
             "stripped_beads_divergence": stripped_beads_divergence,
             "pushed_cleanup_commit": pushed_cleanup_commit,
             "pushed_prepared_head": pushed_prepared_head,
@@ -112,6 +114,7 @@ def main():
             "error": str(exc),
             "base_branch": args.base_branch,
             "head_branch": args.head_branch,
+            "base_commit": locals().get("base_commit", "unknown"),
         }
         json.dump(output, sys.stdout, indent=2, sort_keys=True)
         sys.stdout.write("\n")

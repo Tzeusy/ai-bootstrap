@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "router": "valid-superskill",
+  "cases": [
+    {
+      "id": "alpha-positive",
+      "kind": "positive",
+      "query": "Use the alpha fixture route.",
+      "expected_routes": ["alpha"]
+    },
+    {
+      "id": "beta-positive",
+      "kind": "positive",
+      "query": "Use the beta fixture route.",
+      "expected_routes": ["beta"]
+    },
+    {
+      "id": "negative",
+      "kind": "negative",
+      "query": "This request belongs outside the fixture router.",
+      "expected_routes": []
+    },
+    {
+      "id": "ambiguous",
+      "kind": "ambiguous",
+      "query": "This request could use either fixture route.",
+      "expected_routes": ["alpha", "beta"]
+    }
+  ]
+}

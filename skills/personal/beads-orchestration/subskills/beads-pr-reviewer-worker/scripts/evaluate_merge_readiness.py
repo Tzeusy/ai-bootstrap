@@ -94,6 +94,9 @@ def main():
     parser.add_argument("--owner", required=True)
     parser.add_argument("--repo", required=True)
     parser.add_argument("--pr-number", required=True, type=int)
+    parser.add_argument("--reviewed-head", help="Exact head SHA inspected by this reviewer.")
+    parser.add_argument("--expected-base-sha", help="Fetched base SHA used to prepare the reviewed head.")
+    parser.add_argument("--minimum-check-count", type=int, default=1)
     parser.add_argument("--dry-run", action="store_true", help="Run evaluation without performing any mutations (evaluation is already read-only; flag provided for uniformity).")
     args = parser.parse_args()
 
@@ -104,7 +107,7 @@ def main():
             "view",
             str(args.pr_number),
             "--json",
-            "state,isDraft,mergeStateStatus,reviewDecision,mergedAt,url,baseRefName,headRefName",
+            "state,isDraft,mergeStateStatus,reviewDecision,mergedAt,url,baseRefName,headRefName,baseRefOid,headRefOid",
         ])
         unresolved = unresolved_count(args.owner, args.repo, args.pr_number)
         checks = fetch_required_checks(args.pr_number)
@@ -113,6 +116,10 @@ def main():
     except Exception as exc:
         fail("unexpected-error", str(exc), pr_number=args.pr_number)
 
+    if args.minimum_check_count < 0:
+        fail("invalid-minimum-check-count", "minimum check count cannot be negative")
+
+    required_check_count = len(checks)
     required_non_green = sum(
         1
         for check in checks
@@ -120,6 +127,14 @@ def main():
     )
 
     reasons = []
+    if not args.reviewed_head:
+        reasons.append("reviewed_head=missing")
+    elif pr.get("headRefOid") != args.reviewed_head:
+        reasons.append("reviewed_head=moved")
+    if not args.expected_base_sha:
+        reasons.append("expected_base_sha=missing")
+    elif pr.get("baseRefOid") != args.expected_base_sha:
+        reasons.append("base_sha=stale")
     if pr.get("state") != "OPEN":
         reasons.append(f"state={pr.get('state')}")
     if pr.get("isDraft"):
@@ -128,6 +143,10 @@ def main():
         reasons.append(f"unresolved_threads={unresolved}")
     if required_non_green:
         reasons.append(f"required_non_green={required_non_green}")
+    if required_check_count < args.minimum_check_count:
+        reasons.append(
+            f"required_check_count={required_check_count}<minimum={args.minimum_check_count}"
+        )
     if (pr.get("reviewDecision") or "REVIEW_REQUIRED") == "CHANGES_REQUESTED":
         reasons.append("review_decision=CHANGES_REQUESTED")
     if (pr.get("mergeStateStatus") or "UNKNOWN") not in ALLOWED_MERGE_STATES:
@@ -143,7 +162,11 @@ def main():
         "merged_at": pr.get("mergedAt"),
         "base_branch": pr.get("baseRefName"),
         "head_branch": pr.get("headRefName"),
+        "head_sha": pr.get("headRefOid"),
+        "base_sha": pr.get("baseRefOid"),
         "unresolved_count": unresolved,
+        "required_check_count": required_check_count,
+        "minimum_check_count": args.minimum_check_count,
         "required_non_green": required_non_green,
         "merge_ok": len(reasons) == 0,
         "reasons": reasons,

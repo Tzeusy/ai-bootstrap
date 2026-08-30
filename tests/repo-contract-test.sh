@@ -6,7 +6,8 @@
 #
 #   Spec: REQ-repository-shape-002 (Provenance Visibility)
 #     README's "Skills Layout And Provenance" section and .gitmodules must
-#     agree on the submodule inventory, both directions.
+#     agree on the submodule inventory, both directions; active skill catalog
+#     entries must come from skills/personal and no skill gitlink may remain.
 #
 #   Spec: REQ-repository-shape-006 (Local-Only State Exclusion)
 #     No tracked file may be (a) matched by .gitignore (declared-local-state
@@ -41,11 +42,11 @@ else
   done < <(git config -f .gitmodules --get-regexp 'submodule\..*\.path' | awk '{print $2}')
 
   # Reverse: every path the README claims as a current submodule is registered.
-  # Anchored on the "current submodules are" sentence; if that wording changes,
+  # Anchored on the "current submodule inventory is" sentence; if that wording changes,
   # fail loudly so this check gets updated rather than silently skipping.
-  claimed_block=$(sed -n '/current submodules are/,/\./p' <<<"$section")
+  claimed_block=$(sed -n '/current submodule inventory is/,/only\./p' <<<"$section")
   if [[ -z "$claimed_block" ]]; then
-    _fail "README provenance section lost its 'current submodules are' sentence — update this check's anchor"
+    _fail "README provenance section lost its 'current submodule inventory is' sentence — update this check's anchor"
   else
     while read -r tok; do
       if git config -f .gitmodules --get-regexp 'submodule\..*\.path' | awk '{print $2}' | grep -qxF "$tok"; then
@@ -57,7 +58,64 @@ else
   fi
 fi
 
-# ── Check 2: tracked local-only state (REQ-repository-shape-006) ─────────────
+# ── Check 2: active skill catalog topology ───────────────────────────────────
+echo "=== active skill catalog topology ==="
+
+manifest=$(./scripts/link-ai-skills.sh --catalog-manifest .)
+expected_skills='["beads-orchestration","bws-cli-skill","th-design","th-engineering","th-projects","th-tooling","th-writing"]'
+
+if jq -e --argjson expected "$expected_skills" \
+    '([.skills[].name] | sort) == ($expected | sort)' <<<"$manifest" >/dev/null; then
+  _pass "catalog contains the intentional active roots"
+else
+  _fail "catalog roots differ from the intentional active set"
+fi
+
+if jq -e '.excluded_names == [] and all(.skills[]; .source | startswith("skills/personal/"))' \
+    <<<"$manifest" >/dev/null; then
+  _pass "every active root resolves from skills/personal with no name exclusions"
+else
+  _fail "catalog contains a non-personal source or stale exclusion"
+fi
+
+architecture=$(awk '/^## Architecture Overview/{f=1;next} f&&/^## /{exit} f' CLAUDE.md)
+expected_routers='`beads-orchestration`, `th-design`, `th-engineering`, `th-projects`, `th-tooling`, `th-writing`'
+compact_architecture=$(tr '\n' ' ' <<<"$architecture" | tr -s ' ')
+if [[ "$compact_architecture" == *'Active authored roots live in `skills/personal/`;'* ]] \
+    && [[ "$compact_architecture" == *'`skills/archive/` is pruned mixed-origin history.'* ]] \
+    && [[ "$compact_architecture" == *"Six router-style active roots ($expected_routers)"* ]] \
+    && [[ "$compact_architecture" == *'`bws-cli-skill` is the narrow standalone root.'* ]]; then
+  _pass "CLAUDE.md architecture matches catalog source, archive, and router topology"
+else
+  _fail "CLAUDE.md Architecture Overview drifted from the active catalog topology"
+fi
+
+skill_gitlinks=$(git ls-files -s skills | awk '$1 == 160000 {print $4}')
+if [[ -z "$skill_gitlinks" ]]; then
+  _pass "no gitlink remains under skills/"
+else
+  _fail "gitlinks remain under skills/:"
+  sed 's/^/         /' <<<"$skill_gitlinks" >&2
+fi
+
+# ── Check 3: removed project workflow references ─────────────────────────────
+echo "=== removed project workflow references ==="
+
+removed_project_path='projects/ai-usage-telemetry'
+skill_audit_workflow='.github/workflows/skill-audit.yml'
+if [[ ! -f "$skill_audit_workflow" ]]; then
+  _fail "active Skill audit workflow is missing: $skill_audit_workflow"
+else
+  removed_project_refs=$(grep -nF -- "$removed_project_path" "$skill_audit_workflow" || true)
+  if [[ -z "$removed_project_refs" ]]; then
+    _pass "active Skill audit workflow has no reference to removed project: $removed_project_path"
+  else
+    _fail "active Skill audit workflow references removed project '$removed_project_path':"
+    sed 's/^/         /' <<<"$removed_project_refs" >&2
+  fi
+fi
+
+# ── Check 4: tracked local-only state (REQ-repository-shape-006) ─────────────
 echo "=== tracked local-state exclusion ==="
 
 ignored_tracked=$(git ls-files -ci --exclude-standard)
@@ -85,4 +143,4 @@ if [[ $fail_count -gt 0 ]]; then
   echo "FAIL: $fail_count repo-contract check(s) failed"
   exit 1
 fi
-echo "PASS: repo contract holds (REQ-repository-shape-002, REQ-repository-shape-006)"
+echo "PASS: repo contract holds (REQ-repository-shape-002, catalog topology, removed project workflow references, REQ-repository-shape-006)"

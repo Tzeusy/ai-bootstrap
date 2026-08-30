@@ -30,7 +30,8 @@ ignored — fence your templates.
 Against [`quality-bar.md`](./quality-bar.md), answer:
 
 1. Is the description about activation, not workflow summary? Does it match
-   3–5 realistic user phrasings, and do those samples live in `SKILL.md`?
+   realistic positive, negative, and ambiguous phrasings? For a superskill,
+   do those samples live unloaded in `evals/routing.json` rather than its body?
 2. Would the description collide with a sibling skill in the catalog?
 3. Is the skill grounded in the right source of truth (project-shape docs
    for project-specific skills)?
@@ -49,7 +50,7 @@ Against [`quality-bar.md`](./quality-bar.md), answer:
    (quality-bar section 9)? Structured output projected to named fields,
    verbose gates routed to log files with failure-tail readback, targeted
    tests while iterating with one full gate before completion, polls batched,
-   catalogs consumed grep-first, subagent dispatches right-sized and compact?
+   and catalogs consumed grep-first?
 
 ## Step 3: Update Discipline
 
@@ -62,12 +63,14 @@ When changing an existing skill:
 4. Keep examples, scripts, and adapter metadata synchronized with the revised
    skill.
 5. For superskills, keep the router table and every subskill aligned.
+6. Update unloaded routing cases whenever a route or trigger boundary changes.
 
 ## Step 4: Verification Before Calling It Done
 
 - Re-run `audit_skill.py` on the final package; it must PASS.
-- Check the description against the skill's sample trigger phrasings; if scope
-  is subtle, also check one phrasing that should NOT trigger it.
+- Check the description against realistic trigger phrasings; if routing cases
+  exist, validate them mechanically and forward-test the cases appropriate to
+  the change.
 - For superskills, walk the routing table against one matching-subskill case
   and one no-fit or router-only case.
 - If the skill has executable helpers, run each documented invocation (at
