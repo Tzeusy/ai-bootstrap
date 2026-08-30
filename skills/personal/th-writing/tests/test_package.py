@@ -35,13 +35,21 @@ def test_router_covers_every_subskill_without_loading_its_body() -> None:
 
 
 def test_unloaded_routing_cases_cover_all_classes_and_routes() -> None:
-    cases = json.loads((PACKAGE / "evals/routing-cases.json").read_text())
+    routing = json.loads((PACKAGE / "evals/routing.json").read_text())
+    assert routing["schema_version"] == 1
+    assert routing["router"] == "th-writing"
+    cases = routing["cases"]
+    assert len(cases) == 8
+    assert len({case["id"] for case in cases}) == len(cases)
+    assert len({case["query"] for case in cases}) == len(cases)
     assert {case["kind"] for case in cases} == {"positive", "negative", "ambiguous"}
-    assert {case["expected_route"] for case in cases if case["kind"] == "positive"} == {
+    assert {case["expected_routes"][0] for case in cases if case["kind"] == "positive"} == {
         "writing-editorial-review",
         "writing-publish-hardening",
         "writing-structured-doc",
     }
+    assert all(case["expected_routes"] == [] for case in cases if case["kind"] == "negative")
+    assert all(len(case["expected_routes"]) >= 2 for case in cases if case["kind"] == "ambiguous")
 
 
 def test_active_package_avoids_obsolete_platform_contracts() -> None:
