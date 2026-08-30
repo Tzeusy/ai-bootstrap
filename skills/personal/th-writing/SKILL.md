@@ -9,7 +9,6 @@ metadata:
   owner: tze
   authors:
     - tze
-    - Anthropic (upstream)
     - Claude Fable 5
     - OpenAI Codex
   status: active
