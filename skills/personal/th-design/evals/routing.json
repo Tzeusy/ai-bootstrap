@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "router": "th-design",
+  "cases": [
+    {
+      "id": "holistic-design",
+      "kind": "positive",
+      "query": "Walk through this user flow and hold it to the design bar.",
+      "expected_routes": ["design-bar"]
+    },
+    {
+      "id": "information-density",
+      "kind": "positive",
+      "query": "This settings screen is too dense; reorganize the hierarchy and tighten the copy.",
+      "expected_routes": ["information-design"]
+    },
+    {
+      "id": "visual-language",
+      "kind": "positive",
+      "query": "Define a consistent color, type, spacing, and motion system for this app.",
+      "expected_routes": ["visual-language"]
+    },
+    {
+      "id": "perceived-speed",
+      "kind": "positive",
+      "query": "Make this save interaction feel faster and stop users from double-clicking it.",
+      "expected_routes": ["interaction-speed"]
+    },
+    {
+      "id": "discoverability",
+      "kind": "positive",
+      "query": "Nobody finds this feature; add a command palette and keyboard path.",
+      "expected_routes": ["discoverability"]
+    },
+    {
+      "id": "accessibility",
+      "kind": "positive",
+      "query": "Audit this dialog for keyboard focus, semantics, contrast, and reduced motion.",
+      "expected_routes": ["accessibility"]
+    },
+    {
+      "id": "frontend-build",
+      "kind": "positive",
+      "query": "Build and style this production React dashboard so it has a distinctive visual direction.",
+      "expected_routes": ["frontend-design"]
+    },
+    {
+      "id": "backend-tests-negative",
+      "kind": "negative",
+      "query": "Review this database integration test suite for flakes and weak assertions.",
+      "expected_routes": []
+    },
+    {
+      "id": "project-spec-negative",
+      "kind": "negative",
+      "query": "Concretize this fuzzy feature request into a signed-off spec delta.",
+      "expected_routes": []
+    },
+    {
+      "id": "ambiguous-dashboard",
+      "kind": "ambiguous",
+      "query": "Make this dashboard feel faster and less crowded.",
+      "expected_routes": ["information-design", "interaction-speed"]
+    }
+  ]
+}

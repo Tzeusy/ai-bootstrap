@@ -50,7 +50,8 @@ designed", "audit our skills for quality", "should this be a superskill",
    [`scripts/audit_skill.py`](./scripts/audit_skill.py) first — it checks
    frontmatter, name/description limits, metadata fields, link integrity,
    orphaned support files and deep reference chains, PEP 723 compliance of
-   Python entry-point scripts, adapter YAML, and superskill layout:
+   Python entry-point scripts, adapter YAML, superskill layout, and any
+   unloaded `evals/routing.json` schema and route coverage:
 
    ```bash
    uv run <this-package>/scripts/audit_skill.py <target-skill-dir>
@@ -76,6 +77,9 @@ designed", "audit our skills for quality", "should this be a superskill",
    gates, grep-first catalogs), operational safety, and maintenance
    contracts on stateful reference docs (catalogs of errors, projects, or
    quirks must tell consuming agents when to write back).
+   Keep realistic trigger cases in unloaded eval data when examples would
+   otherwise bloat a router; the audit proves structure and coverage, while
+   behavioral forward-testing remains a separate judgment step.
 4. Use [`references/superskills.md`](./references/superskills.md) only when
    the skill is broad enough to route over internal workflows rather than run
    a single narrow procedure.

@@ -100,6 +100,8 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 - Define the selection criteria for each subskill in one concise routing
   table, with a direct link to each `subskills/<name>/SKILL.md`.
 - Load at most one or two subskills for an ordinary task.
+- Keep realistic selection examples unloaded in `evals/routing.json`, with a
+  positive case for every subskill plus negative and ambiguous cases.
 - Say what to do when no subskill fits: continue with router-level guidance,
   ask for clarification, or create a new subskill if the user requested skill
   maintenance.
@@ -132,6 +134,8 @@ uv run <skill-standards>/scripts/audit_skill.py <superskill-dir>
 
 Then verify by hand:
 
+- Confirm `evals/routing.json` passes schema and positive route-coverage
+  validation. These cases are test inputs, not runtime router prose.
 - Test one broad user request that should trigger the router and select a
   subskill.
 - Test one request that should stay inside the router or be declined because no
