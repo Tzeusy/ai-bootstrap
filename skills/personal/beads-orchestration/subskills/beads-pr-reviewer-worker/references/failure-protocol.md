@@ -73,6 +73,7 @@ Retries must be idempotent:
 ### `merged-pr`
 
 Use only when:
+- the coordinator/operator explicitly supplied `MERGE_AUTHORIZED=yes`,
 - `gh pr merge --squash` succeeded (without `--delete-branch`), and
 - a follow-up `gh pr view` confirms the PR is merged
 
