@@ -58,9 +58,9 @@ Every skill should make ownership obvious.
 
 - One skill solves one coherent class of problems.
 - Title and description should help the agent find the skill from real
-  symptoms, user phrasing, and task context. Write 3–5 sample phrasings that
-  should trigger the skill and check the description against them; keep the
-  samples in `SKILL.md` so future reviews can re-verify.
+  symptoms, user phrasing, and task context. Check it against realistic
+  positive, negative, and ambiguous phrasings. Keep examples out of runtime
+  prose when unloaded eval data can preserve them.
 - Include clear "use when" boundaries and, where helpful, brief "do not use
   when" guidance.
 - Check the description against sibling skills in the catalog: if two
@@ -106,6 +106,12 @@ Every package is either a standard `skill` or a `superskill`.
 - `tests/` (self-tests and fixtures) and `evals/` (trigger/eval datasets) are
   allowed and encouraged for skills with executable helpers; they never load
   as agent context and are exempt from linking requirements.
+- Superskills should keep routing cases in `evals/routing.json`: schema version
+  1, the router name, and cases with unique `id`, `query`, `kind`, and
+  `expected_routes` containing subskill directory names. Positive cases name
+  exactly one route, negative cases none, and ambiguous cases at least two.
+  Cover every subskill with one positive case. The mechanical audit validates
+  schema and coverage without pretending to run a model.
 - Link every important support file from `SKILL.md` with explicit selection
   guidance: what question the file answers and when to load it. A bare link
   list is not a routing layer.
@@ -197,10 +203,8 @@ Exemplar doctrine: `beads-orchestration/references/token-efficiency.md`.
 - Loop or polling workflows batch each cycle's checks into one composite
   command emitting a compact summary, and gate any status report on actual
   state change.
-- Skills that dispatch subagents state model right-sizing rules (default to
-  the lowest tier the task allows; escalate on evidence, not vibes) and keep
-  dispatch prompts compact — identifiers plus a short summary, with the
-  subagent self-fetching detail it needs.
+- Include execution policy only when it is a domain-specific invariant;
+  baseline runtime advice does not belong in skill prose.
 - Large catalogs and appendix docs are consumed grep-first: the skill tells
   the agent to `rg` the symptom and read the matching section, not to load
   the whole file (see section 11 for the write-back side).
