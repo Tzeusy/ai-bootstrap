@@ -64,7 +64,8 @@ write_skill "$bootstrap_dir/skills/superskill" "superskill" "A routed parent ski
 write_skill "$bootstrap_dir/skills/superskill/subskills/deep" "deep" "Must not enter Codex's root catalog."
 write_skill "$bootstrap_dir/skills/duplicate" "duplicate" "The shallow canonical skill."
 write_skill "$bootstrap_dir/skills/vendor/skills/duplicate" "duplicate" "A deeper conflicting skill."
-write_skill "$bootstrap_dir/skills/writing-skills" "writing-skills" "Excluded from all catalogs."
+write_skill "$bootstrap_dir/skills/writing-skills" "writing-skills" "No longer needs a special exclusion."
+write_skill "$bootstrap_dir/skills/.system/source-internal" "source-internal" "A source-owned system skill outside the shared catalog."
 write_skill "$bootstrap_dir/.codex/skills/local" "local" "An unmanaged local skill."
 write_skill "$bootstrap_dir/.codex/skills/.system/internal" "internal" "A system-owned skill outside the shared projection."
 
@@ -76,14 +77,14 @@ cd "$test_root"
 "$linker" "ai-bootstrap"
 cd "$repo_root"
 
-for skill_name in plain superskill duplicate; do
+for skill_name in plain superskill duplicate writing-skills; do
     wrapper="$bootstrap_dir/.codex/skills/$skill_name"
     [ -d "$wrapper" ] || fail "missing Codex wrapper for $skill_name"
     [ ! -L "$wrapper" ] || fail "Codex wrapper for $skill_name must not be a directory symlink"
     [ -f "$wrapper/.codex-skill-projection" ] || fail "missing managed marker for $skill_name"
 done
 
-[ ! -e "$bootstrap_dir/.codex/skills/writing-skills" ] || fail "excluded skill entered Codex catalog"
+[ ! -e "$bootstrap_dir/.codex/skills/source-internal" ] || fail "source .system skill entered Codex catalog"
 [ -f "$bootstrap_dir/.codex/skills/local/SKILL.md" ] || fail "unmanaged Codex skill was removed"
 assert_shallow_codex_catalog "$bootstrap_dir/.codex/skills"
 
@@ -95,6 +96,16 @@ grep -Fq -- "$bootstrap_dir/skills/superskill/SKILL.md" "$superskill_wrapper" ||
 duplicate_wrapper="$bootstrap_dir/.codex/skills/duplicate/SKILL.md"
 grep -Fq -- "$bootstrap_dir/skills/duplicate/SKILL.md" "$duplicate_wrapper" || fail "shallower duplicate source did not win"
 grep -Fq -- "$bootstrap_dir/skills/vendor/skills/duplicate/SKILL.md" "$duplicate_wrapper" && fail "deeper duplicate source unexpectedly won"
+
+manifest="$($linker --catalog-manifest "$bootstrap_dir")"
+jq -e '.schema_version == 1 and .excluded_names == []' <<<"$manifest" >/dev/null \
+    || fail "manifest schema or exclusions are stale"
+jq -e '.surfaces == [".claude/skills", ".codex/skills", ".gemini/skills", ".gemini/antigravity/skills"]' <<<"$manifest" >/dev/null \
+    || fail "manifest does not list every managed surface"
+jq -e '.collisions == [{"losers":["skills/vendor/skills/duplicate"],"name":"duplicate","winner":"skills/duplicate"}]' <<<"$manifest" >/dev/null \
+    || fail "manifest does not report the duplicate collision loser"
+jq -e '[.skills[].name] | index("source-internal") == null and index("writing-skills") != null' <<<"$manifest" >/dev/null \
+    || fail "manifest did not prune .system or retained a dead writing-skills exclusion"
 
 for target in \
     "$bootstrap_dir/.claude/skills/superskill" \

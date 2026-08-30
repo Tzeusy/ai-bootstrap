@@ -30,7 +30,7 @@ shaped product offerings live alongside that harness without becoming a sixth
 project-shape pillar or part of its shared-skill distribution flow:
 
 - **Tool facades:** `.claude/`, `.codex/`, and `.gemini/` contain platform-specific prompts, settings, rules, metadata, and skill mirror surfaces; `opencode/` currently contains tool-specific config only.
-- **Shared authoring layers:** `skills/` is the primary shared workflow library, `skills/personal/` is the primary local operating-model layer, `agents/` is a secondary reference corpus, and repository-level docs explain the contract.
+- **Shared authoring layers:** `skills/personal/` is the active shared workflow library, `skills/archive/` holds pruned legacy packages, `agents/` is a secondary reference corpus, and repository-level docs explain the contract.
 - **Support utilities:** `scripts/` and skill-local scripts/assets provide reproducible maintenance operations such as vendored bundle refreshes.
 - **Product offerings:** `projects/` holds independently shaped products. Each
   product's local `about/` and child OpenSpec change govern product behavior;
@@ -41,8 +41,10 @@ project-shape pillar or part of its shared-skill distribution flow:
 
 ### Source-of-Truth Rules
 
-- Shared workflow content belongs in `skills/` by default.
-- Within `skills/`, `skills/personal/` is the primary locally authored workflow layer, while non-`personal/` trees remain either upstream-derived submodules, vendored copies, or intentional forks that must retain visible provenance.
+- Active shared workflow content belongs in `skills/personal/`.
+- Retired packages live under pruned `skills/archive/`. Upstream-derived work
+  retained as active local behavior records its provenance, revision, authors,
+  and license within its `skills/personal/` package.
 - Tool skill directories such as `.claude/skills`, `.codex/skills`, `.gemini/skills`, and `.gemini/antigravity/skills` are mirrors or entrypoint surfaces, not the authored source of truth.
 - Mirrored skill names are flattened by basename, so provenance must be reasoned about from the source tree rather than from the installed name alone.
 - Tool namespaces may contain equivalents only when the target platform needs different metadata, formatting, or runtime semantics.

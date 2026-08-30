@@ -31,7 +31,7 @@ root shape continues to govern the surrounding `ai-bootstrap` harness.
 
 ## Shape Thesis
 
-The repo's job is to keep shared AI-assistant knowledge stable, explicit, and portable while still allowing each tool to have its own thin adapter layer. For local mirroring and placement, `skills/` is the primary source of truth even when some non-`personal/` skills are upstream-derived. When contributors add or modify content, the default question is not "what command runs this?" but "where should this live so humans and agents can find it, maintain it, and reuse it across tools?"
+The repo's job is to keep shared AI-assistant knowledge stable, explicit, and portable while still allowing each tool to have its own thin adapter layer. For local mirroring and placement, active authored skills live under `skills/personal/`; `skills/archive/` is pruned legacy material. When contributors add or modify content, the default question is not "what command runs this?" but "where should this live so humans and agents can find it, maintain it, and reuse it across tools?"
 
 There are no repo-local pillar skills: the tool skill surfaces
 (`.claude/skills`, `.codex/skills`, `.gemini/skills`) double as the user's
