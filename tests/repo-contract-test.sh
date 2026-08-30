@@ -98,7 +98,24 @@ else
   sed 's/^/         /' <<<"$skill_gitlinks" >&2
 fi
 
-# ── Check 3: tracked local-only state (REQ-repository-shape-006) ─────────────
+# ── Check 3: removed project workflow references ─────────────────────────────
+echo "=== removed project workflow references ==="
+
+removed_project_path='projects/ai-usage-telemetry'
+skill_audit_workflow='.github/workflows/skill-audit.yml'
+if [[ ! -f "$skill_audit_workflow" ]]; then
+  _fail "active Skill audit workflow is missing: $skill_audit_workflow"
+else
+  removed_project_refs=$(grep -nF -- "$removed_project_path" "$skill_audit_workflow" || true)
+  if [[ -z "$removed_project_refs" ]]; then
+    _pass "active Skill audit workflow has no reference to removed project: $removed_project_path"
+  else
+    _fail "active Skill audit workflow references removed project '$removed_project_path':"
+    sed 's/^/         /' <<<"$removed_project_refs" >&2
+  fi
+fi
+
+# ── Check 4: tracked local-only state (REQ-repository-shape-006) ─────────────
 echo "=== tracked local-state exclusion ==="
 
 ignored_tracked=$(git ls-files -ci --exclude-standard)
@@ -126,4 +143,4 @@ if [[ $fail_count -gt 0 ]]; then
   echo "FAIL: $fail_count repo-contract check(s) failed"
   exit 1
 fi
-echo "PASS: repo contract holds (REQ-repository-shape-002, catalog topology, REQ-repository-shape-006)"
+echo "PASS: repo contract holds (REQ-repository-shape-002, catalog topology, removed project workflow references, REQ-repository-shape-006)"
