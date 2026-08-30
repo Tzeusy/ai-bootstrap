@@ -1,7 +1,7 @@
 ---
 name: skill-authoring
 description: Use when creating or substantially updating a repo-owned skill that must follow this repository's superskill, provenance, cross-tool adapter, PEP 723, unloaded routing-eval, and strict-audit conventions. Do not use as a replacement for the current platform-native skill-creation manual.
-license: Derived guidance; upstream terms are in ../../../../skill-creator/LICENSE.txt
+license: Derived guidance; upstream terms are in LICENSE.txt
 metadata:
   owner: tze
   authors:
@@ -11,7 +11,7 @@ metadata:
   status: active
   last_reviewed: "2026-08-31"
   provenance:
-    source: skills/skill-creator/SKILL.md
+    source: https://github.com/anthropics/skills/tree/d685954ab55df87de90d462c333bf8e418d3cb88/skills/skill-creator
     source_commit: d685954ab55df87de90d462c333bf8e418d3cb88
     relationship: local cross-tool delta only
 compatibility: Requires uv for the repository audit loop.
@@ -58,8 +58,9 @@ risk warrants it.
 
 ## Provenance
 
-Tuned from the repository's retained Anthropic `skills/skill-creator` import at
+Tuned from Anthropic's historical `skill-creator` source at
 commit `d685954ab55df87de90d462c333bf8e418d3cb88`. Retained ideas are limited to
 progressive disclosure and purposeful resources; all instructions above are
 repository-specific deltas for superskills, provenance, adapters, PEP 723,
 cross-tool placement, routing evals, and the strict audit loop.
+The upstream Apache-2.0 terms are retained in [LICENSE.txt](./LICENSE.txt).

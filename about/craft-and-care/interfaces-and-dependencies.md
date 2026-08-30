@@ -5,10 +5,11 @@ and adapter-specific config surfaces rather than network APIs.
 
 ## Source-of-Truth Boundaries
 
-- Shared workflow logic belongs in `skills/`.
-- `skills/personal/` is the primary locally authored workflow layer.
-- Non-`personal/` skill trees keep their upstream-derived, vendored, or
-  intentional-fork provenance.
+- Shared workflow logic belongs in `skills/personal/`, the sole active authored
+  catalog layer.
+- `skills/archive/` contains retired packages only and is pruned from every
+  generated catalog. Revived upstream work moves under `skills/personal/` with
+  explicit provenance.
 - `.claude/`, `.codex/`, `.gemini/`, and `opencode/` are adapter surfaces, not
   the default home for shared logic.
 - Repository-shape navigation lives in the project instruction files
