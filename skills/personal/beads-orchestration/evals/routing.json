@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "router": "beads-orchestration",
+  "cases": [
+    {"id":"coordinator","kind":"positive","query":"Keep two workers processing the ready Beads backlog until no runnable work remains.","expected_routes":["beads-coordinator"]},
+    {"id":"worker","kind":"positive","query":"Implement ISSUE_ID bd-42 in the dispatched WORKTREE_PATH on agent/bd-42.","expected_routes":["beads-worker"]},
+    {"id":"reviewer","kind":"positive","query":"Process this dispatched pr-review-task bead for the existing pull request.","expected_routes":["beads-pr-reviewer-worker"]},
+    {"id":"cleanup","kind":"positive","query":"Reconcile stale Beads claims, review locks, and orphaned worktrees before dispatch.","expected_routes":["beads-cleanup"]},
+    {"id":"writer","kind":"positive","query":"Break this approved epic into packet-complete Beads issues and dependencies.","expected_routes":["beads-writer"]},
+    {"id":"fallback-query","kind":"negative","query":"Show me the title and status of bead bd-42 without changing anything.","expected_routes":[]},
+    {"id":"fallback-priority","kind":"negative","query":"Which product milestone should we prioritize next?","expected_routes":[]},
+    {"id":"ambiguous-author-execute","kind":"ambiguous","query":"Turn this vague request into Beads and immediately process the resulting backlog.","expected_routes":["beads-writer","beads-coordinator"]},
+    {"id":"ambiguous-review-recovery","kind":"ambiguous","query":"Audit the stale review lock and then review its existing PR.","expected_routes":["beads-cleanup","beads-pr-reviewer-worker"]}
+  ]
+}

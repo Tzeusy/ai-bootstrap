@@ -33,7 +33,7 @@ COLLECT_LOCAL_LINKS = runpy.run_path(str(AUDIT_SCRIPT))["collect_local_links"]
 class BeadsWorkerPackageTests(unittest.TestCase):
     def test_skill_is_slimmer_than_five_hundred_lines(self) -> None:
         line_count = len(SKILL_MD.read_text(encoding="utf-8").splitlines())
-        self.assertLessEqual(line_count, 500)
+        self.assertLessEqual(line_count, 150)
 
     def test_skill_declares_compatibility(self) -> None:
         frontmatter = SKILL_MD.read_text(encoding="utf-8").split("---", 2)[1]
@@ -72,6 +72,8 @@ class BeadsWorkerPackageTests(unittest.TestCase):
         contents = SKILL_MD.read_text(encoding="utf-8")
         self.assertRegex(contents, re.compile(r"agent/<ISSUE_ID>", re.IGNORECASE))
         self.assertRegex(contents, re.compile(r"branch.*must.*agent", re.IGNORECASE))
+        self.assertIn("sole lifecycle mutation authority", contents)
+        self.assertIn("Work only inside `WORKTREE_PATH`", contents)
 
     def test_skill_documents_structured_invalid_runtime_context_handoff(self) -> None:
         contents = SKILL_MD.read_text(encoding="utf-8")
