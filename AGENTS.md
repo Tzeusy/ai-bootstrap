@@ -105,3 +105,10 @@ installed machines. Before structural, placement, or quality-bar decisions
 here, start from `about/README.md` (or the relevant pillar README) and follow
 its routing. Reading `about/craft-and-care/` is mandatory for non-trivial
 changes.
+
+## Notes to self
+
+- Active catalog roots live only under `skills/personal/`; the linker prunes
+  `skills/archive/`, `subskills/`, and `.system`, reports collision losers in
+  its manifest, and no skill source is a git submodule. The retained repository
+  submodule is the Claude marketplace under `.claude/plugins/marketplaces/`.
