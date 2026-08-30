@@ -10,7 +10,8 @@
 Checks the parts of the skill-standards quality bar that don't need judgment:
 frontmatter validity, name/description limits, metadata fields, link
 integrity, orphaned support files, PEP 723 compliance of Python helpers,
-tool-adapter YAML validity, and superskill (subskills/) layout.
+tool-adapter YAML validity, superskill (subskills/) layout, and unloaded
+superskill routing-eval schema and route coverage when present.
 
 Usage:
   uv run scripts/audit_skill.py <skill-package-dir> [--strict] [--stale-days N]
@@ -48,6 +49,7 @@ LOCAL_LINK_RE = re.compile(r"\[[^\]]*\]\((?!https?://|mailto:|#)([^)#\s]+)")
 KNOWN_DIRS = {"references", "scripts", "assets", "subskills", "agents", "tests", "evals"}
 MAIN_GUARD_RE = re.compile(r"""__name__\s*==\s*["']__main__["']""")
 VALID_STATUS = {"active", "draft", "deprecated"}
+ROUTING_CASE_KINDS = {"positive", "negative", "ambiguous"}
 
 
 class Report:
@@ -258,6 +260,79 @@ def audit_package(pkg: Path, rep: Report, stale_days: int, label: str | None = N
     check_layout(pkg, rep, label)
 
 
+def check_routing_evals(pkg: Path, subskill_dirs: set[str], rep: Report) -> None:
+    """Validate optional unloaded router cases without invoking a model."""
+    eval_path = pkg / "evals" / "routing.json"
+    if not eval_path.exists():
+        return
+    label = f"{pkg.name}: evals/routing.json"
+    try:
+        data = json.loads(eval_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        rep.error(f"{label} is not valid JSON: {exc}")
+        return
+    if not isinstance(data, dict):
+        rep.error(f"{label} must be a JSON object")
+        return
+    if data.get("schema_version") != 1:
+        rep.error(f"{label} schema_version must be 1")
+    if data.get("router") != pkg.name:
+        rep.error(f"{label} router must equal {pkg.name!r}")
+    cases = data.get("cases")
+    if not isinstance(cases, list) or not cases:
+        rep.error(f"{label} cases must be a non-empty array")
+        return
+
+    seen_ids: set[str] = set()
+    kinds: set[str] = set()
+    positive_coverage: set[str] = set()
+    for index, case in enumerate(cases):
+        case_label = f"{label} case[{index}]"
+        if not isinstance(case, dict):
+            rep.error(f"{case_label} must be an object")
+            continue
+        case_id = case.get("id")
+        if not isinstance(case_id, str) or not case_id.strip():
+            rep.error(f"{case_label} id must be a non-empty string")
+        elif case_id in seen_ids:
+            rep.error(f"{case_label} id {case_id!r} is duplicated")
+        else:
+            seen_ids.add(case_id)
+        if not isinstance(case.get("query"), str) or not case["query"].strip():
+            rep.error(f"{case_label} query must be a non-empty string")
+
+        kind = case.get("kind")
+        if kind not in ROUTING_CASE_KINDS:
+            rep.error(f"{case_label} kind must be one of {sorted(ROUTING_CASE_KINDS)}")
+        else:
+            kinds.add(kind)
+        routes = case.get("expected_routes")
+        if not isinstance(routes, list) or any(not isinstance(route, str) or not route for route in routes):
+            rep.error(f"{case_label} expected_routes must be an array of non-empty strings")
+            continue
+        if len(routes) != len(set(routes)):
+            rep.error(f"{case_label} expected_routes contains duplicates")
+        unknown = sorted(set(routes) - subskill_dirs)
+        if unknown:
+            rep.error(f"{case_label} expected_routes names unknown subskills: {unknown}")
+        if kind == "positive":
+            if len(routes) != 1:
+                rep.error(f"{case_label} positive cases require exactly one expected route")
+            elif not unknown:
+                positive_coverage.add(routes[0])
+        elif kind == "negative" and routes:
+            rep.error(f"{case_label} negative cases require no expected routes")
+        elif kind == "ambiguous" and len(routes) < 2:
+            rep.error(f"{case_label} ambiguous cases require at least two expected routes")
+
+    missing_kinds = sorted(ROUTING_CASE_KINDS - kinds)
+    if missing_kinds:
+        rep.error(f"{label} lacks case kinds: {missing_kinds}")
+    missing_routes = sorted(subskill_dirs - positive_coverage)
+    if missing_routes:
+        rep.error(f"{label} lacks positive coverage for subskills: {missing_routes}")
+
+
 def audit_superskill(pkg: Path, rep: Report, stale_days: int) -> None:
     subskills = pkg / "subskills"
     if not subskills.is_dir():
@@ -269,7 +344,9 @@ def audit_superskill(pkg: Path, rep: Report, stale_days: int) -> None:
         for target in collect_local_links(router_md):
             router_links.add((router_md.parent / target).resolve())
     names: dict[str, str] = {}
+    subskill_dirs: set[str] = set()
     for sub in sorted(p for p in subskills.iterdir() if p.is_dir()):
+        subskill_dirs.add(sub.name)
         label = f"{pkg.name}/subskills/{sub.name}"
         audit_package(sub, rep, stale_days, label=label)
         fm = parse_frontmatter(sub / "SKILL.md", Report(), label) if (sub / "SKILL.md").exists() else {}
@@ -280,6 +357,7 @@ def audit_superskill(pkg: Path, rep: Report, stale_days: int) -> None:
             names[name] = label
         if (sub / "SKILL.md").resolve() not in router_links:
             rep.error(f"{pkg.name}: router SKILL.md has no routing-table link to subskills/{sub.name}/SKILL.md")
+    check_routing_evals(pkg, subskill_dirs, rep)
 
 
 # Dirs whose nested SKILL.md files are fixtures or internals, not packages.

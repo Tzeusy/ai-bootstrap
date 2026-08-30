@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "router": "wrong-router",
+  "cases": [
+    {
+      "id": "duplicate",
+      "kind": "positive",
+      "query": "",
+      "expected_routes": ["sub-a", "missing-subskill"]
+    },
+    {
+      "id": "duplicate",
+      "kind": "surprise",
+      "query": "Malformed case",
+      "expected_routes": "sub-b"
+    }
+  ]
+}

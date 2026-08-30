@@ -71,6 +71,23 @@ def main() -> int:
     check("no routing-table link to subskills/sub-a/SKILL.md" not in out,
           "markdown-linked subskill passes the routing check")
     check("duplicates broken-superskill/subskills/sub-a" in out, "duplicate subskill name is an ERROR")
+    check("schema_version must be 1" in out, "routing eval schema version is enforced")
+    check("router must equal 'broken-superskill'" in out, "routing eval router identity is enforced")
+    check("query must be a non-empty string" in out, "routing eval query is required")
+    check("positive cases require exactly one expected route" in out,
+          "positive routing cases select exactly one route")
+    check("names unknown subskills: ['missing-subskill']" in out,
+          "routing eval routes must name real subskill directories")
+    check("id 'duplicate' is duplicated" in out, "routing eval ids are unique")
+    check("expected_routes must be an array" in out, "routing eval route type is enforced")
+    check("lacks case kinds: ['ambiguous', 'negative']" in out,
+          "routing eval requires positive, negative, and ambiguous cases")
+    check("lacks positive coverage for subskills: ['sub-a', 'sub-b']" in out,
+          "routing eval requires positive coverage for every subskill")
+
+    # --- valid-superskill: complete unloaded routing cases ---
+    res = run_audit(str(FIXTURES / "valid-superskill"))
+    check(res.returncode == 0, "valid superskill routing eval passes")
 
     # --- batch + JSON over the fixtures root ---
     res = run_audit("--all", str(FIXTURES), "--json")
@@ -78,8 +95,9 @@ def main() -> int:
     try:
         report = json.loads(res.stdout)
         check(report["status"] == "FAIL", "JSON status is FAIL")
-        check(sorted(p["name"] for p in report["packages"]) == ["broken-skill", "broken-superskill"],
-              "JSON discovers exactly the two fixture packages")
+        check(sorted(p["name"] for p in report["packages"]) ==
+              ["broken-skill", "broken-superskill", "valid-superskill"],
+              "JSON discovers exactly the three fixture packages")
     except (json.JSONDecodeError, KeyError) as exc:
         check(False, f"--json output parses: {exc}")
 
