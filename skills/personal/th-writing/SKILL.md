@@ -47,5 +47,5 @@ Example triggers: "review my blog post", "make this post publishable", "fix
 this MDX frontmatter", "draft an RFC from these notes", "coauthor a proposal".
 Non-trigger example: "audit whether our README matches the implementation".
 
-The routing cases in [evals/routing-cases.json](evals/routing-cases.json) test
+The routing cases in [evals/routing.json](evals/routing.json) test
 selection from this router alone; do not load subskill bodies to classify them.
