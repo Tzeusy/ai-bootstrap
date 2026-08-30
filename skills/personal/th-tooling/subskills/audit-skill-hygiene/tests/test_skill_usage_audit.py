@@ -456,6 +456,7 @@ class UsageAuditTests(unittest.TestCase):
             self.assertEqual(row["counts"]["primary"]["total"], 1)
 
     def test_real_extractors_ignore_skill_like_decoys_in_unverified_event_fields(self) -> None:
+        AUDIT_MODULE.configure_candidates(CANDIDATES)
         claude_fixture = FIXTURES / "claude-events.jsonl"
         codex_fixture = FIXTURES / "codex-events.jsonl"
         claude_records = fixture_records("claude-events.jsonl")
@@ -482,9 +483,9 @@ class UsageAuditTests(unittest.TestCase):
         self.assertTrue(
             any(
                 record.get("payload", {}).get("type") == "function_call"
-                and record["payload"].get("name") != "read_file"
-                and json.loads(record["payload"]["arguments"]).get("path")
-                == "skills/personal/systematic-debugging/SKILL.md"
+                and record["payload"].get("name") != "skills.read"
+                and json.loads(record["payload"]["arguments"]).get("skill")
+                == "systematic-debugging"
                 for record in codex_records
             )
         )
@@ -497,7 +498,8 @@ class UsageAuditTests(unittest.TestCase):
         self.assertEqual(claude_counts["systematic-debugging"], 0)
         self.assertEqual(codex_counts["systematic-debugging"], 0)
 
-    def test_codex_read_file_skips_false_and_null_unregistered_arguments(self) -> None:
+    def test_codex_structured_skill_read_skips_false_and_null_unregistered_arguments(self) -> None:
+        AUDIT_MODULE.configure_candidates(CANDIDATES)
         with tempfile.TemporaryDirectory() as tmp:
             transcript = Path(tmp) / "codex-events.jsonl"
             transcript.write_text(
@@ -506,10 +508,10 @@ class UsageAuditTests(unittest.TestCase):
                         "type": "response_item",
                         "payload": {
                             "type": "function_call",
-                            "name": "read_file",
+                            "name": "skills.read",
                             "arguments": json.dumps(
                                 {
-                                    "path": "skills/superpowers/skills/test-driven-development/SKILL.md",
+                                    "skill": "test-driven-development",
                                     "cache": False,
                                     "optional": None,
                                 }
@@ -525,6 +527,33 @@ class UsageAuditTests(unittest.TestCase):
 
             self.assertEqual(outcome["test-driven-development"], 1)
             self.assertTrue(outcome.input_complete)
+
+    def test_retired_codex_read_file_schema_fails_closed(self) -> None:
+        AUDIT_MODULE.configure_candidates(CANDIDATES)
+        with tempfile.TemporaryDirectory() as tmp:
+            transcript = Path(tmp) / "codex-events.jsonl"
+            transcript.write_text(
+                json.dumps(
+                    {
+                        "type": "response_item",
+                        "payload": {
+                            "type": "function_call",
+                            "name": "read_file",
+                            "arguments": json.dumps(
+                                {"path": "skills/personal/systematic-debugging/SKILL.md"}
+                            ),
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            outcome = AUDIT_MODULE.scan_codex([transcript])
+
+            self.assertEqual(outcome["systematic-debugging"], 0)
+            self.assertFalse(outcome.input_complete)
+            self.assertEqual(outcome.input_errors, 1)
 
     def make_complete_catalog(self, repo: Path) -> Path:
         entries = []
@@ -754,6 +783,8 @@ class UsageAuditTests(unittest.TestCase):
                 "90",
                 "--sensitivity-days",
                 "30",
+                "--codex-event-schema",
+                "structured-skill-read-v1",
                 "--json",
             ],
             capture_output=True,
@@ -963,6 +994,142 @@ class UsageAuditTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("UTC", result.stderr)
+
+    def test_manifest_drives_rows_and_dynamic_event_allowlist(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            source = write_skill(repo, "skills/personal/current-only-skill")
+            manifest = write_manifest(
+                repo,
+                [{"name": "current-only-skill", "source": str(source.relative_to(repo)), "ownership": "repo"}],
+            )
+            catalog = AUDIT_MODULE.load_catalog_manifest(repo, manifest)
+            claude_dir = repo / "transcripts/claude"
+            codex_dir = repo / "transcripts/codex"
+            claude_dir.mkdir(parents=True)
+            codex_dir.mkdir(parents=True)
+            claude_event = claude_dir / "event.jsonl"
+            codex_event = codex_dir / "event.jsonl"
+            claude_event.write_text(claude_skill_event("current-only-skill") + "\n", encoding="utf-8")
+            codex_event.write_text(
+                json.dumps(
+                    {
+                        "type": "response_item",
+                        "payload": {
+                            "type": "function_call",
+                            "name": "skills.read",
+                            "arguments": json.dumps({"skill": "current-only-skill"}),
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            for source_dir in (claude_dir, codex_dir):
+                marker = source_dir / "history.jsonl"
+                marker.write_text("{}\n", encoding="utf-8")
+                set_mtime(marker, AS_OF_DATETIME - timedelta(days=100))
+            for event in (claude_event, codex_event):
+                set_mtime(event, AS_OF_DATETIME - timedelta(days=5))
+
+            report = AUDIT_MODULE.build_report(
+                repo, catalog, claude_dir, codex_dir, AS_OF_DATETIME, 90, 30
+            )
+
+            self.assertEqual([row["name"] for row in report["decision_matrix"]], ["current-only-skill"])
+            self.assertEqual(matrix_row(report, "current-only-skill")["counts"]["primary"]["total"], 2)
+
+    def test_unsupported_codex_schema_reports_unavailable_not_zero(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, _catalog, claude_dir, codex_dir = self.make_established_zero_usage_audit_inputs(tmp)
+            manifest = repo / "catalog-manifest.json"
+            recent = codex_dir / "recent.jsonl"
+            recent.write_text(
+                json.dumps(
+                    {
+                        "type": "response_item",
+                        "payload": {
+                            "type": "function_call",
+                            "name": "read_file",
+                            "arguments": json.dumps(
+                                {"path": "skills/personal/systematic-debugging/SKILL.md"}
+                            ),
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            set_mtime(recent, AS_OF_DATETIME - timedelta(days=5))
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(AUDIT_SCRIPT),
+                    "--repo-root",
+                    str(repo),
+                    "--catalog-manifest",
+                    str(manifest),
+                    "--claude-dir",
+                    str(claude_dir),
+                    "--codex-dir",
+                    str(codex_dir),
+                    "--as-of",
+                    AS_OF,
+                    "--json",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            report = json.loads(result.stdout)
+            row = matrix_row(report, "systematic-debugging")
+            self.assertFalse(report["coverage"]["event_schema_complete"])
+            self.assertEqual(report["coverage"]["codex"]["bytes_scanned"], 0)
+            self.assertIsNone(row["counts"]["primary"]["codex"])
+            self.assertIsNone(row["counts"]["primary"]["total"])
+            self.assertEqual(row["disposition"], "insufficient-evidence")
+
+    def test_checkpoint_reuses_aggregates_without_rereading_unchanged_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            manifest = self.make_complete_catalog(repo)
+            catalog = AUDIT_MODULE.load_catalog_manifest(repo, manifest)
+            claude_dir = repo / "transcripts/claude"
+            codex_dir = repo / "transcripts/codex"
+            claude_dir.mkdir(parents=True)
+            codex_dir.mkdir(parents=True)
+            shutil.copyfile(FIXTURES / "claude-events.jsonl", claude_dir / "events.jsonl")
+            shutil.copyfile(FIXTURES / "codex-events.jsonl", codex_dir / "events.jsonl")
+            for source_dir in (claude_dir, codex_dir):
+                marker = source_dir / "history.jsonl"
+                marker.write_text("{}\n", encoding="utf-8")
+                set_mtime(marker, AS_OF_DATETIME - timedelta(days=100))
+            for event in (claude_dir / "events.jsonl", codex_dir / "events.jsonl"):
+                set_mtime(event, AS_OF_DATETIME - timedelta(days=5))
+            checkpoint = repo / "aggregate-checkpoint.json"
+
+            first = AUDIT_MODULE.build_report(
+                repo, catalog, claude_dir, codex_dir, AS_OF_DATETIME, 90, 30, checkpoint
+            )
+            with mock.patch.object(
+                AUDIT_MODULE,
+                "_open_transcript",
+                side_effect=AssertionError("unchanged transcript bytes must not be reopened"),
+            ):
+                second = AUDIT_MODULE.build_report(
+                    repo, catalog, claude_dir, codex_dir, AS_OF_DATETIME, 90, 30, checkpoint
+                )
+
+            self.assertGreater(first["coverage"]["claude"]["bytes_scanned"], 0)
+            self.assertEqual(second["coverage"]["claude"]["bytes_scanned"], 0)
+            self.assertTrue(second["coverage"]["claude"]["checkpoint_hit"])
+            checkpoint_text = checkpoint.read_text(encoding="utf-8")
+            for forbidden in ("events.jsonl", "transcripts/claude", "SYNTHETIC_SECRET_SENTINEL_AIB_C4M"):
+                self.assertNotIn(forbidden, checkpoint_text)
 
 
 if __name__ == "__main__":
