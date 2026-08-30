@@ -9,6 +9,12 @@ metadata:
     - OpenAI Codex
   status: active
   last_reviewed: "2026-08-31"
+  provenance:
+    source_url: "https://github.com/anthropics/skills"
+    source_revision: "fa0fa64bdc967915dc8399e803be67759e1e62b8"
+    source_path: "skills/doc-coauthoring/SKILL.md"
+    relationship: "Tuned derivative preserving the upstream context-to-draft-to-reader-test intent while replacing its fixed, Claude-specific ceremony and platform tool assumptions with proportional, runtime-neutral guidance."
+    license_status: "Upstream declares no per-skill license for this source path; this is a personal-use tuned copy, and external redistribution requires license review."
 ---
 
 # Writing Structured Documents
