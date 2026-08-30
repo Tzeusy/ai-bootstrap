@@ -1,18 +1,9 @@
 ---
 name: th-projects
 description: >
-  Use for project-level engineering governance: bootstrap or audit the
-  doctrine/spec/topology/standards shape; concretize or amend one feature
-  spec; reconcile specs and implementation; audit repo health; prioritize
-  work; synthesize milestones; ideate from doctrine; run a recurring
-  vision-pursuit; or accumulate and walk through independently vetted owner
-  decisions. Route to exactly one subskill. Triggers: "project shape",
-  "bootstrap docs", "what should we work on next", "should we build this",
-  "spec this feature", "the spec is wrong", "review this project", "audit the
-  codebase", "does code match the spec", "what's the next milestone",
-  "brainstorm features", "run the vision pursuit", "relentlessly improve this
-  project", "prepare decisions for me to review", "walk me through the blocked
-  decisions", "collect owner signoffs".
+  Use for project governance: project shape, feature specs, reconciliation or
+  review, prioritization, milestones, ideation or vision pursuit, and owner
+  decisions. Route to exactly one subskill.
 metadata:
   owner: tze
   authors:
