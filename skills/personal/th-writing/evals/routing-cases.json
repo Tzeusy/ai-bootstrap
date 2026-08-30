@@ -1,0 +1,42 @@
+[
+  {
+    "kind": "positive",
+    "query": "Review my blog post and tell me whether it is ready to publish.",
+    "expected_route": "writing-editorial-review"
+  },
+  {
+    "kind": "positive",
+    "query": "Fix this post's frontmatter and MDX errors so the site build passes.",
+    "expected_route": "writing-publish-hardening"
+  },
+  {
+    "kind": "positive",
+    "query": "Turn these meeting notes into a decision document for the architecture group.",
+    "expected_route": "writing-structured-doc"
+  },
+  {
+    "kind": "negative",
+    "query": "Audit whether our API documentation still matches the implementation.",
+    "expected_route": "th-engineering"
+  },
+  {
+    "kind": "negative",
+    "query": "Reconcile this feature spec with the project's doctrine and implementation.",
+    "expected_route": "th-projects"
+  },
+  {
+    "kind": "negative",
+    "query": "Refactor this parser and add regression tests.",
+    "expected_route": "none"
+  },
+  {
+    "kind": "ambiguous",
+    "query": "Edit my post.",
+    "expected_route": "clarify-review-or-mutation"
+  },
+  {
+    "kind": "ambiguous",
+    "query": "Make this document better.",
+    "expected_route": "clarify-artifact-and-intent"
+  }
+]
