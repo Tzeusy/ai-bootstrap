@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "router": "th-writing",
+  "cases": [
+    {
+      "id": "editorial-review-positive",
+      "kind": "positive",
+      "query": "Review my blog post and tell me whether it is ready to publish.",
+      "expected_routes": ["writing-editorial-review"]
+    },
+    {
+      "id": "publish-hardening-positive",
+      "kind": "positive",
+      "query": "Fix this post's frontmatter and MDX errors so the site build passes.",
+      "expected_routes": ["writing-publish-hardening"]
+    },
+    {
+      "id": "structured-doc-positive",
+      "kind": "positive",
+      "query": "Turn these meeting notes into a decision document for the architecture group.",
+      "expected_routes": ["writing-structured-doc"]
+    },
+    {
+      "id": "documentation-audit-negative",
+      "kind": "negative",
+      "query": "Audit whether our API documentation still matches the implementation.",
+      "expected_routes": []
+    },
+    {
+      "id": "project-spec-negative",
+      "kind": "negative",
+      "query": "Reconcile this feature spec with the project's doctrine and implementation.",
+      "expected_routes": []
+    },
+    {
+      "id": "code-refactor-negative",
+      "kind": "negative",
+      "query": "Refactor this parser and add regression tests.",
+      "expected_routes": []
+    },
+    {
+      "id": "post-edit-ambiguous",
+      "kind": "ambiguous",
+      "query": "Edit my post.",
+      "expected_routes": [
+        "writing-editorial-review",
+        "writing-publish-hardening"
+      ]
+    },
+    {
+      "id": "document-improvement-ambiguous",
+      "kind": "ambiguous",
+      "query": "Make this document better.",
+      "expected_routes": [
+        "writing-editorial-review",
+        "writing-publish-hardening",
+        "writing-structured-doc"
+      ]
+    }
+  ]
+}
