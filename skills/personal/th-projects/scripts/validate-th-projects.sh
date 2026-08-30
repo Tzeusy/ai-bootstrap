@@ -2,8 +2,8 @@
 # validate-th-projects.sh — Package-level validator for skills/personal/th-projects.
 #
 # Runs from any working directory; resolves all paths from BASH_SOURCE.
-# Checks: shell syntax, project-shape self-tests, fixture structural invariants,
-# governance contracts, and spec-trace behavior.
+# Checks: shell syntax, unloaded routing evals, project-shape self-tests,
+# fixture structural invariants, governance contracts, and spec-trace behavior.
 #
 # Exit 0 = all checks passed. Exit 1 = one or more failures.
 set -euo pipefail
@@ -63,7 +63,67 @@ else
   done
 fi
 
-# ── 2. project-shape self-tests ───────────────────────────────────────────────
+# ── 2. Unloaded routing evals ────────────────────────────────────────────────
+section "Unloaded routing evals"
+
+ROUTING_EVALS="$ROOT/evals/routing.json"
+if require_file "$ROUTING_EVALS" "evals/routing.json exists"; then
+  rc=0
+  out=$(uv run python - "$ROUTING_EVALS" 2>&1 <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    data = json.load(handle)
+
+assert data.get("schema_version") == 1, "schema_version must be 1"
+cases = data.get("cases")
+assert isinstance(cases, list) and cases, "cases must be a non-empty list"
+
+required = {"id", "kind", "query", "expected_route", "expected_mode", "must_not_route", "rationale"}
+ids = set()
+for case in cases:
+    missing = required - case.keys()
+    assert not missing, f"{case.get('id', '<unknown>')}: missing {sorted(missing)}"
+    assert case["id"] not in ids, f"duplicate case id: {case['id']}"
+    ids.add(case["id"])
+    assert case["kind"] in {"positive", "negative", "ambiguous"}, f"{case['id']}: invalid kind"
+    assert isinstance(case["query"], str) and case["query"].strip(), f"{case['id']}: empty query"
+    assert isinstance(case["rationale"], str) and case["rationale"].strip(), f"{case['id']}: empty rationale"
+    assert isinstance(case["must_not_route"], list), f"{case['id']}: must_not_route must be a list"
+    assert case["expected_route"] not in case["must_not_route"], f"{case['id']}: expected route is forbidden"
+
+routes = {case["expected_route"] for case in cases}
+required_routes = {
+    "project-shape", "project-feature-request", "project-review",
+    "project-direction", "relentless-vision-pursuit", "user-questionnaire",
+}
+assert required_routes <= routes, f"missing root routes: {sorted(required_routes - routes)}"
+
+modes = {case["expected_mode"] for case in cases if case["expected_mode"]}
+required_modes = {
+    "assess-place", "bootstrap", "audit-maintain", "overview",
+    "doctrine-amendment", "standard-funnel", "amendment", "full-review",
+    "focused-review", "quick-health-check", "third-party-review",
+    "spec-reconciliation", "full-direction", "launch-gate",
+    "milestone-synthesis", "ideation", "feature-evaluation", "spec-drift",
+    "work-decomposition",
+}
+assert required_modes <= modes, f"missing modes: {sorted(required_modes - modes)}"
+assert any(case["kind"] == "negative" for case in cases), "negative cases required"
+assert any(case["kind"] == "ambiguous" for case in cases), "ambiguous cases required"
+print(f"validated {len(cases)} routing cases, {len(routes)} routes, {len(modes)} modes")
+PY
+  ) || rc=$?
+  if [[ $rc -eq 0 ]]; then
+    _pass "routing eval schema and coverage: $out"
+  else
+    _fail "routing eval validation failed (exit $rc): $out"
+  fi
+fi
+
+# ── 3. project-shape self-tests ───────────────────────────────────────────────
 section "project-shape self-tests"
 
 SHAPE_SCRIPTS="$ROOT/subskills/project-shape/scripts"
@@ -83,10 +143,10 @@ for script_name in self-test.sh eval-fallbacks.sh; do
   fi
 done
 
-# ── 3. Fixture structural checks ──────────────────────────────────────────────
+# ── 4. Fixture structural checks ──────────────────────────────────────────────
 section "Fixture structural checks"
 
-# ── 3a. project-direction fixtures ────────────────────────────────────────────
+# ── 4a. project-direction fixtures ────────────────────────────────────────────
 echo ""
 echo "  -- project-direction/tests/fixtures/ --"
 
@@ -127,7 +187,7 @@ else
   fi
 fi
 
-# ── 3a-ii. project-direction launch-gate fixtures ─────────────────────────────
+# ── 4a-ii. project-direction launch-gate fixtures ─────────────────────────────
 echo ""
 echo "  -- project-direction/tests/fixtures/launch-gate/ --"
 
@@ -165,7 +225,7 @@ else
   fi
 fi
 
-# ── 3b. project-feature-request fixtures ──────────────────────────────────────
+# ── 4b. project-feature-request fixtures ──────────────────────────────────────
 echo ""
 echo "  -- project-feature-request/tests/fixtures/ --"
 
@@ -211,7 +271,7 @@ else
   fi
 fi
 
-# ── 3c. project-review fixtures — overclaim gate check ───────────────────────
+# ── 4c. project-review fixtures — overclaim gate check ───────────────────────
 echo ""
 echo "  -- project-review/tests/fixtures/ (overclaim gate) --"
 
@@ -272,7 +332,7 @@ if require_file "$REVIEW_FIXTURE/expected-gate-output.md" \
   fi
 fi
 
-# ── 4. spec-trace-check fixtures ─────────────────────────────────────────────
+# ── 5. Governance contract checks ────────────────────────────────────────────
 section "Governance contract checks"
 
 ROUTER="$ROOT/SKILL.md"
@@ -365,7 +425,7 @@ require_file "$QUESTIONNAIRE_TEMPLATE" \
 require_file "$QUESTIONNAIRE_VALIDATOR" \
   "user-questionnaire/scripts/validate_questionnaire.py exists"
 
-# ── 5. user-questionnaire validator tests ────────────────────────────────────
+# ── 6. user-questionnaire validator tests ────────────────────────────────────
 section "user-questionnaire validator tests"
 
 if [[ -f "$QUESTIONNAIRE_VALIDATOR" ]]; then
@@ -387,7 +447,7 @@ if [[ -f "$QUESTIONNAIRE_VALIDATOR" ]]; then
   fi
 fi
 
-# ── 6. spec-trace-check fixtures ─────────────────────────────────────────
+# ── 7. spec-trace-check fixtures ─────────────────────────────────────────────
 section "spec-trace-check fixtures"
 
 TRACE_SCRIPT="$ROOT/scripts/spec-trace-check.py"
