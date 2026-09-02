@@ -52,6 +52,7 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 | Disk retention for session transcripts and tool logs: inventory, age-tiered compress/delete policy, audit-window trade-off. | [subskills/transcript-retention/SKILL.md](subskills/transcript-retention/SKILL.md) | "transcripts eating disk", "clean up old sessions" |
 | Compact append-only agent memory: AGENTS.md notes-to-self, bd memories — dedupe, merge superseded, retire orphans, keep guardrails. | [subskills/memory-hygiene/SKILL.md](subskills/memory-hygiene/SKILL.md) | "AGENTS.md is huge", "compact my notes", "stale memories" |
 | Audit non-skill context surfaces: MCP servers, permission allowlists, hooks — configured vs. actually used in transcripts. | [subskills/config-surface-audit/SKILL.md](subskills/config-surface-audit/SKILL.md) | "audit my MCP servers", "stale permissions", "config bloat" |
+| Hand the user a script to run themselves when a step needs sudo, a TTY, or is otherwise blocked in the agent's sandbox; read results back from disk instead of paste-back. | [subskills/user-run-scripts/SKILL.md](subskills/user-run-scripts/SKILL.md) | "I need sudo for this", "this needs your password", "run this yourself" |
 
 ## Routing rules
 
@@ -68,6 +69,11 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 - **Fallback**: harness-adjacent but no row fits (e.g. authoring a new skill
   → `/th-engineering` skill-standards; bootstrap.sh logic changes → plain
   engineering work). Do not load a subskill to browse.
+- **user-run-scripts is not harness-specific**: unlike the other five
+  subskills, it applies to any task, in any project, where a step is
+  blocked in the agent's own sandbox (sudo, TTY, other manual steps). It
+  lives here for lack of a better home in this repo's skill tree, not
+  because it audits or cleans this machine's AI-tooling harness.
 
 ## Shared invariants (all subskills)
 
