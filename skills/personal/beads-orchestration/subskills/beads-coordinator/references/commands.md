@@ -58,6 +58,8 @@ default coordinator views.
 | Create issue | `bd create "<title>" --description "<desc>" -t <type> -p <priority> --json` |
 | Claim issue | `bd update <id> --claim --json` (atomic; sets `assignee` + `in_progress`), then write the stall heartbeat note |
 | Release issue | `bd update <id> --status open --json` |
+| Stamp readiness rejection | `bd update <id> --add-label needs-shaping --append-notes "dispatch-readiness <date> <session>: missing <fields>"` (see the readiness gate in `coordinator-loop.md`) |
+| Shaped beads awaiting re-check | `bd list --label needs-shaping --json \| jq -c '[.[] \| {id, title, labels}]'` |
 | Block review issue | `bd update <id> --status blocked --json` |
 | Close issue | `bd close <id> --reason "<reason>"` |
 | Add dependency | `bd dep add <issue> <depends-on>` |

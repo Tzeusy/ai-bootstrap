@@ -288,20 +288,70 @@ Before claiming a candidate, read its structured fields and require a complete
 dispatch packet: outcome/non-goals, governing spec or explicit maintenance
 authority, surface/trust-boundary map, relevant failure/concurrency/idempotence
 matrix, documentation impact, and behavior-executing verification. A blank
-structured `acceptance_criteria` field is not dispatch-ready. Return an
-incomplete bead to beads-writer/project-direction shaping; do not ask a worker
-to reconstruct planning context.
+structured `acceptance_criteria` field is not dispatch-ready. Do not ask a
+worker to reconstruct planning context.
+
+The bar itself is correct and stays as written. The defect this gate had was the
+silent dead end after a rejection, never the requirement — do not "fix" a
+backlog of rejected beads by loosening the packet.
 
 Track readiness precisely: **packet-complete** means the structured content is
 complete; **runnable-now** additionally means dependencies/sign-off are clear,
 ownership does not overlap, and a suitable lane is available. Dispatch only
 runnable-now work.
 
+#### Stamp every rejection
+
+A rejection is a mutation the coordinator owns, so it lands on the bead — never
+only in your own head:
+
+```bash
+bd update <id> --add-label needs-shaping \
+  --append-notes "dispatch-readiness <YYYY-MM-DD> <coordinator-session-id>: missing <field list>"
+```
+
+Name the exact missing packet items (`acceptance_criteria blank`, `design
+blank`, `no governing spec`, `no verification`, …); never a bare "incomplete".
+Idempotence:
+- read existing notes first and skip the note when an identical
+  `dispatch-readiness` note with the same missing set is already present
+- stamp a bead at most once per coordinator run; a later poll cycle that
+  re-rejects the same bead reuses the existing stamp
+- remove `needs-shaping` only when a re-run of this gate passes
+
 Run a **cohesion check** against ready/in-progress beads and active PRs. When a
 candidate shares two or more allocation signals (module/interface,
 tests/fixtures, migration/config/contract, review surface, micro size), bundle
 before work starts or serialize it behind the active owner. Do not dispatch
-overlapping siblings in parallel.
+overlapping siblings in parallel. Record each deferred candidate's id and the
+bead/PR it overlaps with for the report; a cohesion deferral carries no label.
+
+### Shaping lane (readiness exit path)
+
+Rejected beads are work, not silence. When `needs-shaping` beads exist and a
+worker slot is free, dispatch **one** shaping worker for a batch of rejected
+beads sharing a parent epic:
+
+- worker skill: `../beads-writer/SKILL.md`; its workflow Phase 3 "Structured
+  Dispatch Packet" is the shaping target (there is no separate shaping entry
+  point in that skill)
+- prompt carries the bead ids, each one's missing-field list, the parent epic
+  id, and the evidence the beads already cite (pursuit dossier JSON, spec paths)
+- the worker returns **proposed field text only** — `design` and
+  `acceptance_criteria` per bead — and runs no `bd` mutation; the "workers never
+  mutate Beads lifecycle" invariant is unchanged
+- the coordinator applies it as assignee, then re-runs the readiness gate on
+  each shaped bead in this cycle:
+
+```bash
+bd update <id> --design="<proposed>" --acceptance="<proposed>" \
+  --remove-label needs-shaping
+```
+
+Caps: one shaping dispatch per parent epic per run, and one shaping attempt per
+bead per run. A bead that still fails the gate after shaping keeps its
+`needs-shaping` stamp and is escalated in the escalation format of
+`../../../references/decision-autonomy.md`. Never loop shaping on it.
 
 ## Step 2: Select Next Issue
 
@@ -750,3 +800,28 @@ filtered queries plus targeted checks of the ids dispatched this cycle.
 Total closed this session: 1 / 10 open at start
 ═══════════════════════════════════════════════════════════════
 ```
+
+### Not-dispatched disclosure (required)
+
+Every progress report and the final report must list non-dispatched candidates
+**by id**, each under its own heading. An aggregate adjective sentence ("the
+rest are incomplete, overlapping, owner-gated, or unsafe") is not a report; it
+is the silence this contract exists to prevent. Print the heading with `none`
+when a set is empty.
+
+Readiness-rejected (`needs-shaping`):
+
+| Bead ID | Parent epic | Missing packet items | Shaping this run |
+|---------|-------------|----------------------|------------------|
+| bu-abcd | bu-7exe4 | acceptance_criteria, design | dispatched |
+| bu-efgh | bu-7exe4 | acceptance_criteria | epic cap reached |
+
+Cohesion-deferred:
+
+| Bead ID | Overlaps with | Shared allocation signals |
+|---------|---------------|---------------------------|
+| bu-ijkl | bu-mnop (in_progress) | module/interface, tests/fixtures |
+
+Other non-dispatched candidates (owner-gated, foreign-assignee, externally
+dependent) are listed the same way: id, one-phrase reason, and the concrete
+unblock condition.
