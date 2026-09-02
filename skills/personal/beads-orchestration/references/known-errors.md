@@ -19,18 +19,29 @@ debugging cost again unless it lands here.
 
 ## Connectivity / server
 
-### Cannot connect to Dolt server (Gastown rigs)
-- **Symptom**: `bd` commands fail with connection-refused / "no local beads
-  server" style errors in repos whose beads run off the shared Gastown Dolt
-  server.
-- **Cause**: the Gastown Dolt sql-server (listening on `localhost:3307`,
-  config `~/gt/.dolt-data/config.yaml`) is down.
-- **Fix**: `gt dolt start`, then retry. Verify with
-  `ss -tlnp | grep 3307`.
-- **Note**: not every repo uses the server — some run embedded
-  (`bd dolt status` says `Dolt engine: embedded`). Embedded repos are
-  unaffected by the server being down.
-- Observed: 2026-06-12, bd 1.0.4.
+### Cannot connect to Dolt server (`connection refused` on 3307)
+- **Symptom**: `Error: failed to open database: Dolt server unreachable at
+  127.0.0.1:3307: dial tcp 127.0.0.1:3307: connect: connection refused`, or
+  `bd create` → "The Dolt server may not be running. Try: bd dolt start".
+- **Cause (since 2026-08-30)**: the shared Dolt sql-server no longer runs on
+  this host. It is a k8s deployment (namespace `dolt`; `kubectl -n dolt get
+  pods`) reached over Tailscale at `dolt.parrot-hen.ts.net:3307`; nothing listens on
+  `localhost:3307`. A repo whose `.beads/config.yaml` / `.beads/metadata.json`
+  still says `127.0.0.1` is misconfigured, not facing an outage.
+  `~/gt/.dolt-data.migrating/` is the pre-k8s data dir the migration left
+  behind — its presence says nothing about whether the server is up.
+- **Fix**: confirm the server first:
+  `mysql -h dolt.parrot-hen.ts.net -P 3307 -u root --protocol=tcp -e "SHOW DATABASES"`
+  (lists `aib`, `dotfiles`, `homelab`, `gt`, …). Then repoint the repo:
+  `dolt.host` in `.beads/config.yaml` and `dolt_server_host` in
+  `.beads/metadata.json` → `dolt.parrot-hen.ts.net`; commit both. Do NOT run
+  `bd dolt start` or a local `dolt sql-server` as a workaround — that forks a
+  second, divergent server.
+- **If the k8s pod is really down**: recovery belongs to `~/GitHub/homelab`,
+  not to bd.
+- Observed: 2026-06-12 (`gt dolt start` era); rewritten 2026-09-02 after
+  `ai-bootstrap` and `dotfiles` were found still pointing at localhost while
+  `homelab`/`gt` had been repointed. bd 1.0.4.
 
 ## Deprecated / removed commands and flags
 
@@ -96,8 +107,10 @@ assuming breakage, then record the rename here AND fix the subskill docs.
 - **This workspace**: `~/.dotfiles` → DB `dotfiles` (prefix `dotfiles-`,
   shell/dotfiles work); `~/.dotfiles/ai-bootstrap` → DB `aib` (prefix `aib-`,
   skill/agent work). Both now live on the **shared external Dolt server**
-  (`127.0.0.1:3307`, `~/gt/.dolt-data`) as per-project databases — migrated
-  from per-repo embedded Dolt on 2026-06-17. Repo→DB selection is still
+  (`dolt.parrot-hen.ts.net:3307`, k8s-hosted; was `127.0.0.1:3307` /
+  `~/gt/.dolt-data` until 2026-08-30) as per-project databases — migrated
+  from per-repo embedded Dolt on 2026-06-17, repointed to the k8s host
+  2026-09-02. Repo→DB selection is still
   per-`.beads/`, so **ID-prefix auto-routing does NOT work across them**
   (`bd show dotfiles-ac7` from ai-bootstrap fails) — always use `bd -C <repo>`
   when addressing the other repo's beads.
@@ -108,9 +121,9 @@ assuming breakage, then record the rename here AND fix the subskill docs.
   its own per-project DB (keeps all repos on one server, data still isolated).
 - **Steps**: (1) `bd export` to refresh `.beads/issues.jsonl` AND tar the whole
   `.beads/` aside as a backup; (2) create the target DB:
-  `mysql -h127.0.0.1 -P3307 -uroot --ssl-mode=DISABLED -e "CREATE DATABASE <db>;"`;
+  `mysql -h dolt.parrot-hen.ts.net -P3307 -uroot --ssl-mode=DISABLED -e "CREATE DATABASE <db>;"`;
   (3) re-init in external-server mode importing from JSONL:
-  `BEADS_DOLT_PASSWORD= bd init --server --external --server-host 127.0.0.1
+  `BEADS_DOLT_PASSWORD= bd init --server --external --server-host dolt.parrot-hen.ts.net
   --server-port 3307 --server-user root --database <db> --prefix <prefix>
   --from-jsonl --reinit-local --non-interactive --destroy-token DESTROY-<prefix>
   --skip-agents --skip-hooks`; (4) verify counts server-side
@@ -123,7 +136,7 @@ assuming breakage, then record the rename here AND fix the subskill docs.
   Non-interactive re-init refuses without `--destroy-token DESTROY-<prefix>`
   (the JSONL is the import source, so this is safe with a backup). Do NOT use
   `--shared-server` — that points at bd's *own* managed server
-  (`~/.beads/shared-server/`), not the existing `~/gt/.dolt-data` one; use
+  (`~/.beads/shared-server/`), not the existing k8s-hosted one; use
   `--server --external`. Root has no password → `BEADS_DOLT_PASSWORD=` (empty).
 - Observed: 2026-06-17, bd 1.0.4.
 
@@ -321,7 +334,7 @@ an explicit method) reappears in other scripts.
   `bd sync` entry above suggests — that skip behavior predates the
   shared-external-server migration.
 - **Cause**: post-3307-migration repos run against the shared external
-  server (`~/gt/.dolt-data`), where bd cannot drive a CLI push without an
+  server (`dolt.parrot-hen.ts.net:3307`), where bd cannot drive a CLI push without an
   explicit local Dolt database path, and no Dolt remote is configured for
   the per-project DBs anyway.
 - **Disposition**: session-end "push beads" is currently a no-op for these

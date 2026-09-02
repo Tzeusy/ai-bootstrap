@@ -13,21 +13,27 @@ push` until "up to date with origin" — work is NOT done until push succeeds.
 
 ## Beads Database Topology
 
-Beads now live on a **shared external Dolt sql-server** at `127.0.0.1:3307`,
-run independently of bd as `dolt sql-server --config ~/gt/.dolt-data/config.yaml`
-(data under `~/gt/.dolt-data`). Each repo maps to its own per-project database
-on that server: this repo → DB `aib` (prefix `aib-`), the parent
-`~/.dotfiles` → DB `dotfiles` (prefix `dotfiles-`). Connection details are
-recorded in each repo's `.beads/config.yaml` + `.beads/metadata.json`
-(`dolt_mode: server`, `--external`). Migrated from per-repo embedded Dolt on
-2026-06-17.
+Beads live on a **shared external Dolt sql-server** hosted in the homelab k8s
+cluster (namespace `dolt`; `kubectl -n dolt get pods`) and reached over
+Tailscale at `dolt.parrot-hen.ts.net:3307`. Nothing listens on
+`localhost:3307` any more: the old `~/gt/.dolt-data` server was retired on
+2026-08-30, and `~/gt/.dolt-data.migrating/` is its leftover, not live data.
+Each repo maps to its own per-project database on that server: this repo →
+DB `aib` (prefix `aib-`), the parent `~/.dotfiles` → DB `dotfiles` (prefix
+`dotfiles-`). Connection details are recorded in each repo's
+`.beads/config.yaml` + `.beads/metadata.json` (`dolt_mode: server`,
+`--external`). Migrated from per-repo embedded Dolt on 2026-06-17; repointed
+from localhost to the k8s host on 2026-09-02.
 
-`--external` means **bd does not start/stop the server** — if `bd` commands
-hang or error on connection, ensure the dolt sql-server on 3307 is running.
-Repo→DB selection is still per-`.beads/`, so a session here sees only `aib`;
-address the parent's beads explicitly with `bd -C ~/.dotfiles <cmd>`, and
-cross-prefix auto-routing still does NOT work. Known bd errors and workarounds
-are cataloged in
+`--external` means **bd does not start/stop the server**. On `connection
+refused`, first check the repo's config points at the k8s host (a stale
+`127.0.0.1` is the usual cause), verify with
+`mysql -h dolt.parrot-hen.ts.net -P 3307 -u root --protocol=tcp -e "SHOW DATABASES"`,
+and never start a local `dolt sql-server` as a workaround. Repo→DB selection
+is still per-`.beads/`, so a session here sees only `aib`; address the
+parent's beads explicitly with `bd -C ~/.dotfiles <cmd>`, and cross-prefix
+auto-routing still does NOT work. Known bd errors and workarounds are
+cataloged in
 `skills/personal/beads-orchestration/references/known-errors.md` — append new
 rough edges there after resolving them.
 

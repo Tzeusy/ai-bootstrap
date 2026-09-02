@@ -54,7 +54,7 @@
 # - linear.api_key  → use LINEAR_API_KEY env var instead
 # - github.token    → use GITHUB_TOKEN env var instead
 
-dolt.host: 127.0.0.1
+dolt.host: dolt.parrot-hen.ts.net
 
 dolt.port: 3307
 
