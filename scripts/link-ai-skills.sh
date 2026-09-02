@@ -132,7 +132,7 @@ build_skill_map() {
     done < <(find "$skills_dir" \
         -type d \( -name .git -o -name node_modules -o -name tests \
             -o -name fixtures -o -name assets -o -name subskills \
-            -o -name archive \) -prune \
+            -o -name archive -o -name .system \) -prune \
         -o -type f -name "SKILL.md" -print0)
 }
 

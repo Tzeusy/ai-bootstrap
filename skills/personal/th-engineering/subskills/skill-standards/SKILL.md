@@ -35,7 +35,7 @@ designed", "audit our skills for quality", "should this be a superskill",
 
 ## Do Not Use This Skill For
 
-- Replacing `/skill-creator` for initial scaffolding or end-to-end authoring
+- Replacing the sibling [skill-creator](../skill-creator/SKILL.md) subskill for initial scaffolding or end-to-end authoring
 - Replacing project-specific doctrine or navigation skills such as
   `/th-projects`
 - Acting as the domain skill itself; this is a rubric for skill quality, not

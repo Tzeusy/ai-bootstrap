@@ -5,13 +5,12 @@ description: >
   implementation or review to the engineering quality bar, code readability,
   test-suite rigor, module boundaries and dependency chains, diagnosing hard
   bugs and flaky failures to root cause, post-refactor cruft cleanup,
-  codebase documentation, creating or reviewing skills against the skill
-  quality bar, or Excalidraw diagrams. Route to exactly one subskill per
-  subdomain; fan out subagents when a task spans several. Triggers: "hold
+  codebase documentation, scaffolding or reviewing skills against the skill
+  quality bar, or Excalidraw diagrams. Triggers: "hold
   this to the engineering bar", "is this code readable", "review these
   tests", "untangle these dependencies", "diagnose this", "flaky test",
   "clean up this refactor", "document this service", "audit the docs",
-  "review this skill", "draw a diagram".
+  "review this skill", "create a skill", "draw a diagram".
 metadata:
   owner: tze
   authors:
@@ -25,7 +24,7 @@ compatibility: skill-standards auditing and excalidraw rendering require uv and 
 
 # TH Engineering
 
-Superskill router for the engineering quality bar. Nine subskills live under
+Superskill router for the engineering quality bar. Ten subskills live under
 `subskills/`, each a complete skill package. **Not** in the global
 catalog — discover lazily, load **at most one** subskill body per
 subdomain, prefer one subagent per subskill when a task spans several
@@ -56,6 +55,7 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 | Evidence bar for diagnosing hard bugs, flaky failures, and perf regressions: feedback loop, ranked hypotheses, tagged instrumentation, regression test at the correct seam. | [subskills/diagnosis/SKILL.md](subskills/diagnosis/SKILL.md) | "diagnose this", "fails one run in twenty", "find the regression" |
 | Finish same-repo refactors/renames/migrations: delete lingering aliases, wrappers, fallbacks, dead flags. | [subskills/cruft-cleanup/SKILL.md](subskills/cruft-cleanup/SKILL.md) | "clean up this refactor", "old path still works" |
 | Skill/superskill quality bar: triggers, grounding, metadata, routing, context efficiency, validation. | [subskills/skill-standards/SKILL.md](subskills/skill-standards/SKILL.md) | "review this skill", "should this be a superskill" |
+| Scaffold or author a new skill end-to-end: init from template, bundle scripts/references/assets, package for distribution. | [subskills/skill-creator/SKILL.md](subskills/skill-creator/SKILL.md) | "create a new skill", "scaffold a skill", "package this skill" |
 | Excalidraw diagrams into/out of workflows, architectures, protocols, Mermaid. | [subskills/excalidraw-diagram/SKILL.md](subskills/excalidraw-diagram/SKILL.md) | "draw a diagram", "convert this Mermaid" |
 
 ## Routing rules
@@ -73,8 +73,9 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 - **Docs craft vs. knowledge architecture**: README/docs/doc-site quality →
   documentation (consumes excalidraw-diagram for its diagrams — an
   expected pairing); five-pillar shape work → `/th-projects`.
-- **Skill content vs. harness state**: skill quality, authoring, review →
-  skill-standards; whether installed skills are used, linked, fresh on
+- **Skill content vs. harness state**: authoring a skill from scratch →
+  skill-creator (then skill-standards before shipping); reviewing or
+  auditing an existing one → skill-standards; whether installed skills are used, linked, fresh on
   this machine → `/th-tooling` (audit-skill-hygiene, refresh-snapshots).
 - **Fallback**: quality-adjacent but no row fits → answer from router-level
   context or ask; don't load a subskill to browse.

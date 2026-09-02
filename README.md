@@ -41,12 +41,12 @@ The `skills/` tree is intentionally split by ownership:
 
 - `skills/personal/` is the layer built and maintained by me.
 - These are the primary place for custom workflow logic, project-shaping methods, and Beads execution patterns.
-- Some personal skills are original; some are maintained forks adapted to my workflow. `skills/personal/th-engineering/subskills/excalidraw-diagram/` is an example of that pattern.
+- Some personal skills are original; some are maintained forks adapted to my workflow. `skills/personal/th-engineering/subskills/excalidraw-diagram/` is an example of that pattern; `skills/personal/th-workflow/` (forked from `obra/superpowers`) and `th-engineering/subskills/skill-creator/` (forked from `anthropics/skills`) are others.
 
 Everything else under top-level `skills/` should be treated as upstream-derived material:
 
 - Some directories are checked out as git submodules from open source upstreams.
-- The current submodules are `skills/superpowers`, `skills/archive/Skill_Seekers`,
+- The current submodules are `skills/archive/Skill_Seekers`,
   `skills/archive/anthropic-skills`, `skills/archive/notebooklm-skill`,
   `skills/archive/mattpocock-skills`, and
   `.claude/plugins/marketplaces/claude-plugins-official`.

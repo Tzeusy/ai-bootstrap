@@ -1,6 +1,13 @@
 ---
 name: executing-plans
 description: Use when you have a written implementation plan to execute in a separate session with review checkpoints
+metadata:
+  owner: tze
+  authors:
+    - obra/superpowers (upstream)
+    - Claude Fable 5.1
+  status: active
+  last_reviewed: "2026-09-02"
 ---
 
 # Executing Plans
@@ -46,7 +53,7 @@ Based on feedback:
 
 After all tasks complete and verified:
 - Announce: "I'm using the finishing-a-development-branch skill to complete this work."
-- **REQUIRED SUB-SKILL:** Use superpowers:finishing-a-development-branch
+- **REQUIRED SUB-SKILL:** Use [finishing-a-development-branch](../finishing-a-development-branch/SKILL.md)
 - Follow that skill to verify tests, present options, execute choice
 
 ## When to Stop and Ask for Help
@@ -79,6 +86,6 @@ After all tasks complete and verified:
 ## Integration
 
 **Required workflow skills:**
-- **superpowers:using-git-worktrees** - REQUIRED: Set up isolated workspace before starting
-- **superpowers:writing-plans** - Creates the plan this skill executes
-- **superpowers:finishing-a-development-branch** - Complete development after all tasks
+- **Isolated worktree** - REQUIRED: a feature branch in its own git worktree before starting
+- **[brainstorming](../brainstorming/SKILL.md)** - Produces the design and plan this skill executes
+- **[finishing-a-development-branch](../finishing-a-development-branch/SKILL.md)** - Complete development after all tasks

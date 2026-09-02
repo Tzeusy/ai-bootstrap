@@ -1,6 +1,13 @@
 ---
 name: receiving-code-review
 description: Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation
+metadata:
+  owner: tze
+  authors:
+    - obra/superpowers (upstream)
+    - Claude Fable 5.1
+  status: active
+  last_reviewed: "2026-09-02"
 ---
 
 # Code Review Reception

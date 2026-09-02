@@ -2,6 +2,13 @@
 name: skill-creator
 description: Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.
 license: Complete terms in LICENSE.txt
+metadata:
+  owner: tze
+  authors:
+    - anthropics/skills (upstream)
+    - Claude Fable 5.1
+  status: active
+  last_reviewed: "2026-09-02"
 ---
 
 # Skill Creator
@@ -135,7 +142,7 @@ At this point, it is time to actually create the skill.
 
 Skip this step only if the skill being developed already exists, and iteration or packaging is needed. In this case, continue to the next step.
 
-When creating a new skill from scratch, always run the `init_skill.py` script. The script conveniently generates a new template skill directory that automatically includes everything a skill requires, making the skill creation process much more efficient and reliable.
+When creating a new skill from scratch, always run the [`init_skill.py`](scripts/init_skill.py) script. The script conveniently generates a new template skill directory that automatically includes everything a skill requires, making the skill creation process much more efficient and reliable.
 
 Usage:
 
@@ -174,7 +181,7 @@ To complete SKILL.md, answer the following questions:
 
 ### Step 5: Packaging a Skill
 
-Once the skill is ready, it should be packaged into a distributable zip file that gets shared with the user. The packaging process automatically validates the skill first to ensure it meets all requirements:
+Once the skill is ready, package it into a distributable zip file with [`package_skill.py`](scripts/package_skill.py), which runs [`quick_validate.py`](scripts/quick_validate.py) first to ensure it meets all requirements:
 
 ```bash
 scripts/package_skill.py <path/to/skill-folder>

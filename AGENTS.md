@@ -109,3 +109,6 @@ changes.
 # Notes to self
 
 - Before dispatching a baseline-pinned ready bead, verify its governing paths still exist on current `main` and reconcile prior merged PRs plus later history; a stale ready record may describe work that was completed and then deliberately removed, and must not resurrect that surface.
+- Global skill catalog is 8 routers (`beads-orchestration`, `bws-cli-skill`, six `th-*`); every description loads into every session, so a new capability joins an existing superskill as a subskill before it earns a top-level entry. `skills/personal/th-workflow/` (fork of `obra/superpowers`) and `th-engineering/subskills/skill-creator/` (fork of `anthropics/skills`) replaced seven standalone entries on 2026-09-02; unused `doc-coauthoring` sits in `skills/archive/`.
+- `skills/.system/` is a Codex-managed system-skill mirror; `scripts/link-ai-skills.sh` and `~/.dotfiles/bootstrap.sh` prune it from discovery. Without that prune, deleting a same-named top-level skill lets the `.system` copy leak into the Claude/Gemini catalogs.
+- Oversized subskills (`beads-pr-reviewer-worker` 491 lines, `beads-worker` 323, `blogpost-editor` 259, `project-direction`/`project-shape` ~250) exceed the 150-line guideline but run linearly, so fanning them into `references/` saves little; revisit only if a conditional slice (e.g. beads-worker handoff paths) grows.
