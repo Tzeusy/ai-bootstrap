@@ -6,7 +6,7 @@ description: >
   spec; reconcile specs and implementation; audit repo health; prioritize
   work; synthesize milestones; ideate from doctrine; run a recurring
   vision-pursuit; or accumulate and walk through independently vetted owner
-  decisions. Route to exactly one subskill. Triggers: "project shape",
+  decisions. Triggers: "project shape",
   "bootstrap docs", "what should we work on next", "should we build this",
   "spec this feature", "the spec is wrong", "review this project", "audit the
   codebase", "does code match the spec", "what's the next milestone",

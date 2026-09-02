@@ -59,9 +59,9 @@ the relevant pillar README) and follow its routing. Reading
 
 Skills-first (see README.md). Canonical skills live in `skills/`;
 `skills/personal/` is the user-maintained layer, everything else is
-upstream-derived (submodules or vendored). Superskills (`beads-orchestration`,
-`th-projects`, `th-engineering`) are router `SKILL.md` + `subskills/` packages;
-only the router enters the global catalog. `agents/` is legacy/reference.
+upstream-derived (submodules or vendored). Superskills (`beads-orchestration`
+and every `th-*`) are router `SKILL.md` + `subskills/` packages; only the
+router enters the global catalog. `agents/` is legacy/reference.
 
 ## Conventions & Patterns
 

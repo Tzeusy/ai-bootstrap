@@ -4,8 +4,7 @@ description: >
   Use for any work on a blog post — deep editorial review for publication
   readiness (narrative, structure, scannability, factual risk, tone) or
   mechanical publish-hardening (frontmatter normalization, MD/MDX safety
-  fixes, structural scaffolding, asset hygiene). Route to exactly one
-  subskill per task. Triggers: "review my blog post", "edit this post", "is
+  fixes, structural scaffolding, asset hygiene). Triggers: "review my blog post", "edit this post", "is
   this post ready to publish", "format this post for the blog", "fix the
   frontmatter", "make this MDX build".
 metadata:
@@ -41,8 +40,7 @@ exercises minimal editorial judgment.
   first, then formatter — as two sequential subskill loads, not one merged
   pass.
 - **Fallback**: writing a post from scratch or non-blog documentation fits
-  neither row — draft with general writing guidance (or `doc-coauthoring`
-  for structured docs), then return here for review and hardening.
+  neither row — draft with general writing guidance, then return here for review and hardening.
 
 ## Discover subskills
 

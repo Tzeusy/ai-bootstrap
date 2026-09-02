@@ -1,6 +1,13 @@
 ---
 name: dispatching-parallel-agents
 description: Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies
+metadata:
+  owner: tze
+  authors:
+    - obra/superpowers (upstream)
+    - Claude Fable 5.1
+  status: active
+  last_reviewed: "2026-09-02"
 ---
 
 # Dispatching Parallel Agents

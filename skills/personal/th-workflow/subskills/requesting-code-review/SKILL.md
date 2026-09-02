@@ -1,11 +1,18 @@
 ---
 name: requesting-code-review
 description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements
+metadata:
+  owner: tze
+  authors:
+    - obra/superpowers (upstream)
+    - Claude Fable 5.1
+  status: active
+  last_reviewed: "2026-09-02"
 ---
 
 # Requesting Code Review
 
-Dispatch superpowers:code-reviewer subagent to catch issues before they cascade.
+Dispatch a reviewer subagent — a general-purpose agent given the bundled [code-reviewer.md](code-reviewer.md) prompt — to catch issues before they cascade.
 
 **Core principle:** Review early, review often.
 
@@ -31,7 +38,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 
 **2. Dispatch code-reviewer subagent:**
 
-Use Task tool with superpowers:code-reviewer type, fill template at `code-reviewer.md`
+Dispatch a general-purpose subagent (Agent tool) with the prompt template at [code-reviewer.md](code-reviewer.md), placeholders filled:
 
 **Placeholders:**
 - `{WHAT_WAS_IMPLEMENTED}` - What you just built
@@ -56,7 +63,7 @@ You: Let me request code review before proceeding.
 BASE_SHA=$(git log --oneline | grep "Task 1" | head -1 | awk '{print $1}')
 HEAD_SHA=$(git rev-parse HEAD)
 
-[Dispatch superpowers:code-reviewer subagent]
+[Dispatch code-reviewer subagent]
   WHAT_WAS_IMPLEMENTED: Verification and repair functions for conversation index
   PLAN_OR_REQUIREMENTS: Task 2 from docs/plans/deployment-plan.md
   BASE_SHA: a7981ec
@@ -76,7 +83,7 @@ You: [Fix progress indicators]
 
 ## Integration with Workflows
 
-**Subagent-Driven Development:**
+**Task-by-task subagent development:**
 - Review after EACH task
 - Catch issues before they compound
 - Fix before moving to next task
@@ -102,4 +109,4 @@ You: [Fix progress indicators]
 - Show code/tests that prove it works
 - Request clarification
 
-See template at: requesting-code-review/code-reviewer.md
+Template: [code-reviewer.md](code-reviewer.md)

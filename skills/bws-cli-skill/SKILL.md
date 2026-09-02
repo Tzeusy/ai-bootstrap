@@ -1,6 +1,13 @@
 ---
 name: bws-cli-skill
 description: Use when working with Bitwarden Secrets Manager CLI (bws) to run commands with injected secrets, manage secret-manager environment variables, or explain bws usage. Essential for wrapping processes with `bws run --project-id ${BWS_TZEHOUSE_ID_PROD or BWS_TZEHOUSE_ID_DEV} -- {command}`.
+metadata:
+  owner: tze
+  authors:
+    - tze
+    - Claude Fable 5.1
+  status: active
+  last_reviewed: "2026-09-02"
 ---
 
 # bws CLI skill
@@ -25,7 +32,7 @@ Use this skill to guide LLM behavior for the Bitwarden Secrets Manager CLI. Prio
 - Use explicit project IDs from `BWS_TZEHOUSE_ID_PROD` or `BWS_TZEHOUSE_ID_DEV`; do not hardcode IDs.
 - If `/secrets/.env` is the source of project IDs or tokens, load it into the current shell process (avoid printing env values).
 - Keep secrets out of logs, files, and repo history.
-- If a task requires other bws commands, consult `references/secrets-manager-cli.md` and the official docs.
+- If a task requires other bws commands, consult [references/secrets-manager-cli.md](references/secrets-manager-cli.md) and the official docs.
 
 ## Usage examples
 
@@ -39,4 +46,4 @@ Use this skill to guide LLM behavior for the Bitwarden Secrets Manager CLI. Prio
 
 ## Reference
 
-For detailed CLI subcommands and authentication setup, read `ai-bootstrap/skills/bws-cli-skill/references/secrets-manager-cli.md` and the official docs at https://bitwarden.com/help/secrets-manager-cli/.
+For detailed CLI subcommands and authentication setup, read [references/secrets-manager-cli.md](references/secrets-manager-cli.md) and the official docs at https://bitwarden.com/help/secrets-manager-cli/.
