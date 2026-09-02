@@ -7,7 +7,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-18"
+  last_reviewed: "2026-09-02"
 compatibility: Requires a Beads-backed repository with `bd` v1.0.4+, `git`, an authenticated `gh`, `jq`, git worktree support, and network access for `gh` PR operations.
 ---
 
@@ -98,7 +98,9 @@ auto-routing to the right DB — that fails across embedded-mode workspaces
    lane (Step 0), then atomically `--claim` and dispatch ready work.
 4. Enforce the dispatch-readiness and cohesion gates before claiming work;
    malformed or overlapping beads return to planning rather than consuming a
-   worker slot.
+   worker slot. A rejected bead is stamped `needs-shaping`, listed by id in the
+   report, and routed to the bounded shaping lane in
+   `references/coordinator-loop.md` — never silently dropped.
 5. Build a **compact** dispatch prompt carrying `ISSUE_ID`, `WORKTREE_PATH`,
    `REPO_ROOT`, and a 2-4 line issue summary plus acceptance criteria. Do not
    inline full `bd show` JSON; the worker self-fetches if it needs more.
