@@ -7,7 +7,7 @@ metadata:
     - obra/superpowers (upstream)
     - Claude Fable 5.1
   status: active
-  last_reviewed: "2026-09-02"
+  last_reviewed: "2026-09-04"
 ---
 
 # Finishing a Development Branch
@@ -26,10 +26,18 @@ Guide completion of development work by presenting clear options and handling ch
 
 **Before presenting options, verify tests pass:**
 
+Run the gate the repository defines, not a default. If `AGENTS.md`, a
+`Makefile`, or CI names a test-scope policy (scoped local run, broad run in
+CI or a merge queue), follow it; only run the whole suite locally when the
+repo names that as the pre-PR gate.
+
 ```bash
-# Run project's test suite
+# Repo-defined gate, e.g. make test-plan / make check; otherwise:
 npm test / cargo test / pytest / go test ./...
 ```
+
+Note the net test delta (`Tests: +a ~b -c`) for the PR body; adds-only growth
+in an area that already has tests deserves a one-line reason.
 
 **If tests fail:**
 ```
@@ -106,9 +114,19 @@ gh pr create --title "<title>" --body "$(cat <<'EOF'
 
 ## Test Plan
 - [ ] <verification steps>
+
+Tests: +<added> ~<extended> -<removed>
 EOF
 )"
+
+# If the base branch has a merge queue and no human review is pending,
+# hand the PR to the queue instead of merging by hand later:
+gh pr merge --squash --auto
 ```
+
+Do not rebase the branch onto the base before pushing unless it conflicts;
+the squash merge (or the queue) integrates it, and a rebase throws away the
+CI run already spent on this head.
 
 Then: Cleanup worktree (Step 5)
 
@@ -190,6 +208,7 @@ git worktree remove <worktree-path>
 - Merge without verifying tests on result
 - Delete work without confirmation
 - Force-push without explicit request
+- Rebase a clean branch "to freshen it"; rebase only on conflict
 
 **Always:**
 - Verify tests before offering options

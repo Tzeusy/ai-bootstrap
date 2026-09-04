@@ -89,6 +89,33 @@ def fetch_required_checks(pr_number):
     return json.loads(result.stdout)
 
 
+def detect_merge_queue(owner, repo, base_branch):
+    """Return True/False when the base branch's rulesets could be read, else None.
+
+    None means "unknown": the reviewer should attempt a direct merge and fall
+    back to ``gh pr merge --auto`` if GitHub rejects it in favour of the queue.
+    """
+    if not base_branch:
+        return None
+    result = subprocess.run(
+        [
+            "gh",
+            "api",
+            f"repos/{owner}/{repo}/rules/branches/{base_branch}",
+            "--jq",
+            '[.[] | select(.type == "merge_queue")] | length',
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    try:
+        return int(result.stdout.strip() or "0") > 0
+    except ValueError:
+        return None
+
+
 def main():
     parser = argparse.ArgumentParser(description="Evaluate whether a PR is merge-ready.")
     parser.add_argument("--owner", required=True)
@@ -108,6 +135,7 @@ def main():
         ])
         unresolved = unresolved_count(args.owner, args.repo, args.pr_number)
         checks = fetch_required_checks(args.pr_number)
+        merge_queue = detect_merge_queue(args.owner, args.repo, pr.get("baseRefName"))
     except RuntimeError as exc:
         fail("command-failed", str(exc), pr_number=args.pr_number)
     except Exception as exc:
@@ -146,6 +174,10 @@ def main():
         "unresolved_count": unresolved,
         "required_non_green": required_non_green,
         "merge_ok": len(reasons) == 0,
+        "merge_queue": merge_queue,
+        "merge_command": (
+            "gh pr merge --squash --auto" if merge_queue else "gh pr merge --squash"
+        ),
         "reasons": reasons,
     }
     json.dump(output, sys.stdout, indent=2, sort_keys=True)

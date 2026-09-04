@@ -7,7 +7,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-18"
+  last_reviewed: "2026-09-04"
 compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, gh, and python3 available, plus authenticated GitHub access and network access for push and PR operations.
 ---
 
@@ -148,7 +148,10 @@ ISSUE_JSON=$(bd show "${ISSUE_ID}" --json \
 
 1. Make focused incremental changes.
 2. Follow local project conventions.
-3. Add or update tests for behavioral changes.
+3. Pin behavioral changes with tests under
+   [`../../references/test-growth-gate.md`](../../references/test-growth-gate.md):
+   extend the nearest existing test first, one gate species per behavior, no
+   letter-of-law assertions, and track the net delta for the PR body.
 4. Commit incrementally:
 
 ```bash
@@ -171,9 +174,11 @@ gate blocks the PR until a reviewer amends the commit. A plain
 Run all required quality gates from project docs. Typical gates:
 - lint
 - typecheck
-- tests
+- tests (the repo's defined gate; follow its test-scope policy if it has one)
 
-Do not skip gates. If a gate fails, fix it and rerun.
+Do not skip gates. If a gate fails, fix it and rerun. If the repo enforces a
+test budget and this change exceeds it, condense tests in this change or
+justify the raise in the PR body; never bump the budget silently.
 
 Run gates token-efficiently (see `../../references/token-efficiency.md`):
 - While iterating, run only the tests covering your changed area (specific test
@@ -237,7 +242,9 @@ PR_URL=$(gh pr create \
   --base "${BASE}" \
   --head "agent/${ISSUE_ID}" \
   --title "<type>: <summary> [${ISSUE_ID}]" \
-  --body "<description of changes and why>")
+  --body "<description of changes and why>
+
+Tests: +<added> ~<extended> -<removed>")
 PR_NUMBER=$(echo "${PR_URL}" | sed -n 's#.*/pull/\([0-9][0-9]*\).*#\1#p')
 ```
 
@@ -252,6 +259,10 @@ If no PR is needed:
 ```bash
 git push -u origin agent/${ISSUE_ID}
 ```
+
+The coordinator decides how the branch lands: a fast-forward push when the
+base is unprotected, or a `queue-direct` PR enqueued to the merge queue when
+the base has one. Do not open that PR yourself.
 
 If push fails and you cannot repair it with one quick local retry, route it
 through `blocked-awaiting-coordinator`.

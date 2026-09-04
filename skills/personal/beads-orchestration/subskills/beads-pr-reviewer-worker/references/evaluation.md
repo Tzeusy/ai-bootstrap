@@ -46,6 +46,7 @@ shape.
 
 Minimum accepted reviewer statuses:
 - `merged-pr`
+- `merge-queued`
 - `corrections-required`
 - `pushed-review-fixes`
 - `blocked-awaiting-coordinator`
@@ -58,8 +59,10 @@ names, fix the contract drift before shipping the skill update.
 
 On a safe test PR:
 1. resolve context
-2. prepare branch; if rebase or cleanup moves the head, verify the helper pushes
-   it with lease and reports the exact prepared head
+2. prepare branch; verify a cleanly merging head is NOT rebased
+   (`rebased: false`, `rebase_reason: not-needed`); if a conflict forces a
+   rebase or cleanup moves the head, verify the helper pushes it with lease and
+   reports the exact prepared head
 3. list threads
 4. post a reply with a stable dedupe key
 5. rerun the same reply and verify it is skipped as duplicate

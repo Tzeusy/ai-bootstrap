@@ -7,7 +7,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-18"
+  last_reviewed: "2026-09-04"
 compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, gh, and python3 available, plus authenticated GitHub access and network access for review, push, and merge operations.
 ---
 
@@ -36,9 +36,8 @@ You do **not** mutate Beads lifecycle state.
 - the PR already exists and needs review follow-up, retry triage, or merge
   evaluation
 
-This skill is typically invoked by
-[`../beads-coordinator/SKILL.md`](../beads-coordinator/SKILL.md), not directly
-by users.
+Typically invoked by [`../beads-coordinator/SKILL.md`](../beads-coordinator/SKILL.md),
+not directly by users.
 
 ## Context
 
@@ -48,6 +47,7 @@ by users.
 | `WORKTREE_PATH` | Dedicated isolated git worktree for this worker |
 | `REPO_ROOT` | Main repository root for read-only orientation |
 | `ISSUE_JSON` | (Optional/legacy) Full issue JSON if inlined by an older coordinator. When absent, self-fetch with the projected `bd show` in Phase 1 |
+| `MERGE_QUEUE` | (Optional) `yes`/`no` from the coordinator's preflight. When absent, trust `merge_queue` in the merge-readiness helper output |
 
 ## Non-Negotiable Boundaries
 
@@ -80,14 +80,17 @@ Use the bundled helpers in `scripts/` for deterministic read-only operations:
   matches the requested ID; empty, multiple, non-record, or foreign responses
   fail closed rather than selecting a first record.
 - [`scripts/prepare_pr_branch.py`](scripts/prepare_pr_branch.py)
-  Fetches base/head, checks out the PR head branch, rebases onto latest base,
-  strips `.beads/` divergence, and reports whether cleanup changed the branch.
+  Fetches base/head, checks out the PR head branch, rebases onto the base
+  **only when a dry merge conflicts** (or `--force-rebase` is passed), strips
+  `.beads/` divergence, and reports `rebased`, `rebase_reason`, and whether
+  the prepared head was pushed.
 - [`scripts/list_review_threads.py`](scripts/list_review_threads.py)
   Lists review threads with full pagination and returns unresolved-thread
   details in JSON.
 - [`scripts/evaluate_merge_readiness.py`](scripts/evaluate_merge_readiness.py)
   Computes merge gates in one place, failing closed when required checks cannot
-  be verified.
+  be verified, and reports whether the base branch sits behind a merge queue
+  (`merge_queue`, `merge_command`).
 - [`scripts/discover_quality_gates.py`](scripts/discover_quality_gates.py)
   Discovers likely lint, typecheck, and test commands from common project
   manifests when project docs do not name them explicitly.
@@ -184,18 +187,20 @@ PREP_JSON=$(python3 scripts/prepare_pr_branch.py \
 
 3. If branch preparation reports `status=rebase-conflict` or
    `status=blocked`, stop and report `blocked-awaiting-coordinator`.
-4. The helper pushes any rebased or `.beads`-cleaned prepared head with
+4. The helper rebases only when `git merge-tree` shows the head conflicts with
+   the base; a cleanly merging head is reviewed as-is so the author's CI run
+   stays valid and the squash merge (or merge queue) integrates it. Pass
+   `--force-rebase` only when the coordinator asks (e.g. a queue-ejected PR).
+5. The helper pushes any rebased or `.beads`-cleaned prepared head with
    `--force-with-lease`. Before review, verify its reported `head_commit`
    equals both local `HEAD` and the GitHub PR head; otherwise stop as
    `blocked-awaiting-coordinator`.
 
 The helper's deterministic .beads branch-hygiene cleanup is non-semantic
-pre-review preparation and is authorized by this workflow. It does not count
-as reviewer-authored correction work or require `pushed-review-fixes`: the
-reviewer begins substantive review only after the cleanup is pushed and then
-reviews that resulting exact head. Any change outside `.beads/` remains a
-semantic reviewer-authored change and must use the exceptional fixer path with
-a fresh independent reviewer.
+pre-review preparation authorized by this workflow, as is its conflict-only
+rebase; neither counts as reviewer-authored fixes. Review starts on the
+resulting exact head. Any change outside `.beads/` is semantic and takes the
+exceptional fixer path with a fresh independent reviewer.
 
 Never stash, check out `main`, or push `main` from the worktree.
 
@@ -253,7 +258,14 @@ python3 scripts/create_inline_review_comment.py \
   --dedupe-key "${ISSUE_ID}:${PATH}:${LINE}"
 ```
 
-6. Default to **no code changes**. Return current-outcome corrections to the
+6. Review the tests as part of the diff using
+   [`../../references/test-growth-gate.md`](../../references/test-growth-gate.md):
+   the PR body states its net test delta, new tests extend the nearest existing
+   test rather than cloning setup, each behavior is pinned by one gate species,
+   and no test asserts source text, log lines, or exact strings that are not a
+   contract. A violation is a `correction-required` thread like any other.
+
+7. Default to **no code changes**. Return current-outcome corrections to the
    original author when resumable or a recovery worker on the same PR branch.
    This keeps one implementation owner and one independent reviewer.
 
@@ -261,7 +273,7 @@ python3 scripts/create_inline_review_comment.py \
    cross-schema access, concurrency, replay/idempotence, and data-loss handling
    are semantic regardless of line count.
 
-7. Exceptional reviewer-as-fixer path: only use when the coordinator explicitly
+8. Exceptional reviewer-as-fixer path: only use when the coordinator explicitly
    authorizes an urgent mechanical correction and no implementation lane can be
    resumed. Keep the commit focused, verify it, and report
    `pushed-review-fixes`; the resulting head requires a fresh independent
@@ -272,23 +284,19 @@ git add <files>
 git commit -m "fix: <summary> [${ISSUE_ID}]"
 ```
 
-Session-attribution hygiene (mandatory): never include runtime session URLs or
-session-attribution trailers (e.g. `Claude-Session: https://claude.ai/code/...`)
-in commit messages or PR bodies. If the PR's existing commits or body carry such
-a trailer and the repo has a session-link CI gate (e.g. butlers'
-`session-link-guard`), amend the commit message / edit the PR body to strip the
-URL (keep plain `Co-Authored-By:`), force-push with lease, and note that a
-force-push replays a stale `pull_request` event payload — a body-only edit needs
-a fresh `synchronize` event (e.g. an empty retrigger commit) before the gate
-re-reads it.
+Session-attribution hygiene (mandatory): never put runtime session URLs or
+attribution trailers (`Claude-Session: https://...`) in commits or PR bodies.
+If the PR carries one and the repo has a session-link CI gate, strip the URL
+(keep plain `Co-Authored-By:`), force-push with lease, and remember a body-only
+edit needs a fresh `synchronize` event (empty retrigger commit) to re-run the gate.
 
-8. Push exceptional fixes with lease after verification:
+9. Push exceptional fixes with lease after verification:
 
 ```bash
 git push --force-with-lease origin "${PR_HEAD_BRANCH}"
 ```
 
-9. When this pass creates the second substantive reopening, call out the
+10. When this pass creates the second substantive reopening, call out the
    two-correction checkpoint in `Summary`: same invariant rewrites the active
    acceptance/failure matrix; a new trust boundary, subsystem, or risk class
    becomes a spec-gated prerequisite.
@@ -296,8 +304,7 @@ git push --force-with-lease origin "${PR_HEAD_BRANCH}"
 ### Phase 4: Verify
 
 Run all required project quality gates needed to substantiate the review, and
-all gates affected by any exceptional code change. Typical
-gates:
+all gates affected by any exceptional code change. Typical gates:
 - lint
 - typecheck
 - tests
@@ -345,17 +352,20 @@ MERGE_JSON=$(python3 scripts/evaluate_merge_readiness.py \
    is a blocker and must fail closed.
 4. If the head moved after review, stop and report
    `blocked-awaiting-coordinator`; never merge an unreviewed head.
-5. If merge is safe, merge the PR (do **not** delete the branch):
+5. If merge is safe, run the helper's `merge_command` (do **not** delete the
+   branch; `MERGE_QUEUE=yes` from the coordinator overrides a `null` detection):
 
 ```bash
-gh pr merge "${PR_NUMBER}" --squash
+gh pr merge "${PR_NUMBER}" --squash          # no queue; confirm state=MERGED -> merged-pr
+gh pr merge "${PR_NUMBER}" --squash --auto   # queue; confirm autoMergeRequest -> merge-queued
 ```
 
-Leave the `agent/<id>` branch in place. Branch deletion is deferred to the
-coordinator after it closes the bead, so the branch-name → bead correlation
-survives a crash between merge and the worker report.
-
-Then confirm the PR is actually merged before reporting success.
+   Under a queue the reviewer's job ends at `merge-queued`; the queue rebuilds
+   and re-tests once and the coordinator confirms `MERGED`. Never bypass the
+   queue with `--admin`. Leave `agent/<id>` in place: the coordinator deletes
+   it after closure so the branch → bead correlation survives a crash.
+   Confirm the PR is actually merged (or queued) before reporting; details in
+   [`references/failure-protocol.md`](references/failure-protocol.md).
 
 6. If merge is not safe, do not mutate Beads state. Report the retry reason in
    `Blockers-JSON` or `Discovered-Follow-Ups-JSON` so the coordinator can
@@ -376,6 +386,8 @@ something goes wrong. The short version:
   failures -> `blocked-awaiting-coordinator`
 - review fixes pushed but merge still not safe -> `pushed-review-fixes`
 - merge completed and confirmed -> `merged-pr`
+- exact head approved and handed to the base branch's merge queue
+  (`autoMergeRequest` confirmed) -> `merge-queued`
 
 Do not mutate Beads state on failure paths. Report the state and let the
 coordinator reconcile it.
@@ -394,7 +406,7 @@ plain text. Collections are compact valid JSON arrays.
 ````text
 ## PR Reviewer Report: <ISSUE_ID>
 
-Status: merged-pr | corrections-required | pushed-review-fixes | blocked-awaiting-coordinator | invalid-runtime-context
+Status: merged-pr | merge-queued | corrections-required | pushed-review-fixes | blocked-awaiting-coordinator | invalid-runtime-context
 Issue: <ISSUE_ID>
 Original-Issue: <original bead id or unknown>
 Branch: <head branch or n/a>
@@ -407,7 +419,7 @@ Branch-Pushed: yes | no
 PR-URL: <url or n/a>
 PR-Number: <number or n/a>
 Base-Branch: <branch or n/a>
-Merge-Performed: yes | no
+Merge-Performed: yes | queued | no
 PR-Closed: yes | no
 Summary: <1-2 sentence description of what was done>
 
@@ -436,6 +448,10 @@ Rules:
 - use exactly one `Status` value
 - `merged-pr` means the PR was merged and confirmed, but no Beads closure was
   performed here
+- `merge-queued` means the exact reviewed head passed every merge gate and was
+  enqueued with `gh pr merge --squash --auto` (confirmed via
+  `autoMergeRequest`); `Merge-Performed: queued`; the coordinator confirms the
+  eventual merge and performs closure
 - `corrections-required` means actionable unresolved threads were returned to
   the original author or recovery worker; the reviewer did not author semantic
   corrections

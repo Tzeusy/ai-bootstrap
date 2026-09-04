@@ -77,8 +77,10 @@ hidden in creator-session context does not count.
   axis only when demonstrably irrelevant.
 - **Documentation impact** — docs/spec/RFC updates required in this change, or
   an explicit "none" with reason.
-- **Verification** — named behavior-executing checks at the real seam and any
-  required source-scan/completeness gate.
+- **Verification** — named behavior-executing checks at the real seam; for
+  each invariant exactly one gate species (behavior test, source-scan guard,
+  or type/lint rule); the nearest existing test to extend; and the expected
+  net test delta. "Add tests for X" without a named seam is not a packet.
 
 An empty structured `acceptance_criteria` field is not dispatch-ready even when
 the description contains an informal checklist.
@@ -150,3 +152,6 @@ Before materializing the graph, verify:
    milestone callback when doctrine mandates remain uncovered.
 6. Every implementation bead has a complete Dispatch Readiness Packet, and the
    cohesion scan found no duplicate or overhead-dominated boundary.
+7. No requirement is pinned by two gate species, no bead exists only to add
+   tests for behavior an existing test executes, and no epic exceeds 7
+   children without a recorded override.

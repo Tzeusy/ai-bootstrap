@@ -73,6 +73,7 @@ class BreadsPrReviewerWorkerPackageTests(unittest.TestCase):
         contents = SKILL_MD.read_text(encoding="utf-8")
         for status in (
             "merged-pr",
+            "merge-queued",
             "corrections-required",
             "pushed-review-fixes",
             "blocked-awaiting-coordinator",

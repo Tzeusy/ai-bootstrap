@@ -47,7 +47,11 @@ Every subbead adds real cost:
 - Review and merge coordination
 - Context loading for the next worker
 
-That is why 10 tiny subbeads can be worse than 3 focused ones. The sweet spot is usually 3-7 children per epic.
+That is why 10 tiny subbeads can be worse than 3 focused ones. The rule is
+3-7 children per epic; more than 9 needs a recorded override in the epic's
+`design` field, and the usual fix is milestone sub-epics. Each child also pays
+one CI run per push plus a full re-run whenever it rebases, so N children
+merging in sequence cost O(N^2) CI without a merge queue.
 
 Each child should usually:
 

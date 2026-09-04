@@ -26,9 +26,16 @@ Use this reference before finalizing or after creating beads.
       "the only path is Z") is owned by a bead that sweeps PRE-EXISTING code
       into compliance (enumerate current violating paths; fix/route/retire
       them) — not only by beads making the new code comply
-- [ ] Acceptance criteria pin test depth where it matters: behavior-executing
-      (DB/integration/render) vs source-scan; a guardrail bead's criteria
-      quote the spec's mandated scan surface verbatim, not a paraphrase
+- [ ] Each invariant or scenario names exactly ONE gate species in acceptance
+      criteria: a behavior-executing test at the real seam, OR one source-scan
+      guard script in CI (criteria quote the spec's mandated scan surface
+      verbatim), OR a type/lint rule. Never two species for one behavior, and
+      never "add tests proving X" when an existing test already pins X
+- [ ] Acceptance criteria name the nearest existing test to extend and the
+      expected net test delta; a bead whose only deliverable is new tests for
+      already-pinned behavior is not dispatch-ready
+- [ ] Epics have 3-7 children. More than 9 requires a recorded override in the
+      epic's `design` field naming why a milestone split is impossible
 
 ## Persistence Checks
 
@@ -65,3 +72,5 @@ bd doctor --fix --yes
 | Epic without reconciliation | Add a final terminal reconciliation bead |
 | Reconciliation beyond `gen-3` | Stop at `gen-3` and document remaining gaps explicitly |
 | Universal invariant concretized only as new-code compliance | Add a sweep bead: enumerate and fix the pre-existing paths the invariant outlaws (observed: "no merge without review" shipped while two legacy merge endpoints kept bypassing it) |
+| One test bead per requirement, or "add tests proving REQ-x" for pinned behavior | Extend the nearest existing test inside the implementation bead; one gate species per behavior (observed: a suite growing 9.4k to 17.4k tests in twelve weeks with CI minutes tracking the count) |
+| Epic with 20+ children | Split into milestone sub-epics of 3-7 children each; every child pays worktree, CI, review, and rebase overhead |
