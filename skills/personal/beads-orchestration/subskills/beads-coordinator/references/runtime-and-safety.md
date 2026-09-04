@@ -67,6 +67,61 @@ Ownership rule:
 - Never "win" a live foreign claim by writing a newer timestamp; the heartbeat
   does not arbitrate ownership.
 
+## Orchestrator Wake Cadence (Prompt-Cache Economics)
+
+This is a distinct mechanism from the Beads stall heartbeat above — it governs
+the **token cost of resuming this session**, not bead mutual exclusion or
+stall detection. Do not conflate the two.
+
+- The coordinator session's prompt cache lasts **5 minutes**. A wake-up (poll,
+  event callback, or resumed sleep) that lands **more than 5 minutes** after
+  the previous request pays a full cache-miss re-read of context —
+  **10-40x** more expensive than a cache-hit read at the same point.
+- While there is near-term work to track (an active worker, a dispatchable
+  `pr-review-task`, a PR cooldown about to expire), never let the coordinator
+  sit through one long uninterrupted sleep waiting on events. If the runtime
+  cannot guarantee sub-5-minute event delivery, set an explicit heartbeat
+  wake-up at **4m50s** and re-poll even when nothing new needs checking — a
+  cheap cache-hit poll beats an expensive cache-miss wake. This is what "active
+  mode" in `coordinator-loop.md` Step 8 means in practice.
+- The miss cost scales with context size, so the projection and file-routing
+  rules in `../../../references/token-efficiency.md` compound with this one: a
+  lean context makes every wake cheaper in both modes.
+- Never block the coordinator's own turn on a long call either: no in-line
+  test suites, and no wait-on-agent call whose timeout exceeds the ceiling.
+
+Runtime binding (use whichever wake primitive the session exposes):
+
+| Runtime | Active-mode wake | Frontier wake |
+|---|---|---|
+| Claude Code | `ScheduleWakeup` (`/loop` dynamic mode) with `delaySeconds: 290`, or a `Monitor` until-loop; subagent completion also wakes you | `delaySeconds: 3600`, `noop: true` on a no-op wake, `stop: true` after the third |
+| Codex | `wait_agent` with timeout ≤ 290s (a timeout means "still running", never a stall) | `wait_agent`/sleep capped at 60 min per wake |
+
+### No-progress frontier
+
+Once a poll finds genuinely nothing to do — `bd ready` empty, no dispatchable
+`pr-review-task`, no active workers, no near-term PR cooldown, no decision-sweep
+work — the 4m50s cache-preserving cadence stops paying for itself: there is no
+real work to keep warm a cache *for*. At that frontier, switch modes instead of
+continuing to burn cache-hit polls on nothing:
+
+- Widen the wake interval to **60 minutes** and run the safety sweep on each
+  wake.
+- Track consecutive no-op wakes (a wake where the sweep still finds nothing
+  dispatchable). After **3 consecutive no-op wakes** (3 hours of confirmed
+  silence), stop the loop entirely — report the terminal state and hand back —
+  rather than polling forever. Any wake that finds real work (even one
+  dispatchable bead) resets the no-op counter to zero and returns to the
+  near-term-work cadence above.
+- This still respects the mandatory heartbeat-renewal checkpoints below: renew
+  the stall heartbeat on any wake that performs a `bd` mutation.
+
+Net shape: fast, cache-cheap polling while there is work to track; slow,
+infrequent polling with a hard stop while there is confirmed nothing to do.
+Neither mode is license to skip a mandatory heartbeat-renewal checkpoint or
+override the stall-heartbeat/claim rules above — this section is cost-only and
+never trades correctness for it.
+
 ## Model Selection Strategy
 
 The coordinator has discretion on subagent model choice based on task type.
@@ -109,6 +164,7 @@ subagent mechanism:
 | PR review (`pr-review-task`) | `MEDIUM_COMPLEXITY_MODEL`; escalate to `HIGH_COMPLEXITY_MODEL` only for large (>400 changed lines) or risk-flagged (security/auth/schema/public-API) diffs |
 | Simple bugfixes | `MEDIUM_COMPLEXITY_MODEL` |
 | Formatting, linting | `LOW_COMPLEXITY_MODEL` |
+| Probes: bootstrap/status checks, recovery probes, read-only lookups (`Explore`-style) | `LOW_COMPLEXITY_MODEL`, read-only tools; prefer a script or one composite command over a subagent when the answer is mechanical |
 
 ## Review Risk Tiers
 
@@ -208,7 +264,7 @@ Workers may not:
 
 | Runtime | Dispatch mechanism | Permission flag |
 |---|---|---|
-| Claude Code | `Task` tool (subagent) | `--dangerously-skip-permissions` |
+| Claude Code | `Agent` tool (formerly `Task`); pass `model` per the tables above, run workers in the background and act on their completion notification | `--dangerously-skip-permissions` on the coordinator session; subagents inherit it |
 | Codex | built-in subagent | `--yolo` |
 | OpenCode | built-in subagent dispatch | use runtime's full-auto mode |
 
@@ -240,13 +296,15 @@ using this JSON shape:
 
 Beads data lives in Dolt DB, not git-tracked files.
 
-`bd create/update/close/dep` mutate the Dolt database directly. The Dolt
-sql-server is auto-started when needed. Worker worktrees share the same DB via
-redirect files created by `bd worktree create`.
+`bd create/update/close/dep` mutate the Dolt database directly. The sql-server
+is a shared external service (`dolt_mode: server`, `--external` in
+`.beads/config.yaml`): `bd` never starts or stops it. Worker worktrees share
+the same DB via redirect files created by `bd worktree create`.
 
 Rules:
 1. Keep the Dolt server healthy. Run `bd dolt status` before heavy mutation
-   loops.
+   loops. On `connection refused`, search `../../../references/known-errors.md`
+   first; never start a local `dolt sql-server` as a workaround.
 2. Never commit `.beads/` contents on code branches. The directory is
    gitignored; accidental `.beads/` diffs on code branches must be stripped.
 3. Create beads sequentially. Never create multiple beads in parallel because
@@ -255,8 +313,8 @@ Rules:
    the bead first, then wire dependencies with `bd dep add`.
 5. Use `bd dolt commit/push/pull` for Dolt version control, not manual file
    surgery. Use `bd vc status` to check for uncommitted changes.
-6. Before any `bd` mutation: confirm you are the bead's `assignee`, renew the
-   stall heartbeat if near expiry, then mutate.
+6. The assignee-check-then-renew-then-mutate rule from "Claiming And The Stall
+   Heartbeat" applies to every mutation here.
 
 ## Bead Closure Rule
 

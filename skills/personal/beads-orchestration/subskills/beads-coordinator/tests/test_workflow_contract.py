@@ -63,10 +63,18 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         for path in (WRITER, TOKEN_EFFICIENCY):
             self.assertIn("design/specification override", path.read_text(encoding="utf-8"))
 
-    def test_refresh_is_event_driven_with_safety_sweep(self) -> None:
-        contents = LOOP.read_text(encoding="utf-8").lower()
-        self.assertIn("event-driven", contents)
-        self.assertIn("30-minute safety sweep", contents)
+    def test_refresh_is_event_driven_with_cache_bounded_wakes(self) -> None:
+        loop = LOOP.read_text(encoding="utf-8").lower()
+        self.assertIn("event-driven", loop)
+        self.assertIn("no-progress frontier", loop)
+        self.assertIn("safety sweep", loop)
+        # Numbers are canonical in runtime-and-safety.md; the loop only points.
+        safety = SAFETY.read_text(encoding="utf-8").lower()
+        self.assertIn("orchestrator wake cadence", safety)
+        self.assertIn("4m50s", safety)
+        self.assertIn("60 minutes", safety)
+        self.assertIn("3 consecutive no-op wakes", safety)
+        self.assertNotIn("30-minute safety sweep", loop)
 
     def test_dispatch_preserves_context_affinity_when_safe(self) -> None:
         contents = LOOP.read_text(encoding="utf-8").lower()
@@ -129,18 +137,27 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         self.assertTrue(NORMALIZER.exists(), NORMALIZER)
         self.assertIn("scripts/normalize_pr_review_state.py", contents)
         self.assertIn("beads-pr-review-normalization/v1", contents)
-        self.assertIn("immediately before an actual mutation", contents)
+        self.assertIn("immediately before each actual mutation", contents)
         self.assertIn("sole PR-state mutator", contents)
-        self.assertIn("echo the requested original bead\nID", contents)
-        self.assertIn("self-referential", contents)
-        self.assertIn("reciprocal or longer", contents)
-        self.assertIn("cyclic-review-relation", contents)
-        self.assertIn("duplicate review-ID", contents)
-        self.assertIn("same original", contents)
-        self.assertIn("resolver `issue_id`", contents)
-        self.assertIn("required label,\nstatus, or uniqueness", contents)
-        self.assertIn("every active review-task context", contents)
-        self.assertIn("does not form a partial graph or canonical set", contents)
+        self.assertIn("manual-triage", contents)
+        # The fail-closed contract is canonical in the script docstring, not the
+        # loop doc, so the coordinator does not re-read it every cycle.
+        self.assertIn("module docstring", contents)
+        docstring = NORMALIZER.read_text(encoding="utf-8").split('"""', 2)[1]
+        for phrase in (
+            "Fail-closed contract",
+            "manual-triage",
+            "self-referential",
+            "resolver `issue_id`",
+            "required label, status, or uniqueness",
+            "creation timestamp",
+            "`gh-pr:<N>`",
+            "skip-command-failure",
+            "cyclic-review-relation",
+            "duplicate review-ID",
+            "same original",
+        ):
+            self.assertIn(phrase, docstring)
 
     def test_review_deduplication_uses_parsed_chronology_and_fails_closed(self) -> None:
         contents = LOOP.read_text(encoding="utf-8")

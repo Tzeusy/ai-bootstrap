@@ -45,7 +45,10 @@ class BeadsWorkerPackageTests(unittest.TestCase):
         contents = SKILL_MD.read_text(encoding="utf-8")
         self.assertIn("scripts/assert_worker_context.py", contents)
         self.assertIn("scripts/emit_worker_report.py", contents)
-        self.assertIn("references/known-errors.md", COLLECT_LOCAL_LINKS(SKILL_MD))
+        # The error catalog is package-wide; the worker must link the canonical
+        # copy, never a local stub.
+        self.assertIn("../../references/known-errors.md", COLLECT_LOCAL_LINKS(SKILL_MD))
+        self.assertFalse((SKILL_MD.parent / "references" / "known-errors.md").exists())
         self.assertIn("references/runtime-contract.md", contents)
         self.assertIn("references/worker-report.md", contents)
 

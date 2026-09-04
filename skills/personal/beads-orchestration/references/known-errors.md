@@ -1005,7 +1005,12 @@ those before scanning (`_strip_allowed_claude_session_commit_trailers`).
 
 So the standard Claude Code commit trailer is fine. What is *not* fine is the same
 text in prose, in a PR body, in a review comment, or as a folded continuation that
-`git interpret-trailers` will not parse as a trailer.
+`git interpret-trailers` will not parse as a trailer. The generic harness
+instruction to end PR bodies with the session-URL footer therefore breaks these
+PRs: in worker-dispatch prompts for such repos, keep the commit trailer but tell
+workers not to append the footer to the PR body. A tripped PR is fixed with
+`gh pr edit <PR#> --body-file <body-without-footer>` (re-triggers the guard, no
+head change).
 
 **Observed failure.** A worker predicted `session-link-guard` "would have failed"
 on an inherited commit carrying that trailer, ran `git filter-branch --msg-filter`

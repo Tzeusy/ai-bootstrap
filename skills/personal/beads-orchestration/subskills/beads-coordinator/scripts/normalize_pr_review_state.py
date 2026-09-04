@@ -3,7 +3,36 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Emit a read-only compact report of PR-review state for a coordinator."""
+"""Emit a read-only compact report of PR-review state for a coordinator.
+
+Fail-closed contract (canonical; `coordinator-loop.md` Step 0 only points here).
+Recommendations are never authorization: the coordinator re-verifies live state
+before any mutation. The scan is reported `partial` and every finding and
+self-heal candidate is held at `manual-triage` — suppressing dispatch, wiring,
+dedupe, and self-heal for the *whole* active collection — when any of these
+fails:
+
+- inventory: a list-shaped but malformed `pr-review-task` inventory, or a record
+  missing a required label, status, or uniqueness guarantee
+- resolver: resolver `issue_id` not matching the discovered review-task ID; a
+  `bd show` record not echoing the requested original ID; a review task whose
+  resolved original is itself (self-referential)
+- context: any active review-task context missing a valid original identity or
+  a parseable creation timestamp (canonical selection uses parsed chronology,
+  never raw timestamp text)
+- originals: any blocked original that does not resolve to the requested bead
+  with a valid `gh-pr:<N>` reference
+- PR metadata: any resolved PR number without a valid `gh pr view` record; the
+  sole exception is a lone, otherwise complete `command-failed` lookup, reported
+  only as a no-action `skip-command-failure` finding
+- discovery: any `gh pr list` / candidate-source lookup failure (open-PR
+  discovery is collection evidence, not a post-selection best effort)
+- relations: `review_relation_graph.review_relation_error` rejects malformed
+  entries, self-links, duplicate review-ID left sides, a review ID reused in the
+  original role, and reciprocal/longer cycles (`cyclic-review-relation`);
+  distinct review tasks pointing at the same original remain valid
+  canonical-plus-duplicate dedupe input
+"""
 
 from __future__ import annotations
 

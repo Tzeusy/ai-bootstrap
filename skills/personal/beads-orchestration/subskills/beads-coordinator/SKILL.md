@@ -59,13 +59,23 @@ State these hold for the entire run; the references elaborate, never override.
   coordinator under `../../references/decision-autonomy.md`, not parked for a
   human. Only its hard-gate list may block on a human, and only in its
   escalation format.
+- **Execute the DAG, never re-plan it.** Selection order is the bead graph's
+  priority order; the dispatch-readiness gate demands a governing spec. A bead
+  that lacks one, or conflicts with it, goes to the shaping lane or back to
+  `th-projects` — the coordinator does not reinterpret scope to keep a slot
+  busy.
+- **Stay inside the cache window.** Every coordinator wake lands within 5
+  minutes of the last while work is in flight (4m50s heartbeat if needed);
+  at the no-progress frontier, widen to 60 minutes and stop after 3 no-op
+  wakes. Canonical numbers and runtime bindings:
+  `references/runtime-and-safety.md` → "Orchestrator Wake Cadence".
 
 ## Read Order
 
 | File | Read when you need to | Owns |
 |------|-----------------------|------|
 | [`references/coordinator-loop.md`](references/coordinator-loop.md) | run the cycle | Exact steps 0-8, PR-review priority lane, worker bootstrap, report contracts, reconciliation, progress report, adaptive polling |
-| [`references/runtime-and-safety.md`](references/runtime-and-safety.md) | dispatch or mutate safely | Model-selection tables, atomic `--claim` + stall-heartbeat model + thresholds, mutation safety, closure rule, runtime dispatch notes, quality gates |
+| [`references/runtime-and-safety.md`](references/runtime-and-safety.md) | dispatch, mutate, or schedule a wake | Model-selection tables, atomic `--claim` + stall-heartbeat model + thresholds, orchestrator wake cadence (prompt-cache economics + runtime bindings), mutation safety, closure rule, runtime dispatch notes, quality gates |
 | [`references/epic-coordination.md`](references/epic-coordination.md) | the bead is an epic or a worker hits a hard blocker | Epic classification, independent dispatch, Team Lead mode + prompt, blocker handling |
 | [`references/commands.md`](references/commands.md) | a quick command lookup | `bd` quick reference, claim/heartbeat checklist, session-completion checklist |
 | [`scripts/normalize_pr_review_state.py`](scripts/normalize_pr_review_state.py) | inspect Step 0 candidates | Compact `beads-pr-review-normalization/v1` findings for blocked originals/review tasks, cooldowns, duplicates, and self-heal candidates; report-only, never a mutator |
