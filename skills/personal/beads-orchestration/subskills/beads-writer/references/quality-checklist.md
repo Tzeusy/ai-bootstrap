@@ -34,7 +34,9 @@ Use this reference before finalizing or after creating beads.
 
 You must persist Beads changes after creating or modifying beads.
 
-Beads data is stored in the Dolt database under `.beads/dolt/`. Writes go through the auto-started SQL server, so there is no manual file commit for bead content itself.
+Beads data lives in a Dolt database reached through the repo's configured
+sql-server (external and shared; `bd` never starts it). Writes go straight to
+the DB, so there is no manual file commit for bead content itself.
 
 Recommended checks:
 

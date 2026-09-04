@@ -94,7 +94,8 @@ default that performs the gated action without an answer defeats the gate.
 
 ## Coordinator Decision Sweep
 
-Whenever entering idle polling — and at least once per active session — triage
+On every transition into the no-progress frontier (coordinator Step 8) — and
+at least once per active session — triage
 decision-shaped blocked beads (blocked beads whose blocker text asks for a
 choice rather than an external event, including `bd human` flags):
 

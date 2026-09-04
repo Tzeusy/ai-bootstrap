@@ -10,12 +10,9 @@ heartbeat rules, worker bootstrap rules, monitoring details, or adaptive polling
   do not spend worker cycles on a sick tracker.
 - Create a fresh coordinator session ID for this run (used as the stall-heartbeat
   owner; atomic claiming is handled by `bd update --claim`).
-- If running from outside the target rig, point `bd` at the rig workspace with
-  the global `-C <path>` flag, e.g. `bd -C /path/to/rig ready --json`. The
-  removed `--rig` flag is no longer supported (bd 1.0.4+).
-- Commands that accept an existing bead ID (`bd update`, `bd close`, `bd show`,
-  `bd dep`) auto-route via prefix-based routing and need neither `-C` nor a
-  rig flag.
+- If running from outside the target rig, pass `bd -C <path>` on **every**
+  command, including ones that take a bead ID — see "Rig Targeting" in
+  `SKILL.md`; prefix auto-routing does not work.
 
 ## Constraints
 
@@ -28,12 +25,13 @@ heartbeat rules, worker bootstrap rules, monitoring details, or adaptive polling
 | Worktree root | `.worktrees/parallel-agents/` |
 | Worker bootstrap | worker must prove `pwd == WORKTREE_PATH` and expected branch |
 | Issue tracker | `bd` CLI only |
-| Metadata persistence | Dolt DB via auto-started sql-server |
+| Metadata persistence | shared external Dolt sql-server (`bd` never starts it; see `runtime-and-safety.md` → "Bead Mutation Safety") |
 | PR review cooldown | 5 minutes after PR `createdAt` |
 
 The stall-heartbeat model (TTL, renewal cadence), the per-runtime stall
-threshold, and the model-selection tables live in `runtime-and-safety.md`. Do
-not restate them here.
+threshold, the orchestrator wake cadence (prompt-cache economics), and the
+model-selection tables live in `runtime-and-safety.md`. Do not restate them
+here.
 
 Repeat this rule during the whole run:
 
@@ -64,58 +62,18 @@ uv run scripts/normalize_pr_review_state.py --repo-root "${REPO_ROOT}"
 
 It emits one `beads-pr-review-normalization/v1` envelope with deterministic
 lists of blocked original/review-task contexts, duplicate selections, cooldown
-candidates, and open-branch self-heal candidates. It invokes the canonical
-review-context resolver, preserving opaque dotted child IDs. Its
-recommendations are **not authorization**: Step 0 remains the sole PR-state
-mutator, and it must freshly verify the exact `gh`/Beads state, assignee, and
-heartbeat immediately before an actual mutation. A `partial` or `fatal` scan is a
-report-only triage result, never a reason to guess or mutate.
-A list-shaped but malformed `pr-review-task` inventory is incomplete evidence:
-the normalizer reports partial manual triage and keeps every self-heal candidate
-at `manual-triage` until it can collect a clean task inventory.
-The normalizer accepts resolver output only when its resolver `issue_id` matches
-the discovered review-task ID. An inventory record missing a required label,
-status, or uniqueness guarantee is malformed before recommendation selection:
-the report is partial and every finding and self-heal candidate remains
-`manual-triage`.
-Each `bd show` response for an original must echo the requested original bead
-ID; a mismatched record is partial manual triage. A review task whose resolved
-original ID is its own review ID is self-referential and must fail closed before
-canonical selection, dispatch, or wiring.
-Before relation validation, every active review-task context must resolve a
-valid original identity. If any active context is missing or invalid, Step 0
-does not form a partial graph or canonical set; it reports partial manual
-triage and suppresses dispatch, wiring, and self-heal actions throughout the
-collection.
-The same collection-wide hold applies when any active scope lacks a valid
-creation timestamp: canonical selection and every recommendation require a
-complete inventory, task lookup, resolved context, relation graph, and parsed
-chronology for the whole active collection.
-Before that selection, every blocked original must resolve to the requested
-bead and provide a valid `gh-pr:<N>` reference. A lookup or reference failure
-in any original scope makes the whole collection partial/manual, so no sibling
-canonical ID, dispatch, wiring, or self-heal recommendation survives.
-PR metadata is collection evidence too: every resolved PR number must yield a
-valid `gh pr view` record before canonical dispatch or any wiring/self-heal
-recommendation survives. A metadata failure makes the collection partial and
-all wiring candidates manual. The only retained exception is a lone otherwise
-complete `command-failed` PR lookup, reported solely as existing no-action
-`skip-command-failure` findings.
-Actionability is finalized only after open-PR discovery has also completed:
-`gh pr list` and every candidate source lookup are collection evidence, not a
-post-selection best effort. Any discovery failure makes the whole result
-partial/manual, including recommendations derived from precomputed canonical
-selection such as dedupe, dispatch, and wiring. The singleton no-action skip
-survives only when no other metadata phase failed.
+candidates, and open-branch self-heal candidates. How to read it:
 
-The same total pure relation-graph validation applies across the complete
-resolved review-task collection before canonical selection or any
-recommendation. Malformed relation entries, self-links, duplicate review-ID
-left sides, and reuse of a review ID as an original role all emit partial
-manual triage. A reciprocal or longer task-to-original cycle is
-`cyclic-review-relation` and likewise permits no dispatch or wiring
-recommendation. Distinct review tasks may still point to the same original for
-valid canonical-plus-duplicate dedupe.
+- Its recommendations are **not authorization**. Step 0 remains the sole
+  PR-state mutator and must freshly verify the exact `gh`/Beads state,
+  assignee, and heartbeat immediately before each actual mutation.
+- A `partial` or `fatal` envelope, and every `manual-triage` finding, is a
+  report-only triage result: never guess, mutate, dispatch, or wire from it.
+  The script fails the whole collection closed on any inventory, lookup,
+  relation-graph, chronology, or PR-metadata defect; the exact contract lives in
+  the script's module docstring and is enforced by
+  [`scripts/review_relation_graph.py`](../scripts/review_relation_graph.py) —
+  do not re-derive it here, and do not "repair" a partial result by hand.
 
 Before discovering new work, and whenever a worker frees a slot, check
 (projected — never dump the unfiltered JSON into context; see
@@ -280,7 +238,8 @@ bd ready --json | jq -c '[.[] | {id, title, priority, type, labels, assignee, cr
 Selection needs only these fields. Do not `bd show` candidates you are not
 about to claim; fetch detail for the one selected bead only.
 
-If the list is empty, enter idle polling mode.
+If the list is empty and nothing else is dispatchable, you are at the
+no-progress frontier (Step 8).
 
 ### Dispatch readiness gate
 
@@ -334,7 +293,8 @@ beads sharing a parent epic:
 
 - worker skill: `../beads-writer/SKILL.md`; its workflow Phase 3 "Structured
   Dispatch Packet" is the shaping target (there is no separate shaping entry
-  point in that skill)
+  point in that skill). Its deliverable is specification text, so dispatch it
+  at `DESIGN_AND_SPECIFICATION_MODEL`.
 - prompt carries the bead ids, each one's missing-field list, the parent epic
   id, and the evidence the beads already cite (pursuit dossier JSON, spec paths)
 - the worker returns **proposed field text only** — `design` and
@@ -389,14 +349,9 @@ bd update <id> --claim --json
    `runtime-and-safety.md`). The heartbeat is stall detection only; it is NOT
    the claim mechanism.
 5. Only after a verified claim may the coordinator create the worktree or
-   dispatch a worker.
-
-Mutual exclusion comes from two layers:
-- **Atomic `--claim`** (cross-actor): only one actor can win the assignee.
-- **`bd worktree create` failing when `agent/<id>` already exists** (the
-  dispatch-level backstop, including a same-actor session that double-dispatches).
-  If worktree creation fails because the branch exists, treat the bead as
-  already in flight and do not dispatch a second worker.
+   dispatch a worker. If `bd worktree create` then fails because `agent/<id>`
+   already exists, the bead is already in flight: do not dispatch a second
+   worker (the two-layer exclusion model is in `runtime-and-safety.md`).
 
 ## Step 4: Prepare Worker Environment
 
@@ -729,21 +684,32 @@ Immediate recheck triggers:
 - PR discovered, merged, or closed
 - review bead created or deduped
 
-Polling modes:
-- active mode: 1-2 minute polls only when there is known near-term work waiting
-  such as a dispatchable `pr-review-task`, a just-freed slot, or a PR cooldown
-  about to expire
-- idle mode: wait for events when the runtime supports it. Regardless of event
-  delivery, run one **30-minute safety sweep** covering ready work, PR state,
-  released dependencies, stalled claims, and tracker health.
+Polling modes (wake cadence and its cost rationale are canonical in
+`runtime-and-safety.md` → "Orchestrator Wake Cadence"; do not restate the
+numbers here):
+- active mode: whenever near-term work exists (an active worker, a dispatchable
+  `pr-review-task`, a PR cooldown counting down). Wait for events when the
+  runtime supports it, but never let a gap between wakes exceed the 4m50s
+  cache-preserving ceiling. Tighten to 1-2 minutes only when an event is
+  imminent (a cooldown about to expire, a slot just freed); a cache-hit poll is
+  cheap, not free.
+- no-progress frontier: once a sweep finds nothing dispatchable, widen to the
+  60-minute cadence and 3-consecutive-no-op-wake stop condition in
+  `runtime-and-safety.md`. Each wake in this mode still runs the full safety
+  sweep covering ready work, PR state, released dependencies, stalled claims,
+  and tracker health — the sweep's content doesn't shrink, only its cadence
+  widens.
 
-Decision sweep: on every transition into idle mode — and at least once per
-session even if never idle — run the Coordinator Decision Sweep from
-`../../../references/decision-autonomy.md` over blocked and human-flagged
-beads. Decision debt is dispatchable work: a swept-and-decided bead re-enters
-the ready pool this cycle, so re-run Step 0 after a sweep that unblocked
-anything. An idle coordinator with decision-shaped blocked beads is not idle;
-it is avoiding a decision.
+Decision sweep: on every transition into the no-progress frontier — and at
+least once per session even if it's never reached — run the Coordinator
+Decision Sweep from `../../../references/decision-autonomy.md` over blocked
+and human-flagged beads, as part of that wake's safety sweep, **before**
+counting the wake as a no-op. Decision debt is dispatchable work: a
+swept-and-decided bead re-enters the ready pool this cycle, so re-run Step 0
+after a sweep that unblocked anything (this also resets the no-op counter — see
+`runtime-and-safety.md`). A coordinator at the no-progress frontier with
+decision-shaped blocked beads is not actually at the frontier; it is avoiding a
+decision.
 
 Prefer low-cost evidence over narrative heartbeats:
 - worktree exists

@@ -12,12 +12,11 @@ heartbeat if near expiry, then mutate.
 Coordinator responsibilities:
 - claim atomically with `bd update <id> --claim` (sets `assignee` + `in_progress`)
 - check `assignee` (not a lease token) to decide whether a bead is yours
-- renew the stall heartbeat at least every 5 minutes while active
-- renew at every mutation checkpoint (`bd create/update/dep add/close`) and
-  after long `gh`, test, rebase, or merge steps — but skip the renewal when the
-  heartbeat was already renewed within the last 5 minutes (one renewal can
-  cover a burst of consecutive mutations; the TTL is 20 minutes)
+- renew the stall heartbeat at the checkpoints in `runtime-and-safety.md`
+  (TTL, cadence, and the skip-if-recently-renewed rule are canonical there)
 - replace the canonical heartbeat block in notes; never append a second one
+- keep every wake inside the prompt-cache window (`runtime-and-safety.md` →
+  "Orchestrator Wake Cadence")
 
 ## Session Completion Checklist
 

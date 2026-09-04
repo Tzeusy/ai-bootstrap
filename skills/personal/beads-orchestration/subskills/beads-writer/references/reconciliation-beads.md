@@ -57,7 +57,9 @@ Workflow:
 6. Produce a checklist mapping every spec requirement to its implementing
    bead and code evidence (file:line), classified
    implemented/partial/missing/deviates. For large epics, fan out
-   independent per-spec-area skeptic subagents and merge their findings.
+   independent read-only per-spec-area skeptic subagents and merge their
+   findings (the read-only helper allowance in `beads-worker/SKILL.md`; they
+   never write code).
 7. For every partial or missing requirement, report a cold-start-ready gap
    candidate in `Discovered-Follow-Ups-JSON`, including priority, proposed
    parent/dependencies, exact spec link, and acceptance evidence.

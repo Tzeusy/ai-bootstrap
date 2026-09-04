@@ -63,6 +63,13 @@ rg -n "^name:|^description:" subskills/*/SKILL.md
 - Worktrees live at `.worktrees/parallel-agents/<id>` on branch `agent/<id>`.
 - `.beads/` is Dolt-backed and gitignored — never commit it to code branches.
 - bd 1.0.4 has no `--rig` flag: target another project with `bd -C <path> …`.
+- **Spirit > spec > DAG.** Beads are the implementation DAG derived from the
+  project's specs, which serve its doctrine (`th-projects`). The writer derives
+  beads from approved specs, the coordinator executes the DAG in priority
+  order, and a worker implements one node. None of them re-plans: a bead that
+  conflicts with its spec or doctrine, or has no governing spec, is routed back
+  through `th-projects` (feature-request amendment or direction), not
+  reinterpreted, re-scoped, or quietly dispatched.
 - **Decide, don't defer.** Engineering-judgment choices are resolved
   autonomously per [`references/decision-autonomy.md`](references/decision-autonomy.md);
   blocking on a human is reserved for its hard-gate list. Load that file before

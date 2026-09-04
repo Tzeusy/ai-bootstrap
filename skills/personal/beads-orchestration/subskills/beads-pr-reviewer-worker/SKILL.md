@@ -47,7 +47,7 @@ by users.
 | `ISSUE_ID` | Assigned PR-review bead ID |
 | `WORKTREE_PATH` | Dedicated isolated git worktree for this worker |
 | `REPO_ROOT` | Main repository root for read-only orientation |
-| `ISSUE_JSON` | (Optional/legacy) Full issue JSON if inlined by an older coordinator. When absent, self-fetch: `bd show "${ISSUE_ID}" --json` |
+| `ISSUE_JSON` | (Optional/legacy) Full issue JSON if inlined by an older coordinator. When absent, self-fetch with the projected `bd show` in Phase 1 |
 
 ## Non-Negotiable Boundaries
 
@@ -64,17 +64,11 @@ by users.
 
 ## Optional Project-Level Craft-And-Care Gate
 
-Some repositories define a project-local `craft-and-care` skill as the
-execution-quality bar for implementation work.
-
-Before reviewing, check for a repository-level `craft-and-care` skill in
-the project's standard skill locations. If one exists:
-- read it before review,
-- follow its guidance as the quality bar for findings and merge readiness,
-- use it again before handoff to review the actual diff for violations or
-  missing cleanup.
-
-If no repository-level `craft-and-care` skill exists, continue with this skill.
+Before the first finding, apply
+[`../../references/craft-and-care-gate.md`](../../references/craft-and-care-gate.md):
+discover a repo-owned `craft-and-care` skill, read it once if present, use it
+as the bar for findings and merge readiness, and run its final standards pass
+against the diff before handoff.
 
 ## Bundled Helpers
 
@@ -119,8 +113,12 @@ review-thread operations or the failure protocol:
 2. Fetch full issue details when `ISSUE_JSON` was not inlined by the coordinator:
 
 ```bash
-ISSUE_JSON=$(bd show "${ISSUE_ID}" --json)
+ISSUE_JSON=$(bd show "${ISSUE_ID}" --json \
+  | jq '{id, title, status, labels, external_ref, description, acceptance_criteria, design, notes}')
 ```
+
+Project to those fields only (`../../references/token-efficiency.md`); the
+full record carries history you do not need.
 
 3. Verify runtime context:
 
@@ -318,15 +316,9 @@ gate stdout to a log file and read back only the exit status plus the failure
 tail, and while iterating on a fix run only the tests covering it — the full
 defined gate runs once, immediately before the merge decision.
 
-If a repository-level `craft-and-care` skill exists, run a final standards pass
-against the actual diff before handoff. At minimum, confirm the change does not
-violate the project's explicit standards around:
-- cleanup versus compatibility cruft,
-- readability and simplicity over cleverness,
-- explicitness over hidden magic,
-- fail-fast behavior over silent fallback unless the project says otherwise,
-- same-change documentation or contract updates when behavior changed,
-- risk-scaled verification depth.
+If a repository-level `craft-and-care` skill exists, run the final standards
+pass from `../../references/craft-and-care-gate.md` against the actual diff
+before handoff.
 
 ### Phase 5: Merge Or Report Retry
 

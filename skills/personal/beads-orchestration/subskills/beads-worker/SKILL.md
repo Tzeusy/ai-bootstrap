@@ -52,6 +52,9 @@ by users.
 - The current branch must be `agent/<ISSUE_ID>`.
 - Do not run `bd create`, `bd update`, `bd dep add`, or `bd close`.
 - Do not spawn code-writing helpers or parallel implementation tracks.
+  Read-only helpers (discovery, architecture lookup, per-spec-area audit such
+  as a reconciliation bead's skeptic pass) are allowed at `LOW`/`MEDIUM` model
+  tier; you merge their findings and own the deliverable.
 - Do not commit `.beads/` changes on the worker branch.
 
 If the issue truly needs multiple code-writing tracks, stop and hand that back
@@ -70,21 +73,16 @@ not to replace local judgment.
   Exact bootstrap rules, guidance discovery order, and push/PR failure routing.
 - [`references/worker-report.md`](references/worker-report.md)
   Report-generation rules, examples, and JSON entry schemas.
-- [`references/known-errors.md`](references/known-errors.md)
-  Known worker errors and workarounds to check before re-deriving a recovery.
+- [`../../references/known-errors.md`](../../references/known-errors.md)
+  Package-wide catalog of known `bd`/`gh`/CI errors and workarounds. Search it
+  (`rg -i -n '<error text>'`) before re-deriving a recovery; never read it whole.
 
 ## Optional Project-Level Craft-And-Care Gate
 
-Some repositories define a project-local `craft-and-care` skill as the
-execution-quality bar for implementation work.
-
-Before editing:
-- search the worktree for a repo-owned `craft-and-care/SKILL.md`,
-- if it exists, read it before implementation,
-- follow its guidance as a required quality bar for the change,
-- run a final pass against the actual diff before handoff.
-
-If no repository-level `craft-and-care` skill exists, continue normally.
+Before the first edit, apply
+[`../../references/craft-and-care-gate.md`](../../references/craft-and-care-gate.md):
+discover a repo-owned `craft-and-care` skill, read it once if present, and run
+its final standards pass against the diff before handoff.
 
 ## Workflow
 
@@ -186,15 +184,9 @@ Run gates token-efficiently (see `../../references/token-efficiency.md`):
   failure tail; on failure, iterate on the failing subset (`--lf` or named test
   ids), then re-run the full gate once more.
 
-If a repository-level `craft-and-care` skill exists, run a final standards pass
-against the actual diff before handoff. At minimum, confirm the change does not
-violate explicit project guidance around:
-- cleanup versus compatibility cruft,
-- readability and simplicity over cleverness,
-- explicitness over hidden magic,
-- fail-fast behavior over silent fallback unless the project says otherwise,
-- same-change documentation or contract updates when behavior changed,
-- risk-scaled verification depth.
+If a repository-level `craft-and-care` skill exists, run the final standards
+pass from `../../references/craft-and-care-gate.md` against the actual diff
+before handoff.
 
 ## Phase 5: Choose Handoff Path
 
