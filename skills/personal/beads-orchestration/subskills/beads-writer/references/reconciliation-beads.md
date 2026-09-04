@@ -48,9 +48,12 @@ Workflow:
    proves nothing.
 4. Audit the instruments. For every guardrail/scan test, read its regex,
    glob, and scan roots and check they cover the surface the spec mandates —
-   a green-but-blind guardrail is itself a gap. For every spec scenario,
-   confirm a test EXECUTES the behavior (DB/integration level); a test that
-   merely greps source for the feature does not count.
+   a green-but-blind guardrail is itself a gap; the fix is widening that
+   guard's scope, not adding a parallel test. For every spec scenario,
+   confirm ONE gate pins it: a test that EXECUTES the behavior (DB/integration
+   level) or, for structural invariants, the designated scan guard. A test
+   that merely greps source for a feature does not count as a behavior gate,
+   and a scenario already pinned by one species does not need a second.
 5. When several surfaces implement the same contract (N readers of one
    store, N writers of one table), diff them against each other for
    consistency: filters, defaults, ordering, authz.
@@ -62,7 +65,11 @@ Workflow:
    never write code).
 7. For every partial or missing requirement, report a cold-start-ready gap
    candidate in `Discovered-Follow-Ups-JSON`, including priority, proposed
-   parent/dependencies, exact spec link, and acceptance evidence.
+   parent/dependencies, exact spec link, acceptance evidence, the gate
+   species that will pin it, and the expected net test delta. The deliverable
+   of reconciliation is the report plus spec amendments; new tests are
+   proposed only for scenarios with NO gate, never as "prove X" additions for
+   behavior an existing test already executes.
 8. When gaps remain, report the need for the next-generation reconciliation
    candidate (up to gen-3) and return `blocked-awaiting-coordinator` with
    "coverage gaps remain" as the unblock condition.
@@ -82,8 +89,10 @@ Workflow:
 2. Universal/negative invariants are verified by enumerating every code path
    that performs the operation, not by citing a single compliant example.
 3. Guardrail/scan tests were audited for blind spots (scan scope vs the
-   spec-mandated surface), and every spec scenario has a behavior-executing
-   test (not a source-grep).
+   spec-mandated surface), and every spec scenario is pinned by exactly one
+   gate species (a behavior-executing test, or the designated scan guard for
+   structural invariants); no gap candidate proposes tests for a scenario
+   that already has one.
 4. Any gaps found are reported as dedupe-ready child-bead candidates under the same epic.
 5. If gaps were found, the handoff reports a next-generation reconciliation candidate.
 6. The close reason records the reconciliation summary.

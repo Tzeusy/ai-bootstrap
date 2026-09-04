@@ -13,6 +13,20 @@ heartbeat rules, worker bootstrap rules, monitoring details, or adaptive polling
 - If running from outside the target rig, pass `bd -C <path>` on **every**
   command, including ones that take a bead ID — see "Rig Targeting" in
   `SKILL.md`; prefix auto-routing does not work.
+- Detect once per run whether the default branch is behind a merge queue, and
+  carry the answer as `MERGE_QUEUE=yes|no` into every reviewer prompt and the
+  direct-merge path:
+
+```bash
+BASE=$(git remote show origin | sed -n 's/.*HEAD branch: //p')
+MERGE_QUEUE=$(gh api "repos/{owner}/{repo}/rules/branches/${BASE}" \
+  --jq '[.[] | select(.type=="merge_queue")] | if length > 0 then "yes" else "no" end' \
+  2>/dev/null || echo no)
+```
+
+  With a queue, integration (rebase onto the latest base plus one full CI run
+  on the merge group) is GitHub's job: reviewers stop at `merge-queued`,
+  nothing rebases a PR to "freshen" it, and Step 0 confirms `MERGED`.
 
 ## Constraints
 
@@ -146,16 +160,19 @@ If no PR number can be resolved, append a note and skip mutation for that bead.
 When PR number is available, check:
 
 ```bash
-gh pr view <number> --json state,mergedAt,createdAt
+gh pr view <number> --json state,mergedAt,createdAt,autoMergeRequest,mergeStateStatus,labels
 ```
 
 Handle each case:
 
 | PR State | Action |
 |---|---|
-| `MERGED` | renew heartbeat, then close review/original beads as appropriate; then run the post-closure branch/worktree cleanup below |
+| `MERGED` | renew heartbeat, then close review/original beads as appropriate (a `queue-direct` PR has only an original bead); then run the post-closure branch/worktree cleanup below |
 | `CLOSED` and not merged | renew heartbeat, then reopen original for re-triage; block/close review bead as appropriate |
+| `OPEN` and `autoMergeRequest` non-null | queued: do nothing this cycle; re-check on the next wake |
+| `OPEN`, review bead labelled `merge-queued`, `autoMergeRequest` null | the queue ejected it (merge-group CI failed or a conflict appeared): remove `merge-queued`, treat as an `OPEN` `pr-review-task`, and authorize `--force-rebase` in the next reviewer prompt |
 | `OPEN` with `pr-review-task` | wait for cooldown; once elapsed, atomically claim the review bead with `bd update <id> --claim`, then dispatch review worker if slot is open |
+| `OPEN` labelled `queue-direct` | no review bead by design; if `autoMergeRequest` is null re-run `gh pr merge <n> --squash --auto`, and after two failed re-enqueues drop the label and route through the normal review lane |
 | `OPEN` without `pr-review-task` | ensure exactly one dedicated review bead exists |
 | `gh` failure | log warning, skip; do not mutate on transient errors |
 
@@ -192,6 +209,13 @@ Priority rule:
   before selecting from `bd ready`
 - do not start new implementation work while a dispatchable `pr-review-task`
   is waiting for an open slot
+- dispatch review beads oldest PR first (`createdAt`), so the PR that has waited
+  longest lands first and later PRs rebase (if at all) once
+- never run two reviewers concurrently whose PRs touch overlapping files
+  (`gh pr diff <n> --name-only`); serialize the newer one behind the older.
+  Without a merge queue, each merge invalidates the CI of every overlapping
+  open PR; with one, the queue serializes them anyway and the reviewer's job
+  ends at `merge-queued`
 
 ### 0c. Self-heal rule
 
@@ -201,7 +225,9 @@ Reconcile open PRs back into Beads even if workers failed to mutate metadata:
 gh pr list --state open --json number,url,headRefName,createdAt
 ```
 
-For each PR whose `headRefName` matches `agent/<issue-id>`:
+For each PR whose `headRefName` matches `agent/<issue-id>`, skipping PRs that
+carry the `queue-direct` label (coordinator-opened direct-merge candidates that
+the merge queue integrates without a review bead):
 - ensure the original bead is `status=blocked`, has
   `external_ref=gh-pr:<N>`, and label `pr-review`
 - ensure exactly one dedicated `pr-review-task` bead exists; if missing, create
@@ -490,7 +516,18 @@ Report first, then verify the reported branch / PR state:
      - re-run Step 0 immediately so review/merge is prioritized
    - `completed-direct-merge-candidate`:
      - require `Branch-Pushed=yes` and no open PR
-     - attempt fast-forward merge:
+     - if `MERGE_QUEUE=yes`: the base rejects direct pushes, so open a PR and
+       hand it to the queue without a review bead:
+       ```bash
+       PR_URL=$(gh pr create --base main --head agent/<id> --label queue-direct \
+         --title "<worker title> [<id>]" --body "<worker summary>")
+       gh pr merge "${PR_URL}" --squash --auto
+       ```
+       then renew heartbeat, block the original bead with
+       `external_ref=gh-pr:<N>`, and let Step 0b close it on `MERGED`. The
+       merge-group CI run is the gate; the `queue-direct` label tells Step 0c
+       not to create a review bead
+     - otherwise attempt fast-forward merge:
        ```bash
        git fetch origin
        git checkout main && git pull --ff-only
@@ -568,6 +605,7 @@ echo "${BLOCKERS_JSON}" | jq -e 'type == "array"' >/dev/null
 Reviewer-worker report contract:
 - accepted `Status` values:
   - `merged-pr`
+  - `merge-queued`
   - `corrections-required`
   - `pushed-review-fixes`
   - `blocked-awaiting-coordinator`
@@ -580,6 +618,9 @@ Reviewer-worker report contract:
   is auditable
 - `merged-pr` means GitHub merge is complete but Beads closure still belongs to
   the coordinator
+- `merge-queued` means the exact reviewed head passed every gate and was handed
+  to the base branch's merge queue (`Merge-Performed: queued`); the queue
+  integrates and re-tests it, and Step 0b closes on `MERGED`
 - `corrections-required` means the independent reviewer left unresolved,
   actionable threads for the implementation/recovery lane and did not author
   semantic code
@@ -593,6 +634,11 @@ When a reviewer worker completes:
   cleanup in Step 0b (delete the `ORIGINAL_ID` PR branch, remove the
   `REVIEW_ID` worktree, then delete the original and temporary review local
   branches) — the reviewer left the PR branch in place on purpose
+- if it reports `merge-queued`, confirm `gh pr view <n> --json autoMergeRequest`
+  is non-null, then renew the heartbeat, add label `merge-queued` to the review
+  bead, remove `review-running`, and keep both beads blocked; Step 0b performs
+  closure and cleanup when the PR reports `MERGED`, or re-dispatches review with
+  `--force-rebase` authorized if the queue ejects it
 - if it reports `blocked-awaiting-coordinator`, keep the review bead blocked
   and create any follow-up merge-blocker bead from the structured report if one
   does not already exist

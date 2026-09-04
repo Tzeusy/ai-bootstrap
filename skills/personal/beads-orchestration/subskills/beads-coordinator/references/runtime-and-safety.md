@@ -331,8 +331,14 @@ met:
      reconciliation
    - coordinator blocks the original bead and stores `external_ref=gh-pr:<N>`
    - coordinator creates or reuses exactly one dedicated PR-review bead
-   - reviewer worker may merge the PR, but coordinator confirms merge and then
-     closes the review and original beads
+   - reviewer worker may merge the PR (or enqueue it to the base branch's
+     merge queue and report `merge-queued`), but coordinator confirms `MERGED`
+     and then closes the review and original beads
+3. Queued direct merge (base branch behind a merge queue):
+   - worker pushes `agent/<id>` and reports `direct-merge-candidate`
+   - coordinator opens a `queue-direct` PR and enqueues it with
+     `gh pr merge --squash --auto`; no review bead is created
+   - coordinator closes the bead only after `gh pr view` reports `MERGED`
 
 Implementation workers and reviewer workers must never call `bd close`.
 
@@ -342,3 +348,9 @@ Workers must pass all quality gates defined in the repository's `AGENTS.md` /
 `CLAUDE.md` before coordinator closure. The specific gate commands are
 language/project-dependent. If a worker skips gates, the coordinator should
 flag the issue and re-dispatch or escalate.
+
+Test growth is governed, not free: workers and reviewers apply
+`../../../references/test-growth-gate.md` (extend the nearest test, one gate
+species per behavior, net delta stated, repo test budget respected). A PR that
+fails a repo test-budget ratchet is an ordinary CI failure for the review lane;
+the coordinator never raises a budget on a worker's behalf.

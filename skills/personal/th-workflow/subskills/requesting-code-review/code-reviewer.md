@@ -47,6 +47,11 @@ git diff {BASE_SHA}..{HEAD_SHA}
 - Edge cases covered?
 - Integration tests where needed?
 - All tests passing?
+- Net test delta stated and proportionate to the behavior changed?
+- New tests extend the nearest existing test rather than cloning its setup?
+- One gate species per behavior (no source-grep test beside a behavior test)?
+- Any letter-of-law assertion (source text, log line, exact string) that is
+  not a documented contract?
 
 **Requirements:**
 - All plan requirements met?

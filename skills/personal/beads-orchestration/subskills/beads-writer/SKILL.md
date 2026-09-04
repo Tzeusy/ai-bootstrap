@@ -7,7 +7,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-18"
+  last_reviewed: "2026-09-04"
 compatibility: Requires a Beads-backed repository with the `bd` CLI available. Assumes the agent can inspect the target project workspace before creating issues.
 ---
 

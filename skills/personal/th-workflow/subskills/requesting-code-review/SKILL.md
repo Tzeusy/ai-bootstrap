@@ -7,7 +7,7 @@ metadata:
     - obra/superpowers (upstream)
     - Claude Fable 5.1
   status: active
-  last_reviewed: "2026-09-02"
+  last_reviewed: "2026-09-04"
 ---
 
 # Requesting Code Review

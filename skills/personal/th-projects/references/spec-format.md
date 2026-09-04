@@ -109,11 +109,19 @@ requirement (`ID`) → WHEN/THEN scenario → test citing the ID → code.
 
 ## Test Tagging
 
-Every `v1-mandatory` requirement is cited by ≥1 test — the requirement ID in
-the test name (`test_REQ_core_config_001_missing_field_blocks_startup`) or in
-a comment/docstring adjacent to the test (`Spec: REQ-core-config-001`).
-`spec-trace-check.py` greps the test tree for IDs and reports uncovered
-requirements and stale IDs (cited in tests, absent from specs).
+Every `v1-mandatory` requirement is pinned by ≥1 gate that cites its ID: the
+requirement ID in the test name
+(`test_REQ_core_config_001_missing_field_blocks_startup`) or in a
+comment/docstring adjacent to the test (`Spec: REQ-core-config-001`), or in a
+CI guard script for structural invariants. `spec-trace-check.py` greps the
+test tree for IDs and reports uncovered requirements and stale IDs (cited in
+tests, absent from specs).
+
+Coverage is a presence check, not a per-requirement quota. One requirement
+gets one gate species (behavior test, scan guard, or type rule), and one seam
+test may cite several adjacent requirement IDs. Do not create a test per
+requirement when one behavior test at the seam pins them together, and do not
+add a source-grep test beside a behavior test for the same requirement.
 
 ## Heading Hierarchy
 

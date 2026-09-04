@@ -125,8 +125,13 @@ def _make_gh_evaluate(bin_dir: FakeBinDir, *, pr_state: str = "OPEN",
                        is_draft: bool = False, merge_state: str = "CLEAN",
                        review_decision: str | None = None, unresolved: int = 0,
                        check_states: list[str] | None = None,
-                       checks_error: str | None = None) -> None:
-    """Configure a fake `gh` for evaluate_merge_readiness tests."""
+                       checks_error: str | None = None,
+                       merge_queue_rules: int | None = None) -> None:
+    """Configure a fake `gh` for evaluate_merge_readiness tests.
+
+    ``merge_queue_rules`` is the number of ``merge_queue`` rules the branch
+    rules endpoint reports; ``None`` makes that endpoint fail (unknown).
+    """
     thread_nodes = json.dumps([{"isResolved": False}] * unresolved +
                               [{"isResolved": True}] * 0)
     pr_json = json.dumps({
@@ -159,6 +164,13 @@ if 'pr' in argv and 'view' in argv and '--json' in argv:
 if 'pr' in argv and 'checks' in argv:
     {checks_error_body or f'print({repr(checks_json)}); sys.exit(0)'}
 
+if 'api' in argv and any(a.startswith('repos/') and '/rules/branches/' in a for a in argv):
+    if {merge_queue_rules!r} is None:
+        print('gh: Not Found (HTTP 404)', file=sys.stderr)
+        sys.exit(1)
+    print({merge_queue_rules!r})
+    sys.exit(0)
+
 if 'api' in argv and 'graphql' in argv:
     # Return thread count query response
     nodes = {repr(thread_nodes)}
@@ -172,6 +184,39 @@ sys.exit(1)
 
 
 class EvaluateMergeReadinessTests(unittest.TestCase):
+    def test_merge_queue_unknown_when_rules_endpoint_fails(self) -> None:
+        with FakeBinDir() as fbd:
+            _make_gh_evaluate(fbd)
+            result = run_script("evaluate_merge_readiness.py",
+                                ["--owner", "o", "--repo", "r", "--pr-number", "42"],
+                                env=fbd.env())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertIsNone(payload["merge_queue"])
+        self.assertEqual(payload["merge_command"], "gh pr merge --squash")
+
+    def test_merge_queue_detected_selects_auto_merge_command(self) -> None:
+        with FakeBinDir() as fbd:
+            _make_gh_evaluate(fbd, merge_queue_rules=1)
+            result = run_script("evaluate_merge_readiness.py",
+                                ["--owner", "o", "--repo", "r", "--pr-number", "42"],
+                                env=fbd.env())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["merge_queue"])
+        self.assertEqual(payload["merge_command"], "gh pr merge --squash --auto")
+
+    def test_no_merge_queue_rule_selects_direct_merge(self) -> None:
+        with FakeBinDir() as fbd:
+            _make_gh_evaluate(fbd, merge_queue_rules=0)
+            result = run_script("evaluate_merge_readiness.py",
+                                ["--owner", "o", "--repo", "r", "--pr-number", "42"],
+                                env=fbd.env())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["merge_queue"])
+        self.assertEqual(payload["merge_command"], "gh pr merge --squash")
+
     def test_merge_ok_when_all_conditions_green(self) -> None:
         with FakeBinDir() as fbd:
             _make_gh_evaluate(fbd, pr_state="OPEN", is_draft=False,
@@ -687,133 +732,130 @@ sys.exit(1)
 # ---------------------------------------------------------------------------
 
 class PreparePrBranchTests(unittest.TestCase):
-    def test_success_returns_ready(self) -> None:
-        with FakeBinDir() as fbd:
-            fbd.add("git", """
+    """prepare_pr_branch.py rebases only when the head conflicts with the base.
+
+    Fake git convention: ``merge-tree`` exit 0 = clean, 1 = conflict, anything
+    else = unsupported. ``rebase`` (without --abort) is the mutation under test.
+    """
+
+    @staticmethod
+    def _fake_git(*, merge_tree_exit=0, rebase_exit=0, push_exit=0,
+                  remote_head="same-head", local_head="same-head",
+                  beads_diff="", status=""):
+        return f"""
 import sys
-import json
 
 argv = sys.argv[1:]
-# All git commands succeed; diff returns empty (no beads divergence)
-if argv[:1] == ['diff']:
-    print('')
+if argv[:2] == ['merge-tree', '--write-tree']:
+    if {merge_tree_exit} not in (0, 1):
+        print("error: unknown option `write-tree'", file=sys.stderr)
+    sys.exit({merge_tree_exit})
+if argv[:1] == ['rebase'] and '--abort' not in argv:
+    if {rebase_exit} != 0:
+        print('CONFLICT (content): Merge conflict in foo.py', file=sys.stderr)
+    sys.exit({rebase_exit})
+if argv[:2] == ['rev-parse', 'origin/agent/test-1']:
+    print({remote_head!r})
+elif argv[:2] == ['rev-parse', 'HEAD']:
+    print({local_head!r})
+elif argv[:1] == ['diff']:
+    print({beads_diff!r})
 elif argv[:1] == ['status']:
-    print('')
-# Everything else succeeds silently
+    print({status!r})
+elif argv[:1] == ['push']:
+    if {push_exit} != 0:
+        print('push failed: remote rejected', file=sys.stderr)
+    sys.exit({push_exit})
 sys.exit(0)
-""")
-            result = run_script("prepare_pr_branch.py",
-                                ["--base-branch", "main", "--head-branch", "agent/test-1"],
-                                env=fbd.env())
+"""
+
+    def _run(self, fake_git, extra_args=()):
+        with FakeBinDir() as fbd:
+            fbd.add("git", fake_git)
+            return run_script(
+                "prepare_pr_branch.py",
+                ["--base-branch", "main", "--head-branch", "agent/test-1", *extra_args],
+                env=fbd.env(),
+            )
+
+    def test_success_returns_ready(self) -> None:
+        result = self._run(self._fake_git())
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "ready")
         self.assertTrue(payload["ok"])
 
-    def test_rebase_conflict_returns_error(self) -> None:
-        with FakeBinDir() as fbd:
-            fbd.add("git", """
-import sys
+    def test_clean_merge_skips_rebase_and_push(self) -> None:
+        # A rebase call would fail the fake, proving the head was left alone.
+        result = self._run(self._fake_git(rebase_exit=97))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["rebased"])
+        self.assertEqual(payload["rebase_reason"], "not-needed")
+        self.assertFalse(payload["pushed_prepared_head"])
+        self.assertEqual(payload["head_commit"], "same-head")
 
-argv = sys.argv[1:]
-if argv[:1] == ['rebase'] and '--abort' not in argv:
-    print('CONFLICT (content): Merge conflict in foo.py', file=sys.stderr)
-    sys.exit(1)
-sys.exit(0)
-""")
-            result = run_script("prepare_pr_branch.py",
-                                ["--base-branch", "main", "--head-branch", "agent/test-1"],
-                                env=fbd.env())
+    def test_conflict_triggers_rebase_and_pushes_prepared_head(self) -> None:
+        result = self._run(self._fake_git(
+            merge_tree_exit=1, remote_head="old-head", local_head="rebased-head"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["rebased"])
+        self.assertEqual(payload["rebase_reason"], "conflict-with-base")
+        self.assertTrue(payload["pushed_prepared_head"])
+        self.assertEqual(payload["head_commit"], "rebased-head")
+
+    def test_force_rebase_flag_rebases_a_clean_head(self) -> None:
+        result = self._run(self._fake_git(
+            remote_head="old-head", local_head="rebased-head"), ["--force-rebase"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["rebased"])
+        self.assertEqual(payload["rebase_reason"], "forced")
+        self.assertTrue(payload["pushed_prepared_head"])
+
+    def test_unsupported_merge_tree_falls_back_to_rebase(self) -> None:
+        result = self._run(self._fake_git(
+            merge_tree_exit=129, remote_head="old-head", local_head="rebased-head"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["rebased"])
+        self.assertEqual(payload["rebase_reason"], "merge-tree-unsupported")
+
+    def test_rebase_conflict_returns_error(self) -> None:
+        result = self._run(self._fake_git(merge_tree_exit=1, rebase_exit=1))
         self.assertNotEqual(result.returncode, 0)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "rebase-conflict")
         self.assertFalse(payload["ok"])
+        self.assertEqual(payload["rebase_reason"], "conflict-with-base")
 
     def test_push_failure_after_beads_cleanup_returns_blocked(self) -> None:
-        with FakeBinDir() as fbd:
-            fbd.add("git", """
-import sys
-
-argv = sys.argv[1:]
-if argv[:1] == ['diff']:
-    print('some beads diff content')  # triggers cleanup path
-elif argv[:1] == ['status']:
-    print('M .beads/issues.jsonl')    # dirty after checkout
-elif argv[:1] == ['push']:
-    print('push failed: remote rejected', file=sys.stderr)
-    sys.exit(1)
-sys.exit(0)
-""")
-            result = run_script("prepare_pr_branch.py",
-                                ["--base-branch", "main", "--head-branch", "agent/test-1"],
-                                env=fbd.env())
+        result = self._run(self._fake_git(
+            beads_diff="some beads diff content", status="M .beads/issues.jsonl",
+            push_exit=1))
         self.assertNotEqual(result.returncode, 0)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "blocked")
+        self.assertFalse(payload["rebased"])
 
     def test_push_failure_after_rebase_returns_blocked(self) -> None:
-        with FakeBinDir() as fbd:
-            fbd.add("git", """
-import sys
-
-argv = sys.argv[1:]
-if argv[:2] == ['rev-parse', 'origin/agent/test-1']:
-    print('old-head')
-elif argv[:2] == ['rev-parse', 'HEAD']:
-    print('rebased-head')
-elif argv[:1] == ['diff']:
-    print('')
-elif argv[:1] == ['push']:
-    print('push failed: remote rejected', file=sys.stderr)
-    sys.exit(1)
-sys.exit(0)
-""")
-            result = run_script(
-                "prepare_pr_branch.py",
-                ["--base-branch", "main", "--head-branch", "agent/test-1"],
-                env=fbd.env(),
-            )
+        result = self._run(self._fake_git(
+            merge_tree_exit=1, remote_head="old-head", local_head="rebased-head",
+            push_exit=1))
         self.assertNotEqual(result.returncode, 0)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "blocked")
         self.assertIn("prepared head", payload["error"])
-
-    def test_successful_rebase_pushes_and_reports_prepared_head(self) -> None:
-        with FakeBinDir() as fbd:
-            fbd.add("git", """
-import sys
-
-argv = sys.argv[1:]
-if argv[:2] == ['rev-parse', 'origin/agent/test-1']:
-    print('old-head')
-elif argv[:2] == ['rev-parse', 'HEAD']:
-    print('rebased-head')
-elif argv[:1] == ['diff']:
-    print('')
-sys.exit(0)
-""")
-            result = run_script(
-                "prepare_pr_branch.py",
-                ["--base-branch", "main", "--head-branch", "agent/test-1"],
-                env=fbd.env(),
-            )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        self.assertTrue(payload["pushed_prepared_head"])
-        self.assertEqual(payload["head_commit"], "rebased-head")
+        self.assertTrue(payload["rebased"])
 
     def test_dry_run_skips_all_git_mutations(self) -> None:
         """In --dry-run mode the script must not invoke git at all."""
-        with FakeBinDir() as fbd:
-            # This fake git always fails — if it's called, the test fails.
-            fbd.add("git", """
+        result = self._run("""
 import sys
 print('git called in dry-run!', file=sys.stderr)
 sys.exit(99)
-""")
-            result = run_script("prepare_pr_branch.py",
-                                ["--base-branch", "main", "--head-branch", "agent/test-1", "--dry-run"],
-                                env=fbd.env())
+""", ["--dry-run"])
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "dry-run")

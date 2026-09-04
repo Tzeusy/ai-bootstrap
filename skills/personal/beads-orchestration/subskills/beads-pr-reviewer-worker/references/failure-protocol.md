@@ -79,3 +79,18 @@ Use only when:
 Do not delete the `agent/<id>` branch; the coordinator deletes it after closure
 so the branch-name → bead correlation survives a crash. Do not close review or
 original beads here either. The coordinator handles closure and branch cleanup.
+
+### `merge-queued`
+
+Use only when:
+- the base branch is behind a merge queue (`merge_queue: true` from the
+  readiness helper or `MERGE_QUEUE=yes` from the coordinator), and
+- every merge gate held for the exact reviewed head, and
+- `gh pr merge --squash --auto` succeeded and `gh pr view --json
+  autoMergeRequest` is non-null.
+
+This is a successful terminal outcome, not a failure. The queue rebuilds the PR
+on the latest base and runs CI once more; the coordinator confirms `MERGED` in
+Step 0 and closes the beads. If the queue later ejects the PR (CI failed on the
+merge group, or a conflict appeared), the coordinator re-dispatches a review
+bead and may authorize `--force-rebase`. Never bypass the queue with `--admin`.

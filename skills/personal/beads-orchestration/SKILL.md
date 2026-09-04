@@ -80,6 +80,13 @@ rg -n "^name:|^description:" subskills/*/SKILL.md
   and read only failures, iterate on targeted tests before the single full
   gate, and right-size worker models. Load it once per session before the
   first `bd`/`gh` query loop.
+- **Quality gates travel with the work.** `beads-worker` and
+  `beads-pr-reviewer-worker` share
+  [`references/craft-and-care-gate.md`](references/craft-and-care-gate.md)
+  (the repo-defined execution-quality bar) and
+  [`references/test-growth-gate.md`](references/test-growth-gate.md) (one gate
+  species per behavior, a `Tests: +a ~b -c` delta in every PR). Load them at
+  the subskill's first edit or first finding, not at dispatch.
 
 ## When `bd` itself misbehaves
 
