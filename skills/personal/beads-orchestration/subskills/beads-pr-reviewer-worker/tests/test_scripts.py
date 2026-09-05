@@ -748,17 +748,24 @@ sys.exit(1)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(json.loads(result.stderr)["error_code"], "invalid-dependency-row")
 
-    def test_resolves_reverse_dependency_from_current_bd_shape(self) -> None:
+    def test_resolves_reverse_dependency_from_current_bd_shape_with_null_collections(self) -> None:
+        review_record = {
+            "id": "aib-xyz",
+            "description": "Review PR (no marker)\nhttps://github.com/owner/repo/pull/99",
+            "dependencies": None,
+        }
         with FakeBinDir() as fbd:
             self._make_bins(
                 fbd,
                 description="Review PR (no marker)\nhttps://github.com/owner/repo/pull/99",
                 bd_list=[
+                    {"id": "aib-unrelated", "dependencies": None},
                     {
                         "id": "aib-abc",
                         "dependencies": [{"id": "aib-xyz", "dependency_type": "blocks"}],
                     }
                 ],
+                show_payloads={"aib-xyz": [review_record]},
             )
             result = run_script(
                 "resolve_review_context.py", ["--issue-id", "aib-xyz"], env=fbd.env()

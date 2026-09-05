@@ -75,6 +75,8 @@ def dependency_target_id(record):
 
 def dependency_targets(records, source_id):
     """Validate dependency rows and preserve their unique target identities."""
+    if records is None:
+        return []
     if not isinstance(records, list):
         raise EvidenceError("invalid-dependency-row", "dependencies were not a list")
     targets = []
