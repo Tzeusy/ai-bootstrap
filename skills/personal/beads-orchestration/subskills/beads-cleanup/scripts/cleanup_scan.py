@@ -115,6 +115,22 @@ def record_id(record: dict[str, Any]) -> str | None:
     return candidate if isinstance(candidate, str) and BEAD_ID_RE.fullmatch(candidate) else None
 
 
+def dependency_target_id(record: object) -> str | None:
+    """Read one unambiguous current or legacy dependency target."""
+    if not isinstance(record, dict):
+        return None
+    has_current = "id" in record
+    has_legacy = "depends_on_id" in record
+    if not has_current and not has_legacy:
+        return None
+    current = record.get("id")
+    legacy = record.get("depends_on_id")
+    if has_current and has_legacy and current != legacy:
+        return None
+    candidate = current if has_current else legacy
+    return candidate if isinstance(candidate, str) and BEAD_ID_RE.fullmatch(candidate) else None
+
+
 def labels(record: dict[str, Any]) -> set[str]:
     raw = record.get("labels")
     return {item for item in raw if isinstance(item, str)} if isinstance(raw, list) else set()
@@ -796,13 +812,15 @@ def scan_blockers(
             )
             continue
         dependencies = []
+        seen_dependency_ids: set[str] = set()
         failed = False
         for item in payload:
-            dep_id = item.get("depends_on_id") if isinstance(item, dict) else None
-            if not isinstance(dep_id, str) or not BEAD_ID_RE.fullmatch(dep_id):
+            dep_id = dependency_target_id(item)
+            if dep_id is None or dep_id == issue_id or dep_id in seen_dependency_ids:
                 failed = True
                 report_error(errors, "invalid-record", "blockers")
                 continue
+            seen_dependency_ids.add(dep_id)
             dep_payload, dep_error = command_json(["bd", "show", dep_id, "--json"], repo_root)
             if dep_error is None:
                 dep, evidence_error = requested_record(dep_payload, dep_id)
