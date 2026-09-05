@@ -55,6 +55,43 @@ def requested_record(payload, issue_id):
     return record
 
 
+def dependency_target_id(record):
+    """Read one unambiguous current or legacy dependency target."""
+    if not isinstance(record, dict):
+        raise EvidenceError("invalid-dependency-row", "dependency evidence was not a record")
+    has_current = "id" in record
+    has_legacy = "depends_on_id" in record
+    if not has_current and not has_legacy:
+        raise EvidenceError("invalid-dependency-row", "dependency target id was missing")
+    current = record.get("id")
+    legacy = record.get("depends_on_id")
+    if has_current and has_legacy and current != legacy:
+        raise EvidenceError("invalid-dependency-row", "dependency target fields conflicted")
+    candidate = current if has_current else legacy
+    if not isinstance(candidate, str) or not BEAD_ID_RE.fullmatch(candidate):
+        raise EvidenceError("invalid-dependency-row", "dependency target id was malformed")
+    return candidate
+
+
+def dependency_targets(records, source_id):
+    """Validate dependency rows and preserve their unique target identities."""
+    if not isinstance(records, list):
+        raise EvidenceError("invalid-dependency-row", "dependencies were not a list")
+    targets = []
+    seen = set()
+    for record in records:
+        target = dependency_target_id(record)
+        if target == source_id:
+            raise EvidenceError("invalid-dependency-row", "dependency target was a self-link")
+        if target in seen:
+            raise EvidenceError("invalid-dependency-row", "dependency target was duplicated")
+        seen.add(target)
+        relation_type = record.get("dependency_type", record.get("type"))
+        if relation_type != "parent-child":
+            targets.append(target)
+    return sorted(targets)
+
+
 def extract_original_id(description):
     matches = []
     malformed = []
@@ -117,14 +154,8 @@ def main():
         # that carries a gh-pr external_ref (the bead under review) so gate /
         # blocker dependencies do not masquerade as the original.
         if not original_id:
-            review_deps = review.get("dependencies") or []
-            dep_targets = sorted({
-                dep.get("depends_on_id")
-                for dep in review_deps
-                if dep.get("depends_on_id")
-                and dep.get("depends_on_id") != args.issue_id
-                and dep.get("type") != "parent-child"
-            })
+            review_deps = review.get("dependencies", [])
+            dep_targets = dependency_targets(review_deps, args.issue_id)
             if dep_targets:
                 pr_bearing = []
                 for target in dep_targets:
@@ -153,8 +184,8 @@ def main():
             for candidate in candidates:
                 if candidate.get("id") == args.issue_id:
                     continue
-                dependencies = candidate.get("dependencies") or []
-                if any(dep.get("depends_on_id") == args.issue_id for dep in dependencies):
+                dependencies = candidate.get("dependencies", [])
+                if args.issue_id in dependency_targets(dependencies, candidate.get("id")):
                     fallback_matches.append(candidate.get("id") or "")
 
             fallback_matches = sorted({match for match in fallback_matches if match})

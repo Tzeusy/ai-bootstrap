@@ -695,7 +695,7 @@ sys.exit(1)
             self._make_bins(
                 fbd,
                 description="Review PR (no marker)\nhttps://github.com/owner/repo/pull/99",
-                review_dependencies=[{"depends_on_id": "aib-abc", "type": "blocks"}],
+                review_dependencies=[{"id": "aib-abc", "dependency_type": "blocks"}],
             )
             result = run_script("resolve_review_context.py",
                                 ["--issue-id", "aib-xyz"],
@@ -704,6 +704,67 @@ sys.exit(1)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["original_id"], "aib-abc")
         self.assertEqual(payload["pr_number"], 99)
+
+    def test_dependency_target_shapes_are_compatible_only_when_unambiguous(self) -> None:
+        valid_rows = {
+            "legacy": [{"depends_on_id": "aib-abc", "type": "blocks"}],
+            "equal-dual": [
+                {"id": "aib-abc", "depends_on_id": "aib-abc", "dependency_type": "blocks"}
+            ],
+        }
+        invalid_rows = {
+            "conflicting-dual": [{"id": "aib-abc", "depends_on_id": "aib-other"}],
+            "missing": [{"dependency_type": "blocks"}],
+            "malformed": [{"id": "not_a_bead"}],
+            "self-link": [{"id": "aib-xyz"}],
+            "duplicate": [{"id": "aib-abc"}, {"id": "aib-abc"}],
+        }
+
+        for name, rows in valid_rows.items():
+            with self.subTest(name=name):
+                with FakeBinDir() as fbd:
+                    self._make_bins(
+                        fbd,
+                        description="Review PR (no marker)\nhttps://github.com/owner/repo/pull/99",
+                        review_dependencies=rows,
+                    )
+                    result = run_script(
+                        "resolve_review_context.py", ["--issue-id", "aib-xyz"], env=fbd.env()
+                    )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout)["original_id"], "aib-abc")
+
+        for name, rows in invalid_rows.items():
+            with self.subTest(name=name):
+                with FakeBinDir() as fbd:
+                    self._make_bins(
+                        fbd,
+                        description="Review PR (no marker)\nhttps://github.com/owner/repo/pull/99",
+                        review_dependencies=rows,
+                    )
+                    result = run_script(
+                        "resolve_review_context.py", ["--issue-id", "aib-xyz"], env=fbd.env()
+                    )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(json.loads(result.stderr)["error_code"], "invalid-dependency-row")
+
+    def test_resolves_reverse_dependency_from_current_bd_shape(self) -> None:
+        with FakeBinDir() as fbd:
+            self._make_bins(
+                fbd,
+                description="Review PR (no marker)\nhttps://github.com/owner/repo/pull/99",
+                bd_list=[
+                    {
+                        "id": "aib-abc",
+                        "dependencies": [{"id": "aib-xyz", "dependency_type": "blocks"}],
+                    }
+                ],
+            )
+            result = run_script(
+                "resolve_review_context.py", ["--issue-id", "aib-xyz"], env=fbd.env()
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["original_id"], "aib-abc")
 
     def test_review_dep_excludes_parent_and_prefers_gh_pr(self) -> None:
         # Parent-child (epic) edges are excluded; among the rest the target
@@ -714,9 +775,9 @@ sys.exit(1)
                 fbd,
                 description="Review PR (no marker)\nhttps://github.com/owner/repo/pull/99",
                 review_dependencies=[
-                    {"depends_on_id": "aib-epic", "type": "parent-child"},
-                    {"depends_on_id": "aib-gate", "type": "blocks"},
-                    {"depends_on_id": "aib-abc", "type": "blocks"},
+                    {"id": "aib-epic", "dependency_type": "parent-child"},
+                    {"id": "aib-gate", "dependency_type": "blocks"},
+                    {"id": "aib-abc", "dependency_type": "blocks"},
                 ],
             )
             result = run_script("resolve_review_context.py",
