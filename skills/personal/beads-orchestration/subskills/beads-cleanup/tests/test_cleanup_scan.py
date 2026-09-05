@@ -332,8 +332,8 @@ class CleanupScanTests(unittest.TestCase):
             "blocked": [bead("aib-blocked", "blocked"), bead("aib-unblock", "blocked")],
             "review_running": [bead("aib-lock", "blocked", notes=heartbeat("2026-08-14T03:00:00Z"))],
             "dependencies": {
-                "aib-blocked": [{"depends_on_id": "aib-dep-open"}, {"depends_on_id": "aib-dep-closed"}],
-                "aib-unblock": [{"depends_on_id": "aib-dep-closed"}],
+                "aib-blocked": [{"id": "aib-dep-open"}, {"id": "aib-dep-closed"}],
+                "aib-unblock": [{"id": "aib-dep-closed"}],
             },
             "shows": {
                 "aib-dep-open": [bead("aib-dep-open", "open")],
@@ -376,6 +376,49 @@ class CleanupScanTests(unittest.TestCase):
         self.assertEqual(worktree["recommendation"], "cleanup-eligible-after-verification")
         self.assertNotIn(repo_root, result.stdout + result.stderr)
         self.assertTrue(any(call["tool"] == "git" for call in calls))
+
+    def test_dependency_target_shapes_are_compatible_only_when_unambiguous(self) -> None:
+        valid_rows = {
+            "current": [{"id": "aib-dependency"}],
+            "legacy": [{"depends_on_id": "aib-dependency"}],
+            "equal-dual": [{"id": "aib-dependency", "depends_on_id": "aib-dependency"}],
+        }
+        invalid_rows = {
+            "conflicting-dual": [{"id": "aib-dependency", "depends_on_id": "aib-other"}],
+            "missing": [{"type": "blocks"}],
+            "malformed": [{"id": "not_a_bead"}],
+            "self-link": [{"id": "aib-blocked"}],
+            "duplicate": [{"id": "aib-dependency"}, {"id": "aib-dependency"}],
+        }
+        base_fixture = {
+            "in_progress": [],
+            "blocked": [bead("aib-blocked", "blocked")],
+            "review_running": [],
+            "shows": {"aib-dependency": [bead("aib-dependency", "closed")]},
+            "blocked_pr_review": [],
+            "blocked_pr_review_tasks": [],
+            "open_prs": [],
+        }
+
+        for name, rows in valid_rows.items():
+            with self.subTest(name=name):
+                result, _, _ = self.run_fixture(
+                    {**base_fixture, "dependencies": {"aib-blocked": rows}}
+                )
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(payload["blockers"][0]["recommendation"], "unblock-candidate")
+                self.assertNotIn({"code": "invalid-record", "scope": "blockers"}, payload["errors"])
+
+        for name, rows in invalid_rows.items():
+            with self.subTest(name=name):
+                result, _, _ = self.run_fixture(
+                    {**base_fixture, "dependencies": {"aib-blocked": rows}}
+                )
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(payload["blockers"][0]["recommendation"], "manual-triage")
+                self.assertIn({"code": "invalid-record", "scope": "blockers"}, payload["errors"])
 
     def test_cleanup_embeds_canonical_dotted_review_findings_without_reparsing(self) -> None:
         original_id = "aib-swr.1"
