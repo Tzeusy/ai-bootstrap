@@ -93,14 +93,15 @@ Use only when:
 gh api graphql \
   -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state mergedAt autoMergeRequest{enabledAt} mergeQueueEntry{position enqueuedAt}}}}' \
   -F owner="${OWNER}" -F name="${REPO}" -F number="${PR_NUMBER}" \
-  | jq -e '.data.repository.pullRequest | select(type == "object" and has("state") and has("mergedAt") and has("autoMergeRequest") and has("mergeQueueEntry")) | {state, mergedAt, auto_merge_armed: (.autoMergeRequest != null), merge_queue_entry: (.mergeQueueEntry | if . == null then null else {position, enqueuedAt} end)}'
+  | jq -e '. | select((has("errors") | not) or .errors == null or ((.errors | type) == "array" and (.errors | length) == 0)) | .data.repository.pullRequest | select(type == "object" and has("state") and (.state | type) == "string" and has("mergedAt") and (.mergedAt == null or (.mergedAt | type) == "string") and has("autoMergeRequest") and (.autoMergeRequest == null or ((.autoMergeRequest | type) == "object" and (.autoMergeRequest | has("enabledAt")) and (.autoMergeRequest.enabledAt == null or (.autoMergeRequest.enabledAt | type) == "string"))) and has("mergeQueueEntry") and (.mergeQueueEntry == null or ((.mergeQueueEntry | type) == "object" and (.mergeQueueEntry | has("position")) and (.mergeQueueEntry.position | type) == "number" and (.mergeQueueEntry | has("enqueuedAt")) and (.mergeQueueEntry.enqueuedAt | type) == "string"))) | {state, mergedAt, auto_merge_armed: (.autoMergeRequest != null), merge_queue_entry: (.mergeQueueEntry | if . == null then null else {position, enqueuedAt} end)}'
 ```
 
-If the command or projection fails, fail closed. A non-null `autoMergeRequest`
-with no `mergeQueueEntry` means auto-merge is armed, not that queue membership
-is confirmed. A null `autoMergeRequest` does not prove queue ejection and never
-authorizes a rebase; only a textual merge conflict or a justified reviewer
-request does.
+The projection rejects non-empty top-level GraphQL `errors`, missing response
+fields, and malformed non-null queue entries. If it fails, fail closed. A
+non-null `autoMergeRequest` with no `mergeQueueEntry` means auto-merge is armed,
+not that queue membership is confirmed. A null `autoMergeRequest` does not prove
+queue ejection and never authorizes a rebase; only a textual merge conflict or
+a justified reviewer request does.
 Report `blocked-awaiting-coordinator` with the projected state when the entry is
 absent; never report `merge-queued` from the armed state.
 

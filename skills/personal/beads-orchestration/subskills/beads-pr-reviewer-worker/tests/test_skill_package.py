@@ -114,8 +114,10 @@ class BreadsPrReviewerWorkerPackageTests(unittest.TestCase):
         protocol = FAILURE_PROTOCOL_MD.read_text(encoding="utf-8").lower()
         combined = skill + protocol
         self.assertIn("mergequeueentry{position enqueuedat}", combined)
-        self.assertIn("auto-merge is armed, not that queue membership", combined)
-        self.assertIn("null `automergeRequest` does not prove queue ejection".lower(), combined)
+        self.assertIn("means auto-merge is armed", combined)
+        self.assertIn("not that queue membership is confirmed", combined)
+        self.assertIn("null `automergeRequest`".lower(), combined)
+        self.assertIn("queue ejection and never authorizes a rebase", combined)
         self.assertIn("blocked-awaiting-coordinator", combined)
 
     def test_report_exposes_risk_and_reviewer_identity(self) -> None:
