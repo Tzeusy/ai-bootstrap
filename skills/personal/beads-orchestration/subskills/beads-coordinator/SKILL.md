@@ -119,8 +119,9 @@ auto-routing to the right DB — that fails across embedded-mode workspaces
    - `pr-review-task` issue → `../beads-pr-reviewer-worker/SKILL.md`
    - epic-complexity issue → Team Lead, see `references/epic-coordination.md`
 7. Pick the model per the assignment rules in `references/runtime-and-safety.md`.
-8. Require bootstrap proof (`pwd == WORKTREE_PATH`, expected branch, not
-   `REPO_ROOT`) before counting a worker as running.
+8. Require bootstrap proof (actual process cwd equals `WORKTREE_PATH`, expected
+   branch, not `REPO_ROOT`, and the worktree shares `REPO_ROOT`'s canonical
+   common Git directory) before counting a worker as running.
 
 Worker skill paths (when a runtime needs the absolute location):
 - `~/.claude/skills/beads-orchestration/subskills/beads-worker/SKILL.md`

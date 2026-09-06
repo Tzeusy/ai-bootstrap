@@ -13,7 +13,8 @@ Before reading the issue deeply or editing code:
 ```bash
 CURRENT_PATH=$(pwd -P)
 CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || true)
-python3 scripts/assert_worker_context.py \
+ASSERT_WORKER_CONTEXT="<loaded beads-worker package>/scripts/assert_worker_context.py"
+python3 "${ASSERT_WORKER_CONTEXT}" \
   --worktree-path "${WORKTREE_PATH}" \
   --repo-root "${REPO_ROOT}" \
   --issue-id "${ISSUE_ID}" \
@@ -21,11 +22,23 @@ python3 scripts/assert_worker_context.py \
   --branch "${CURRENT_BRANCH}"
 ```
 
+Resolve `ASSERT_WORKER_CONTEXT` from the absolute path of the loaded
+`beads-worker/SKILL.md`; the skill package need not live in the target repo.
+
 3. The worker is valid only if:
+   - the helper's actual process cwd equals `CURRENT_PATH`
    - `CURRENT_PATH == WORKTREE_PATH`
    - `CURRENT_PATH != REPO_ROOT`
    - `CURRENT_BRANCH == agent/${ISSUE_ID}`
    - the branch is not `main` or `master`
+   - `WORKTREE_PATH` and `REPO_ROOT` are Git worktree roots with the same
+     canonical common Git directory
+
+Run both the helper and every Git/worktree command with actual process cwd set
+to the intended repository or worktree. `bd -C "${REPO_ROOT}"` selects the
+tracker; it does not bind subsequent Git commands to that repository. The
+helper removes inherited `GIT_*` repository overrides for its identity probes
+and reports only reason codes, never remote URLs or Git command diagnostics.
 
 If validation fails, stop immediately and report `invalid-runtime-context`.
 
