@@ -157,11 +157,19 @@ For each blocked issue:
 
 If no PR number can be resolved, append a note and skip mutation for that bead.
 
-When PR number is available, check:
+When PR number is available, query queue membership directly and project only
+the reconciliation fields:
 
 ```bash
-gh pr view <number> --json state,mergedAt,createdAt,autoMergeRequest,mergeStateStatus,labels
+PR_QUEUE_JSON=$(gh api graphql \
+  -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state mergedAt autoMergeRequest{enabledAt} mergeQueueEntry{position enqueuedAt} labels(first:20){nodes{name}}}}}' \
+  -F owner="${OWNER}" -F name="${REPO}" -F number="${PR_NUMBER}" \
+  | jq -e '.data.repository.pullRequest | select(type == "object" and has("state") and has("mergedAt") and has("autoMergeRequest") and has("mergeQueueEntry") and has("labels")) | {state, mergedAt, auto_merge_armed: (.autoMergeRequest != null), merge_queue_entry: (.mergeQueueEntry | if . == null then null else {position, enqueuedAt} end), labels: [.labels.nodes[].name]}')
 ```
+
+If GraphQL or the projection fails, log a warning and skip every mutation for
+that PR this cycle. A successful projection distinguishes actual queue
+membership from auto-merge merely being armed.
 
 Handle each case:
 
@@ -169,10 +177,11 @@ Handle each case:
 |---|---|
 | `MERGED` | renew heartbeat, then close review/original beads as appropriate (a `queue-direct` PR has only an original bead); then run the post-closure branch/worktree cleanup below |
 | `CLOSED` and not merged | renew heartbeat, then reopen original for re-triage; block/close review bead as appropriate |
-| `OPEN` and `autoMergeRequest` non-null | queued: do nothing this cycle; re-check on the next wake |
-| `OPEN`, review bead labelled `merge-queued`, `autoMergeRequest` null | the queue ejected it (merge-group CI failed or a conflict appeared): remove `merge-queued`, treat as an `OPEN` `pr-review-task`, and authorize `--force-rebase` in the next reviewer prompt |
+| `OPEN` and `merge_queue_entry` non-null | queued: do nothing this cycle, regardless of `auto_merge_armed`; re-check on the next wake |
+| `OPEN`, `merge_queue_entry` null, and `auto_merge_armed` true | auto-merge is armed but the PR is not yet confirmed in the queue: remove any stale `merge-queued` label, then wait and re-check; do not dispatch or rebase |
+| `OPEN`, review bead labelled `merge-queued`, `merge_queue_entry` null, and `auto_merge_armed` false | membership is absent, but absence alone does not prove why: remove `merge-queued` and treat it as an `OPEN` `pr-review-task`; do not authorize `--force-rebase` without a textual merge conflict or a justified reviewer request |
 | `OPEN` with `pr-review-task` | wait for cooldown; once elapsed, atomically claim the review bead with `bd update <id> --claim`, then dispatch review worker if slot is open |
-| `OPEN` labelled `queue-direct` | no review bead by design; if `autoMergeRequest` is null re-run `gh pr merge <n> --squash --auto`, and after two failed re-enqueues drop the label and route through the normal review lane |
+| `OPEN` labelled `queue-direct` | no review bead by design; if `merge_queue_entry` is null and `auto_merge_armed` is false, re-run `gh pr merge <n> --squash --auto`; after two failed enrollment attempts drop the label and route through the normal review lane, without authorizing a rebase from queue metadata alone |
 | `OPEN` without `pr-review-task` | ensure exactly one dedicated review bead exists |
 | `gh` failure | log warning, skip; do not mutate on transient errors |
 
@@ -634,11 +643,11 @@ When a reviewer worker completes:
   cleanup in Step 0b (delete the `ORIGINAL_ID` PR branch, remove the
   `REVIEW_ID` worktree, then delete the original and temporary review local
   branches) — the reviewer left the PR branch in place on purpose
-- if it reports `merge-queued`, confirm `gh pr view <n> --json autoMergeRequest`
-  is non-null, then renew the heartbeat, add label `merge-queued` to the review
+- if it reports `merge-queued`, run the Step 0b GraphQL projection and confirm
+  `merge_queue_entry` is non-null, then renew the heartbeat, add label `merge-queued` to the review
   bead, remove `review-running`, and keep both beads blocked; Step 0b performs
-  closure and cleanup when the PR reports `MERGED`, or re-dispatches review with
-  `--force-rebase` authorized if the queue ejects it
+  closure and cleanup when the PR reports `MERGED`; missing/error metadata fails
+  closed, and an absent entry never authorizes `--force-rebase` by itself
 - if it reports `blocked-awaiting-coordinator`, keep the review bead blocked
   and create any follow-up merge-blocker bead from the structured report if one
   does not already exist

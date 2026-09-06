@@ -7,7 +7,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-09-04"
+  last_reviewed: "2026-09-06"
 compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, gh, and python3 available, plus authenticated GitHub access and network access for review, push, and merge operations.
 ---
 
@@ -190,7 +190,7 @@ PREP_JSON=$(python3 scripts/prepare_pr_branch.py \
 4. The helper rebases only when `git merge-tree` shows the head conflicts with
    the base; a cleanly merging head is reviewed as-is so the author's CI run
    stays valid and the squash merge (or merge queue) integrates it. Pass
-   `--force-rebase` only when the coordinator asks (e.g. a queue-ejected PR).
+   `--force-rebase` only for a textual merge conflict or a coordinator-relayed, justified reviewer request; queue metadata alone never authorizes it.
 5. The helper pushes any rebased or `.beads`-cleaned prepared head with
    `--force-with-lease`. Before review, verify its reported `head_commit`
    equals both local `HEAD` and the GitHub PR head; otherwise stop as
@@ -357,7 +357,7 @@ MERGE_JSON=$(python3 scripts/evaluate_merge_readiness.py \
 
 ```bash
 gh pr merge "${PR_NUMBER}" --squash          # no queue; confirm state=MERGED -> merged-pr
-gh pr merge "${PR_NUMBER}" --squash --auto   # queue; confirm autoMergeRequest -> merge-queued
+gh pr merge "${PR_NUMBER}" --squash --auto   # queue; confirm mergeQueueEntry -> merge-queued
 ```
 
    Under a queue the reviewer's job ends at `merge-queued`; the queue rebuilds
@@ -387,7 +387,7 @@ something goes wrong. The short version:
 - review fixes pushed but merge still not safe -> `pushed-review-fixes`
 - merge completed and confirmed -> `merged-pr`
 - exact head approved and handed to the base branch's merge queue
-  (`autoMergeRequest` confirmed) -> `merge-queued`
+  (`mergeQueueEntry` confirmed) -> `merge-queued`
 
 Do not mutate Beads state on failure paths. Report the state and let the
 coordinator reconcile it.
@@ -449,8 +449,8 @@ Rules:
 - `merged-pr` means the PR was merged and confirmed, but no Beads closure was
   performed here
 - `merge-queued` means the exact reviewed head passed every merge gate and was
-  enqueued with `gh pr merge --squash --auto` (confirmed via
-  `autoMergeRequest`); `Merge-Performed: queued`; the coordinator confirms the
+  enqueued with `gh pr merge --squash --auto` (confirmed via an actual
+  `mergeQueueEntry`); `Merge-Performed: queued`; the coordinator confirms the
   eventual merge and performs closure
 - `corrections-required` means actionable unresolved threads were returned to
   the original author or recovery worker; the reviewer did not author semantic

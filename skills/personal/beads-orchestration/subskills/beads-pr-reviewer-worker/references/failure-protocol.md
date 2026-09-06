@@ -86,11 +86,26 @@ Use only when:
 - the base branch is behind a merge queue (`merge_queue: true` from the
   readiness helper or `MERGE_QUEUE=yes` from the coordinator), and
 - every merge gate held for the exact reviewed head, and
-- `gh pr merge --squash --auto` succeeded and `gh pr view --json
-  autoMergeRequest` is non-null.
+- `gh pr merge --squash --auto` succeeded and the GraphQL projection below
+  reports a non-null `merge_queue_entry`:
+
+```bash
+gh api graphql \
+  -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state mergedAt autoMergeRequest{enabledAt} mergeQueueEntry{position enqueuedAt}}}}' \
+  -F owner="${OWNER}" -F name="${REPO}" -F number="${PR_NUMBER}" \
+  | jq -e '.data.repository.pullRequest | select(type == "object" and has("state") and has("mergedAt") and has("autoMergeRequest") and has("mergeQueueEntry")) | {state, mergedAt, auto_merge_armed: (.autoMergeRequest != null), merge_queue_entry: (.mergeQueueEntry | if . == null then null else {position, enqueuedAt} end)}'
+```
+
+If the command or projection fails, fail closed. A non-null `autoMergeRequest`
+with no `mergeQueueEntry` means auto-merge is armed, not that queue membership
+is confirmed. A null `autoMergeRequest` does not prove queue ejection and never
+authorizes a rebase; only a textual merge conflict or a justified reviewer
+request does.
+Report `blocked-awaiting-coordinator` with the projected state when the entry is
+absent; never report `merge-queued` from the armed state.
 
 This is a successful terminal outcome, not a failure. The queue rebuilds the PR
 on the latest base and runs CI once more; the coordinator confirms `MERGED` in
-Step 0 and closes the beads. If the queue later ejects the PR (CI failed on the
-merge group, or a conflict appeared), the coordinator re-dispatches a review
-bead and may authorize `--force-rebase`. Never bypass the queue with `--admin`.
+Step 0 and closes the beads. If queue membership later disappears, the
+coordinator re-dispatches the review bead without inferring a cause or
+authorizing a rebase from that absence. Never bypass the queue with `--admin`.

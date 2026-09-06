@@ -92,6 +92,13 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         self.assertIn("REVIEW_CORRECTION_MODE=yes", contents)
         self.assertIn("bd dep add <original-id> <review-id>", contents)
 
+    def test_queue_membership_uses_entry_and_never_infers_rebase_from_absence(self) -> None:
+        contents = LOOP.read_text(encoding="utf-8")
+        self.assertIn("mergeQueueEntry{position enqueuedAt} labels(first:20)", contents)
+        self.assertIn("`merge_queue_entry` is non-null", contents)
+        self.assertIn("queue metadata alone", contents)
+        self.assertNotIn("the queue ejected it", contents)
+
     def test_review_bead_template_is_packet_complete(self) -> None:
         contents = LOOP.read_text(encoding="utf-8")
         self.assertIn('--acceptance="1. Record reviewer identity', contents)
