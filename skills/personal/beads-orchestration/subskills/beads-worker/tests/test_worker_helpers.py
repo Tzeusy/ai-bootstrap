@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -17,31 +18,65 @@ EMIT_REPORT = SKILL_ROOT / "scripts" / "emit_worker_report.py"
 
 
 class AssertWorkerContextTests(unittest.TestCase):
+    def _init_repo(self, path: Path, branch: str = "main") -> None:
+        path.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", branch, str(path)], check=True)
+        subprocess.run(["git", "-C", str(path), "config", "user.name", "Test User"], check=True)
+        subprocess.run(
+            ["git", "-C", str(path), "config", "user.email", "test@example.invalid"],
+            check=True,
+        )
+        (path / "tracked.txt").write_text("fixture\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(path), "add", "tracked.txt"], check=True)
+        subprocess.run(["git", "-C", str(path), "commit", "-q", "-m", "fixture"], check=True)
+
+    def _run_context(
+        self,
+        *,
+        worktree: Path,
+        repo_root: Path,
+        current_path: Path | None = None,
+        env: dict[str, str] | None = None,
+        cwd: Path | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                "python3",
+                str(ASSERT_CONTEXT),
+                "--worktree-path",
+                str(worktree),
+                "--repo-root",
+                str(repo_root),
+                "--issue-id",
+                "bd-42",
+                "--current-path",
+                str(current_path or worktree),
+            ],
+            cwd=(cwd or worktree).resolve(),
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
     def test_context_passes_for_expected_worktree_and_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            worktree = Path(tmp) / "worker"
             repo_root = Path(tmp) / "repo"
-            worktree.mkdir()
-            repo_root.mkdir()
+            worktree = Path(tmp) / "worker"
+            self._init_repo(repo_root)
+            subprocess.run(
+                ["git", "-C", str(repo_root), "worktree", "add", "-q", "-b", "agent/bd-42", str(worktree)],
+                check=True,
+            )
+            repo_alias = Path(tmp) / "repo-alias"
+            worktree_alias = Path(tmp) / "worker-alias"
+            repo_alias.symlink_to(repo_root, target_is_directory=True)
+            worktree_alias.symlink_to(worktree, target_is_directory=True)
 
-            result = subprocess.run(
-                [
-                    "python3",
-                    str(ASSERT_CONTEXT),
-                    "--worktree-path",
-                    str(worktree),
-                    "--repo-root",
-                    str(repo_root),
-                    "--issue-id",
-                    "bd-42",
-                    "--current-path",
-                    str(worktree),
-                    "--branch",
-                    "agent/bd-42",
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
+            result = self._run_context(
+                worktree=worktree_alias,
+                repo_root=repo_alias,
+                current_path=worktree,
             )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -51,35 +86,105 @@ class AssertWorkerContextTests(unittest.TestCase):
 
     def test_context_fails_for_wrong_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            worktree = Path(tmp) / "worker"
             repo_root = Path(tmp) / "repo"
-            worktree.mkdir()
-            repo_root.mkdir()
-
-            result = subprocess.run(
+            expected_worktree = Path(tmp) / "expected-worker"
+            actual_worktree = Path(tmp) / "actual-worker"
+            self._init_repo(repo_root)
+            subprocess.run(
                 [
-                    "python3",
-                    str(ASSERT_CONTEXT),
-                    "--worktree-path",
-                    str(worktree),
-                    "--repo-root",
+                    "git",
+                    "-C",
                     str(repo_root),
-                    "--issue-id",
-                    "bd-42",
-                    "--current-path",
-                    str(worktree),
-                    "--branch",
-                    "feature/misbound",
+                    "worktree",
+                    "add",
+                    "-q",
+                    "-b",
+                    "agent/bd-42",
+                    str(expected_worktree),
                 ],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo_root),
+                    "worktree",
+                    "add",
+                    "-q",
+                    "-b",
+                    "agent/other",
+                    str(actual_worktree),
+                ],
+                check=True,
+            )
+            expected_git_dir = subprocess.run(
+                ["git", "-C", str(expected_worktree), "rev-parse", "--absolute-git-dir"],
                 capture_output=True,
                 text=True,
-                check=False,
+                check=True,
+            ).stdout.strip()
+            redirected_env = os.environ.copy()
+            redirected_env.update(
+                {
+                    "GIT_DIR": expected_git_dir,
+                    "GIT_WORK_TREE": str(expected_worktree),
+                }
+            )
+            result = self._run_context(
+                worktree=actual_worktree,
+                repo_root=repo_root,
+                env=redirected_env,
             )
 
         self.assertNotEqual(result.returncode, 0)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "invalid-runtime-context")
+        self.assertEqual(payload["branch"], "agent/other")
         self.assertIn("branch", " ".join(payload["reasons"]))
+
+    def test_context_rejects_foreign_or_unverifiable_repository_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp) / "expected"
+            foreign = Path(tmp) / "matching-name-worker"
+            self._init_repo(repo_root)
+            self._init_repo(foreign, branch="agent/bd-42")
+            subprocess.run(
+                ["git", "-C", str(foreign), "remote", "add", "origin", "https://token@example.invalid/repo.git"],
+                check=True,
+            )
+            redirected_env = os.environ.copy()
+            redirected_env.update(
+                {
+                    "GIT_DIR": str(repo_root / ".git"),
+                    "GIT_WORK_TREE": str(repo_root),
+                    "GIT_COMMON_DIR": str(repo_root / ".git"),
+                }
+            )
+
+            foreign_result = self._run_context(
+                worktree=foreign,
+                repo_root=repo_root,
+                env=redirected_env,
+            )
+            missing_root = Path(tmp) / "missing-root"
+            missing_root.mkdir()
+            missing_result = self._run_context(worktree=foreign, repo_root=missing_root)
+            misbound_result = self._run_context(
+                worktree=foreign,
+                repo_root=repo_root,
+                cwd=repo_root,
+            )
+
+        self.assertNotEqual(foreign_result.returncode, 0)
+        foreign_payload = json.loads(foreign_result.stdout)
+        self.assertIn("worktree-is-not-owned-by-repo-root", foreign_payload["reasons"])
+        self.assertNotIn("token", foreign_result.stdout + foreign_result.stderr)
+        self.assertNotEqual(missing_result.returncode, 0)
+        missing_payload = json.loads(missing_result.stdout)
+        self.assertIn("repo-root-git-identity-unverifiable", missing_payload["reasons"])
+        misbound_payload = json.loads(misbound_result.stdout)
+        self.assertIn("process-cwd-does-not-match-current-path", misbound_payload["reasons"])
 
 
 class EmitWorkerReportTests(unittest.TestCase):

@@ -92,13 +92,21 @@ its final standards pass against the diff before handoff.
 2. Validate runtime context with the bundled helper:
 
 ```bash
-python3 scripts/assert_worker_context.py \
+ASSERT_WORKER_CONTEXT="<loaded beads-worker package>/scripts/assert_worker_context.py"
+python3 "${ASSERT_WORKER_CONTEXT}" \
   --worktree-path "${WORKTREE_PATH}" \
   --repo-root "${REPO_ROOT}" \
   --issue-id "${ISSUE_ID}" \
-  --current-path "$(pwd -P)" \
-  --branch "$(git branch --show-current 2>/dev/null || true)"
+  --current-path "$(pwd -P)"
 ```
+
+Resolve `ASSERT_WORKER_CONTEXT` from the absolute path of the `SKILL.md` this
+runtime loaded; do not assume the skill package lives inside the target repo.
+The helper independently reads both Git identities and the actual worktree
+branch after removing inherited `GIT_*` overrides. It fails closed unless the
+process cwd is the assigned worktree root, the branch matches the issue, and
+that worktree shares `REPO_ROOT`'s canonical common Git directory. It never
+reads or emits a remote URL.
 
 3. If validation fails, stop and report `invalid-runtime-context`.
    Prefer the structured helper instead of a raw `echo`:

@@ -391,11 +391,13 @@ bd update <id> --claim --json
 ## Step 4: Prepare Worker Environment
 
 ```bash
-bd worktree create .worktrees/parallel-agents/<id> --branch agent/<id>
+(cd "${REPO_ROOT}" && bd worktree create .worktrees/parallel-agents/<id> --branch agent/<id>)
 ```
 
 This creates an isolated code worktree for the worker branch. Beads metadata is
 shared across worktrees via a Dolt DB redirect file.
+The subshell is required: `bd -C "${REPO_ROOT}"` selects the owning tracker but
+does not guarantee that Git worktree operations run against that repository.
 
 PR-review worktrees are the exception to the generic `agent/<id>` branch
 invariant. Their path and initial branch are keyed by the review bead. The
@@ -443,9 +445,11 @@ A spawned worker is not considered running until it proves it is operating from
 the assigned worktree.
 
 Bootstrap contract:
-- `pwd` must equal `WORKTREE_PATH`
+- the worker's actual process cwd and `pwd -P` must equal `WORKTREE_PATH`
 - current branch must equal expected worker branch
 - `pwd` must not equal `REPO_ROOT`
+- `WORKTREE_PATH` must share `REPO_ROOT`'s canonical common Git directory,
+  verified without inherited `GIT_*` repository overrides
 
 For a PR-review worker, branch attestation has two explicit stages:
 
