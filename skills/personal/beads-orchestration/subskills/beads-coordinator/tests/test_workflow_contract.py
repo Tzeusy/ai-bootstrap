@@ -14,6 +14,7 @@ from pathlib import Path
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 LOOP = SKILL_ROOT / "references" / "coordinator-loop.md"
 SAFETY = SKILL_ROOT / "references" / "runtime-and-safety.md"
+EPIC = SKILL_ROOT / "references" / "epic-coordination.md"
 WRITER = SKILL_ROOT.parent / "beads-writer" / "SKILL.md"
 TOKEN_EFFICIENCY = SKILL_ROOT.parents[1] / "references" / "token-efficiency.md"
 NORMALIZER = SKILL_ROOT / "scripts" / "normalize_pr_review_state.py"
@@ -85,6 +86,12 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
     def test_dispatch_preserves_context_affinity_when_safe(self) -> None:
         contents = LOOP.read_text(encoding="utf-8").lower()
         self.assertIn("context affinity", contents)
+
+    def test_worktree_creation_is_bound_to_repo_root(self) -> None:
+        command = '(cd "${REPO_ROOT}" && bd worktree create'
+        for document in (LOOP, EPIC):
+            with self.subTest(document=document.name):
+                self.assertIn(command, document.read_text(encoding="utf-8"))
 
     def test_review_cycle_state_has_a_canonical_note(self) -> None:
         contents = LOOP.read_text(encoding="utf-8")

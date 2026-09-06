@@ -35,6 +35,7 @@ Use when bootstrap failed before meaningful work started. Examples:
 - `pwd` is not `WORKTREE_PATH`
 - current branch is `main` or `master`
 - worktree and repo root resolve to the same checkout
+- worktree and repo root do not share a canonical common Git directory
 
 Stop immediately. Do not change code or GitHub state.
 
