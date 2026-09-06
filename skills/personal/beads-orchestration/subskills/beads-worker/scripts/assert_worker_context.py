@@ -11,8 +11,8 @@ import subprocess
 import sys
 
 
-def git_worktree_identity(path: str) -> tuple[str, str] | None:
-    """Return canonical (worktree root, common Git directory) without inherited redirects."""
+def git_worktree_identity(path: str) -> tuple[str, str, str] | None:
+    """Return canonical worktree identity and branch without inherited redirects."""
     env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
     try:
         result = subprocess.run(
@@ -25,6 +25,8 @@ def git_worktree_identity(path: str) -> tuple[str, str] | None:
                 "--path-format=absolute",
                 "--show-toplevel",
                 "--git-common-dir",
+                "--abbrev-ref",
+                "HEAD",
             ],
             env=env,
             stdout=subprocess.PIPE,
@@ -37,20 +39,19 @@ def git_worktree_identity(path: str) -> tuple[str, str] | None:
         return None
 
     lines = result.stdout.splitlines()
-    if result.returncode != 0 or len(lines) != 2:
+    if result.returncode != 0 or len(lines) != 3:
         return None
-    return os.path.realpath(lines[0]), os.path.realpath(lines[1])
+    return os.path.realpath(lines[0]), os.path.realpath(lines[1]), lines[2].strip()
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Validate that a Beads worker is running in the expected worktree and branch.",
+        description="Validate that a Beads worker is running in the expected Git worktree.",
     )
     parser.add_argument("--worktree-path", required=True)
     parser.add_argument("--repo-root", required=True)
     parser.add_argument("--issue-id", required=True)
     parser.add_argument("--current-path", required=True)
-    parser.add_argument("--branch", required=True)
     return parser.parse_args()
 
 
@@ -61,7 +62,6 @@ def main() -> int:
     worktree_path = os.path.realpath(args.worktree_path)
     repo_root = os.path.realpath(args.repo_root)
     process_cwd = os.path.realpath(os.getcwd())
-    branch = args.branch.strip()
     reasons: list[str] = []
 
     if process_cwd != current_path:
@@ -70,15 +70,9 @@ def main() -> int:
         reasons.append("current-path-does-not-match-worktree-path")
     if current_path == repo_root:
         reasons.append("current-path-equals-repo-root")
-    if not branch:
-        reasons.append("branch-is-empty")
-    if branch in {"main", "master"}:
-        reasons.append("branch-is-protected-base")
-    if branch and branch != expected_branch:
-        reasons.append(f"branch-must-equal-{expected_branch}")
-
     repo_identity = git_worktree_identity(repo_root)
     worktree_identity = git_worktree_identity(worktree_path)
+    branch = worktree_identity[2] if worktree_identity is not None else ""
     if repo_identity is None:
         reasons.append("repo-root-git-identity-unverifiable")
     elif repo_identity[0] != repo_root:
@@ -93,6 +87,12 @@ def main() -> int:
         and repo_identity[1] != worktree_identity[1]
     ):
         reasons.append("worktree-is-not-owned-by-repo-root")
+    if not branch:
+        reasons.append("branch-is-empty")
+    if branch in {"main", "master"}:
+        reasons.append("branch-is-protected-base")
+    if branch and branch != expected_branch:
+        reasons.append(f"branch-must-equal-{expected_branch}")
 
     payload = {
         "status": "ok" if not reasons else "invalid-runtime-context",

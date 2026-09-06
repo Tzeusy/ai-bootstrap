@@ -36,7 +36,6 @@ class AssertWorkerContextTests(unittest.TestCase):
         worktree: Path,
         repo_root: Path,
         current_path: Path | None = None,
-        branch: str = "agent/bd-42",
         env: dict[str, str] | None = None,
         cwd: Path | None = None,
     ) -> subprocess.CompletedProcess[str]:
@@ -52,8 +51,6 @@ class AssertWorkerContextTests(unittest.TestCase):
                 "bd-42",
                 "--current-path",
                 str(current_path or worktree),
-                "--branch",
-                branch,
             ],
             cwd=(cwd or worktree).resolve(),
             env=env,
@@ -90,21 +87,60 @@ class AssertWorkerContextTests(unittest.TestCase):
     def test_context_fails_for_wrong_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp) / "repo"
-            worktree = Path(tmp) / "worker"
+            expected_worktree = Path(tmp) / "expected-worker"
+            actual_worktree = Path(tmp) / "actual-worker"
             self._init_repo(repo_root)
             subprocess.run(
-                ["git", "-C", str(repo_root), "worktree", "add", "-q", "-b", "agent/bd-42", str(worktree)],
+                [
+                    "git",
+                    "-C",
+                    str(repo_root),
+                    "worktree",
+                    "add",
+                    "-q",
+                    "-b",
+                    "agent/bd-42",
+                    str(expected_worktree),
+                ],
                 check=True,
             )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo_root),
+                    "worktree",
+                    "add",
+                    "-q",
+                    "-b",
+                    "agent/other",
+                    str(actual_worktree),
+                ],
+                check=True,
+            )
+            expected_git_dir = subprocess.run(
+                ["git", "-C", str(expected_worktree), "rev-parse", "--absolute-git-dir"],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            redirected_env = os.environ.copy()
+            redirected_env.update(
+                {
+                    "GIT_DIR": expected_git_dir,
+                    "GIT_WORK_TREE": str(expected_worktree),
+                }
+            )
             result = self._run_context(
-                worktree=worktree,
+                worktree=actual_worktree,
                 repo_root=repo_root,
-                branch="feature/misbound",
+                env=redirected_env,
             )
 
         self.assertNotEqual(result.returncode, 0)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "invalid-runtime-context")
+        self.assertEqual(payload["branch"], "agent/other")
         self.assertIn("branch", " ".join(payload["reasons"]))
 
     def test_context_rejects_foreign_or_unverifiable_repository_identity(self) -> None:

@@ -131,13 +131,13 @@ python3 "${ASSERT_WORKER_CONTEXT}" \
   --worktree-path "${WORKTREE_PATH}" \
   --repo-root "${REPO_ROOT}" \
   --issue-id "${ISSUE_ID}" \
-  --current-path "$(pwd -P)" \
-  --branch "$(git branch --show-current 2>/dev/null || true)"
+  --current-path "$(pwd -P)"
 ```
 
-Resolve the helper from the loaded `beads-worker/SKILL.md` path. It rejects a
-foreign common Git directory before review. Run it and later Git/worktree
-commands with actual cwd set to `WORKTREE_PATH`; `bd -C` does not set Git's cwd.
+Resolve the helper from the loaded `beads-worker/SKILL.md` path. It derives the
+branch and repository identity without inherited `GIT_*` overrides. Run it and
+later Git/worktree commands with actual cwd set to `WORKTREE_PATH`; `bd -C`
+does not set Git's cwd.
 
 4. Confirm GitHub access before doing anything expensive:
 
