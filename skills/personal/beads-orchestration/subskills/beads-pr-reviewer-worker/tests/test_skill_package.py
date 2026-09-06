@@ -109,6 +109,17 @@ class BreadsPrReviewerWorkerPackageTests(unittest.TestCase):
         self.assertIn("exact head sha", combined)
         self.assertIn("fresh independent reviewer", combined)
 
+    def test_queue_membership_requires_actual_entry_and_fails_closed(self) -> None:
+        skill = SKILL_MD.read_text(encoding="utf-8").lower()
+        protocol = FAILURE_PROTOCOL_MD.read_text(encoding="utf-8").lower()
+        combined = skill + protocol
+        self.assertIn("mergequeueentry{position enqueuedat}", combined)
+        self.assertIn("means auto-merge is armed", combined)
+        self.assertIn("not that queue membership is confirmed", combined)
+        self.assertIn("null `automergeRequest`".lower(), combined)
+        self.assertIn("queue ejection and never authorizes a rebase", combined)
+        self.assertIn("blocked-awaiting-coordinator", combined)
+
     def test_report_exposes_risk_and_reviewer_identity(self) -> None:
         contents = SKILL_MD.read_text(encoding="utf-8")
         self.assertIn("Risk-Tier:", contents)

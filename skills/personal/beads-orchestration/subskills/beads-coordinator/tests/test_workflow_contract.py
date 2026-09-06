@@ -4,6 +4,9 @@
 
 from __future__ import annotations
 
+import json
+import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -14,6 +17,9 @@ SAFETY = SKILL_ROOT / "references" / "runtime-and-safety.md"
 WRITER = SKILL_ROOT.parent / "beads-writer" / "SKILL.md"
 TOKEN_EFFICIENCY = SKILL_ROOT.parents[1] / "references" / "token-efficiency.md"
 NORMALIZER = SKILL_ROOT / "scripts" / "normalize_pr_review_state.py"
+REVIEW_FAILURE_PROTOCOL = (
+    SKILL_ROOT.parent / "beads-pr-reviewer-worker" / "references" / "failure-protocol.md"
+)
 SKILL_AUDIT_WORKFLOW = SKILL_ROOT.parents[4] / ".github" / "workflows" / "skill-audit.yml"
 
 
@@ -91,6 +97,129 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         self.assertIn("bd dep remove <original-id> <review-id>", contents)
         self.assertIn("REVIEW_CORRECTION_MODE=yes", contents)
         self.assertIn("bd dep add <original-id> <review-id>", contents)
+
+    def test_queue_membership_uses_entry_and_never_infers_rebase_from_absence(self) -> None:
+        contents = LOOP.read_text(encoding="utf-8")
+        self.assertIn("mergeQueueEntry{position enqueuedAt} labels(first:20)", contents)
+        self.assertIn("`merge_queue_entry` is non-null", contents)
+        self.assertIn("queue metadata alone", contents)
+        self.assertNotIn("the queue ejected it", contents)
+
+        documents = (LOOP, REVIEW_FAILURE_PROTOCOL)
+        valid_cases = {
+            "queued": (
+                {
+                    "state": "OPEN",
+                    "mergedAt": None,
+                    "autoMergeRequest": None,
+                    "mergeQueueEntry": {
+                        "position": 1,
+                        "enqueuedAt": "2026-09-06T13:55:14Z",
+                    },
+                },
+                {"auto_merge_armed": False, "queue_position": 1},
+            ),
+            "armed": (
+                {
+                    "state": "OPEN",
+                    "mergedAt": None,
+                    "autoMergeRequest": {"enabledAt": None},
+                    "mergeQueueEntry": None,
+                },
+                {"auto_merge_armed": True, "queue_position": None},
+            ),
+            "absent": (
+                {
+                    "state": "OPEN",
+                    "mergedAt": None,
+                    "autoMergeRequest": None,
+                    "mergeQueueEntry": None,
+                },
+                {"auto_merge_armed": False, "queue_position": None},
+            ),
+            "merged": (
+                {
+                    "state": "MERGED",
+                    "mergedAt": "2026-09-06T14:05:09Z",
+                    "autoMergeRequest": None,
+                    "mergeQueueEntry": None,
+                },
+                {"auto_merge_armed": False, "queue_position": None},
+            ),
+        }
+        invalid_cases = {
+            "partial data with errors": (
+                {"errors": [{"message": "partial failure"}]},
+                {
+                    "state": "OPEN",
+                    "mergedAt": None,
+                    "autoMergeRequest": None,
+                    "mergeQueueEntry": None,
+                },
+            ),
+            "empty queue entry": (
+                {},
+                {
+                    "state": "OPEN",
+                    "mergedAt": None,
+                    "autoMergeRequest": None,
+                    "mergeQueueEntry": {},
+                },
+            ),
+            "null queue fields": (
+                {},
+                {
+                    "state": "OPEN",
+                    "mergedAt": None,
+                    "autoMergeRequest": None,
+                    "mergeQueueEntry": {"position": None, "enqueuedAt": None},
+                },
+            ),
+        }
+
+        for document in documents:
+            match = re.search(
+                r"\| jq -e '([^'\n]+)'", document.read_text(encoding="utf-8")
+            )
+            self.assertIsNotNone(match, document)
+            projection = match.group(1)
+            for name, (pull_request, expected) in valid_cases.items():
+                pull_request["labels"] = {"nodes": []}
+                result = subprocess.run(
+                    ["jq", "-e", projection],
+                    input=json.dumps(
+                        {"data": {"repository": {"pullRequest": pull_request}}}
+                    ),
+                    capture_output=True,
+                    text=True,
+                )
+                with self.subTest(document=document.name, case=name):
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    output = json.loads(result.stdout)
+                    self.assertEqual(output["state"], pull_request["state"])
+                    self.assertEqual(output["mergedAt"], pull_request["mergedAt"])
+                    self.assertEqual(
+                        output["auto_merge_armed"], expected["auto_merge_armed"]
+                    )
+                    entry = output["merge_queue_entry"]
+                    self.assertEqual(
+                        None if entry is None else entry["position"],
+                        expected["queue_position"],
+                    )
+            for name, (top_level, pull_request) in invalid_cases.items():
+                pull_request["labels"] = {"nodes": []}
+                payload = {
+                    **top_level,
+                    "data": {"repository": {"pullRequest": pull_request}},
+                }
+                result = subprocess.run(
+                    ["jq", "-e", projection],
+                    input=json.dumps(payload),
+                    capture_output=True,
+                    text=True,
+                )
+                with self.subTest(document=document.name, case=name):
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
 
     def test_review_bead_template_is_packet_complete(self) -> None:
         contents = LOOP.read_text(encoding="utf-8")
@@ -174,7 +303,9 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         )[0]
         for command in (
             "uv run skills/personal/beads-orchestration/subskills/beads-coordinator/tests/test_normalize_pr_review_state.py",
+            "uv run skills/personal/beads-orchestration/subskills/beads-coordinator/tests/test_workflow_contract.py",
             "uv run skills/personal/beads-orchestration/subskills/beads-cleanup/tests/test_cleanup_scan.py",
+            "uv run skills/personal/beads-orchestration/subskills/beads-pr-reviewer-worker/tests/test_skill_package.py",
             "uv run skills/personal/beads-orchestration/subskills/beads-pr-reviewer-worker/tests/test_scripts.py",
         ):
             self.assertIn(command, step)
