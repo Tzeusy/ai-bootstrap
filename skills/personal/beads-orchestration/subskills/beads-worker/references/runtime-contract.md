@@ -86,6 +86,26 @@ Do not use helpers for:
 - Beads lifecycle changes,
 - splitting implementation into parallel writers.
 
+## Cheap Pre-Push Checks
+
+Before pushing to `origin agent/${ISSUE_ID}`, run these project-specific cheap
+checks if your change touches the indicated areas. These are deterministic,
+fast (seconds to ~10s), and catch issues before CI preflight:
+
+- **New test files**: run `make check-ci-test-shards` to register the file in
+  CI shard manifests (`.github/ci-test-shards/{unit,integration}-N.txt`).
+- **New frontend copy/strings**: run the project's copy/inventory-validation
+  command if it has one — check the actual target name in the project's
+  Makefile/scripts rather than assuming a name; some projects (e.g. Butlers)
+  fold this into their general guard target (`make check-guards`) rather than
+  a standalone `check-frontend-copy` target.
+- **Pre-commit guards**: run `make check-guards` if the project defines it; it
+  runs all guard steps locally before push.
+
+These commands examine only the diff and complement targeted test runs without
+the full `make check` wall-clock cost. Consult `AGENTS.md` for project-specific
+guidance, timing, and equivalents.
+
 ## Push And PR Failure Routing
 
 If `git push` or `gh pr create` fails:
