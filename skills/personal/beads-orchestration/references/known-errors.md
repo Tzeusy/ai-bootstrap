@@ -2193,3 +2193,80 @@ filter, or better: don't probe by name at all — record the PID at launch and p
 
 Same defect family as everything else in this file: an empty grep result is not evidence of absence,
 it is evidence that this pattern did not match.
+
+## `resolve_review_context.py` misses the PR number when only the REVIEW bead carries `external_ref`
+
+Observed 2026-09-06 (bu-9akae, PR #4027): the review bead had `external_ref: "gh-pr:4027"` set
+directly (by the coordinator, at dispatch time), but the *original implementation* bead's
+`external_ref` was `null` — it doesn't get one; only `pr-review-task` beads seem to. The script only
+ever reads `external_ref` off `original_id`, never off the review bead (`args.issue_id`) itself, so
+it fell through to `extract_pr_number(review_description)`, which needs a literal
+`https://github.com/.../pull/N` URL in the bead's `description` field. A review-bead description
+written as prose ("Review PR #4027: ...") has no such URL, so resolution failed with
+`missing-pr-number` even though the PR number was sitting right there in the bead's own record.
+
+Workaround used: read `external_ref` off the review bead directly (`bd show "${ISSUE_ID}" --json`),
+regex out `gh-pr:(\d+)`, then reconstruct the rest of `CONTEXT_JSON` by hand with `gh repo view` +
+`gh pr view <n> --json ...` (same fields the script emits). Don't block on
+`blocked-awaiting-coordinator` when the PR number is this directly available — that status is for
+genuinely unresolved context, not a narrow gap in one fallback script.
+
+Fix candidate for the script itself: check `args.issue_id`'s own `external_ref` for a `gh-pr:N` match
+before (or alongside) `original_id`'s, since the coordinator is now observed to set it on the review
+bead rather than the original.
+
+## `gh pr merge --squash --auto` under a merge queue: `autoMergeRequest` stays `null`, use `mergeQueueEntry` instead
+
+Observed 2026-09-06 (bu-81436, PR #4030): `gh pr merge 4030 --squash --auto` printed the
+informational `! The merge strategy for main is set by the merge queue` line (expected per the
+coordinator's dispatch note) and exit 0. But `gh pr view 4030 --json autoMergeRequest` came back
+`null` — the confirmation field `failure-protocol.md`'s `merge-queued` criterion names. A second
+`gh pr merge --squash --auto` call confirmed `! Pull request ... is already queued to merge`, so the
+first call did enqueue; `autoMergeRequest` simply never populates for a PR whose base has a
+repository-level merge queue with a fixed merge strategy (GitHub models it as a merge-queue entry,
+not a "set auto-merge" request).
+
+Durable confirmation for this repo's queue setup:
+
+```bash
+gh api graphql -f query='
+query { repository(owner: "OWNER", name: "REPO") {
+  pullRequest(number: N) { state mergeStateStatus
+    autoMergeRequest { enabledAt mergeMethod }
+    mergeQueueEntry { state position } } } }'
+```
+
+`mergeQueueEntry.state` (`AWAITING_CHECKS`, etc.) plus a non-null `position` is the actual enqueue
+signal here. Treat `autoMergeRequest: null` alongside a present `mergeQueueEntry` as `merge-queued`,
+not as a failed enqueue — don't retry-loop `gh pr merge` past the second confirming call, and don't
+report `blocked-awaiting-coordinator` solely because `autoMergeRequest` is null on a queue-managed
+base branch.
+
+## `bd update --claim` refuses a stale claim held by a *different* actor
+
+`runtime-and-safety.md`'s ownership rule says an expired-heartbeat claim held by
+another actor may be reclaimed with `bd update <id> --claim`. In practice (bd
+1.0.4) `--claim` hard-refuses whenever `assignee` is already non-empty and not
+you, regardless of heartbeat staleness:
+
+```
+Error claiming <id>: issue already claimed by coordinator:<other-uuid>
+```
+
+This is a different failure from the documented "claiming a blocked bead" and
+"claiming an already-in_progress bead with an empty assignee" cases above —
+here `assignee` is populated, just stale. Confirm the heartbeat is actually
+past the stall threshold first (never do this to a live actor), then clear the
+assignee before reclaiming:
+
+```bash
+bd update <id> --status open --assignee "" --json   # drop the stale assignee
+bd update <id> --claim --json                        # now succeeds
+```
+
+Note `--claim` sets `assignee` to your resolved identity (e.g. the git user
+`Tzeusy`), not a synthetic `coordinator:<uuid>` string — only the heartbeat
+note uses that convention. Re-verify `assignee` in the result as usual.
+Observed 2026-09-08, bd 1.0.4, reclaiming two `in_progress` spec-correction
+beads (`bu-atsax`, `bu-m09qm`) whose prior coordinator session's heartbeat was
+~24h stale.

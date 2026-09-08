@@ -729,15 +729,82 @@ def normalizer_report(args: argparse.Namespace, repo_root: Path) -> dict[str, An
         return sanitize_normalizer(None)
 
 
-def worktree_ids(result: subprocess.CompletedProcess[str] | None) -> tuple[list[str] | None, str | None]:
-    if result is None or result.returncode != 0:
-        return None, "command-failed"
+def worktree_entries(payload: object) -> list[dict[str, str | None]]:
+    """Extract (path-derived id, branch-derived id) pairs from ``bd worktree
+    list --json`` rows.
+
+    The plain ``bd worktree list`` table truncates long paths and branch
+    names to fit terminal width, which silently corrupts id extraction --
+    ``--json`` returns the untruncated ``path``/``branch`` fields instead.
+    """
+    if not isinstance(payload, list):
+        return []
+    entries: list[dict[str, str | None]] = []
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        path = item.get("path")
+        branch = item.get("branch")
+        path_match = WORKTREE_RE.search(path) if isinstance(path, str) else None
+        branch_match = AGENT_BRANCH_RE.search(branch) if isinstance(branch, str) else None
+        path_id = path_match.group(1) if path_match else None
+        branch_id = branch_match.group(1) if branch_match else None
+        if path_id is None and branch_id is None:
+            continue
+        entries.append({"path_id": path_id, "branch_id": branch_id})
+    return entries
+
+
+def worktree_listing(
+    entries: list[dict[str, str | None]],
+) -> tuple[list[str], dict[str, str], set[str]]:
+    """Flatten worktree entries into (all ids, branch-id -> path-id, ambiguous branch ids).
+
+    Each JSON entry from ``bd worktree list --json`` already pairs one
+    worktree's directory-derived id with the bead id of its checked-out
+    branch, so no line-based text correlation is required. The coordinator's
+    two-stage review topology transfers an existing PR worktree to the
+    reviewer instead of creating a same-named one, so a worktree directory
+    keyed by the review bead id can have the *original* bead's branch
+    checked out inside it -- the conventional ``parallel-agents/<original-id>``
+    path never exists, only ``parallel-agents/<review-id>`` does. Callers
+    resolve the branch id to the directory id it actually lives under via
+    the returned mapping. A branch id claimed by more than one distinct
+    directory id is reported as ambiguous rather than resolved, since git's
+    own branch-uniqueness guarantee makes that shape suspicious.
+    """
     names: set[str] = set()
-    for match in WORKTREE_RE.finditer(result.stdout):
-        names.add(match.group(1))
-    for match in AGENT_BRANCH_RE.finditer(result.stdout):
-        names.add(match.group(1))
-    return sorted(names), None
+    mapping: dict[str, str] = {}
+    ambiguous: set[str] = set()
+    for entry in entries:
+        path_id = entry["path_id"]
+        branch_id = entry["branch_id"]
+        if path_id is not None:
+            names.add(path_id)
+        if branch_id is not None:
+            names.add(branch_id)
+        if branch_id is not None and path_id is not None:
+            existing = mapping.get(branch_id)
+            if existing is not None and existing != path_id:
+                ambiguous.add(branch_id)
+            else:
+                mapping[branch_id] = path_id
+    for branch_id in ambiguous:
+        mapping.pop(branch_id, None)
+    return sorted(names), mapping, ambiguous
+
+
+def resolve_claim_worktree(
+    issue_id: str,
+    repo_root: Path,
+    *,
+    branch_path_ids: dict[str, str],
+    ambiguous_worktree_ids: set[str],
+) -> tuple[Path | None, bool]:
+    if issue_id in ambiguous_worktree_ids:
+        return None, True
+    path_id = branch_path_ids.get(issue_id, issue_id)
+    return repo_root / ".worktrees" / "parallel-agents" / path_id, False
 
 
 def scan_claims(
@@ -745,6 +812,8 @@ def scan_claims(
     *,
     repo_root: Path,
     worktree_names: set[str],
+    branch_path_ids: dict[str, str],
+    ambiguous_worktree_ids: set[str],
     now: datetime,
     errors: list[dict[str, str]],
 ) -> list[dict[str, Any]]:
@@ -756,10 +825,18 @@ def scan_claims(
         if issue_id is None:
             report_error(errors, "invalid-record", "claims")
             continue
-        worktree = repo_root / ".worktrees" / "parallel-agents" / issue_id
-        exists = issue_id in worktree_names or worktree.is_dir()
+        worktree, ambiguous = resolve_claim_worktree(
+            issue_id,
+            repo_root,
+            branch_path_ids=branch_path_ids,
+            ambiguous_worktree_ids=ambiguous_worktree_ids,
+        )
+        exists = ambiguous or issue_id in worktree_names or (worktree is not None and worktree.is_dir())
         branch, branch_error = remote_branch_exists(issue_id, repo_root)
-        unpublished, unpublished_error = unpublished_work(worktree, repo_root) if exists else (None, None)
+        if ambiguous:
+            unpublished, unpublished_error = None, "ambiguous-worktree"
+        else:
+            unpublished, unpublished_error = unpublished_work(worktree, repo_root) if exists else (None, None)
         if branch_error:
             report_error(errors, branch_error, "claims")
         if unpublished_error:
@@ -970,10 +1047,15 @@ def scan(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         if error:
             report_error(errors, error, scope)
 
-    worktree_result = run_command(["bd", "-C", str(repo_root), "worktree", "list"], repo_root)
-    names, worktree_error = worktree_ids(worktree_result)
+    worktree_payload, worktree_error = command_json(
+        ["bd", "-C", str(repo_root), "worktree", "list", "--json"], repo_root
+    )
     if worktree_error:
         report_error(errors, worktree_error, "worktrees")
+        names: list[str] | None = None
+        branch_path_ids, ambiguous_worktree_ids = {}, set()
+    else:
+        names, branch_path_ids, ambiguous_worktree_ids = worktree_listing(worktree_entries(worktree_payload))
 
     dolt_result = run_command(["bd", "-C", str(repo_root), "dolt", "status"], repo_root)
     doctor_result = run_command(["bd", "-C", str(repo_root), "doctor"], repo_root)
@@ -993,6 +1075,8 @@ def scan(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         claims_records,
         repo_root=repo_root,
         worktree_names=worktree_names,
+        branch_path_ids=branch_path_ids,
+        ambiguous_worktree_ids=ambiguous_worktree_ids,
         now=now,
         errors=errors,
     )

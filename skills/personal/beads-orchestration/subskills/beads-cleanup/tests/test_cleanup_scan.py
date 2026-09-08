@@ -78,7 +78,7 @@ def install_fakes(fake_bin: FakeBinDir) -> None:
 
         if argv[:2] == ["worktree", "list"]:
             fail("bd-worktree-list")
-            print(fixture.get("worktrees_raw", ""))
+            print(json.dumps(fixture.get("worktree_entries", [])))
             raise SystemExit(0)
 
         if "list" in argv:
@@ -212,6 +212,16 @@ def heartbeat(timestamp: str) -> str:
     return f"[beads-heartbeat]\nowner=coordinator:test\nlast_heartbeat_at={timestamp}\n[/beads-heartbeat]"
 
 
+def worktree_entry(path_id: str | None = None, branch_id: str | None = None) -> dict[str, str]:
+    """Build a ``bd worktree list --json`` row, mirroring its real (untruncated) shape."""
+    entry: dict[str, str] = {}
+    if path_id is not None:
+        entry["path"] = f"/safe/parallel-agents/{path_id}"
+    if branch_id is not None:
+        entry["branch"] = f"agent/{branch_id}"
+    return entry
+
+
 class CleanupScanTests(unittest.TestCase):
     maxDiff = None
 
@@ -341,7 +351,7 @@ class CleanupScanTests(unittest.TestCase):
                 "aib-stale": [bead("aib-stale", "in_progress")],
                 "aib-closed": [bead("aib-closed", "closed")],
             },
-            "worktrees_raw": "worktree /safe/parallel-agents/aib-stale\nworktree /safe/parallel-agents/aib-closed\n",
+            "worktree_entries": [worktree_entry(path_id="aib-stale"), worktree_entry(path_id="aib-closed")],
             "worktree_dirs": ["aib-stale", "aib-closed"],
             "remote_branches": ["aib-stale", "aib-closed"],
             "unpublished_worktrees": ["aib-stale"],
@@ -376,6 +386,162 @@ class CleanupScanTests(unittest.TestCase):
         self.assertEqual(worktree["recommendation"], "cleanup-eligible-after-verification")
         self.assertNotIn(repo_root, result.stdout + result.stderr)
         self.assertTrue(any(call["tool"] == "git" for call in calls))
+
+    def test_claims_resolve_transferred_reviewer_worktree_by_branch_not_directory_name(self) -> None:
+        # The coordinator's two-stage review topology transfers an existing PR
+        # worktree to the reviewer instead of creating a same-named one: the
+        # directory is keyed by the review bead id (aib-review) but has the
+        # *original* bead's branch (agent/aib-original) checked out inside it.
+        fixture = {
+            "in_progress": [bead("aib-original", "in_progress", notes=heartbeat("2026-08-14T03:00:00Z"))],
+            "blocked": [],
+            "review_running": [],
+            "worktree_entries": [worktree_entry(path_id="aib-review", branch_id="aib-original")],
+            "worktree_dirs": ["aib-review"],
+            "remote_branches": ["aib-original"],
+            "unpublished_worktrees": ["aib-review"],
+            "shows": {
+                "aib-review": [bead("aib-review", "closed")],
+                "aib-original": [bead("aib-original", "in_progress")],
+            },
+            "blocked_pr_review": [],
+            "blocked_pr_review_tasks": [],
+            "open_prs": [],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        claim = next(item for item in payload["claims"] if item["id"] == "aib-original")
+        self.assertTrue(claim["worktree_exists"])
+        self.assertTrue(claim["remote_branch_exists"])
+        self.assertTrue(claim["unpublished_work"])
+        self.assertEqual(claim["recommendation"], "preserve-unpublished-work")
+        self.assertNotIn({"code": "worktree-unavailable", "scope": "claims"}, payload["errors"])
+        self.assertEqual(payload["status"], "success")
+
+    def test_claims_ordinary_same_name_worktree_topology_still_resolves(self) -> None:
+        fixture = {
+            "in_progress": [bead("aib-plain", "in_progress", notes=heartbeat("2026-08-14T03:00:00Z"))],
+            "blocked": [],
+            "review_running": [],
+            "worktree_entries": [worktree_entry(path_id="aib-plain", branch_id="aib-plain")],
+            "worktree_dirs": ["aib-plain"],
+            "remote_branches": ["aib-plain"],
+            "unpublished_worktrees": [],
+            "shows": {"aib-plain": [bead("aib-plain", "closed")]},
+            "blocked_pr_review": [],
+            "blocked_pr_review_tasks": [],
+            "open_prs": [],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        claim = next(item for item in payload["claims"] if item["id"] == "aib-plain")
+        self.assertTrue(claim["worktree_exists"])
+        self.assertFalse(claim["unpublished_work"])
+        self.assertEqual(claim["recommendation"], "release-claim-candidate")
+        self.assertEqual(payload["errors"], [])
+        self.assertEqual(payload["status"], "success")
+
+    def test_claims_missing_worktree_directory_remains_manual_triage(self) -> None:
+        # "aib-missing" is registered as a bare branch reference (no
+        # associated directory/path id to correlate against) and no
+        # directory for it -- under any name -- actually exists on disk.
+        # This must stay a fail-closed manual-triage, never silently resolved.
+        fixture = {
+            "in_progress": [bead("aib-missing", "in_progress", notes=heartbeat("2026-08-14T03:00:00Z"))],
+            "blocked": [],
+            "review_running": [],
+            "worktree_entries": [worktree_entry(branch_id="aib-missing")],
+            "worktree_dirs": [],
+            "remote_branches": ["aib-missing"],
+            "unpublished_worktrees": [],
+            "shows": {"aib-missing": [bead("aib-missing", "in_progress")]},
+            "blocked_pr_review": [],
+            "blocked_pr_review_tasks": [],
+            "open_prs": [],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        claim = next(item for item in payload["claims"] if item["id"] == "aib-missing")
+        self.assertTrue(claim["worktree_exists"])
+        self.assertIsNone(claim["unpublished_work"])
+        self.assertEqual(claim["recommendation"], "manual-triage")
+        self.assertEqual(payload["errors"], [{"code": "worktree-unavailable", "scope": "claims"}])
+        self.assertEqual(payload["status"], "partial")
+
+    def test_claims_ambiguous_worktree_branch_registration_remains_manual_triage(self) -> None:
+        # Two distinct worktree directories both claim to host agent/aib-ambig
+        # -- a shape git's own branch-uniqueness guarantee should forbid.
+        # Refuse to guess which one is real rather than picking either.
+        fixture = {
+            "in_progress": [bead("aib-ambig", "in_progress", notes=heartbeat("2026-08-14T03:00:00Z"))],
+            "blocked": [],
+            "review_running": [],
+            "worktree_entries": [
+                worktree_entry(path_id="aib-dupe-a", branch_id="aib-ambig"),
+                worktree_entry(path_id="aib-dupe-b", branch_id="aib-ambig"),
+            ],
+            "worktree_dirs": ["aib-dupe-a", "aib-dupe-b"],
+            "remote_branches": ["aib-ambig"],
+            "unpublished_worktrees": [],
+            "shows": {
+                "aib-dupe-a": [bead("aib-dupe-a", "closed")],
+                "aib-dupe-b": [bead("aib-dupe-b", "closed")],
+                "aib-ambig": [bead("aib-ambig", "in_progress")],
+            },
+            "blocked_pr_review": [],
+            "blocked_pr_review_tasks": [],
+            "open_prs": [],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        claim = next(item for item in payload["claims"] if item["id"] == "aib-ambig")
+        self.assertTrue(claim["worktree_exists"])
+        self.assertIsNone(claim["unpublished_work"])
+        self.assertEqual(claim["recommendation"], "manual-triage")
+        self.assertEqual(payload["errors"], [{"code": "ambiguous-worktree", "scope": "claims"}])
+        self.assertEqual(payload["status"], "partial")
+
+    def test_claims_fresh_heartbeat_preserved_across_transferred_topology(self) -> None:
+        fixture = {
+            "in_progress": [bead("aib-fresh-original", "in_progress", notes=heartbeat("2026-08-14T03:50:00Z"))],
+            "blocked": [],
+            "review_running": [],
+            "worktree_entries": [worktree_entry(path_id="aib-fresh-review", branch_id="aib-fresh-original")],
+            "worktree_dirs": ["aib-fresh-review"],
+            "remote_branches": ["aib-fresh-original"],
+            "unpublished_worktrees": [],
+            "shows": {
+                "aib-fresh-review": [bead("aib-fresh-review", "closed")],
+                "aib-fresh-original": [bead("aib-fresh-original", "in_progress")],
+            },
+            "blocked_pr_review": [],
+            "blocked_pr_review_tasks": [],
+            "open_prs": [],
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        claim = next(item for item in payload["claims"] if item["id"] == "aib-fresh-original")
+        self.assertEqual(claim["heartbeat_state"], "fresh")
+        self.assertEqual(claim["recommendation"], "preserve-live-claim")
+        self.assertTrue(claim["worktree_exists"])
+        self.assertFalse(claim["unpublished_work"])
+        self.assertEqual(payload["errors"], [])
+        self.assertEqual(payload["status"], "success")
 
     def test_dependency_target_shapes_are_compatible_only_when_unambiguous(self) -> None:
         valid_rows = {
@@ -1361,7 +1527,7 @@ class CleanupScanTests(unittest.TestCase):
             "normalizer_stdout": normalizer_empty,
             "remote_branches": [],
             "worktree_dirs": [worktree_id],
-            "worktrees_raw": f"worktree /safe/parallel-agents/{worktree_id}\\n",
+            "worktree_entries": [worktree_entry(path_id=worktree_id)],
         }
         cases = {
             "valid-control": (
@@ -1486,7 +1652,7 @@ class CleanupScanTests(unittest.TestCase):
             "open_prs": [],
             "remote_branches": [claim_id, worktree_id],
             "worktree_dirs": [claim_id, worktree_id],
-            "worktrees_raw": f"branch refs/heads/agent/{worktree_id}\n",
+            "worktree_entries": [worktree_entry(branch_id=worktree_id)],
         }
 
         result, calls, repo_root = self.run_fixture(fixture)
@@ -1533,7 +1699,7 @@ class CleanupScanTests(unittest.TestCase):
             {"tool": "bd", "argv": ["-C", repo_root, "list", "--status=in_progress", "--json", "--limit", "0"]},
             {"tool": "bd", "argv": ["-C", repo_root, "list", "--status=blocked", "--json", "--limit", "0"]},
             {"tool": "bd", "argv": ["-C", repo_root, "list", "--label", "review-running", "--json", "--limit", "0"]},
-            {"tool": "bd", "argv": ["-C", repo_root, "worktree", "list"]},
+            {"tool": "bd", "argv": ["-C", repo_root, "worktree", "list", "--json"]},
             {"tool": "bd", "argv": ["-C", repo_root, "dolt", "status"]},
             {"tool": "bd", "argv": ["-C", repo_root, "doctor"]},
             {"tool": "git", "argv": ["ls-remote", "--heads", "origin", f"agent/{claim_id}"]},
@@ -1556,7 +1722,7 @@ class CleanupScanTests(unittest.TestCase):
             "blocked": [],
             "review_running": [],
             "shows": {issue_id: [bead(issue_id, "closed")]},
-            "worktrees_raw": f"worktree /safe/parallel-agents/{issue_id}\\n",
+            "worktree_entries": [worktree_entry(path_id=issue_id)],
             "worktree_dirs": [issue_id],
             "remote_branches": [issue_id],
             "blocked_pr_review": [],
@@ -1583,7 +1749,7 @@ class CleanupScanTests(unittest.TestCase):
             ],
             "blocked": [],
             "review_running": [],
-            "worktrees_raw": "worktree /safe/parallel-agents/aib-log-failed\\n",
+            "worktree_entries": [worktree_entry(path_id="aib-log-failed")],
             "worktree_dirs": ["aib-log-failed"],
             "remote_branches": ["aib-log-failed"],
             "blocked_pr_review": [],
@@ -1618,7 +1784,7 @@ class CleanupScanTests(unittest.TestCase):
                 "aib-dependency": [bead("aib-dependency", secret_status)],
                 "aib-worktree": [bead("aib-worktree", secret_status)],
             },
-            "worktrees_raw": "worktree /safe/parallel-agents/aib-worktree\\n",
+            "worktree_entries": [worktree_entry(path_id="aib-worktree")],
             "worktree_dirs": ["aib-worktree"],
             "blocked_pr_review": [],
             "blocked_pr_review_tasks": [],
