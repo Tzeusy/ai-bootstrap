@@ -130,26 +130,44 @@ The coordinator has discretion on subagent model choice based on task type.
 
 ### Complexity Constants
 
+Before revising this matrix, re-check the current
+[OpenAI model-selection guidance](https://developers.openai.com/api/docs/guides/model-selection),
+[Anthropic model-selection guidance](https://platform.claude.com/docs/en/about-claude/models/choosing-a-model),
+and [Anthropic effort guidance](https://platform.claude.com/docs/en/build-with-claude/effort),
+then update this reference and its contract test in the same change.
+
 | Strategy | Claude | Codex / ChatGPT | Gemini |
 |---|---|---|---|
-| `EPIC_COMPLEXITY_MODEL` | Opus 5.5 (high effort) | 5.6 Sol Medium | gemini-3-pro |
-| `HIGH_COMPLEXITY_MODEL` | Opus 5.5 (medium effort) | 5.6 Sol Medium | gemini-3-pro |
-| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5 one-shot; Opus 5.5 (medium) as a lane | 5.6 Luna Max | gemini-3-pro |
-| `LOW_COMPLEXITY_MODEL` | 4.5 Haiku | 5.6 Luna Max | gemini-3-flash-preview |
-| `DESIGN_AND_SPECIFICATION_MODEL` | Opus 5.5 (high effort) | 5.6 Sol High | gemini-3-pro |
+| `EPIC_COMPLEXITY_MODEL` | Opus 5.5 High | GPT-6 Astra Low | gemini-3-pro |
+| `HIGH_COMPLEXITY_MODEL` | Opus 5.5 Medium | GPT-6 Sol High | gemini-3-pro |
+| `MEDIUM_COMPLEXITY_MODEL` | Opus 5.5 Low | GPT-6 Luna XHigh | gemini-3-pro |
+| `LOW_COMPLEXITY_MODEL` | Opus 5.5 Low | GPT-6 Luna XHigh | gemini-3-flash-preview |
+| `DESIGN_AND_SPECIFICATION_MODEL` | Opus 5.5 High | GPT-6 Astra Low | gemini-3-pro |
 
-Claude column rationale: Opus 5.5 has a lower list price than Opus 4.8, and
-its cache read ($0.20/MTok) costs the same as Sonnet 5's. So a warm lane pays
-Sonnet's rate on its dominant cost and Opus's rate only on uncached input and
-output. Sonnet 5 stays the MEDIUM pick for short one-shot dispatches, where
-cold loading and output dominate. A lane that mixes tiers runs at its highest
-tier for its whole life (model continuity,
-`../../../references/token-efficiency.md` → "Model right-sizing").
+These are deliberate local quality floors over the vendors' starting-point
+guidance. OpenAI positions Luna for scoped, repeatable work, Sol for demanding
+work that needs judgment, and Astra for the hardest ambiguous work. Dispatch
+low and medium Codex work with Luna XHigh; never dispatch Luna below `xhigh`.
+Dispatch high work with Sol High. Treat epic work as the extreme tier and use
+Astra Low for it and for plan/specification drafting. Astra Low is a
+model-family escalation, not an effort escalation.
 
-For Codex, dispatch low and medium work with 5.6 Luna Max and operational
-high/epic work with 5.6 Sol Medium. Use 5.6 Sol High only for work whose
-primary deliverable is a design or specification artifact; it is not a generic
-complexity escalation.
+Anthropic recommends starting Opus 5.5 at its default `medium` effort and
+tuning against task-specific evals. This policy uses Opus 5.5 throughout:
+`low` for low/medium work, `medium` for high work, and `high` for epic or
+plan/specification drafting. Escalate after a shallow or failed attempt; do
+not silently substitute another Claude family.
+
+### Claude Dispatch Binding
+
+Pass model and effort independently. Set effort explicitly: Opus 5.5 defaults
+to `medium`, which would violate the low and high policy rows if omitted.
+
+| Policy choice | `model` | `effort` |
+|---|---|---|
+| Opus 5.5 Low | `claude-opus-5-5` | `low` |
+| Opus 5.5 Medium | `claude-opus-5-5` | `medium` |
+| Opus 5.5 High | `claude-opus-5-5` | `high` |
 
 ### Codex Dispatch Binding
 
@@ -158,17 +176,18 @@ subagent mechanism:
 
 | Policy choice | `model` | `reasoning_effort` |
 |---|---|---|
-| 5.6 Luna Max | `gpt-5.6-luna` | `max` |
-| 5.6 Sol Medium | `gpt-5.6-sol` | `medium` |
-| 5.6 Sol High | `gpt-5.6-sol` | `high` |
+| GPT-6 Luna XHigh | `gpt-6-luna` | `xhigh` |
+| GPT-6 Sol High | `gpt-6-sol` | `high` |
+| GPT-6 Astra Low | `gpt-6-astra` | `low` |
 
 ### Assignment Rules
 
 | Task Type | Model Complexity |
 |---|---|
-| Epic / team-coordinated work | `EPIC_COMPLEXITY_MODEL` |
+| Epic / team-coordinated work (the extreme tier) | `EPIC_COMPLEXITY_MODEL` |
 | Reconciliation bead for a medium-or-higher epic | `EPIC_COMPLEXITY_MODEL` (floor — see below) |
-| Planning, research, architecting, design, or specification work | `DESIGN_AND_SPECIFICATION_MODEL` |
+| Plan drafting, architecting, design, or specification work whose primary deliverable is the plan/specification | `DESIGN_AND_SPECIFICATION_MODEL` |
+| Research or analysis | Matching complexity model; use `EPIC_COMPLEXITY_MODEL` only when the work itself meets the epic/extreme criteria |
 | Coding | `MEDIUM_COMPLEXITY_MODEL` unless trivial (see LOW criteria below) |
 | Orchestration | `HIGH_COMPLEXITY_MODEL` |
 | PR review (`pr-review-task`) | `MEDIUM_COMPLEXITY_MODEL`; escalate to `HIGH_COMPLEXITY_MODEL` only for large (>400 changed lines) or risk-flagged (security/auth/schema/public-API) diffs |
@@ -205,11 +224,11 @@ Concrete `LOW_COMPLEXITY_MODEL` criteria — dispatch at LOW when **all** hold:
 - no API, schema, auth, or cross-module behavior change
 - acceptance criteria are fully mechanical (no design judgment required)
 
-**Design/specification override.** If the bead's primary deliverable is a
-design or specification artifact, select `DESIGN_AND_SPECIFICATION_MODEL`
-before the complexity-label fast path. Do not apply this override to
-implementation, review, or reconciliation work merely because it consumes a
-design or specification.
+**Plan/design/specification override.** If the bead's primary deliverable is a
+plan, design, architecture, or specification artifact, select
+`DESIGN_AND_SPECIFICATION_MODEL` before the complexity-label fast path. Do not
+apply this override to research, implementation, review, or reconciliation work
+merely because it informs or consumes such an artifact.
 
 **Complexity-label fast path.** Otherwise, if the bead carries a
 `complexity:<tier>` label (`low`/`medium`/`high`/`epic`, stamped by
@@ -222,10 +241,11 @@ follow-ups). Apply the Reconciliation Floor below regardless of label.
 most backlog beads are not the hard case. Default to the lowest tier the
 criteria allow and escalate on evidence (a failed or shallow attempt), not on
 vibes: one redispatch after a too-weak attempt costs less than habitually
-over-provisioning every bead. On runtimes that expose a reasoning-effort knob,
-dispatch LOW/MEDIUM workers at reduced effort as well. Right-size when a lane
-is **formed**, from the highest tier in its planned chain. Never switch a live
-lane's model: that is a cold start, so retire the lane instead.
+over-provisioning every bead. Effort is part of each approved pairing, not a
+second opportunity to cheapen it: in particular, Luna `xhigh` is the Codex
+floor even for LOW work. Right-size when a lane is **formed**, from the highest
+tier in its planned chain. Never switch a live lane's model: that is a cold
+start, so retire the lane instead.
 
 ### Reconciliation Floor (mandatory)
 
