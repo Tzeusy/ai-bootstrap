@@ -147,9 +147,9 @@ After the interview, synthesize — don't transcribe. The human said many things
 
 ### Subagent Dispatch Guidance
 
-When subagents are available and scope is substantive, fan out synthesis by pillar: one each for `heart-and-soul`, `craft-and-care`, `legends-and-lore`, `lay-and-land`, and `spec-and-spine` (once prerequisite pillars are stable). Keeps each draft grounded in the right evidence slice rather than blurring doctrine, contracts, requirements, topology, and standards in one swollen window.
+Synthesize pillar by pillar in the lead's own session, in pillar order. The lead holds the interview; a fresh pillar worker would re-read it cold and lose the human's phrasing. Keep drafts from blurring by finishing and checkpointing each pillar to disk before starting the next, not by splitting sessions. Autocompaction then works from the written drafts instead of from half-remembered dialogue.
 
-Lead agent owns the interview, routes evidence to the right pillar worker, reconciles cross-pillar contradictions. Pillar subagents investigate, draft, and refine within their narrower remit.
+Dispatch a pillar subagent only when that pillar needs investigation that would flood the lead's context (e.g. mapping topology across a large codebase, or RFC archaeology). The lead still owns the interview, routes evidence to that worker, and reconciles cross-pillar contradictions. Independent review is the exception that stays fresh-context by design (`review-protocol.md`).
 
 ### Synthesis Steps
 

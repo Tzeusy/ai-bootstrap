@@ -7,7 +7,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-09-06"
+  last_reviewed: "2026-09-27"
 compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, gh, and python3 available, plus authenticated GitHub access and network access for review, push, and merge operations.
 ---
 
@@ -56,7 +56,7 @@ not directly by users.
 - Do not run `bd create`, `bd update`, `bd dep add`, or `bd close`.
 - Assume the coordinator already claimed the review bead and applied the
   `review-running` lock. Do not try to claim or release that lock yourself.
-- Do not create hidden parallel code-writing tracks under one review bead.
+- No hidden parallel writers; on `LANE-CONTINUATION`, redo bootstrap + attestations.
 - Preserve reviewer independence: do not author semantic corrections on the
   head being reviewed. The original author or a recovery worker owns fixes.
 - Do not require a synthetic "no issues detected" marker thread in order to

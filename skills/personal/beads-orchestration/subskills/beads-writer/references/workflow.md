@@ -45,7 +45,9 @@ Every subbead adds real cost:
 - Worktree creation and teardown
 - CI and test runs per branch or PR
 - Review and merge coordination
-- Context loading for the next worker
+- Context loading for the next worker. Lanes make this cheap for a child that
+  shares context with the previous one, because the lane already holds it
+  cached. It stays full price for a child that sends the lane somewhere new.
 
 That is why 10 tiny subbeads can be worse than 3 focused ones. The rule is
 3-7 children per epic; more than 9 needs a recorded override in the epic's
@@ -62,6 +64,24 @@ Each child should usually:
 - Carry enough task framing and context to act as a standalone prompt for a fresh session
 
 When tempted to split further, ask whether the split reduces review complexity or just creates more reviews.
+
+### Lane-Ordered Graphs
+
+Execution runs on long-lived lanes (`../../../references/token-efficiency.md`
+→ "Cache-first execution"), so shape the graph to be walked in a line:
+
+- Wire `bd dep add` edges so the ready order within an epic follows context
+  locality. Consecutive children should share module, spec area, or fixtures,
+  so one lane can carry them without re-loading the repo.
+- Don't split *to enable parallelism* unless the owner has asked for
+  throughput. A split still has to pay for itself through independent review,
+  rollback, or a different risk or sign-off gate.
+- Keep every child cold-start self-contained anyway. Lanes compact and retire,
+  and a child may be the first bead a new lane sees.
+- Give all children of a chain the same `complexity:` tier when you honestly
+  can. A lane runs at its highest tier, so a single `high` child upgrades the
+  whole chain. Isolate a genuinely harder child at the chain's end, or give it
+  its own lane, instead of mixing tiers mid-chain.
 
 When tempted to merge, ask whether a reviewer can still hold the full change in their head.
 

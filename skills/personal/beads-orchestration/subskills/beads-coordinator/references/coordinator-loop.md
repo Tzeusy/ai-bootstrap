@@ -32,7 +32,9 @@ MERGE_QUEUE=$(gh api "repos/{owner}/{repo}/rules/branches/${BASE}" \
 
 | Constraint | Value |
 |---|---|
-| Max parallel workers | 3 by default; override only when explicitly requested |
+| Worker lanes | 1 by default; open a 2nd/3rd only under `../../../references/token-efficiency.md` → "Cache-first execution"; ceiling 3 unless the owner explicitly asks for more |
+| Lane unit | one long-lived worker session running one bead at a time; each bead keeps its own claim, worktree, branch, PR, and report |
+| Slot | an idle lane, or unused capacity to open one within the lane limit; implementation and reviewer lanes are separate |
 | Worker isolation | each worker gets its own beads worktree and branch |
 | Worktree creation | `bd worktree create` |
 | Branch naming | `agent/<issue-id>` |
@@ -356,9 +358,15 @@ Pick the issue with the lowest `priority` number, breaking ties by oldest
 - is assigned to another live actor (per `assignee`)
 - is blocked by a dispatchable review task that should run first
 
-Within equal priority and readiness, preserve **context affinity**: prefer the
-worker/recovery lane that already owns the same active subsystem or PR when it
-can be resumed safely. Prefer the same independent reviewer for exact-head
+Within a lane, **context locality** outranks the created-at tie-break and may
+outrank a small priority gap. When an idle lane frees up, prefer the ready bead
+that shares the most cohesion signals with that lane's last bead (module, spec
+area, fixtures, review surface). Priority still decides which lane opens next,
+and a P0/P1 in a different area never waits behind locality: it preempts at the
+next bead boundary or opens its own lane.
+
+Otherwise, preserve **context affinity**: prefer the worker/recovery lane that already owns the same active
+subsystem or PR when it can be resumed safely. Prefer the same independent reviewer for exact-head
 rechecks. Rotate only for independence, risk-tier, availability, or stale-
 context reasons; affinity never overrides isolation or conflicting ownership.
 
@@ -430,6 +438,22 @@ and likely edit targets.
 
 ## Step 6: Dispatch The Worker
 
+**Lane continuation first.** If a lane is idle (its last worker report has
+been reconciled) and the selected bead fits it (shares context and needs the
+same model tier), continue that worker's session with the constructed prompt
+headed `LANE-CONTINUATION` (Claude Code: `SendMessage` to the worker's agent
+id/name; Codex: send input to the same thread). The worker re-runs its Phase 1
+bootstrap against the new `WORKTREE_PATH`, and Step 6a applies unchanged. Keep
+a lane table `{lane_id, agent_ref, model, beads_done, last_bead,
+compactions_seen}` in the coordinator's run state.
+
+Spawn a **new** worker only to open a lane, or to replace one that must retire
+(`../../../references/token-efficiency.md` → "Retire a lane"). Retire the lane,
+without forcing it past its limits, when any of these holds: its worker reports
+`blocked-awaiting-coordinator` for context reasons, it gets a
+bootstrap/worktree mismatch on continuation, its reports get vaguer, or it
+contradicts its own earlier decisions.
+
 Spawn via the runtime's native subagent mechanism using the constructed prompt.
 Use `fork_context=false` for Codex worker dispatches unless you are explicitly
 dispatching a coordinator-like helper that must inherit thread history.
@@ -479,7 +503,8 @@ bootstrap window.
 
 - Track each worker's issue ID, branch, worktree path, start time, bootstrap
   status, and last progress signal.
-- Do not count a slot as occupied until bootstrap succeeds.
+- Do not count a lane as occupied until bootstrap succeeds, including a
+  continuation's re-bootstrap.
 - A missing bootstrap acknowledgement is a dispatch failure, not an
   implementation stall.
 - If `main` or the repo-root checkout advances unexpectedly while a worker is
@@ -748,10 +773,10 @@ Polling modes (wake cadence and its cost rationale are canonical in
 numbers here):
 - active mode: whenever near-term work exists (an active worker, a dispatchable
   `pr-review-task`, a PR cooldown counting down). Wait for events when the
-  runtime supports it, but never let a gap between wakes exceed the 4m50s
-  cache-preserving ceiling. Tighten to 1-2 minutes only when an event is
-  imminent (a cooldown about to expire, a slot just freed); a cache-hit poll is
-  cheap, not free.
+  runtime supports it, but never let a gap between wakes exceed the runtime's
+  cache-TTL fallback (20-30 minutes on a 1-hour TTL, 4m50s on a 5-minute TTL).
+  Tighten to 1-2 minutes only when an event is imminent (a cooldown about to
+  expire, a lane just freed). A cache-hit poll is cheap, not free.
 - no-progress frontier: once a sweep finds nothing dispatchable, widen to the
   60-minute cadence and 3-consecutive-no-op-wake stop condition in
   `runtime-and-safety.md`. Each wake in this mode still runs the full safety

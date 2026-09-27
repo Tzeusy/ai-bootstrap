@@ -1,13 +1,13 @@
 ---
 name: beads-orchestration
-description: Use for any Beads (`bd`) issue workflow in a Beads-backed repository — coordinating unattended execution of ready issues across parallel workers, implementing a single dispatched issue in a worktree, handling PR-review follow-up tasks, reconciling stale worker/PR/worktree state, or creating and decomposing backlog issues. Route to exactly one subskill per task.
+description: Use for any Beads (`bd`) issue workflow in a Beads-backed repository — coordinating unattended execution of ready issues through long-lived worker lanes, implementing a single dispatched issue in a worktree, handling PR-review follow-up tasks, reconciling stale worker/PR/worktree state, or creating and decomposing backlog issues. Route to exactly one subskill per task.
 metadata:
   owner: tze
   authors:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-18"
+  last_reviewed: "2026-09-27"
 compatibility: Requires bd (beads) CLI v1.0.4+, git, and a Beads-backed repository. Execution subskills additionally require gh (authenticated), jq, python3, and git worktree support.
 ---
 
@@ -74,12 +74,15 @@ rg -n "^name:|^description:" subskills/*/SKILL.md
   autonomously per [`references/decision-autonomy.md`](references/decision-autonomy.md);
   blocking on a human is reserved for its hard-gate list. Load that file before
   filing or reconciling any decision-shaped blocker.
-- **Spend tokens like money.** All subskills follow
-  [`references/token-efficiency.md`](references/token-efficiency.md): project
-  JSON output through `jq` to needed fields, route verbose gate output to files
-  and read only failures, iterate on targeted tests before the single full
-  gate, and right-size worker models. Load it once per session before the
-  first `bd`/`gh` query loop.
+- **Spend tokens like money; cache first.** All subskills follow
+  [`references/token-efficiency.md`](references/token-efficiency.md). Lanes
+  over fan-out: one long-lived session works through a chain of beads that
+  share context, one at a time, rides autocompaction, and keeps its cache warm,
+  instead of spawning a fresh cold worker per bead. A bead stays the unit of
+  claim, PR, review, and closure. Also: project JSON through `jq`, route gate
+  output to files, run targeted tests before the single full gate, and keep one
+  model per lane. Load it once per session before the first `bd`/`gh` query
+  loop.
 - **Quality gates travel with the work.** `beads-worker` and
   `beads-pr-reviewer-worker` share
   [`references/craft-and-care-gate.md`](references/craft-and-care-gate.md)

@@ -2,7 +2,7 @@
 name: relentless-vision-pursuit
 description: >
   Use for a recurring, generative pursuit run that closes the gap between what
-  a project is today and the ideal its doctrine describes: fan-out audits of
+  a project is today and the ideal its doctrine describes: lane-sequenced audits of
   every surface against the applicable quality bar, vision-grounded ideation
   lenses, synthesis into a ranked move list with tier-board movement across
   runs, and a gated (never auto-released) work plan. Triggers: "run the vision
@@ -15,12 +15,12 @@ metadata:
     - tze
     - Claude Fable 5
   status: active
-  last_reviewed: "2026-07-27"
+  last_reviewed: "2026-09-27"
 compatibility: >
-  Needs repo-root access and doctrine (about/heart-and-soul/). Fan-out wants
-  the Workflow tool and bd (beads); both degrade — small projects run audits
-  inline sequentially, and without bd the ranked move list stays in the
-  dossier.
+  Needs repo-root access and doctrine (about/heart-and-soul/). Audit and
+  ideation lanes want a subagent facility with session continuation, plus bd
+  (beads). Both degrade: small projects run everything inline, sequentially,
+  and without bd the ranked move list stays in the dossier.
 ---
 
 # Relentless Vision Pursuit
@@ -52,7 +52,7 @@ The posture, which every dispatched prompt inherits:
   ideation focus mode.
 - Sequencing already-approved work → `../project-direction/SKILL.md`.
 
-## Phase 0 — Ground and scope (inline, before any fan-out)
+## Phase 0 — Ground and scope (inline, before any lane)
 
 1. **Doctrine.** Read `about/heart-and-soul/` (vision, non-negotiables,
    NOT-boundaries) plus any normative design-language or architecture spec
@@ -61,10 +61,11 @@ The posture, which every dispatched prompt inherits:
 2. **Surface inventory.** Enumerate from the project's source-of-truth
    artifact for its type — route table for frontends, command tree for CLIs,
    public API for libraries, module map from `about/lay-and-land/` otherwise
-   — never a directory listing. Group routes/modules into cohesive surfaces,
-   one agent each.
-3. **Already-known ledger** — the dedup input injected verbatim into every
-   prompt: prior pursuit dossiers (move lists + tier boards), open/in-flight
+   — never a directory listing. Group routes/modules into cohesive surfaces
+   and order them for locality (adjacent surfaces share code). That order is
+   the audit lane's walk.
+3. **Already-known ledger** — the dedup input injected verbatim into each
+   lane's opening prompt: prior pursuit dossiers (move lists + tier boards), open/in-flight
    beads (`bd list --json`), recently merged work on the audited surfaces,
    and `about/legends-and-lore/ideas-ledger.md`. Compress to a bullet list:
    "known and in-flight — do not re-report".
@@ -74,9 +75,10 @@ The posture, which every dispatched prompt inherits:
    `../project-review/SKILL.md` verification pass over the surfaces it
    touched; only verified landings count as movement.
 
-## Phase 1 — Surface pursuit fan-out
+## Phase 1 — Surface pursuit (audit lane)
 
-One agent per surface, plus cross-cutting sweeps chosen for the project:
+One long-lived audit lane walks every surface in locality order, one per turn,
+then runs the cross-cutting sweeps chosen for the project:
 discoverability/shell, visual language, interaction speed, accessibility for
 human surfaces; architecture seams, test rigor, operability for code
 surfaces. Non-negotiables baked into every prompt:
@@ -88,10 +90,10 @@ surfaces. Non-negotiables baked into every prompt:
 - Every surface gets a verdict tier —
   `world-class | solid | functional | weak | broken` — a gap paragraph, and
   a ranked move list.
-- The already-known ledger is included verbatim; duplicates are dropped by
-  the agent, not the synthesizer.
+- The already-known ledger is in the lane's opening prompt; the lane drops
+  duplicates, not the synthesizer.
 
-## Phase 2 — Vision pursuit lenses (concurrent with Phase 1)
+## Phase 2 — Vision pursuit lenses (ideation lane, concurrent with Phase 1)
 
 Ideation at scale. Lens definitions, fit-trace discipline, and the
 mandate-grounded vs vision-extending classing all come from
@@ -99,14 +101,15 @@ mandate-grounded vs vision-extending classing all come from
 — do not redefine them here. Beyond its base lenses, derive 3–6
 project-specific lenses from topology and doctrine (e.g. integrations, the
 core loop's latency/cost, data or knowledge growth, proactivity/automation,
-cross-component collaboration). Each lens agent returns concrete,
+cross-component collaboration). One ideation lane runs the lenses in turn;
+each lens turn returns concrete,
 integration-point-named proposals (which module, schema, or spec would
 change), scored owner-value vs build-cost, deduped against the ledger.
 
 ## Phase 3 — Synthesis (orchestrator, barrier after Phases 1–2)
 
 The strategic core — keep it on the session's model, inline. Read inputs
-from the durable harvest file, never from live agent returns (see execution
+from the durable harvest file, never from live lane returns (see execution
 discipline §3). Produce:
 
 - Tier board with movement vs baseline (verified movement only; inferred
@@ -127,9 +130,9 @@ runnable until the owner releases the gate.
 ## Execution discipline
 
 Load [`references/execution-discipline.md`](references/execution-discipline.md)
-before any fan-out. Four hard rules — throttle (≤3 agents in flight), model
-routing by task difficulty, checkpoint-to-disk per batch, cadence/resume
-hygiene. Violating one is a defect in the run, not a style choice.
+before dispatching any lane. Four hard rules: lanes not batches (≤3 sessions
+in flight), model routing by task difficulty, checkpoint-to-disk per unit, and
+cadence/resume hygiene. Violating one is a defect in the run, not a style choice.
 
 ## Handoffs
 

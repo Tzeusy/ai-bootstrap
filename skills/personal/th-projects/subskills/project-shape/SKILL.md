@@ -82,9 +82,12 @@ Bootstrapping is **consultative**, not template-filling. Extract shape from the 
 
 **Quality gates:**
 - Most capable model, max thinking budget when available.
-- Keep one bootstrap owner. Use one subagent per substantive, independently
-  reviewable pillar cluster only when work partitions cleanly; group small
-  adjacent docs so context and review overhead do not exceed the drafting work.
+- Keep one bootstrap owner, drafting pillars in sequence in its own warm
+  session. The interview is the evidence, and a cold pillar worker would have
+  to be re-briefed from it at full price. Hand a pillar cluster to a subagent
+  only when its investigation (large-repo topology, RFC code archaeology)
+  would flood the owner's context with material later pillars don't need.
+  Review is different: it stays independent and fresh-context.
 - Never self-review — independent review subagents when the environment supports them.
 - Challenge the user — accept vague answers only to push deeper, never to ship.
 
@@ -97,8 +100,9 @@ Bootstrapping is **consultative**, not template-filling. Extract shape from the 
 
 1. **Interview** — Socratic extraction across five tracks (identity, boundaries, principles, architecture, contracts). Read [`references/consultative-bootstrapping.md`](references/consultative-bootstrapping.md) for question banks + challenge patterns.
 2. **Synthesize** — distill answers into drafts. Use the human's own language.
-   Make trade-offs explicit. Flag contradictions. Split to a pillar/doc-cluster
-   worker only when the artifact is substantive and independently reviewable.
+   Make trade-offs explicit. Flag contradictions. Draft pillar by pillar in
+   the owner's session; split to a pillar/doc-cluster worker only under the
+   flooding exception above.
 3. **Independent review** — fresh context reviews stable pillar/doc clusters;
    combine coherence + adversarial lenses unless risk warrants separate agents,
    then run cross-pillar review at convergence points. Read

@@ -10,7 +10,7 @@ to commit directly where repo convention allows:
   movement vs baseline, systemic themes with exemplars, ranked move list
   (what / why with doctrine citation / evidence / rough slice plan), and
   the known-ledger snapshot the run deduped against.
-- `YYYY-MM-DD-vision-pursuit-data.json` — full per-agent structured output.
+- `YYYY-MM-DD-vision-pursuit-data.json` — full per-unit (surface or lens) structured output.
   Document the access pattern in the md, e.g.
   `jq '.audits[] | select(.surface=="<key>")'`.
 
