@@ -6,11 +6,11 @@ Step-by-step guide for establishing the five-pillar knowledge architecture from 
 
 - A project with a clear purpose (even if only in the founder's head)
 - Willingness to write before coding
-- Ability to partition substantive pillar work across subagents when supported
+- Optionally, subagents for investigation-heavy pillars and for independent review
 
 ## Dispatch Principle
 
-For substantive pillar generation/curation, prefer one subagent per pillar or per coherent doc cluster. Not ceremony — narrower context windows:
+Draft pillars **in sequence in the bootstrap owner's session**, in pillar order. That session already holds the interview, so it keeps the cache warm and keeps the human's own language (see `beads-orchestration/references/token-efficiency.md` → "Cache-first execution"). Keep each pillar's framing distinct by deliberately switching lens between pillars, not by switching sessions. Dispatch a pillar or doc-cluster subagent only when that pillar's *investigation* would flood the owner's context. When you do, it is for these narrower-context reasons:
 
 - doctrine not diluted by RFC implementation detail
 - RFC drafting not inheriting topology or overview-writing context

@@ -11,11 +11,11 @@ An LLM that writes vision.md then reviews it is primed by its own generation con
 
 Independent review breaks this — give a fresh agent only the document, not the generation context.
 
-Same principle one step earlier: partition substantive generation/curation too. A dedicated pillar worker with a tighter context window produces cleaner doctrine, contracts, specs, topology, and standards than one monolithic agent carrying all pillars.
+Generation is different. Independence matters for review; for drafting, a warm owner session that holds the interview beats cold pillar workers on both cost and fidelity. Partition generation only when a pillar's investigation would flood the owner's context.
 
 ## Generation And Curation Partitioning
 
-When the task justifies dispatch, prefer one investigation/refinement subagent per pillar, or per coherent doc cluster within a pillar:
+When investigation load justifies dispatch (see above), use one investigation/refinement subagent per pillar, or per coherent doc cluster within a pillar:
 
 - `heart-and-soul/vision.md` + `v1.md` → one doctrine worker
 - `legends-and-lore/rfcs/0001-*.md` + review notes → one contracts worker

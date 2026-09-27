@@ -52,11 +52,11 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         contents = SAFETY.read_text(encoding="utf-8")
         self.assertIn("| Strategy | Claude | Codex / ChatGPT | Gemini |", contents)
         for row in (
-            "| `EPIC_COMPLEXITY_MODEL` | Opus 4.8 | 5.6 Sol Medium | gemini-3-pro |",
-            "| `HIGH_COMPLEXITY_MODEL` | Sonnet 5 | 5.6 Sol Medium | gemini-3-pro |",
-            "| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5 | 5.6 Luna Max | gemini-3-pro |",
+            "| `EPIC_COMPLEXITY_MODEL` | Opus 5.5 (high effort) | 5.6 Sol Medium | gemini-3-pro |",
+            "| `HIGH_COMPLEXITY_MODEL` | Opus 5.5 (medium effort) | 5.6 Sol Medium | gemini-3-pro |",
+            "| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5 one-shot; Opus 5.5 (medium) as a lane | 5.6 Luna Max | gemini-3-pro |",
             "| `LOW_COMPLEXITY_MODEL` | 4.5 Haiku | 5.6 Luna Max | gemini-3-flash-preview |",
-            "| `DESIGN_AND_SPECIFICATION_MODEL` | Sonnet 5 | 5.6 Sol High | gemini-3-pro |",
+            "| `DESIGN_AND_SPECIFICATION_MODEL` | Opus 5.5 (high effort) | 5.6 Sol High | gemini-3-pro |",
         ):
             self.assertIn(row, contents)
         for binding in (
@@ -79,6 +79,7 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         safety = SAFETY.read_text(encoding="utf-8").lower()
         self.assertIn("orchestrator wake cadence", safety)
         self.assertIn("4m50s", safety)
+        self.assertIn("1-hour", safety)
         self.assertIn("60 minutes", safety)
         self.assertIn("3 consecutive no-op wakes", safety)
         self.assertNotIn("30-minute safety sweep", loop)
@@ -86,6 +87,13 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
     def test_dispatch_preserves_context_affinity_when_safe(self) -> None:
         contents = LOOP.read_text(encoding="utf-8").lower()
         self.assertIn("context affinity", contents)
+
+    def test_dispatch_continues_warm_lanes_before_spawning(self) -> None:
+        loop = LOOP.read_text(encoding="utf-8")
+        self.assertIn("Lane continuation first", loop)
+        self.assertIn("LANE-CONTINUATION", loop)
+        self.assertIn("| Worker lanes | 1 by default", loop)
+        self.assertIn("Cache-first execution", TOKEN_EFFICIENCY.read_text(encoding="utf-8"))
 
     def test_worktree_creation_is_bound_to_repo_root(self) -> None:
         command = '(cd "${REPO_ROOT}" && bd worktree create'

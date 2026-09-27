@@ -20,7 +20,7 @@ metadata:
     - Claude Fable 5
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-09-04"
+  last_reviewed: "2026-09-27"
 compatibility: Subskill scripts require bash, git, grep, find, and uv; project-shape uses uv for fail-closed YAML validation. project-direction additionally assumes the bd (beads) CLI and an OpenSpec-capable environment for changeset synthesis.
 ---
 
@@ -46,7 +46,7 @@ Five subskills, one lifecycle:
    launch gate judges whether goals and requirements are settled enough to
    specify from.
 5. **Pursuit** — recurring generative loop against the baseline's ideal:
-   fan-out surface audits + ideation lenses → ranked moves, tier-board
+   sequential surface audits + ideation lenses → ranked moves, tier-board
    movement, gated work plan; pursued moves re-enter via feature request.
 
 **Questionnaire** crosses that lifecycle only at hard human gates. It
@@ -148,6 +148,13 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   [`references/work-allocation.md`](references/work-allocation.md): one bead and
   primary agent per cohesive independently verifiable outcome, with enough work
   to amortize context/worktree/CI/review overhead and no overlapping ownership.
+- **Cache-first orchestration.** Plan and run work as a few long-lived,
+  cache-warm sessions that ride autocompaction, not as many fresh subagents.
+  A subagent here is justified by independence (adversarial or fresh-context
+  review, questionnaire vetting) or by context isolation the lead can't afford,
+  never by "it's parallelizable". Canonical rules:
+  [`beads-orchestration/references/token-efficiency.md`](../beads-orchestration/references/token-efficiency.md)
+  → "Cache-first execution".
 - Autonomy contract — what agents may do without the human:
 
   | Artifact | Agent may | Human must |

@@ -1,20 +1,21 @@
 ---
 name: beads-coordinator
-description: Coordinate Beads issue execution by continuously selecting the highest-priority ready issue from `bd ready`, claiming it atomically with `bd update --claim`, and dispatching a fresh worker in an isolated beads worktree. Use for unattended parallel issue throughput in Beads-backed repos.
+description: Coordinate Beads issue execution by continuously selecting the highest-priority ready issue from `bd ready`, claiming it atomically with `bd update --claim`, and running it in an isolated beads worktree on a long-lived, cache-warm worker lane. Use for unattended issue throughput in Beads-backed repos.
 metadata:
   owner: tze
   authors:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-09-04"
+  last_reviewed: "2026-09-27"
 compatibility: Requires a Beads-backed repository with `bd` v1.0.4+, `git`, an authenticated `gh`, `jq`, git worktree support, and network access for `gh` PR operations.
 ---
 
 # Beads Coordinator
 
-Run a coordinator loop that repeatedly pulls ready Beads work and fans it out to
-parallel workers in isolated branches and worktrees. This skill is a routing
+Run a coordinator loop that repeatedly pulls ready Beads work and feeds it,
+one bead at a time, to long-lived worker **lanes** (by default one), each bead
+in its own isolated branch and worktree. This skill is a routing
 layer over the Beads operating model in [`../../../../../README.md`](../../../../../README.md);
 it coordinates, it never implements code.
 
@@ -24,7 +25,7 @@ reference that owns each detailed procedure. Load only the reference you need.
 ## Use This Skill When
 
 - "while true, tackle the next highest-priority Beads issue"
-- "dispatch each Beads issue to a new parallel agent"
+- "work through the backlog with a worker"
 - "keep N workers processing the `bd ready` backlog"
 - "coordinate beads work across parallel agents"
 
@@ -64,10 +65,16 @@ State these hold for the entire run; the references elaborate, never override.
   that lacks one, or conflicts with it, goes to the shaping lane or back to
   `th-projects` — the coordinator does not reinterpret scope to keep a slot
   busy.
-- **Stay inside the cache window.** Every coordinator wake lands within 5
-  minutes of the last while work is in flight (4m50s heartbeat if needed);
-  at the no-progress frontier, widen to 60 minutes and stop after 3 no-op
-  wakes. Canonical numbers and runtime bindings:
+- **Lanes over fan-out.** Feed the next bead to the lane that already holds
+  the relevant context by continuing that worker's session, not by spawning a
+  cold worker. Run one lane by default and open another only under the rule in
+  `../../references/token-efficiency.md` → "Cache-first execution". Each bead
+  keeps its own claim, worktree, branch, PR, report, and closure.
+- **Stay inside the cache TTL.** While work is in flight, every coordinator
+  wake lands inside the runtime's prompt-cache TTL (1 hour on Claude Code
+  sessions by default, 5 minutes elsewhere or in usage overage). At the
+  no-progress frontier, widen to 60 minutes and stop after 3 no-op wakes.
+  Canonical numbers and runtime bindings:
   `references/runtime-and-safety.md` → "Orchestrator Wake Cadence".
 
 ## Read Order
@@ -113,7 +120,10 @@ auto-routing to the right DB — that fails across embedded-mode workspaces
    `references/coordinator-loop.md` — never silently dropped.
 5. Build a **compact** dispatch prompt carrying `ISSUE_ID`, `WORKTREE_PATH`,
    `REPO_ROOT`, and a 2-4 line issue summary plus acceptance criteria. Do not
-   inline full `bd show` JSON; the worker self-fetches if it needs more.
+   inline full `bd show` JSON; the worker self-fetches if it needs more. If a
+   lane is idle and holds related context, send this as a **lane continuation**
+   to that worker's existing session (`references/coordinator-loop.md` →
+   Step 6). Spawn a new worker only to open or replace a lane.
 6. Choose the worker skill by issue type:
    - default implementation issue → `../beads-worker/SKILL.md`
    - `pr-review-task` issue → `../beads-pr-reviewer-worker/SKILL.md`

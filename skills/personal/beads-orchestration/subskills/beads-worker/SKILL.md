@@ -7,7 +7,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-09-04"
+  last_reviewed: "2026-09-27"
 compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, gh, and python3 available, plus authenticated GitHub access and network access for push and PR operations.
 ---
 
@@ -59,6 +59,26 @@ by users.
 
 If the issue truly needs multiple code-writing tracks, stop and hand that back
 to the coordinator instead of improvising local fan-out.
+
+## Lane Continuation
+
+A worker session is usually a **lane**: after your report is reconciled, the
+coordinator may send a `LANE-CONTINUATION` prompt with a new `ISSUE_ID` and
+`WORKTREE_PATH` into this same session. Treat it as a fresh assignment for
+state and lifecycle, but keep what you already know about the repo:
+
+- Re-run Phase 1 bootstrap in full against the new `WORKTREE_PATH`. Never edit
+  the previous bead's worktree again; its branch belongs to its PR now.
+- Reuse the guidance you already read, including the craft-and-care skill, and
+  the repo knowledge you built up. Re-read a file only if you know it changed
+  (for example, the previous bead merged into it) or compaction dropped it.
+- Take state from the new bead's fields and the repo, never from your memory
+  of the last bead. Prior-bead context tells you where things live, not what
+  this bead requires.
+- If compaction left you unsure of anything the current bead needs, re-fetch
+  it (`bd show`, the spec, the diff) instead of guessing. If you notice you are
+  repeating settled work or contradicting your own earlier decisions, say so
+  in the report summary. The coordinator retires drifting lanes.
 
 ## Bundled Helpers
 

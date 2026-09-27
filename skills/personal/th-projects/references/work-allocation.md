@@ -4,6 +4,14 @@ Load when turning an approved spec, confirmed gap set, or milestone into beads
 and agent assignments. The objective is reliable ownership with minimum context,
 worktree, CI, and review overhead.
 
+**Cache-first.** Context loading is the dominant cost. It is paid at full
+(write) price by every cold session and re-read at 1/20th of that price
+(Opus 5.5) by a session that is still warm. So plan work to be walked in a line
+by a few long-lived **lanes**, not fanned out to many fresh sessions. The
+canonical economics and lane rules live in
+[`beads-orchestration/references/token-efficiency.md`](../../beads-orchestration/references/token-efficiency.md)
+→ "Cache-first execution". This contract applies them to graph shape.
+
 ## Unit of Work
 
 Default to **one bead per cohesive, independently verifiable outcome**, with one
@@ -16,8 +24,9 @@ A bead is correctly sized when one worker can:
 - implement, test, review, and roll back the outcome independently;
 - own a bounded file/interface surface without another bead making the same
   decisions; and
-- finish in one focused agent session, usually several hours rather than a few
-  mechanical minutes.
+- finish as one bead-sized stretch of a lane: substantial enough to be worth
+  a PR and review, usually hours rather than a few mechanical minutes. It does
+  not need a whole fresh session to itself.
 
 ## Merge or Split
 
@@ -27,8 +36,11 @@ context loading, worktree setup, CI, and review overhead is material compared
 with the implementation. Keep distinct acceptance criteria inside the bead.
 
 **Split** only when each outcome can land, test, review, and roll back without
-the other; separate owners reduce cognitive load or unlock safe parallelism;
-or one outcome has a different hard dependency, risk class, or sign-off gate.
+the other; separate owners reduce cognitive load; or one outcome has a
+different hard dependency, risk class, or sign-off gate. Unlocking parallelism
+counts as a reason only when the owner has asked for throughput. The default
+executor is one lane walking the graph in order, so a split made only for
+parallelism buys nothing and costs an extra PR.
 
 Never split by file, layer, requirement, scenario, TODO, or subagent specialty
 alone. Never merge unrelated outcomes merely to fill a worker session.
@@ -102,7 +114,13 @@ being runnable-now.
   bead and one verification path. One bead may cover several adjacent
   requirements when the implementation seam is shared.
 - Serialize beads that touch the same contract, migration, fixture, config, or
-  architecture decision. Parallelize only disjoint surfaces with stable inputs.
+  architecture decision. Serial is the default in any case. Plan a second lane
+  only for a disjoint chain with stable inputs, and only when throughput is
+  wanted.
+- **Order for locality.** Wire dependencies so each bead's ready successor
+  shares module, spec area, or fixtures with it, which lets one lane carry the
+  chain on a warm cache. Record the intended lane order in the epic's
+  `design` field when it is not obvious from the dependencies.
 - Put requirement-level reconciliation inside the implementation bead's
   acceptance criteria. Add one epic-level reconciliation bead only for
   cross-child and end-to-end behavior; do not create a reconciliation bead per
@@ -155,3 +173,6 @@ Before materializing the graph, verify:
 7. No requirement is pinned by two gate species, no bead exists only to add
    tests for behavior an existing test executes, and no epic exceeds 7
    children without a recorded override.
+8. The graph walks as a line: ready order follows context locality; every
+   planned lane's chain shares one model tier or isolates the harder bead; and
+   any extra lane is justified by disjoint surfaces plus a throughput need.

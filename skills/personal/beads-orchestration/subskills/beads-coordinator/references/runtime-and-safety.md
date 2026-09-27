@@ -73,17 +73,19 @@ This is a distinct mechanism from the Beads stall heartbeat above — it governs
 the **token cost of resuming this session**, not bead mutual exclusion or
 stall detection. Do not conflate the two.
 
-- The coordinator session's prompt cache lasts **5 minutes**. A wake-up (poll,
-  event callback, or resumed sleep) that lands **more than 5 minutes** after
-  the previous request pays a full cache-miss re-read of context —
-  **10-40x** more expensive than a cache-hit read at the same point.
-- While there is near-term work to track (an active worker, a dispatchable
-  `pr-review-task`, a PR cooldown about to expire), never let the coordinator
-  sit through one long uninterrupted sleep waiting on events. If the runtime
-  cannot guarantee sub-5-minute event delivery, set an explicit heartbeat
-  wake-up at **4m50s** and re-poll even when nothing new needs checking — a
-  cheap cache-hit poll beats an expensive cache-miss wake. This is what "active
-  mode" in `coordinator-loop.md` Step 8 means in practice.
+- The coordinator session's prompt cache lives for the runtime's **TTL**,
+  measured start-to-start between requests. Claude Code sessions default to a
+  **1-hour** TTL (it falls back to 5 minutes in usage overage). Treat any
+  runtime whose TTL you cannot confirm as **5 minutes**. A wake that lands
+  after the TTL re-reads the whole context at write price: 12.5x-40x a cache
+  hit, depending on model and TTL (see `../../../references/token-efficiency.md`).
+- While there is near-term work to track (an active lane, a dispatchable
+  `pr-review-task`, a PR cooldown about to expire), wake on events first.
+  Behind them, set a fallback heartbeat that always lands inside the TTL:
+  **20-30 minutes** on a 1-hour TTL, **4m50s** on a 5-minute TTL. On a 1-hour
+  TTL, polling faster than every 20 minutes just to keep the cache warm is
+  waste, because there is no cache cliff to beat. This is what "active mode"
+  in `coordinator-loop.md` Step 8 means in practice.
 - The miss cost scales with context size, so the projection and file-routing
   rules in `../../../references/token-efficiency.md` compound with this one: a
   lean context makes every wake cheaper in both modes.
@@ -94,14 +96,14 @@ Runtime binding (use whichever wake primitive the session exposes):
 
 | Runtime | Active-mode wake | Frontier wake |
 |---|---|---|
-| Claude Code | `ScheduleWakeup` (`/loop` dynamic mode) with `delaySeconds: 290`, or a `Monitor` until-loop; subagent completion also wakes you | `delaySeconds: 3600`, `noop: true` on a no-op wake, `stop: true` after the third |
+| Claude Code | subagent completion wakes you; fallback `ScheduleWakeup` (`/loop` dynamic mode) with `delaySeconds: 1200`-`1800` on the default 1-hour TTL (`290` only if the session is on the 5-minute TTL), or a `Monitor` until-loop | `delaySeconds: 3600`, `noop: true` on a no-op wake, `stop: true` after the third |
 | Codex | `wait_agent` with timeout ≤ 290s (a timeout means "still running", never a stall) | `wait_agent`/sleep capped at 60 min per wake |
 
 ### No-progress frontier
 
 Once a poll finds genuinely nothing to do — `bd ready` empty, no dispatchable
 `pr-review-task`, no active workers, no near-term PR cooldown, no decision-sweep
-work — the 4m50s cache-preserving cadence stops paying for itself: there is no
+work — the cache-preserving fallback cadence stops paying for itself: there is no
 real work to keep warm a cache *for*. At that frontier, switch modes instead of
 continuing to burn cache-hit polls on nothing:
 
@@ -130,11 +132,19 @@ The coordinator has discretion on subagent model choice based on task type.
 
 | Strategy | Claude | Codex / ChatGPT | Gemini |
 |---|---|---|---|
-| `EPIC_COMPLEXITY_MODEL` | Opus 4.8 | 5.6 Sol Medium | gemini-3-pro |
-| `HIGH_COMPLEXITY_MODEL` | Sonnet 5 | 5.6 Sol Medium | gemini-3-pro |
-| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5 | 5.6 Luna Max | gemini-3-pro |
+| `EPIC_COMPLEXITY_MODEL` | Opus 5.5 (high effort) | 5.6 Sol Medium | gemini-3-pro |
+| `HIGH_COMPLEXITY_MODEL` | Opus 5.5 (medium effort) | 5.6 Sol Medium | gemini-3-pro |
+| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5 one-shot; Opus 5.5 (medium) as a lane | 5.6 Luna Max | gemini-3-pro |
 | `LOW_COMPLEXITY_MODEL` | 4.5 Haiku | 5.6 Luna Max | gemini-3-flash-preview |
-| `DESIGN_AND_SPECIFICATION_MODEL` | Sonnet 5 | 5.6 Sol High | gemini-3-pro |
+| `DESIGN_AND_SPECIFICATION_MODEL` | Opus 5.5 (high effort) | 5.6 Sol High | gemini-3-pro |
+
+Claude column rationale: Opus 5.5 has a lower list price than Opus 4.8, and
+its cache read ($0.20/MTok) costs the same as Sonnet 5's. So a warm lane pays
+Sonnet's rate on its dominant cost and Opus's rate only on uncached input and
+output. Sonnet 5 stays the MEDIUM pick for short one-shot dispatches, where
+cold loading and output dominate. A lane that mixes tiers runs at its highest
+tier for its whole life (model continuity,
+`../../../references/token-efficiency.md` → "Model right-sizing").
 
 For Codex, dispatch low and medium work with 5.6 Luna Max and operational
 high/epic work with 5.6 Sol Medium. Use 5.6 Sol High only for work whose
@@ -177,6 +187,13 @@ moves, merge readiness expires until that SHA is reviewed.
 | Standard | Cohesive product/backend/UI behavior with bounded failure surface | Independent exact-head review; retain the same reviewer for correction rechecks when independence is intact. |
 | Low | Tiny docs, tests, formatting, chore, or mechanical refactor with no observable contract/risk change | Schedule a sequential convoy of 3-4 same-domain review beads to one sticky reviewer identity. Process one PR/SHA and emit one verdict at a time; escalate on any semantic finding. |
 
+**Reviewer lanes.** Standard- and low-tier reviews run on a sticky reviewer
+lane: one reviewer session takes sequential reviews (and their correction
+rechecks) so the repo context it loaded stays cached. A reviewer lane never
+reviews a PR produced by an implementation lane it shares a session with.
+High-tier reviews, and any review that needs a fresh reviewer, retire or
+bypass the reviewer lane and start cold. Independence beats cache.
+
 Risk tiers reduce repeated context loading, never the evidence required for the
 actual change. Do not batch high-risk work or merge an unreviewed moved head.
 "Sequential convoy" never means one multi-PR reviewer worker: the one-bead,
@@ -206,7 +223,9 @@ most backlog beads are not the hard case. Default to the lowest tier the
 criteria allow and escalate on evidence (a failed or shallow attempt), not on
 vibes: one redispatch after a too-weak attempt costs less than habitually
 over-provisioning every bead. On runtimes that expose a reasoning-effort knob,
-dispatch LOW/MEDIUM workers at reduced effort as well.
+dispatch LOW/MEDIUM workers at reduced effort as well. Right-size when a lane
+is **formed**, from the highest tier in its planned chain. Never switch a live
+lane's model: that is a cold start, so retire the lane instead.
 
 ### Reconciliation Floor (mandatory)
 
