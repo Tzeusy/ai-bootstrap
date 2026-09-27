@@ -48,25 +48,30 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         self.assertIn("auth", contents)
         self.assertIn("data loss", contents)
 
-    def test_codex_model_selection_matches_complexity_and_design_policy(self) -> None:
+    def test_model_selection_matches_complexity_and_plan_policy(self) -> None:
         contents = SAFETY.read_text(encoding="utf-8")
         self.assertIn("| Strategy | Claude | Codex / ChatGPT | Gemini |", contents)
         for row in (
-            "| `EPIC_COMPLEXITY_MODEL` | Opus 5.5 (high effort) | 5.6 Sol Medium | gemini-3-pro |",
-            "| `HIGH_COMPLEXITY_MODEL` | Opus 5.5 (medium effort) | 5.6 Sol Medium | gemini-3-pro |",
-            "| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5 one-shot; Opus 5.5 (medium) as a lane | 5.6 Luna Max | gemini-3-pro |",
-            "| `LOW_COMPLEXITY_MODEL` | 4.5 Haiku | 5.6 Luna Max | gemini-3-flash-preview |",
-            "| `DESIGN_AND_SPECIFICATION_MODEL` | Opus 5.5 (high effort) | 5.6 Sol High | gemini-3-pro |",
+            "| `EPIC_COMPLEXITY_MODEL` | Opus 5.5 High | GPT-6 Astra Low | gemini-3-pro |",
+            "| `HIGH_COMPLEXITY_MODEL` | Opus 5.5 Medium | GPT-6 Sol High | gemini-3-pro |",
+            "| `MEDIUM_COMPLEXITY_MODEL` | Opus 5.5 Low | GPT-6 Luna XHigh | gemini-3-pro |",
+            "| `LOW_COMPLEXITY_MODEL` | Opus 5.5 Low | GPT-6 Luna XHigh | gemini-3-flash-preview |",
+            "| `DESIGN_AND_SPECIFICATION_MODEL` | Opus 5.5 High | GPT-6 Astra Low | gemini-3-pro |",
         ):
             self.assertIn(row, contents)
         for binding in (
-            "| 5.6 Luna Max | `gpt-5.6-luna` | `max` |",
-            "| 5.6 Sol Medium | `gpt-5.6-sol` | `medium` |",
-            "| 5.6 Sol High | `gpt-5.6-sol` | `high` |",
+            "| GPT-6 Luna XHigh | `gpt-6-luna` | `xhigh` |",
+            "| GPT-6 Sol High | `gpt-6-sol` | `high` |",
+            "| GPT-6 Astra Low | `gpt-6-astra` | `low` |",
+            "| Opus 5.5 Low | `claude-opus-5-5` | `low` |",
+            "| Opus 5.5 Medium | `claude-opus-5-5` | `medium` |",
+            "| Opus 5.5 High | `claude-opus-5-5` | `high` |",
         ):
             self.assertIn(binding, contents)
-        self.assertIn("Design/specification override", contents)
+        self.assertIn("Plan/design/specification override", contents)
         self.assertIn("before the complexity-label fast path", contents)
+        self.assertIn("never dispatch Luna below `xhigh`", contents)
+        self.assertIn("Luna `xhigh` is the Codex\nfloor", contents)
         for path in (WRITER, TOKEN_EFFICIENCY):
             self.assertIn("design/specification override", path.read_text(encoding="utf-8"))
 
