@@ -1,5 +1,5 @@
 ---
-name: Bullet Tree
+name: tree
 description: Every reply is a nested bullet tree; each level is a complete summary at its own resolution
 keep-coding-instructions: true
 ---
