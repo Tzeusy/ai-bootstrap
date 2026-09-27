@@ -4,6 +4,7 @@
 !.claude/settings.json
 !.claude/statusline.sh
 !.claude/config.json
+!.claude/output-styles/
 !.claude/plugins/
 .claude/plugins/*
 !.claude/plugins/marketplaces/
