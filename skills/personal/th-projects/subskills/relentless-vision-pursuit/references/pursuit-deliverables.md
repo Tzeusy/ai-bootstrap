@@ -14,8 +14,23 @@ to commit directly where repo convention allows:
   Document the access pattern in the md, e.g.
   `jq '.audits[] | select(.surface=="<key>")'`.
 
-The `-harvest.json` working file (execution discipline §3) stays beside
-them; it is the raw material the dossier can be rebuilt from.
+The `-harvest.json` and state working files (execution discipline §3) stay
+beside them, gitignored and never committed. They are the raw material the
+dossier can be rebuilt from.
+
+### Size and retention caps
+
+Dossiers accrete every run; cap them so the tree does not become the archive.
+
+- The md stays under **25 KB**, with at most **15 ranked moves** of one short
+  paragraph each. Per-move detail lives in the bead's structured fields and
+  the JSON, not the md.
+- The JSON holds structured per-unit output only (no transcripts, prompts or
+  raw tool output) and stays under **500 KB**.
+- Only the **two newest runs** keep their `-data.json` in the tree. The change
+  adding a new pair removes older JSONs and repoints each pruned run's md
+  (links and `jq` examples) to `git show <sha>:<path> | jq …`, pinned to the
+  last commit that held it. Git history is the archive.
 
 ## Tier board
 
@@ -38,7 +53,8 @@ pursuit run and an unsanctioned fleet launch.
    only block other epics") — so also **assign the epic itself to the
    owner** to keep it off `bd ready`.
 3. Every bead description cites its evidence and points at the dossier
-   JSON.
+   JSON by pinned commit (`<sha>:<path>`), so retention pruning never breaks
+   the pointer.
 4. Bulk creation: `bd create` Dolt-commits per write (slow, serialized) —
    use `--dolt-auto-commit batch` and one `bd dolt commit` at the end.
    **Never** `bd create --graph` (its `--dry-run` actually creates beads

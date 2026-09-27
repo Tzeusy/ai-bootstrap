@@ -80,8 +80,8 @@ lane's memory. A kill or a compaction loses at most the unit in flight.
 
 - After each lane turn, **append** that surface's or lens's structured output
   to a durable harvest file
-  (`<dossier-home>/<date>-vision-pursuit-harvest.json`), keyed by lane and
-  unit label.
+  (`<dossier-home>/<date>-vision-pursuit-harvest.json`, gitignored), keyed by
+  lane and unit label.
 - Write atomically: temp path in the same dir, then `rename()` over the
   target — a crash mid-write never leaves torn JSON.
 - Maintain a state file
