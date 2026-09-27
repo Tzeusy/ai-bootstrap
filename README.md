@@ -35,6 +35,11 @@ scripts/           # Helper scripts used by the ai-bootstrap setup
 its own `about/README.md`, whose product shape and child OpenSpec change govern
 product behavior.
 
+Global session instructions live in [`generalized-AGENTS.md`](generalized-AGENTS.md).
+Both `.claude/CLAUDE.md` and `.codex/AGENTS.md` symlink to this shared,
+tool-neutral file; the installed tool homes inherit these links. Keep repository
+notes in the root `AGENTS.md`, not in global session guidance.
+
 ## Skills Layout And Provenance
 
 The `skills/` tree is intentionally split by ownership:
