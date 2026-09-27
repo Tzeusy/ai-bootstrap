@@ -1,12 +1,14 @@
 ---
 name: tree
-description: Every reply is a nested bullet tree; each level is a complete summary at its own resolution
+description: Replies as an abstraction tree — high levels reviewable at a glance, each branch drillable into detail
 keep-coding-instructions: true
 ---
 
 # Tree Output Style
 
 Format every reply to the user as a nested tree of bullets: final answers, progress updates between tool calls, questions, and error reports.
+
+Purpose: abstraction increases toward the root. A reader reviews the whole reply at a high level by reading only the top bullets, then drills into any single concept without reading its siblings.
 
 Scope: this governs chat replies only. Files, code, comments, commit messages, PR bodies, and docs you write keep their own conventions.
 
@@ -41,6 +43,22 @@ Scope: this governs chat replies only. Files, code, comments, commit messages, P
 - Depth is a ZOOM LEVEL, not a path to hidden content. Going deeper adds resolution, never new conclusions.
 - A caveat that changes the answer is not a detail: its gist belongs in the parent.
 
+## Abstraction ladder
+
+- Each depth is a different KIND of statement, not a shorter one.
+  - Top: outcome or decision — what and why, for a reviewer.
+  - Middle: concepts — the components, trade-offs, or reasons.
+  - Deep: mechanisms — how each concept works or was done.
+  - Leaves: evidence — file paths, numbers, commands, output.
+- Specifics (names, paths, flags, numbers) sink to the lowest level that needs them.
+  - A parent names the concept; its children name the artifacts.
+- Each branch is self-contained.
+  - A child's subtree reads correctly without its siblings.
+  - One branch holds one concept; don't split a concept across branches.
+- Parents abstract; they don't compress.
+  - Bad parent: "Edited auth.py, session.py, and middleware.py".
+  - Good parent: "Sessions now expire server-side".
+
 ## Example
 
 Question: "Should we cache the user lookup?"
@@ -68,10 +86,30 @@ Good — every depth answers on its own:
 - Depths 1–2: why it's worth it, and why it's safe.
 - Full tree: the evidence.
 
+Project review — reporting a change:
+
+```
+- Sessions now expire server-side; clients can't extend them
+  - Expiry moved from cookie to session store
+    - Store records `expires_at` on create
+      - `session.py:42`, new column plus migration `0031`
+    - Middleware rejects expired sessions before routing
+      - `middleware.py:18`
+  - Refresh requires re-authentication
+    - Removed the silent-refresh endpoint
+  - Verified by tests and a manual expiry check
+    - 14 new tests pass; full suite green
+```
+
+- Depth 1: a reviewer knows what changed and its consequence.
+- Depth 2: the three concepts to check, each reviewable alone.
+- Deeper: where each concept lives in the code, and proof.
+
 ## Self-check before sending
 
 - Read only the top-level bullets. Do they answer the question? If not, fix the parents.
 - Repeat at each depth, for every parent with children.
+- Does any parent contain a path, number, or name its children could hold? Push it down.
 - Split any bullet that runs noticeably past 10 words.
 
 ## Exceptions
