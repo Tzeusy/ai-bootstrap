@@ -140,8 +140,8 @@ then update this reference and its contract test in the same change.
 |---|---|---|---|
 | `EPIC_COMPLEXITY_MODEL` | Opus 5.5 High | GPT-6 Astra Low | gemini-3-pro |
 | `HIGH_COMPLEXITY_MODEL` | Opus 5.5 Medium | GPT-6 Sol High | gemini-3-pro |
-| `MEDIUM_COMPLEXITY_MODEL` | Opus 5.5 Low | GPT-6 Luna XHigh | gemini-3-pro |
-| `LOW_COMPLEXITY_MODEL` | Opus 5.5 Low | GPT-6 Luna XHigh | gemini-3-flash-preview |
+| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5.5 High | GPT-6 Luna XHigh | gemini-3-pro |
+| `LOW_COMPLEXITY_MODEL` | Sonnet 5.5 Low | GPT-6 Luna XHigh | gemini-3-flash-preview |
 | `DESIGN_AND_SPECIFICATION_MODEL` | Opus 5.5 High | GPT-6 Astra Low | gemini-3-pro |
 
 These are deliberate local quality floors over the vendors' starting-point
@@ -153,19 +153,22 @@ Astra Low for it and for plan/specification drafting. Astra Low is a
 model-family escalation, not an effort escalation.
 
 Anthropic recommends starting Opus 5.5 at its default `medium` effort and
-tuning against task-specific evals. This policy uses Opus 5.5 throughout:
-`low` for low/medium work, `medium` for high work, and `high` for epic or
-plan/specification drafting. Escalate after a shallow or failed attempt; do
-not silently substitute another Claude family.
+tuning against task-specific evals. This policy uses Sonnet 5.5 for the
+cheap tiers (`low` effort for low/trivial work, `high` effort for medium work)
+and Opus 5.5 above them: `medium` for high work, `high` for epic or
+plan/specification drafting. Escalate after a shallow or failed attempt: low
+to medium tier first, then to Opus.
 
 ### Claude Dispatch Binding
 
-Pass model and effort independently. Set effort explicitly: Opus 5.5 defaults
-to `medium`, which would violate the low and high policy rows if omitted.
+Pass model and effort independently. Set effort explicitly: both models default
+to `medium`, which would violate the Sonnet low/high and Opus low/high rows if
+omitted.
 
 | Policy choice | `model` | `effort` |
 |---|---|---|
-| Opus 5.5 Low | `claude-opus-5-5` | `low` |
+| Sonnet 5.5 Low | `claude-sonnet-5-5` | `low` |
+| Sonnet 5.5 High | `claude-sonnet-5-5` | `high` |
 | Opus 5.5 Medium | `claude-opus-5-5` | `medium` |
 | Opus 5.5 High | `claude-opus-5-5` | `high` |
 
@@ -251,7 +254,7 @@ start, so retire the lane instead.
 
 A reconciliation bead (label `reconciliation`, title `Reconcile spec-to-code
 (gen-N) …`) is a deep spec-to-code audit, not ordinary coding. Its `task` type
-would otherwise route it to `MEDIUM_COMPLEXITY_MODEL`, which is too weak to
+would otherwise route it to `MEDIUM_COMPLEXITY_MODEL` (Sonnet), which is too weak to
 catch coverage gaps across a large epic.
 
 Rule: before dispatching a reconciliation bead, resolve its parent epic's

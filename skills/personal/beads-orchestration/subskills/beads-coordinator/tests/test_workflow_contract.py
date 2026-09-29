@@ -54,8 +54,8 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         for row in (
             "| `EPIC_COMPLEXITY_MODEL` | Opus 5.5 High | GPT-6 Astra Low | gemini-3-pro |",
             "| `HIGH_COMPLEXITY_MODEL` | Opus 5.5 Medium | GPT-6 Sol High | gemini-3-pro |",
-            "| `MEDIUM_COMPLEXITY_MODEL` | Opus 5.5 Low | GPT-6 Luna XHigh | gemini-3-pro |",
-            "| `LOW_COMPLEXITY_MODEL` | Opus 5.5 Low | GPT-6 Luna XHigh | gemini-3-flash-preview |",
+            "| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5.5 High | GPT-6 Luna XHigh | gemini-3-pro |",
+            "| `LOW_COMPLEXITY_MODEL` | Sonnet 5.5 Low | GPT-6 Luna XHigh | gemini-3-flash-preview |",
             "| `DESIGN_AND_SPECIFICATION_MODEL` | Opus 5.5 High | GPT-6 Astra Low | gemini-3-pro |",
         ):
             self.assertIn(row, contents)
@@ -63,7 +63,8 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
             "| GPT-6 Luna XHigh | `gpt-6-luna` | `xhigh` |",
             "| GPT-6 Sol High | `gpt-6-sol` | `high` |",
             "| GPT-6 Astra Low | `gpt-6-astra` | `low` |",
-            "| Opus 5.5 Low | `claude-opus-5-5` | `low` |",
+            "| Sonnet 5.5 Low | `claude-sonnet-5-5` | `low` |",
+            "| Sonnet 5.5 High | `claude-sonnet-5-5` | `high` |",
             "| Opus 5.5 Medium | `claude-opus-5-5` | `medium` |",
             "| Opus 5.5 High | `claude-opus-5-5` | `high` |",
         ):
