@@ -52,17 +52,19 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         contents = SAFETY.read_text(encoding="utf-8")
         self.assertIn("| Strategy | Claude | Codex / ChatGPT | Gemini |", contents)
         for row in (
-            "| `EPIC_COMPLEXITY_MODEL` | Opus 5.5 High | GPT-6 Astra Low | gemini-3-pro |",
-            "| `HIGH_COMPLEXITY_MODEL` | Opus 5.5 Medium | GPT-6 Sol High | gemini-3-pro |",
-            "| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5.5 High | GPT-6 Luna XHigh | gemini-3-pro |",
-            "| `LOW_COMPLEXITY_MODEL` | Sonnet 5.5 Low | GPT-6 Luna XHigh | gemini-3-flash-preview |",
-            "| `DESIGN_AND_SPECIFICATION_MODEL` | Opus 5.5 High | GPT-6 Astra Low | gemini-3-pro |",
+            "| `EPIC_COMPLEXITY_MODEL` | Opus 5.5 High | GPT-6.1 Sol XHigh | gemini-3-pro |",
+            "| `HIGH_COMPLEXITY_MODEL` | Opus 5.5 Medium | GPT-6.1 Sol High | gemini-3-pro |",
+            "| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5.5 High | GPT-6.1 Sol High | gemini-3-pro |",
+            "| `LOW_COMPLEXITY_MODEL` | Sonnet 5.5 Low | GPT-6.1 Sol Low | gemini-3-flash-preview |",
+            "| `TRIVIAL_COMPLEXITY_MODEL` | Sonnet 5.5 Low | GPT-6 Luna Max | gemini-3-flash-preview |",
+            "| `DESIGN_AND_SPECIFICATION_MODEL` | Opus 5.5 High | GPT-6.1 Sol XHigh | gemini-3-pro |",
         ):
             self.assertIn(row, contents)
         for binding in (
-            "| GPT-6 Luna XHigh | `gpt-6-luna` | `xhigh` |",
-            "| GPT-6 Sol High | `gpt-6-sol` | `high` |",
-            "| GPT-6 Astra Low | `gpt-6-astra` | `low` |",
+            "| GPT-6 Luna Max | `gpt-6-luna` | `max` |",
+            "| GPT-6.1 Sol Low | `gpt-6.1-sol` | `low` |",
+            "| GPT-6.1 Sol High | `gpt-6.1-sol` | `high` |",
+            "| GPT-6.1 Sol XHigh | `gpt-6.1-sol` | `xhigh` |",
             "| Sonnet 5.5 Low | `claude-sonnet-5-5` | `low` |",
             "| Sonnet 5.5 High | `claude-sonnet-5-5` | `high` |",
             "| Opus 5.5 Medium | `claude-opus-5-5` | `medium` |",
@@ -71,8 +73,8 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
             self.assertIn(binding, contents)
         self.assertIn("Plan/design/specification override", contents)
         self.assertIn("before the complexity-label fast path", contents)
-        self.assertIn("never dispatch Luna below `xhigh`", contents)
-        self.assertIn("Luna `xhigh` is the Codex\nfloor", contents)
+        self.assertIn("never\ndispatch Luna for anything that needs judgment", contents)
+        self.assertIn("do not dispatch Astra or Terra", contents)
         for path in (WRITER, TOKEN_EFFICIENCY):
             self.assertIn("design/specification override", path.read_text(encoding="utf-8"))
 

@@ -138,19 +138,21 @@ then update this reference and its contract test in the same change.
 
 | Strategy | Claude | Codex / ChatGPT | Gemini |
 |---|---|---|---|
-| `EPIC_COMPLEXITY_MODEL` | Opus 5.5 High | GPT-6 Astra Low | gemini-3-pro |
-| `HIGH_COMPLEXITY_MODEL` | Opus 5.5 Medium | GPT-6 Sol High | gemini-3-pro |
-| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5.5 High | GPT-6 Luna XHigh | gemini-3-pro |
-| `LOW_COMPLEXITY_MODEL` | Sonnet 5.5 Low | GPT-6 Luna XHigh | gemini-3-flash-preview |
-| `DESIGN_AND_SPECIFICATION_MODEL` | Opus 5.5 High | GPT-6 Astra Low | gemini-3-pro |
+| `EPIC_COMPLEXITY_MODEL` | Opus 5.5 High | GPT-6.1 Sol XHigh | gemini-3-pro |
+| `HIGH_COMPLEXITY_MODEL` | Opus 5.5 Medium | GPT-6.1 Sol High | gemini-3-pro |
+| `MEDIUM_COMPLEXITY_MODEL` | Sonnet 5.5 High | GPT-6.1 Sol High | gemini-3-pro |
+| `LOW_COMPLEXITY_MODEL` | Sonnet 5.5 Low | GPT-6.1 Sol Low | gemini-3-flash-preview |
+| `TRIVIAL_COMPLEXITY_MODEL` | Sonnet 5.5 Low | GPT-6 Luna Max | gemini-3-flash-preview |
+| `DESIGN_AND_SPECIFICATION_MODEL` | Opus 5.5 High | GPT-6.1 Sol XHigh | gemini-3-pro |
 
-These are deliberate local quality floors over the vendors' starting-point
-guidance. OpenAI positions Luna for scoped, repeatable work, Sol for demanding
-work that needs judgment, and Astra for the hardest ambiguous work. Dispatch
-low and medium Codex work with Luna XHigh; never dispatch Luna below `xhigh`.
-Dispatch high work with Sol High. Treat epic work as the extreme tier and use
-Astra Low for it and for plan/specification drafting. Astra Low is a
-model-family escalation, not an effort escalation.
+These are deliberate local choices over the vendors' starting-point guidance.
+On Codex, Sol 6.1 is the workhorse and Luna is reserved for trivial work.
+Dispatch trivial work (see the TRIVIAL criteria below) with Luna Max; never
+dispatch Luna for anything that needs judgment. Dispatch non-trivial work below
+medium with Sol Low, medium and high work with Sol High, and epic work and
+plan/scoping/design/specification drafting with Sol XHigh. Sol is the only
+non-trivial Codex model: do not dispatch Astra or Terra. Escalation on Codex is
+an effort step within Sol (Low -> High -> XHigh), never a model-family switch.
 
 Anthropic recommends starting Opus 5.5 at its default `medium` effort and
 tuning against task-specific evals. This policy uses Sonnet 5.5 for the
@@ -179,9 +181,10 @@ subagent mechanism:
 
 | Policy choice | `model` | `reasoning_effort` |
 |---|---|---|
-| GPT-6 Luna XHigh | `gpt-6-luna` | `xhigh` |
-| GPT-6 Sol High | `gpt-6-sol` | `high` |
-| GPT-6 Astra Low | `gpt-6-astra` | `low` |
+| GPT-6 Luna Max | `gpt-6-luna` | `max` |
+| GPT-6.1 Sol Low | `gpt-6.1-sol` | `low` |
+| GPT-6.1 Sol High | `gpt-6.1-sol` | `high` |
+| GPT-6.1 Sol XHigh | `gpt-6.1-sol` | `xhigh` |
 
 ### Assignment Rules
 
@@ -191,12 +194,12 @@ subagent mechanism:
 | Reconciliation bead for a medium-or-higher epic | `EPIC_COMPLEXITY_MODEL` (floor — see below) |
 | Plan drafting, architecting, design, or specification work whose primary deliverable is the plan/specification | `DESIGN_AND_SPECIFICATION_MODEL` |
 | Research or analysis | Matching complexity model; use `EPIC_COMPLEXITY_MODEL` only when the work itself meets the epic/extreme criteria |
-| Coding | `MEDIUM_COMPLEXITY_MODEL` unless trivial (see LOW criteria below) |
+| Coding | `MEDIUM_COMPLEXITY_MODEL` unless trivial (see TRIVIAL criteria below) |
 | Orchestration | `HIGH_COMPLEXITY_MODEL` |
 | PR review (`pr-review-task`) | `MEDIUM_COMPLEXITY_MODEL`; escalate to `HIGH_COMPLEXITY_MODEL` only for large (>400 changed lines) or risk-flagged (security/auth/schema/public-API) diffs |
 | Simple bugfixes | `MEDIUM_COMPLEXITY_MODEL` |
-| Formatting, linting | `LOW_COMPLEXITY_MODEL` |
-| Probes: bootstrap/status checks, recovery probes, read-only lookups (`Explore`-style) | `LOW_COMPLEXITY_MODEL`, read-only tools; prefer a script or one composite command over a subagent when the answer is mechanical |
+| Formatting, linting | `TRIVIAL_COMPLEXITY_MODEL` |
+| Probes: bootstrap/status checks, recovery probes, read-only lookups (`Explore`-style) | `TRIVIAL_COMPLEXITY_MODEL`, read-only tools; prefer a script or one composite command over a subagent when the answer is mechanical |
 
 ## Review Risk Tiers
 
@@ -222,10 +225,12 @@ actual change. Do not batch high-risk work or merge an unreviewed moved head.
 one-PR report contract remains intact, and the coordinator dispatches the next
 low-risk bead only after the prior verdict returns.
 
-Concrete `LOW_COMPLEXITY_MODEL` criteria — dispatch at LOW when **all** hold:
+Concrete `TRIVIAL_COMPLEXITY_MODEL` criteria — dispatch at TRIVIAL when **all** hold:
 - docs-only, config/dotfile-only, test-only, or single-file mechanical change
 - no API, schema, auth, or cross-module behavior change
 - acceptance criteria are fully mechanical (no design judgment required)
+
+Non-trivial work labeled `complexity:low` uses `LOW_COMPLEXITY_MODEL`.
 
 **Plan/design/specification override.** If the bead's primary deliverable is a
 plan, design, architecture, or specification artifact, select
@@ -236,7 +241,8 @@ merely because it informs or consumes such an artifact.
 **Complexity-label fast path.** Otherwise, if the bead carries a
 `complexity:<tier>` label (`low`/`medium`/`high`/`epic`, stamped by
 `beads-writer` at creation), map it directly to the matching
-`*_COMPLEXITY_MODEL` and skip re-deriving complexity from the description.
+`*_COMPLEXITY_MODEL` (a `low` bead that meets the TRIVIAL criteria goes to
+`TRIVIAL_COMPLEXITY_MODEL`) and skip re-deriving complexity from the description.
 Re-derive only when the label is obviously stale (e.g. scope grew via
 follow-ups). Apply the Reconciliation Floor below regardless of label.
 
@@ -245,8 +251,8 @@ most backlog beads are not the hard case. Default to the lowest tier the
 criteria allow and escalate on evidence (a failed or shallow attempt), not on
 vibes: one redispatch after a too-weak attempt costs less than habitually
 over-provisioning every bead. Effort is part of each approved pairing, not a
-second opportunity to cheapen it: in particular, Luna `xhigh` is the Codex
-floor even for LOW work. Right-size when a lane is **formed**, from the highest
+second opportunity to cheapen it: in particular, Luna `max` is the only Codex
+setting for TRIVIAL work. Right-size when a lane is **formed**, from the highest
 tier in its planned chain. Never switch a live lane's model: that is a cold
 start, so retire the lane instead.
 
