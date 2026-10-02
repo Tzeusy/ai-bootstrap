@@ -1,23 +1,12 @@
 #!/usr/bin/env bash
-# Claude Code StatusLine - cross-platform (macOS + Ubuntu)
-# Line 1: Model | tokens used/total | % used <count> | % remain <count> | thinking: on/off
-# Line 2: current (5h): <bar> | weekly (7d): <bar> [| extra: <bar>]
-# Line 3: resets <time> | resets <datetime> [| resets <date>]
+# Claude Code StatusLine - cross-platform (macOS + Ubuntu), stdin JSON only (no API calls)
+# Line 1: model | effort | thinking | session name | branch
+# Line 2: ctx bar | 5h bar + reset | 7d bar + reset | cache health
 
-# Read JSON from stdin
 INPUT=$(cat)
-if [ -z "$INPUT" ]; then
-    printf "Claude"
-    exit 0
-fi
+if [ -z "$INPUT" ]; then printf "Claude"; exit 0; fi
+if ! command -v jq &>/dev/null; then printf "Claude (install jq)"; exit 0; fi
 
-# Require jq
-if ! command -v jq &>/dev/null; then
-    printf "Claude (install jq)"
-    exit 0
-fi
-
-# --- ANSI Colors ---
 blue=$'\033[38;2;0;153;255m'
 orange=$'\033[38;2;255;176;85m'
 green=$'\033[38;2;0;160;0m'
@@ -29,205 +18,102 @@ dim=$'\033[2m'
 reset=$'\033[0m'
 sep=" ${dim}|${reset} "
 
-# --- Helper: format token count (50k, 1.2m) ---
 format_tokens() {
     local n=$1
-    if [ "$n" -ge 1000000 ]; then
-        awk "BEGIN { printf \"%.1fm\", $n/1000000 }"
-    elif [ "$n" -ge 1000 ]; then
-        awk "BEGIN { printf \"%dk\", int($n/1000 + 0.5) }"
-    else
-        printf "%d" "$n"
-    fi
+    if [ "$n" -ge 1000000 ]; then awk "BEGIN { printf \"%.1fm\", $n/1000000 }"
+    elif [ "$n" -ge 1000 ]; then awk "BEGIN { printf \"%dk\", int($n/1000 + 0.5) }"
+    else printf "%d" "$n"; fi
 }
 
-# --- Helper: format number with commas (portable) ---
-format_commas() {
-    printf "%d" "$1" | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'
+# Percent -> color (green/orange/yellow/red)
+pct_color() {
+    local pct=$1
+    if [ "$pct" -ge 90 ]; then printf "%s" "$red"
+    elif [ "$pct" -ge 70 ]; then printf "%s" "$yellow"
+    elif [ "$pct" -ge 50 ]; then printf "%s" "$orange"
+    else printf "%s" "$green"; fi
 }
 
-# --- Helper: build colored progress bar (● filled, ○ empty) ---
 build_bar() {
     local pct=$1 width=$2
-    [ "$pct" -lt 0 ] 2>/dev/null && pct=0
-    [ "$pct" -gt 100 ] 2>/dev/null && pct=100
-    local filled=$(( pct * width / 100 ))
-    local empty=$(( width - filled ))
-
-    local bar_color
-    if [ "$pct" -ge 90 ]; then bar_color=$red
-    elif [ "$pct" -ge 70 ]; then bar_color=$yellow
-    elif [ "$pct" -ge 50 ]; then bar_color=$orange
-    else bar_color=$green
-    fi
-
-    local filled_str="" empty_str=""
-    local i
+    [ "$pct" -lt 0 ] && pct=0
+    [ "$pct" -gt 100 ] && pct=100
+    local filled=$(( pct * width / 100 )) i filled_str="" empty_str=""
     for ((i=0; i<filled; i++)); do filled_str+="●"; done
-    for ((i=0; i<empty; i++)); do empty_str+="○"; done
-
-    printf "%s%s%s%s%s" "$bar_color" "$filled_str" "$dim" "$empty_str" "$reset"
+    for ((i=filled; i<width; i++)); do empty_str+="○"; done
+    printf "%s%s%s%s%s" "$(pct_color "$pct")" "$filled_str" "$dim" "$empty_str" "$reset"
 }
 
-# --- Helper: parse ISO time to local (cross-platform) ---
-format_reset_time() {
-    local iso=$1 style=$2
-    [ -z "$iso" ] && return
-
-    if [[ "$OSTYPE" == darwin* ]]; then
-        # macOS: use python3 (always available, BSD date can't parse ISO reliably)
-        python3 -c "
-from datetime import datetime, timezone
-dt = datetime.fromisoformat('${iso}'.replace('Z','+00:00')).astimezone()
-if '${style}' == 'time':
-    print(dt.strftime('%-I:%M%p').lower(), end='')
-else:
-    print(dt.strftime('%b %-d, %-I:%M%p').lower(), end='')
-" 2>/dev/null
-    else
-        # Linux: GNU date handles ISO natively
-        if [ "$style" = "time" ]; then
-            date -d "$iso" "+%-l:%M%P" 2>/dev/null | tr -d ' '
-        else
-            date -d "$iso" "+%b %-d, %-l:%M%P" 2>/dev/null | sed 's/  / /g'
-        fi
-    fi
+# epoch -> local time ("time" = 6:20am, "date" = Oct 3)
+format_epoch() {
+    local epoch=$1 style=$2 fmt
+    [ -z "$epoch" ] && return
+    if [ "$style" = "time" ]; then fmt="+%-I:%M%p"; else fmt="+%b %-d"; fi
+    if [[ "$OSTYPE" == darwin* ]]; then date -r "$epoch" "$fmt"; else date -d "@$epoch" "$fmt"; fi 2>/dev/null | sed 's/AM$/am/;s/PM$/pm/'
 }
 
-# ========== PARSE MODEL & CONTEXT FROM STDIN JSON ==========
+# Single jq pass; \x1f-separated so empty fields survive `read`.
+IFS=$'\x1f' read -r model effort thinking session cwd size ctx_pct used \
+    five_pct five_reset seven_pct seven_reset \
+    cache_warm cache_exp cache_hit cache_miss over200k < <(
+    echo "$INPUT" | jq -r '[
+        (.model.display_name // "Claude"),
+        (.effort.level // "-"),
+        (.thinking.enabled // false),
+        (.session_name // "-"),
+        (.workspace.current_dir // .cwd // "-"),
+        (.context_window.context_window_size // 200000),
+        (.context_window.used_percentage // 0 | floor),
+        ((.context_window.current_usage // {}) | (.input_tokens // 0) + (.cache_creation_input_tokens // 0) + (.cache_read_input_tokens // 0)),
+        (.rate_limits.five_hour.used_percentage // "-" | if type=="number" then (.+0.5|floor) else . end),
+        (.rate_limits.five_hour.resets_at // "-"),
+        (.rate_limits.seven_day.used_percentage // "-" | if type=="number" then (.+0.5|floor) else . end),
+        (.rate_limits.seven_day.resets_at // "-"),
+        (.prompt_cache.warm // "-"),
+        (.prompt_cache.expires_at // "-"),
+        (.prompt_cache.hit_ratio // "-" | if type=="number" then (.*100|floor) else . end),
+        (.prompt_cache.misses // 0),
+        (.exceeds_200k_tokens // false)
+    ] | map(tostring) | join("\u001f")'
+)
 
-model_name=$(echo "$INPUT" | jq -r '.model.display_name // "Claude"')
-size=$(echo "$INPUT" | jq -r '.context_window.context_window_size // 200000')
-input_tokens=$(echo "$INPUT" | jq -r '.context_window.current_usage.input_tokens // 0')
-cache_create=$(echo "$INPUT" | jq -r '.context_window.current_usage.cache_creation_input_tokens // 0')
-cache_read=$(echo "$INPUT" | jq -r '.context_window.current_usage.cache_read_input_tokens // 0')
-
-current=$(( input_tokens + cache_create + cache_read ))
-used_fmt=$(format_tokens "$current")
-total_fmt=$(format_tokens "$size")
-
-if [ "$size" -gt 0 ]; then
-    pct_used=$(( current * 100 / size ))
-else
-    pct_used=0
-fi
-pct_remain=$(( 100 - pct_used ))
-used_comma=$(format_commas "$current")
-remain_comma=$(format_commas "$(( size - current ))")
-
-# --- Thinking status ---
-thinking="Off"
-thinking_color=$dim
-settings_file="$HOME/.claude/settings.json"
-if [ -f "$settings_file" ]; then
-    thinking_val=$(jq -r '.alwaysThinkingEnabled // false' "$settings_file" 2>/dev/null)
-    if [ "$thinking_val" = "true" ]; then
-        thinking="On"
-        thinking_color=$orange
-    fi
-fi
-
-# ========== LINE 1: Model | tokens | % used | % remain | thinking ==========
-
-line1="${blue}${model_name}${reset}"
-line1+="${sep}${orange}${used_fmt} / ${total_fmt}${reset}"
-line1+="${sep}${green}${pct_used}% used ${orange}${used_comma}${reset}"
-line1+="${sep}${cyan}${pct_remain}% remain ${blue}${remain_comma}${reset}"
-line1+="${sep}thinking: ${thinking_color}${thinking}${reset}"
-
-# ========== LINES 2-3: Usage limits (cached API call) ==========
-
-cache_dir="${TMPDIR:-/tmp}"
-cache_file="${cache_dir}/claude-statusline-usage-cache.json"
-cache_max_age=60
-
-needs_refresh=true
-if [ -f "$cache_file" ]; then
-    if [[ "$OSTYPE" == darwin* ]]; then
-        cache_mtime=$(stat -f %m "$cache_file" 2>/dev/null || echo 0)
-    else
-        cache_mtime=$(stat -c %Y "$cache_file" 2>/dev/null || echo 0)
-    fi
-    now=$(date +%s)
-    age=$(( now - cache_mtime ))
-    if [ "$age" -lt "$cache_max_age" ]; then
-        needs_refresh=false
-    fi
+# ========== LINE 1: model | effort | thinking | session | branch ==========
+line1="${blue}${model}${reset}"
+[ "$effort" != "-" ] && line1+="${sep}effort ${yellow}${effort}${reset}"
+if [ "$thinking" = "true" ]; then line1+="${sep}think ${orange}on${reset}"; else line1+="${sep}think ${dim}off${reset}"; fi
+[ "$session" != "-" ] && line1+="${sep}${white}${session}${reset}"
+if [ "$cwd" != "-" ]; then
+    branch=$(git -C "$cwd" branch --show-current 2>/dev/null)
+    repo=$(basename "$cwd")
+    line1+="${sep}${cyan}${repo}${branch:+ ${dim}@${reset}${cyan} ${branch}}${reset}"
 fi
 
-usage_data=""
-if [ "$needs_refresh" = true ]; then
-    creds_file="$HOME/.claude/.credentials.json"
-    if [ -f "$creds_file" ] && command -v curl &>/dev/null; then
-        token=$(jq -r '.claudeAiOauth.accessToken // empty' "$creds_file" 2>/dev/null)
-        if [ -n "$token" ]; then
-            response=$(curl -s --max-time 5 \
-                -H "Accept: application/json" \
-                -H "Content-Type: application/json" \
-                -H "Authorization: Bearer $token" \
-                -H "anthropic-beta: oauth-2025-04-20" \
-                -H "User-Agent: claude-code/2.1.34" \
-                "https://api.anthropic.com/api/oauth/usage" 2>/dev/null) || true
-            if [ -n "$response" ] && echo "$response" | jq . &>/dev/null; then
-                usage_data="$response"
-                echo "$response" > "$cache_file" 2>/dev/null || true
-            fi
+# ========== LINE 2: ctx | 5h | 7d | cache ==========
+line2="${white}ctx${reset} $(build_bar "$ctx_pct" 10) $(pct_color "$ctx_pct")${ctx_pct}%${reset} ${dim}$(format_tokens "$used")/$(format_tokens "$size")${reset}"
+[ "$over200k" = "true" ] && line2+=" ${red}>200k${reset}"
+
+if [ "$five_pct" != "-" ]; then
+    line2+="${sep}${white}5h${reset} $(build_bar "$five_pct" 10) $(pct_color "$five_pct")${five_pct}%${reset}"
+    [ "$five_reset" != "-" ] && line2+=" ${dim}↻$(format_epoch "$five_reset" time)${reset}"
+fi
+if [ "$seven_pct" != "-" ]; then
+    line2+="${sep}${white}7d${reset} $(build_bar "$seven_pct" 10) $(pct_color "$seven_pct")${seven_pct}%${reset}"
+    [ "$seven_reset" != "-" ] && line2+=" ${dim}↻$(format_epoch "$seven_reset" date)${reset}"
+fi
+
+# --- Cache health: warm + time to expiry + hit ratio; red on misses ---
+if [ "$cache_warm" != "-" ]; then
+    left=""
+    if [ "$cache_exp" != "-" ]; then
+        secs=$(( cache_exp - $(date +%s) ))
+        if [ "$secs" -gt 0 ]; then
+            if [ "$secs" -ge 60 ]; then left=" $(( secs / 60 ))m"; else left=" ${secs}s"; fi
         fi
     fi
+    if [ "$cache_warm" = "true" ]; then cache="${green}cache warm${reset}${left}"; else cache="${red}cache cold${reset}"; fi
+    [ "$cache_hit" != "-" ] && cache+=" ${dim}${cache_hit}% hit${reset}"
+    [ "$cache_miss" -gt 0 ] 2>/dev/null && cache+=" ${red}${cache_miss} miss${reset}"
+    line2+="${sep}${cache}"
 fi
 
-# Fall back to stale cache
-if [ -z "$usage_data" ] && [ -f "$cache_file" ]; then
-    usage_data=$(cat "$cache_file" 2>/dev/null) || true
-fi
-
-line2=""
-line3=""
-bar_width=10
-
-if [ -n "$usage_data" ]; then
-    # --- 5-hour (current) ---
-    five_pct=$(echo "$usage_data" | jq -r '.five_hour.utilization // 0' | awk '{printf "%d", $1+0.5}')
-    five_reset_iso=$(echo "$usage_data" | jq -r '.five_hour.resets_at // empty')
-    five_reset=$(format_reset_time "$five_reset_iso" "time")
-    five_bar=$(build_bar "$five_pct" "$bar_width")
-
-    # --- 7-day (weekly) ---
-    seven_pct=$(echo "$usage_data" | jq -r '.seven_day.utilization // 0' | awk '{printf "%d", $1+0.5}')
-    seven_reset_iso=$(echo "$usage_data" | jq -r '.seven_day.resets_at // empty')
-    seven_reset=$(format_reset_time "$seven_reset_iso" "datetime")
-    seven_bar=$(build_bar "$seven_pct" "$bar_width")
-
-    # Line 2: progress bars
-    line2="${white}current:${reset} ${five_bar} ${cyan}${five_pct}%${reset}"
-    line2+="${sep}${white}weekly:${reset} ${seven_bar} ${cyan}${seven_pct}%${reset}"
-
-    # Line 3: reset times
-    line3="${white}resets ${five_reset}${reset}"
-    line3+="${sep}${white}resets ${seven_reset}${reset}"
-
-    # --- Extra usage (if enabled) ---
-    extra_enabled=$(echo "$usage_data" | jq -r '.extra_usage.is_enabled // false')
-    if [ "$extra_enabled" = "true" ]; then
-        extra_pct=$(echo "$usage_data" | jq -r '.extra_usage.utilization // 0' | awk '{printf "%d", $1+0.5}')
-        extra_used=$(echo "$usage_data" | jq -r '.extra_usage.used_credits // 0' | awk '{printf "%.2f", $1/100}')
-        extra_limit=$(echo "$usage_data" | jq -r '.extra_usage.monthly_limit // 0' | awk '{printf "%.2f", $1/100}')
-        extra_bar=$(build_bar "$extra_pct" "$bar_width")
-
-        # Next month's 1st for reset date
-        if [[ "$OSTYPE" == darwin* ]]; then
-            extra_reset=$(date -v+1m -v1d "+%b %-d" 2>/dev/null | tr '[:upper:]' '[:lower:]')
-        else
-            extra_reset=$(date -d "$(date +%Y-%m-01) +1 month" "+%b %-d" 2>/dev/null | tr '[:upper:]' '[:lower:]')
-        fi
-
-        line2+="${sep}${white}extra:${reset} ${extra_bar} ${cyan}\$${extra_used}/\$${extra_limit}${reset}"
-        line3+="${sep}${white}resets ${extra_reset}${reset}"
-    fi
-fi
-
-# ========== OUTPUT ==========
-
-printf "%s" "$line1"
-[ -n "$line2" ] && printf "\n%s" "$line2"
-[ -n "$line3" ] && printf "\n%s" "$line3"
+printf "%s\n%s" "$line1" "$line2"
