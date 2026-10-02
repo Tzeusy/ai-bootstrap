@@ -77,6 +77,13 @@ IFS=$'\x1f' read -r model effort thinking session cwd size ctx_pct used \
     ] | map(tostring) | join("\u001f")'
 )
 
+# Effective window: CLAUDE_CODE_AUTO_COMPACT_WINDOW caps it (stdin pct uses the full model window).
+win=${CLAUDE_CODE_AUTO_COMPACT_WINDOW:-}
+if [[ "$win" =~ ^[0-9]+$ ]] && [ "$win" -gt 0 ] && [ "$win" -lt "$size" ]; then
+    size=$win
+    ctx_pct=$(( used * 100 / size ))
+fi
+
 # ========== LINE 1: model | effort | thinking | session | branch ==========
 line1="${blue}${model}${reset}"
 [ "$effort" != "-" ] && line1+="${sep}effort ${yellow}${effort}${reset}"
