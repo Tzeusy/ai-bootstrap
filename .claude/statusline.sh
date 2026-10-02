@@ -108,14 +108,12 @@ if [ "$seven_pct" != "-" ]; then
     [ "$seven_reset" != "-" ] && line2+=" ${dim}↻$(format_epoch "$seven_reset" date)${reset}"
 fi
 
-# --- Cache health: warm + time to expiry + hit ratio; red on misses ---
+# --- Cache health: warm + expiry clock time + hit ratio; red on misses ---
 if [ "$cache_warm" != "-" ]; then
+    # Statusline only re-renders on events, so show the absolute expiry, not a countdown that goes stale.
     left=""
     if [ "$cache_exp" != "-" ]; then
-        secs=$(( cache_exp - $(date +%s) ))
-        if [ "$secs" -gt 0 ]; then
-            if [ "$secs" -ge 60 ]; then left=" $(( secs / 60 ))m"; else left=" ${secs}s"; fi
-        fi
+        if [ "$cache_exp" -gt "$(date +%s)" ]; then left=" until $(format_epoch "$cache_exp" time)"; else cache_warm=false; fi
     fi
     if [ "$cache_warm" = "true" ]; then cache="${green}cache warm${reset}${left}"; else cache="${red}cache cold${reset}"; fi
     [ "$cache_hit" != "-" ] && cache+=" ${dim}${cache_hit}% hit${reset}"
