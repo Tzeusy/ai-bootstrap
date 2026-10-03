@@ -3,6 +3,21 @@
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "ENABLE_TOOL_SEARCH": "1"
   },
+  "permissions": {
+    "deny": [
+      "NotebookEdit",
+      "EnterPlanMode",
+      "ExitPlanMode",
+      "DesignSync",
+      "PushNotification",
+      "RemoteTrigger",
+      "CronCreate",
+      "CronDelete",
+      "CronList",
+      "EnterWorktree",
+      "ExitWorktree"
+    ]
+  },
   "model": "sonnet",
   "hooks": {
     "PreCompact": [
@@ -38,5 +53,6 @@
   "autoContinueAtUsageLimit": true,
   "teammateMode": "in-process",
   "remoteControlAtStartup": true,
-  "compactModel": "sonnet"
+  "compactModel": "sonnet",
+  "outputStyle": "tree"
 }
