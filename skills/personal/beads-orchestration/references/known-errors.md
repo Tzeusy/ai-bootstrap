@@ -2270,3 +2270,32 @@ note uses that convention. Re-verify `assignee` in the result as usual.
 Observed 2026-09-08, bd 1.0.4, reclaiming two `in_progress` spec-correction
 beads (`bu-atsax`, `bu-m09qm`) whose prior coordinator session's heartbeat was
 ~24h stale.
+
+## Transient "Verify the external server is running and reachable" on bd mutations
+
+**Seen:** 2026-10-03, syzygy, during a `bd close` burst while several worker lanes were also hitting the shared Dolt sql-server over tailnet (`dolt.parrot-hen.ts.net:3307`).
+**Symptom:** `bd close` prints only the "Verify the external server is running and reachable from this host: nc -zv …" hint and closes nothing. The command after it in the same shell (`git push`, etc.) succeeds, so the failure is easy to miss.
+**Fix:** run `nc -zv -w5 <host> <port>`. If it connects, the blip was transient: re-run the same `bd` mutation and confirm the `✓ Closed …` lines. Always read `bd` mutation output for the ✓ line rather than assuming success. A batched cleanup command hides the failure otherwise.
+
+## `gh pr merge` refused: "Auto merge is not allowed for this repository" (merge-queue repo)
+- **Symptom**: `gh pr merge <n> [--squash --auto]` on a repo whose ruleset uses a merge queue
+  but has `enablePullRequestAutoMerge` off → `GraphQL: Auto merge is not allowed for this
+  repository`; the PR is never queued.
+- **Fix**: enqueue directly:
+  `ID=$(gh api graphql -f query='{repository(owner:"O",name:"R"){pullRequest(number:N){id}}}' -q .data.repository.pullRequest.id)`
+  then `gh api graphql -f query="mutation{enqueuePullRequest(input:{pullRequestId:\"$ID\"}){mergeQueueEntry{position state}}}"`.
+- Observed: 2026-10-03, tzeusy-org/tze-hud PR #1245.
+
+## bd 1.3.x: "legacy Dolt server workspace detected; explicit migration is required"
+- **Symptom**: `~/.local/bin/bd` (1.3.1) refuses a server-mode workspace created by 1.0.4.
+- **Fix (no migration)**: use the 1.0.4 binary explicitly (`/usr/local/bin/bd`). Also check
+  the workspace points at the shared server (`dolt.parrot-hen.ts.net:3307`), not 127.0.0.1:
+  a local `dolt sql-server` on 3307 owned by another user lacks the project DB, and bd 1.0.4
+  then suggests `bd bootstrap` — don't; repoint `dolt_server_host` / `dolt.host` instead.
+- bd mutations print auto-backup/auto-export warnings and may exit non-zero while succeeding;
+  verify with `bd show <id> --json`. In zsh loops, unquoted `$ids` does not word-split.
+- Observed: 2026-10-03, tze-hud.
+
+## tze-hud: `gh pr merge --squash --auto` fails "Auto merge is not allowed"
+- **Symptom**: reviewer cannot enter the merge queue; repo has enablePullRequestAutoMerge off.
+- **Workaround**: enqueue directly with GraphQL `mutation{enqueuePullRequest(input:{pullRequestId:$id}){mergeQueueEntry{position}}}` (queue still enforces required checks). Observed: 2026-10-03, tze-hud PR #1247.
