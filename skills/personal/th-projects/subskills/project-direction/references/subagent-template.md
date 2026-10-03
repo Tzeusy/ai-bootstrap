@@ -14,7 +14,7 @@ Use when dispatching investigation subagents for project direction analysis.
 | D | Alignment review & gap analysis | A + B + C findings (+ review-packet constraints) | Alignment matrix, classification, gaps, push-back list, spec deltas |
 
 **Dispatch strategy**:
-- Launch A, B, C in parallel (B starts with scan output; doesn't need A's full output to read specs).
+- Launch A, B, C in parallel (B starts with scan output; doesn't need A's full output to read specs). Each is isolated because its evidence set (doctrine, specs, code) would flood the orchestrator; three in flight is the cache-first ceiling, not a target.
 - Launch D after A, B, C complete (it synthesizes their findings).
 - Handoff Output (direction report + beads handoff) is assembled by the orchestrator from all agent outputs; not a numbered phase.
 - **Receiver protocol**: fresh `../../project-review/` packet exists → Agent C's dispatch must explicitly list the dimensions to SKIP (review-scored: typically test confidence, observability, delivery readiness) and narrow C to architectural fitness for the proposed direction.
@@ -49,7 +49,7 @@ Prior evidence: {paths to fresh packet or upstream reports; do not paste them}
 - You are the primary evidence owner only for the assigned concern; cite a
   sibling's artifact for overlapping evidence rather than rescanning it
 - If requirements are ambiguous or contradictory, flag the conflict — do not guess the intent
-- Do NOT hallucinate architecture, team process, or roadmap intent
+- Where the repo gives no evidence for architecture, team process, or roadmap intent, write [Unknown] rather than inferring it
 - Be blunt about overreach, misalignment, and infeasibility
 
 ## Depth limits
@@ -57,11 +57,16 @@ Prior evidence: {paths to fresh packet or upstream reports; do not paste them}
 - For code, examine at most 30 files in detail per agent
 - For large codebases: focus on entry points, core modules, and areas referenced by specs
 - Return the minimum complete evidence needed for synthesis; target 500-900
-  words total unless the assigned surface proves materially larger
+  words total unless the assigned surface proves materially larger. The
+  target bounds prose, never coverage: every evidenced finding is listed,
+  one line each if need be
 
 ## Output format
 Return a structured report matching the deliverable section from your reference file.
-Include a "Key Findings" section at the top with your 3-5 most important observations.
+Lead with a "Key Findings" section: the observations that most change the
+direction decision. Then list every other evidenced finding with severity
+and confidence, including minor and low-confidence ones; the orchestrator
+filters, so nothing is dropped for seeming small.
 ```
 
 ---

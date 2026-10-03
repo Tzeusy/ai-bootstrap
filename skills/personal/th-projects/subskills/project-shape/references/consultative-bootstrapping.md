@@ -10,12 +10,12 @@ The human knows what they want to build but often can't articulate it precisely.
 3. Synthesize what they *mean*, not just what they *said*
 4. Write docs they recognize as their own thinking, made sharper
 
-## Model and Thinking Configuration
+## Model and Effort Configuration
 
-Shape docs are constitutional — errors cascade into every downstream decision. Demand the highest reasoning quality available.
+Shape docs are constitutional — errors cascade into every downstream decision. Spend capability here, not speed.
 
-- **Most capable model available** (e.g., Opus with extended thinking)
-- **Maximum thinking budget** for synthesis steps
+- **Most capable model available**, at `high` reasoning effort for interview synthesis and drafting, where the harness exposes the setting (chosen at session or dispatch start; a mid-run change discards the warm cache)
+- **Raise effort, not prompt pressure** — go above `high` only by dispatching a synthesis step that is still contested after review. Current models take effort as a setting and think adaptively; thinking-budget knobs are gone and "think harder" prose adds nothing
 - **Never rush generation** — a flawed vision.md costs more than a delayed one
 - **Depth over speed** — one excellent document beats three mediocre ones
 

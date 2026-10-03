@@ -272,9 +272,9 @@ Per risk across steps 1-3: **Title** · **Severity** C/H/M/L · **Likelihood** H
 1. Feature gap analysis (blockers vs enhancements table, with effort)
 2. Scale analysis (10x bottleneck, 100x breaking point, org limits)
 3. Time-horizon risks (1yr, 3yr, 5yr)
-4. Prioritized risk register (top 10-15, by severity × likelihood)
-5. Advisory roadmap draft: 5 quick wins, 5 medium, 3 strategic
-6. Planning constraints for `/project-direction`: required spec work, sequencing constraints, explicit deprioritizations
+4. Full risk register, ordered by severity × likelihood
+5. Advisory roadmap draft: up to 5 quick wins, 5 medium, 3 strategic
+6. Planning constraints for `project-direction`: required spec work, sequencing constraints, explicit deprioritizations
 
 ---
 

@@ -7,8 +7,9 @@ metadata:
     - tze
     - OpenAI Codex
     - Claude
+    - Claude Fable 5.1
   status: active
-  last_reviewed: "2026-07-19"
+  last_reviewed: "2026-10-03"
 compatibility: Requires uv to run scripts/audit_skill.py.
 ---
 
@@ -73,9 +74,12 @@ designed", "audit our skills for quality", "should this be a superskill",
    trigger quality, scope sharpness, project grounding, progressive
    discovery, script-vs-prose decisions, runtime token economics of
    prescribed commands (projected output, log-tail readback, targeted
-   gates, grep-first catalogs), operational safety, and maintenance
+   gates, grep-first catalogs), operational safety, maintenance
    contracts on stateful reference docs (catalogs of errors, projects, or
-   quirks must tell consuming agents when to write back).
+   quirks must tell consuming agents when to write back), and fit to
+   current models (section 12: reasons over personas, effort tiers,
+   uncapped review prompts, explicit delegation and stop conditions,
+   legible output).
 4. Use [`references/superskills.md`](./references/superskills.md) only when
    the skill is broad enough to route over internal workflows rather than run
    a single narrow procedure.

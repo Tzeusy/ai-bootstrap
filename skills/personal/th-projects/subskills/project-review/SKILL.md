@@ -6,19 +6,20 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - Claude Fable 5.1
     - Claude Sonnet 4.6
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-13"
+  last_reviewed: "2026-10-03"
 ---
 
 # Project Review
 
-Blunt, evidence-based audit of a repo across 15 categories. Establish the normative baseline via `/project-shape` first; hand confirmed findings to `/project-direction` for scheduling. README is a claim to validate, not primary truth when shape artifacts exist.
+Blunt, evidence-based audit of a repo across 15 categories. Establish the normative baseline via sibling `project-shape` first; hand confirmed findings to sibling `project-direction` for scheduling. README is a claim to validate, not primary truth when shape artifacts exist.
 
 **Sample triggers:** "review this project" · "audit the codebase" · "assess project health" · "process this third-party review" · "reconcile spec vs implementation".
 
-**Not for:** single-PR/diff review (use `/th-engineering`), or deciding what to build next (use `/project-direction`).
+**Not for:** single-PR/diff review (use `/code-review`; change-level quality bars live in `/th-engineering`), or deciding what to build next (sibling [`project-direction`](../project-direction/SKILL.md)).
 
 Normative source order: 1. `about/heart-and-soul/` + `about/legends-and-lore/` → 2. `openspec/` → 3. `about/lay-and-land/` → 4. README/docs/issues → 5. inference from code+history.
 
@@ -26,7 +27,7 @@ Every major claim cites specific files/sections. Label assertions [Observed] / [
 
 ## Workflow
 
-### Phase 0 — Normative baseline via `/project-shape`
+### Phase 0 — Normative baseline via `project-shape`
 
 Run project-shape's scanner directly; load its maturity rubric only when
 interpreting the score. Do not load the full sibling skill for this baseline:
@@ -82,7 +83,11 @@ Dispatch plan:
 | F | Gaps, scale & planning constraints | — | Feature gaps, 10x/100x, risk register, sequencing constraints |
 
 Strategy:
-- Launch A-F in parallel for a full review.
+- A-F are isolated from the orchestrator because each domain's evidence
+  would flood it. Run them as at most 3 investigator lanes (cache-first
+  ceiling): when a lane's domain returns, continue that session on its next
+  domain instead of spawning a cold agent, so the baseline and scan are
+  paid for three times, not six. Merge returned reports meanwhile.
 - Pass artifact paths plus a compact Phase 0 manifest and scoped scan excerpt;
   do not paste the same full baseline/scan into every prompt. Assign one primary
   evidence owner per concern so overlapping domains cite rather than rescan.
@@ -101,7 +106,7 @@ Collect subagent reports. Read [`references/report-template.md`](references/repo
 
 1. Merge scores conservatively — on disagreement take the lower score, record the disagreement.
 2. Mark genuinely inapplicable categories `N/A`; exclude from average.
-3. Bucket findings: **Normative violations** (doctrine/lore/spec/topology contradicted by code) · **Generic health risks** (quality/reliability/tooling/security/perf/DX) · **Shape gaps** (missing/stale pillars weakening confidence) · **Deprioritized** (good ideas that don't fit context).
+3. Bucket every reported finding (lower-severity ones that skip Phase 3.5 keep their stated confidence, are marked ungated, and stay out of the packet): **Normative violations** (doctrine/lore/spec/topology contradicted by code) · **Generic health risks** (quality/reliability/tooling/security/perf/DX) · **Shape gaps** (missing/stale pillars weakening confidence) · **Deprioritized** (good ideas that don't fit context).
 4. Build risk register by severity × likelihood.
 5. Generate advisory roadmap (quick wins / medium / strategic) — synthesis only, creates no execution artifacts.
 6. Assign verdict:
@@ -114,7 +119,7 @@ Collect subagent reports. Read [`references/report-template.md`](references/repo
 | **At risk** | 3+ categories <3 OR any at 1 OR 2+ critical risks; avg <3.0 |
 | **Severely at risk** | 5+ categories <3 OR multiple at 1 OR critical security/data risks; avg <2.0 |
 
-7. Prepare `/project-direction` handoff packet: confirmed findings only · Phase 0 baseline packet · required doctrine/lore/spec updates before planning · sequencing constraints + dependency hints · deprioritized items with reasons · evidence index. Write it to `docs/reviews/YYYY-MM-DD-{scope}-packet.md` with the reviewed commit SHA on the first line — that file is the cross-session handoff contract project-direction's receiver protocol reads; a packet living only in conversation dies with the session.
+7. Prepare the `project-direction` handoff packet: confirmed findings only · Phase 0 baseline packet · required doctrine/lore/spec updates before planning · sequencing constraints + dependency hints · deprioritized items with reasons · evidence index. Write it to `docs/reviews/YYYY-MM-DD-{scope}-packet.md` with the reviewed commit SHA on the first line — that file is the cross-session handoff contract project-direction's receiver protocol reads; a packet living only in conversation dies with the session.
 
 ### Phase 3.5 — Veracity Gate
 
@@ -139,15 +144,15 @@ Output the report per `report-template.md`. Make the boundary explicit: `project
 
 ## Adapting to scope
 
-- **Full review** (default): all 6 subagents, all 15 categories, complete report + handoff packet.
+- **Full review** (default): all 6 domains, all 15 categories, complete report + handoff packet.
 - **Focused review** (user names categories): dispatch only relevant subagents. Still include normative baseline, scorecard for scoped categories, risk register, handoff packet.
 - **Quick health check** (fast answer): shape scan + project scan + Agent A, then a brief orchestrator sweep of obvious high-risk areas (tests, CI, auth/secrets, docs). Output: exec summary, provisional scorecard, top 5 risks, explicit low-confidence markers. Don't pass this off as a full review.
-- **Third-party deep-dive** ("process this review/audit"): fact-check external findings, filter through actual context, convert confirmed findings into a handoff packet, route planning to `/project-direction`. Read [`references/third-party-review.md`](references/third-party-review.md) for the five-step protocol.
-- **Spec reconciliation** ("reconcile spec vs implementation", "what's implemented but undocumented", "what's specified but missing"): exhaustive bidirectional spec↔code mapping, report-only by default. Remediation requires explicit authorization; then observed behavior gets spec bookkeeping, cohesive unimplemented outcomes get beads, and strategic gaps escalate to `/project-direction`. Read [`references/spec-reconciliation.md`](references/spec-reconciliation.md). Samples nothing.
+- **Third-party deep-dive** ("process this review/audit"): fact-check external findings, filter through actual context, convert confirmed findings into a handoff packet, route planning to `project-direction`. Read [`references/third-party-review.md`](references/third-party-review.md) for the five-step protocol.
+- **Spec reconciliation** ("reconcile spec vs implementation", "what's implemented but undocumented", "what's specified but missing"): exhaustive bidirectional spec↔code mapping, report-only by default. Remediation requires explicit authorization; then observed behavior gets spec bookkeeping, cohesive unimplemented outcomes get beads, and strategic gaps escalate to `project-direction`. Read [`references/spec-reconciliation.md`](references/spec-reconciliation.md). Samples nothing.
 
 ## Anti-patterns
 
-- Skipping `/project-shape`, treating README as sufficient when doctrine/spec artifacts exist
+- Skipping the `project-shape` baseline, treating README as sufficient when doctrine/spec artifacts exist
 - Accepting external-review severities at face value
 - Treating all recommendations as equally important
 - Enterprise-framing a personal project
@@ -175,6 +180,6 @@ Output the report per `report-template.md`. Make the boundary explicit: `project
 - [`../project-shape/scripts/shape-scan.sh`](../project-shape/scripts/shape-scan.sh) `<repo_root>` — establishes normative baseline + shape maturity. Run first (Phase 0).
 - [`scripts/project-scan.sh`](scripts/project-scan.sh) `<repo_root>` — structural scan: languages, deps, tests, CI, infra, governance, git signals, size (Phase 1).
 
-## After review: schedule with `/project-direction`
+## After review: schedule with `project-direction`
 
-Once findings are confirmed, invoke `/project-direction` with the Phase 3 handoff packet at `docs/reviews/` (Phase 0 baseline packet, not just the scorecard). Ownership stays separate: `project-review` audits, `/project-direction` plans.
+Once findings are confirmed, load the sibling [`../project-direction/SKILL.md`](../project-direction/SKILL.md) (a subskill, not a slash command) and run it with the Phase 3 handoff packet at `docs/reviews/` (Phase 0 baseline packet, not just the scorecard). Ownership stays separate: `project-review` audits, `project-direction` plans.

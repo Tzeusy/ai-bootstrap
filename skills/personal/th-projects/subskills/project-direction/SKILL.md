@@ -6,9 +6,10 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - Claude Fable 5.1
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-26"
+  last_reviewed: "2026-10-03"
 ---
 
 # Project Direction
@@ -19,7 +20,7 @@ Do not use when:
 - One concrete new feature, idea → spec → `../project-feature-request/SKILL.md`.
 - Score repo health / confirm findings → `../project-review/SKILL.md` (hands its packet here).
 - Backlog mechanics only, no direction analysis → `/beads-orchestration` (beads-writer).
-- Recurring orchestrated pursuit loop (fan-out surface audits + ideation at
+- Recurring orchestrated pursuit loop (lane-sequenced surface audits + ideation at
   scale + gated work plan) → `../relentless-vision-pursuit/SKILL.md`;
   ideation here is the inline single-brief mode it builds on.
 
@@ -47,7 +48,8 @@ Do not use when:
 
 ### Preflight: Gather Context
 
-Ask user or infer from repo:
+Infer from the repo. Ask only for a parameter the repo cannot answer and whose
+value changes the plan; otherwise state the assumption and proceed:
 
 | Parameter | Values | Default |
 |-----------|--------|---------|
@@ -82,15 +84,27 @@ it against existing work.
 
 ### Reconciliation Protocol: Proportional to Risk
 
-Reconciliation passes = subagent-driven deep-dive reviews of generated artifacts. Unbiased-reviewer persona every pass (customize only phase context + artifact list):
+Reconciliation passes = subagent-driven deep-dive reviews of generated artifacts. Same brief every pass (fill only the braces); it states the stakes and the evidence contract instead of a persona:
 
 ```text
-You are a lead software architect at a world-class software organization.
-Perform an unbiased deep-dive reconciliation review of the provided artifacts.
-Do not assume they are correct or incorrect.
-Identify contradictions, omissions, requirement drift, weak assumptions, and unverifiable claims.
-Map every finding to concrete evidence (file/section references) and to phase acceptance criteria.
-Recommend the minimum precise changes required to reach acceptance.
+Reconcile the artifacts below against their sources of truth. They are
+normative for this project: downstream agents implement whatever they say,
+so an error that survives this review multiplies.
+
+Phase: {phase, what it changed, its acceptance criteria}
+Artifacts under review: {paths}
+Sources of truth: {doctrine / lore / spec / code paths}
+
+You have not seen how these artifacts were produced; treat them as neither
+correct nor incorrect. Look for contradictions, omissions, requirement
+drift, weak assumptions, and unverifiable claims. Report every finding you
+can evidence, including minor and low-confidence ones. For each: the
+file/section reference, the acceptance criterion it affects, severity,
+confidence, and the minimum precise change that resolves it. The
+orchestrator ranks and filters, so leave nothing out for seeming small.
+Where an area is clean, say what you checked. End with a verdict:
+acceptance criteria met or not met, naming the findings that block
+acceptance. Read-only: propose changes, do not apply them.
 ```
 
 Two tiers, chosen per phase by what the phase did; change-tier depth scales
@@ -103,6 +117,9 @@ with blast radius (same sizing vocabulary as
 | **Change-tier, medium** | Several specs, new external surface, or lore edits | 2 passes + confirming pass |
 | **Change-tier, large** | Doctrine edits, new subsystem, or cross-boundary contract changes | ≥4 dedicated passes (`R1`-`R4`), fresh subagent each, fixes applied between passes; continue while acceptance criteria unmet |
 | **Verify-tier** | Phase only *consumed* normative artifacts: doctrine checks, drift analysis, graph from approved changeset | One verification pass; escalate to change-tier only if it finds the consumed artifacts need modification |
+
+A pass converges when no acceptance-blocking finding remains; other findings
+are fixed or recorded without spending another pass on them.
 
 Every change-tier pass uses a fresh subagent regardless of size — size sets
 the pass count, never self-review. Run

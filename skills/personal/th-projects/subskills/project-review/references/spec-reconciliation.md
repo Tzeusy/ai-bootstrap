@@ -80,7 +80,7 @@ R3/R5 with a remediation proposal; do not edit specs or mutate Beads.
 3. Create children sequentially; wire ordering with `bd dep add` after creation.
 4. **Escalate instead of filing** when a gap is strategic (changes
    architecture, conflicts with doctrine, needs sequencing judgment) →
-   `/project-direction` handoff packet.
+   `project-direction` handoff packet.
 5. Evidence unknown → create a bounded investigation only when authorized,
    with evidence target, owner, blocking status, and exit criterion.
 

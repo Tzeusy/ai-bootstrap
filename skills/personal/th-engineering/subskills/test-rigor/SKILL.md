@@ -12,8 +12,9 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - Claude Fable 5.1
   status: active
-  last_reviewed: "2026-08-02"
+  last_reviewed: "2026-10-03"
 ---
 
 # Test Rigor
@@ -92,8 +93,11 @@ Reviewable expectations — cite the one violated, with file:line evidence:
    [suite-discipline](references/suite-discipline.md).
 10. **Growth is governed** — A test is worth *adding* only if it catches a
     plausible bug no existing test catches: search for the nearest existing
-    test first and prefer extending it. Reviews state the net test delta;
-    adds-only growth in a mature area is a finding
+    test first and prefer extending it. Scratch checks run while iterating
+    verify the change; commit one only if it passes that worth-adding test
+    (a bugfix's reproduction becomes its regression test, bar 2). Reviews
+    state the
+    net test delta; adds-only growth in a mature area is a finding
     ([suite-discipline](references/suite-discipline.md)).
 
 ## Workflow

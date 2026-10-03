@@ -54,7 +54,7 @@ An index file with one-line descriptions and a recommended reading order. Not do
 
 ### Dispatch note
 
-When subagents are available, handle doctrine drafting/revision in a dedicated doctrine subagent, not a general worker carrying other pillar context.
+Draft and revise doctrine in the bootstrap owner's warm session, which holds the interview. Hand it to a subagent only under the flooding exception in `SKILL.md`, and never to a general worker carrying other pillar context.
 
 ## Phase 2: Engineering Standards (about/craft-and-care/)
 

@@ -10,9 +10,10 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - Claude Fable 5.1
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-08-02"
+  last_reviewed: "2026-10-03"
 ---
 
 # Engineering Bar
@@ -82,9 +83,12 @@ biases apply:
    operationalizes this, including the code-citation discipline that makes
    doc claims re-verifiable.)
 8. **Prefer verification depth over throughput** — Verification is deliberate
-   and risk-scaled. Re-check important changes before merge rather than
-   assuming the first pass sufficed. Evidence (command output, test runs,
-   rendered artifacts) beats assertion.
+   and risk-scaled. Important changes get a second look before merge rather
+   than assuming the first pass sufficed, and high-risk ones an independent
+   one (fresh-context reviewer). The same agent does not re-run an identical
+   passing check on an unchanged head for reassurance; independent
+   verification and flake measurement are not that. Evidence (command
+   output, test runs, rendered artifacts) beats assertion.
    ([test-rigor](../test-rigor/SKILL.md) operationalizes the testing half.)
 9. **Take pride in the work, but evaluate feedback on merit** — Defend good
    work with rigor, not ego. Incorporate valid feedback quickly, stay humble

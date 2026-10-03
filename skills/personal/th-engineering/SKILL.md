@@ -16,9 +16,10 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - Claude Fable 5.1
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-19"
+  last_reviewed: "2026-10-03"
 compatibility: skill-standards auditing and excalidraw rendering require uv and Python 3.11+; excalidraw-diagram additionally requires Playwright Chromium setup on first render.
 ---
 
@@ -27,8 +28,8 @@ compatibility: skill-standards auditing and excalidraw rendering require uv and 
 Superskill router for the engineering quality bar. Ten subskills live under
 `subskills/`, each a complete skill package. **Not** in the global
 catalog — discover lazily, load **at most one** subskill body per
-subdomain, prefer one subagent per subskill when a task spans several
-(see "Subagent dispatch").
+subdomain, and apply several in sequence in your own session when a task
+spans them ("Subagent dispatch" says when delegating pays).
 
 `/th-projects` governs the project (doctrine, specs, topology, audits);
 `/th-tooling` governs this machine's harness (installed skills, dotfiles,
@@ -82,17 +83,30 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 
 ## Subagent dispatch
 
-Subskills are independent subdomains; multi-subdomain work parallelizes:
+Default inline. A sweep across several subdomains reads the same diff, so
+one warm session applying each subskill in turn beats N cold subagents that
+each re-read it at full price (cache-first rules:
+[`beads-orchestration/references/token-efficiency.md`](../beads-orchestration/references/token-efficiency.md)).
+Delegate only when one of these holds:
 
-- **Quality sweep across subdomains**: one subagent per relevant subskill.
-  Each prompt carries (1) the absolute path to its
-  `subskills/<name>/SKILL.md` with instruction to read and apply it,
-  (2) exact scope (diff, files, directories), (3) the output contract:
-  findings with file:line evidence and a proposed fix. Parent
-  synthesizes and dedupes; conflicts resolve via engineering-bar's biases.
-- **Iteration-heavy single subdomains** (excalidraw render loop, skill
+- **Independence**: the reviewer must not be the implementer. A
+  fresh-context verifier catches what self-critique misses on high-risk
+  changes.
+- **Context isolation**: the scope would flood your context with material
+  the rest of the task never needs (repo-wide sweep, large generated
+  surface).
+- **Iteration-heavy single subdomain** (excalidraw render loop, skill
   audit-and-fix): delegate the whole loop, review the returned artifact.
-- **One narrow question**: load the single subskill, answer directly.
+
+At most 3 subagent sessions in flight; meanwhile keep working on anything
+that does not move the head under review. Each review prompt carries (1) the
+absolute path to its `subskills/<name>/SKILL.md` with instruction to read
+and apply it, (2) exact scope (diff, files, directories), (3) what the
+result feeds and what done looks like, (4) the output contract: every
+evidenced finding with file:line, severity, confidence, and a proposed fix,
+or a clean verdict citing what was checked. The parent filters, dedupes,
+and synthesizes; conflicts resolve via engineering-bar's biases. A loop
+delegation states the artifact and its done-condition instead of (4).
 
 ## Shared invariants (all subskills)
 
@@ -104,5 +118,12 @@ Subskills are independent subdomains; multi-subdomain work parallelizes:
   small in-scope findings. Independent reviewers retain verifier ownership;
   new architecture, trust-boundary, contract, or risk-class findings return to
   `/th-projects` allocation/spec gates instead of silently expanding the diff.
+- The owner's instructions outrank skill text: a subskill's bar shapes how
+  work is done, not whether a direct request from the human owner (not a
+  dispatching agent) is honored. Safety hard stops stay. When a gate here
+  makes you pause, name the rule and its file.
+- Reports and subagent briefs are written for a cold reader: outcome first,
+  complete sentences, terms defined. The terse prose of these skill files
+  is a loading-cost choice, not a template for deliverables.
 - Subskills reference each other by relative path (`../engineering-bar/…`);
   those paths are package-internal and stable.

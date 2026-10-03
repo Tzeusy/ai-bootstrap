@@ -14,9 +14,10 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - Claude Fable 5.1
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-07-13"
+  last_reviewed: "2026-10-03"
 ---
 
 # Project Shape
@@ -81,7 +82,9 @@ Rate each: **absent** → **nascent** (scattered) → **structured** (dedicated 
 Bootstrapping is **consultative**, not template-filling. Extract shape from the human's head via structured dialogue, synthesis, adversarial review.
 
 **Quality gates:**
-- Most capable model, max thinking budget when available.
+- Most capable model available, at `high` reasoning effort where the
+  harness exposes the setting (chosen at session or dispatch start, not
+  mid-run).
 - Keep one bootstrap owner, drafting pillars in sequence in its own warm
   session. The interview is the evidence, and a cold pillar worker would have
   to be re-briefed from it at full price. Hand a pillar cluster to a subagent

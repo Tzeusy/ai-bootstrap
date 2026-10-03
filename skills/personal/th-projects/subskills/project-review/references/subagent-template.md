@@ -6,6 +6,8 @@ Use when dispatching investigation subagents. Fill placeholders per domain.
 
 ```text
 You are investigating domain {LETTER} ({DOMAIN_NAME}) of a project review.
+Your report feeds a scored repo-health report and a planning handoff; the
+orchestrator merges all domains and re-verifies high-severity claims.
 
 Project: {project_name}
 Type: {type} | Maturity: {maturity} | Users: {users}
@@ -32,7 +34,7 @@ Calibrate for project type using these adjustments:
 - Cite specific files and line numbers for every claim: `path/to/file.ts:42`
 - Label each claim: [Observed], [Inferred], or [Unknown]
 - For each weakness, give at least one concrete remedy with effort estimate (S/M/L/XL)
-- Do not hallucinate architecture, team size, or processes not evidenced in the repo
+- Where the repo gives no evidence for architecture, team size, or process, write [Unknown] rather than inferring it
 - Skip categories that are N/A for this project type (explain why in one line)
 - If a category is not applicable, score it as `N/A` rather than forcing a 1-5
 - Distinguish between normative violations, generic health risks, and missing norms
@@ -43,16 +45,17 @@ Calibrate for project type using these adjustments:
 - Examine at most 30 files in detail per domain
 - For monorepos: sample 3-5 representative packages, plus shared/core code
 - For codebases >50k LOC: focus on entry points, hotspot files, and public API surface
-- Target 700-1400 words total per domain unless evidence volume requires more
+- Target 700-1400 words total per domain unless evidence volume requires more; the target bounds prose, never coverage
 
 ## Output format
 Return a structured report with:
 1. One section per assigned category (or deliverable for non-scoring agents)
 2. Score (1-5) and Confidence (High/Medium/Low) per category
 3. Evidence list (files cited)
-4. Top 3 risks found in this domain
-5. Top 3 strengths found in this domain
-6. Any planning constraints or sequencing notes that `/project-direction` should inherit
+4. Every evidenced weakness with severity (Critical/High/Medium/Low) and confidence, including minor and low-confidence ones; the orchestrator filters and the veracity gate verifies, so nothing is dropped for seeming small
+5. Up to 3 risks that matter most in this domain, drawn from item 4
+6. Up to 3 evidenced strengths; fewer is fine
+7. Any planning constraints or sequencing notes that `project-direction` should inherit
 ```
 
 ---

@@ -18,9 +18,10 @@ metadata:
   authors:
     - tze
     - Claude Fable 5
+    - Claude Fable 5.1
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-09-27"
+  last_reviewed: "2026-10-03"
 compatibility: Subskill scripts require bash, git, grep, find, and uv; project-shape uses uv for fail-closed YAML validation. project-direction additionally assumes the bd (beads) CLI and an OpenSpec-capable environment for changeset synthesis.
 ---
 
@@ -63,7 +64,7 @@ hard human gate or when the approved spec is achieved and verified.
 ## Discover subskills
 
 ```bash
-PKG="$(dirname "$SKILL_PATH")"
+PKG="$(dirname "<absolute-path-to-this-SKILL.md>")"
 find "$PKG/subskills" -maxdepth 2 -name SKILL.md
 rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 ```
@@ -76,7 +77,7 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 | Concretize ONE fuzzy feature/project request into a signed-off spec delta: motif, doctrine gate, topology placement, design sketch, WHEN/THEN scenarios. Also amendment mode: fix a spec found wrong/ambiguous mid-implementation. | [subskills/project-feature-request/SKILL.md](subskills/project-feature-request/SKILL.md) | "I want to add X", "spec this feature", "turn this idea into requirements", "what would it take to build X", "the spec is wrong" |
 | Decide what to work on next; evaluate competing priorities; check roadmap alignment; turn approved specs into a prioritized beads work plan. Also the vision-generative modes when nothing is proposed: milestone synthesis (derive work doctrine already implies) and ideation (brainstorm new feature candidates grounded in doctrine); and the launch gate, which judges whether goals and requirements are settled enough to author a project's first specs. | [subskills/project-direction/SKILL.md](subskills/project-direction/SKILL.md) | "what's highest leverage", "what should we work on next", "break this down", "is this roadmap aligned", "what's the next milestone", "brainstorm features for this project", "are we ready to write specs" |
 | Repo-wide health audit: code quality, reliability, security, docs, maintainability — scored, evidence-based, with a planning handoff packet. Includes the exhaustive spec-reconciliation mode (bidirectional spec↔code gap audit + remediation). | [subskills/project-review/SKILL.md](subskills/project-review/SKILL.md) | "review this project", "audit the codebase", "assess project health", "reconcile spec vs implementation", "what's implemented but undocumented" |
-| Recurring generative pursuit of the project's ideal: fan-out audits of every surface against the applicable bar + vision-grounded ideation lenses → ranked move list, tier-board movement across runs, gated (never auto-released) work plan. | [subskills/relentless-vision-pursuit/SKILL.md](subskills/relentless-vision-pursuit/SKILL.md) | "run the vision pursuit", "what's the next best step toward the vision", "relentlessly improve this project", "audit the whole project against the ideal" |
+| Recurring generative pursuit of the project's ideal: lane-sequenced audits of every surface against the applicable bar + vision-grounded ideation lenses → ranked move list, tier-board movement across runs, gated (never auto-released) work plan. | [subskills/relentless-vision-pursuit/SKILL.md](subskills/relentless-vision-pursuit/SKILL.md) | "run the vision pursuit", "what's the next best step toward the vision", "relentlessly improve this project", "audit the whole project against the ideal" |
 | Accumulate genuine hard owner gates into a local asynchronous packet, independently vet each problem scope and recommendation, walk the owner through one decision at a time, or route recorded signoffs through the canonical owning workflow. | [subskills/user-questionnaire/SKILL.md](subskills/user-questionnaire/SKILL.md) | "prepare decisions for me to review", "review when I wake up", "walk me through blocked decisions", "collect owner signoffs" |
 
 ## Routing rules
@@ -164,6 +165,23 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   | Main-spec bookkeeping of [Observed] behavior | edit directly | — |
   | Beads/planning graph | generate from approved changeset | approve the changeset it derives from |
 
+- **Run to the gate, not to a plan.** A run ends at a hard human gate (table
+  above; full contract in
+  [`beads-orchestration/references/decision-autonomy.md`](../beads-orchestration/references/decision-autonomy.md))
+  or at the requested deliverable, verified; never short of it on a plan to
+  produce it, a promise, or "shall I proceed". Where a subskill's
+  deliverable is itself a plan or report, delivering it is completion.
+  Decide reversible engineering choices and record why; finish everything
+  that does not depend on a pending owner answer before surfacing the
+  question.
+- **The owner's instructions outrank skill text.** A direct request from the
+  human owner (not a dispatching agent) narrows, reorders, or skips a
+  workflow here; it does not lift the safety gates in decision-autonomy.md.
+  When a gate in this package makes you pause, name the rule and its file.
+- **Deliverables are written for a cold reader.** Reports, handoff packets,
+  subagent briefs, and owner questions lead with the outcome in complete
+  sentences and define their terms. The terse prose of these skill files is
+  a loading-cost choice, not a template for output.
 - Every major claim cites evidence, labeled [Observed], [Inferred], or
   [Unknown].
 - A questionnaire item is not owner-review-ready until an independent subagent

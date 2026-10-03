@@ -1,8 +1,8 @@
 # Epic Report Bead
 
-Execution guide for the **epic report bead** — a child bead `/project-direction` creates during work-plan materialization to generate a human-readable report of what was built, for human review.
+Execution guide for the **epic report bead** — a child bead `project-direction` creates during work-plan materialization to generate a human-readable report of what was built, for human review.
 
-Referenced in the report bead's description. The executor (human, `/beads-worker`, or agent) follows this guide.
+Referenced in the report bead's description. The executor (human, `/beads-orchestration` beads-worker, or agent) follows this guide.
 
 `<skill_dir>` = the directory containing this subskill's `SKILL.md`, i.e. `.../th-projects/subskills/project-direction`.
 
@@ -10,7 +10,7 @@ Referenced in the report bead's description. The executor (human, `/beads-worker
 
 ## Bead Template
 
-When `/project-direction` calls `/beads-writer` to create the epic, include a report bead:
+When `project-direction` calls `/beads-orchestration` (beads-writer) to create the epic, include a report bead:
 
 ```
 Title: "Generate epic report for: {epic title}"
@@ -20,7 +20,7 @@ Parent: {epic-id}
 Dependencies: ALL implementation children + reconciliation bead (this runs last)
 Description: |
   Generate a human-readable epic report following the guide in
-  /project-direction references/epic-report.md.
+  <skill_dir>/references/epic-report.md.
 
   Epic ID: {epic-id}
   Spec sections covered: {list}

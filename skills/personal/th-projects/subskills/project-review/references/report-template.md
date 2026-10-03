@@ -165,7 +165,7 @@ _Only [Confirmed] findings from Phase 3.5 appear here. Invalidated claims go to 
 
 ---
 
-## 10. Planning Handoff for `/project-direction`
+## 10. Planning Handoff for `project-direction`
 
 ### Required shape work before implementation planning
 - {doctrine/lore/topology gap or "none"}

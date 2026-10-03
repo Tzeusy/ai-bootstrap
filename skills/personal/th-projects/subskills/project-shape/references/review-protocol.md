@@ -30,7 +30,7 @@ Don't split so aggressively the coordinator spends more time stitching than the 
 Style: conceptual, simple. Use /th-engineering (excalidraw-diagram).
 Layout: vertical pipeline with fan-out and convergence.
 Elements:
-  - Top: hero rectangle "Generator Agent" labeled "(highest capability model, max thinking)", warm/primary color
+  - Top: hero rectangle "Generator Agent" labeled "(most capable model, high effort)", warm/primary color
   - Arrow down labeled "produces draft document"
   - Fan-out to 3 parallel review agents (side-by-side rectangles, all in a cool/secondary color):
     - "Review Agent 1: Coherence" — subtitle "fresh context, no generation history"
@@ -44,6 +44,9 @@ Argument: Independence is the key — review agents have NO access to generation
 -->
 
 ## Subagent Specifications
+
+Every review prompt below reports each finding with severity and confidence,
+and may return a clean verdict that cites what was checked.
 
 ### Review Agent 1: Coherence Review
 
@@ -77,8 +80,12 @@ Output format:
 
 **Prompt pattern:**
 ```
-You are a skeptical reviewer. Your job is to find problems, not confirm quality.
-You have NOT seen the conversation that produced this document.
+Review this document adversarially. Other agents will treat it as
+constitutional, so a flaw that survives here propagates into every
+downstream spec and plan. You have not seen the conversation that produced
+it. Report only findings you can evidence from the document, including
+what it omits; an attack vector that comes up clean is a valid result, so
+say what you checked rather than inventing a finding.
 
 Document type: [type]
 Document: [full content]
@@ -99,7 +106,8 @@ For each finding, provide:
 - Why it's a problem
 - A concrete question the author should answer to fix it
 
-VERDICT: List the top 3 issues that would cause the most downstream damage if unfixed.
+VERDICT: ACCEPT or REVISE. Rank every finding by downstream damage if
+unfixed, and name each one that must be fixed before acceptance.
 ```
 
 ### Review Agent 3: Cross-Pillar Review
@@ -140,7 +148,7 @@ Output: Ranked list of cross-pillar issues, each with affected documents and fix
 
 ### For New Projects (bootstrapping)
 
-1. **Generate** — consultative bootstrapping protocol per document, preferring per-pillar subagents when substantial
+1. **Generate** — consultative bootstrapping protocol per document, in the owner's warm session; split a pillar out only under the flooding exception above
 2. **Review stable clusters** — after a coherent pillar/doc cluster stabilizes,
    run one fresh reviewer with Coherence + Adversarial lenses; split the lenses
    only for high-risk or contested artifacts
@@ -151,7 +159,7 @@ Output: Ranked list of cross-pillar issues, each with affected documents and fix
 ### For Existing Projects (maintenance)
 
 1. **Detect drift** — code diverges from docs → flag for review
-2. **Update** — generate updated sections, per-pillar curation subagents when multiple pillars affected
+2. **Update** — generate updated sections in the owner's session; split by pillar only when one pillar's investigation would flood it
 3. **Review the delta** — one fresh reviewer applies Coherence + Adversarial to
    the changed cluster; split only when risk warrants
 4. **Cross-check** — Review Agent 3 if changes affect cross-pillar coherence
@@ -168,7 +176,7 @@ Output: Ranked list of cross-pillar issues, each with affected documents and fix
 
 ## Model Configuration for Review Agents
 
-- Capable model, no extended thinking needed — evaluating, not generating
+- Capable model at `medium` effort — evaluating, not generating
 - Key requirement: **fresh context** — review agent must NOT see the generation conversation
 - Use `Agent` tool with a clean prompt (no history) for independence
 - Do not batch unrelated pillars into one reviewer. Combining review lenses on
@@ -188,6 +196,6 @@ Weaker than true independent review — say so plainly. The fallback preserves r
 ## Anti-Patterns
 
 - **Self-review** — generator reviewing its own output in-context. Catches typos, not blind spots.
-- **Rubber-stamp** — "looks good" without evidence. A useful review always has findings.
+- **Rubber-stamp** — "looks good" without evidence. A clean verdict cites what was checked and why it holds; findings invented to look useful are the same failure inverted.
 - **Review without mandate** — running reviews but not incorporating findings. Every REVISE must be addressed or explicitly overruled by the user.
 - **Infinite loops** — >2 rounds means the problem is upstream. Stop and return to the user.

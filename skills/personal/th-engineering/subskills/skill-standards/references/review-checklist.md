@@ -50,6 +50,12 @@ Against [`quality-bar.md`](./quality-bar.md), answer:
    verbose gates routed to log files with failure-tail readback, targeted
    tests while iterating with one full gate before completion, polls batched,
    catalogs consumed grep-first, subagent dispatches right-sized and compact?
+10. Is the skill written for current models (quality-bar section 12)?
+    Reasons instead of personas or shouted emphasis, effort tiers instead of
+    thinking budgets, review prompts that report everything and filter
+    separately, explicit delegation criteria and stop conditions, and
+    human-facing output specified as legible prose, not the skill's own
+    shorthand?
 
 ## Step 3: Update Discipline
 
@@ -94,3 +100,6 @@ When changing an existing skill:
 - Workflows that re-run the full gate on every iteration, or tell agents to
   load a whole catalog when a grep would answer
 - Session stories disguised as reusable guidance
+- Prompts written for an older model: personas, blanket MUST/NEVER,
+  "think harder" or thinking-budget settings, capped or padded findings
+  ("top 3", "always find something")

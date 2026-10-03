@@ -174,7 +174,7 @@ gate; don't patch the spec text.
 
 ## Boundaries
 
-- One request per run. A list of features is N runs (or `/project-direction`
+- One request per run. A list of features is N runs (or sibling `project-direction`
   if the real ask is prioritization).
 - No implementation, no estimates, no sequencing — those belong to
   project-direction and execution tooling.
