@@ -6,8 +6,9 @@ metadata:
   authors:
     - tze
     - OpenAI Codex
+    - Claude Fable 5.1
   status: active
-  last_reviewed: "2026-09-27"
+  last_reviewed: "2026-10-04"
 compatibility: Requires a Beads-backed repository with `bd` v1.0.4+, `git`, an authenticated `gh`, `jq`, git worktree support, and network access for `gh` PR operations.
 ---
 
@@ -118,9 +119,11 @@ auto-routing to the right DB — that fails across embedded-mode workspaces
    worker slot. A rejected bead is stamped `needs-shaping`, listed by id in the
    report, and routed to the bounded shaping lane in
    `references/coordinator-loop.md` — never silently dropped.
-5. Build a **compact** dispatch prompt carrying `ISSUE_ID`, `WORKTREE_PATH`,
-   `REPO_ROOT`, and a 2-4 line issue summary plus acceptance criteria. Do not
-   inline full `bd show` JSON; the worker self-fetches if it needs more. If a
+5. Build a **compact** dispatch prompt carrying the worker skill's absolute
+   path, `ISSUE_ID`, `WORKTREE_PATH`, `REPO_ROOT`, and a 2-4 line issue summary
+   plus acceptance criteria (`references/coordinator-loop.md` → Step 5 lists
+   the conditional fields). Do not inline full `bd show` JSON or the skill
+   body; the worker self-fetches if it needs more. If a
    lane is idle and holds related context, send this as a **lane continuation**
    to that worker's existing session (`references/coordinator-loop.md` →
    Step 6). Spawn a new worker only to open or replace a lane.
@@ -133,6 +136,9 @@ auto-routing to the right DB — that fails across embedded-mode workspaces
    branch, not `REPO_ROOT`, and the worktree shares `REPO_ROOT`'s canonical
    common Git directory) before counting a worker as running.
 
-Worker skill paths (when a runtime needs the absolute location):
+Worker skill paths: resolve them from this package's absolute location and
+put the absolute path in the dispatch prompt, because a worker's cwd is its
+worktree and a relative path does not resolve there. Under Claude Code's
+default install:
 - `~/.claude/skills/beads-orchestration/subskills/beads-worker/SKILL.md`
 - `~/.claude/skills/beads-orchestration/subskills/beads-pr-reviewer-worker/SKILL.md`

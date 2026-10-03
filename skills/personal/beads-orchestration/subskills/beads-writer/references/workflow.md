@@ -6,7 +6,7 @@ Use this reference for the actual step-by-step issue-writing flow.
 
 Before writing any bead, gather enough context to write it well:
 
-1. Clarify scope. A vague ask like "improve auth" produces vague beads. Push for the desired outcome, affected users, constraints, and why it matters.
+1. Clarify scope. A vague ask like "improve auth" produces vague beads. Take the desired outcome, affected users, constraints, and why it matters from the governing spec and the repo first; ask the requester only what they alone can answer (intent, priority, a preference the project's doctrine does not settle).
 2. Survey the codebase. Read the relevant files so the bead uses the repo's real terms, modules, and current behavior.
 3. Check existing and recently completed delivery. Search open and recently closed beads, open PRs/branches, and the concrete symbols and files involved;
    keyword-only title matching is insufficient. Link or supersede an existing

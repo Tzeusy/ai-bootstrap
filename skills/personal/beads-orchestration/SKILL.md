@@ -6,8 +6,9 @@ metadata:
   authors:
     - tze
     - OpenAI Codex
+    - Claude Fable 5.1
   status: active
-  last_reviewed: "2026-09-27"
+  last_reviewed: "2026-10-04"
 compatibility: Requires bd (beads) CLI v1.0.4+, git, and a Beads-backed repository. Execution subskills additionally require gh (authenticated), jq, python3, and git worktree support.
 ---
 
@@ -23,9 +24,15 @@ workers at a second one; the workers load it themselves).
 ## Discover subskills
 
 ```bash
-find "$(dirname "$SKILL_PATH")/subskills" -maxdepth 2 -name SKILL.md
-rg -n "^name:|^description:" subskills/*/SKILL.md
+PKG="$(dirname "<absolute-path-to-this-SKILL.md>")"
+find "$PKG/subskills" -maxdepth 2 -name SKILL.md
+rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 ```
+
+Resolve every bundled `scripts/` and `references/` path from the absolute
+location of the `SKILL.md` the runtime loaded. A dispatched worker's cwd is its
+worktree in the target repository, not this package, so a bare relative path
+resolves against the wrong tree.
 
 ## Routing table
 
@@ -90,6 +97,20 @@ rg -n "^name:|^description:" subskills/*/SKILL.md
   [`references/test-growth-gate.md`](references/test-growth-gate.md) (one gate
   species per behavior, a `Tests: +a ~b -c` delta in every PR). Load them at
   the subskill's first edit or first finding, not at dispatch.
+- **Finish on a report, not a question.** A dispatched subskill ends only in
+  its defined report (a terminal status, or the shaping writer's returned bead
+  text), never mid-task on a plan, a promise, or a "shall I". It decides what
+  `references/decision-autonomy.md` lets it decide; only an external or
+  hard-gated blocker is reported as blocked. The coordinator ends at its
+  frontier stop, an owner stop, or a tracker fault it cannot recover. Every
+  report is written for a reader who has not seen the session.
+- **The owner's instructions outrank skill defaults.** A direct instruction
+  from the human owner or operator (not a dispatching agent), or the target
+  repo's `AGENTS.md` / `CLAUDE.md`, overrides this package's defaults: lane
+  count, routing, cadence, model tier. It does not lift mutation authority,
+  worktree isolation, exact-head review, or the hard gates in
+  `references/decision-autonomy.md`. When one of those pauses work, name the
+  rule and its file in the report.
 
 ## When `bd` itself misbehaves
 
@@ -98,8 +119,8 @@ mutations, weird exit states), consult
 [`references/known-errors.md`](references/known-errors.md) **before**
 debugging from scratch — it catalogs known errors, deprecations, and
 workarounds. Search it instead of reading it whole: run
-`rg -i -n '<distinctive error text>' references/known-errors.md`, then read
-only the matching section (fall back to skimming the headers via
+`rg -i -n '<distinctive error text>' <this package>/references/known-errors.md`,
+then read only the matching section (fall back to skimming the headers via
 `rg -n '^##' …` if the search misses). If you hit a rough edge that is not
 listed, append an entry after resolving it: that file is this skill's
 persistent memory, and an unrecorded fix gets re-debugged by the next session.

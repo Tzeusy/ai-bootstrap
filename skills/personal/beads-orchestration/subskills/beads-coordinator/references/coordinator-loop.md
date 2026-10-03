@@ -5,14 +5,14 @@ heartbeat rules, worker bootstrap rules, monitoring details, or adaptive polling
 
 ## Preflight
 
-- Before entering the loop, run `../beads-cleanup/SKILL.md`. This is mandatory.
+- Before entering the loop, run `../../beads-cleanup/SKILL.md`. This is mandatory.
 - Run `bd doctor` once at startup and again after any unexpected `bd` error;
   do not spend worker cycles on a sick tracker.
 - Create a fresh coordinator session ID for this run (used as the stall-heartbeat
   owner; atomic claiming is handled by `bd update --claim`).
 - If running from outside the target rig, pass `bd -C <path>` on **every**
   command, including ones that take a bead ID — see "Rig Targeting" in
-  `SKILL.md`; prefix auto-routing does not work.
+  `../SKILL.md`; prefix auto-routing does not work.
 - Detect once per run whether the default branch is behind a merge queue, and
   carry the answer as `MERGE_QUEUE=yes|no` into every reviewer prompt and the
   direct-merge path:
@@ -250,7 +250,7 @@ Safe PR-review bead creation pattern:
 ```bash
 REVIEW_JSON=$(bd create \
   "Conduct a thorough code review of ${PR_URL}" \
-  --description="Review PR ${PR_URL} thoroughly. Original implementation bead: ${ORIGINAL_ID}. Leave resolvable PR comments on notable issues, report corrections for the implementation lane, and attest merge readiness for the exact reviewed head." \
+  --description="Review PR ${PR_URL} thoroughly. Original implementation bead: ${ORIGINAL_ID}. Leave resolvable PR comments on verdict-changing issues, report corrections for the implementation lane, and attest merge readiness for the exact reviewed head." \
   --design="Independent exact-head review. Classify risk before review; reviewer reports semantic corrections to the implementation lane and never merges an unreviewed moved head." \
   --acceptance="1. Record reviewer identity and risk tier. 2. Bind findings and merge verdict to the exact PR head SHA. 3. Resolve or explicitly classify every review thread. 4. Run risk-scaled gates and merge only when readiness fails closed to safe." \
   -t task -p 1 --validate --json)
@@ -328,7 +328,7 @@ Rejected beads are work, not silence. When `needs-shaping` beads exist and a
 worker slot is free, dispatch **one** shaping worker for a batch of rejected
 beads sharing a parent epic:
 
-- worker skill: `../beads-writer/SKILL.md`; its workflow Phase 3 "Structured
+- worker skill: `../../beads-writer/SKILL.md`; its workflow Phase 3 "Structured
   Dispatch Packet" is the shaping target (there is no separate shaping entry
   point in that skill). Its deliverable is specification text, so dispatch it
   at `DESIGN_AND_SPECIFICATION_MODEL`.
@@ -417,24 +417,30 @@ requiring both branch states in one bootstrap check.
 
 Choose worker skill by issue type:
 - epic-complexity issue: dispatch as team lead; see `epic-coordination.md`
-- default implementation issue: `../beads-worker/SKILL.md`
-- `pr-review-task` issue: `../beads-pr-reviewer-worker/SKILL.md`
+- default implementation issue: `../../beads-worker/SKILL.md`
+- `pr-review-task` issue: `../../beads-pr-reviewer-worker/SKILL.md`
 
-A `reconciliation`-labelled bead still uses `../beads-worker/SKILL.md`, but its
+A `reconciliation`-labelled bead still uses `../../beads-worker/SKILL.md`, but its
 model is floored at `EPIC_COMPLEXITY_MODEL` for medium-or-higher epics — apply
 the "Reconciliation Floor" in `runtime-and-safety.md` when picking the model in
 Step 6.
 
-Inject only:
-- `ISSUE_ID`
-- `WORKTREE_PATH`
-- `REPO_ROOT`
+The prompt carries:
+- the worker skill's absolute path (the worker reads it; never paste its body)
+- `ISSUE_ID`, `WORKTREE_PATH`, `REPO_ROOT`
 - a 2-4 line issue summary plus its acceptance criteria
+- when they apply: the `LANE-CONTINUATION` header (Step 6), `MERGE_QUEUE`
+  (reviewer dispatches), the correction-mode variables
+  (`REVIEW_CORRECTION_MODE`, `EXISTING_PR_NUMBER`, `REVIEW_BEAD_ID`,
+  `CORRECTION_THREADS_JSON`), an inlined `[decision]` record, a coordinator
+  authorization the reviewer skill requires (reviewer-as-fixer,
+  `--force-rebase`), and likely edit targets
 
-Do not inline full `bd show <id> --json` output. `ISSUE_JSON` is deprecated as a
-dispatch field: the worker runs `bd show <id> --json` itself when it needs more
-detail. Keep the prompt compact; carry only the summary, acceptance criteria,
-and likely edit targets.
+No other issue content. Do not inline full `bd show <id> --json` output.
+`ISSUE_JSON` is deprecated as a dispatch field: the worker runs
+`bd show <id> --json` itself when it needs more detail. Team Lead and
+shaping-lane prompts are defined in their own sections and are not bound by
+this list.
 
 ## Step 6: Dispatch The Worker
 
@@ -586,7 +592,7 @@ Report first, then verify the reported branch / PR state:
      - convert the remaining (external or hard-gated) `Blockers-JSON` entries
        into blocker beads and wire the original bead to depend on them;
        hard-gated decisions must use the escalation format from
-       `decision-autonomy.md`
+       `../../../references/decision-autonomy.md`
      - classify `Discovered-Follow-Ups-JSON` entries before creating linked work
      - set the original bead to `blocked`
      - preserve recovery state explicitly:
@@ -774,7 +780,7 @@ numbers here):
 - active mode: whenever near-term work exists (an active worker, a dispatchable
   `pr-review-task`, a PR cooldown counting down). Wait for events when the
   runtime supports it, but never let a gap between wakes exceed the runtime's
-  cache-TTL fallback (20-30 minutes on a 1-hour TTL, 4m50s on a 5-minute TTL).
+  cache-TTL fallback.
   Tighten to 1-2 minutes only when an event is imminent (a cooldown about to
   expire, a lane just freed). A cache-hit poll is cheap, not free.
 - no-progress frontier: once a sweep finds nothing dispatchable, widen to the
@@ -875,3 +881,19 @@ Cohesion-deferred:
 Other non-dispatched candidates (owner-gated, foreign-assignee, externally
 dependent) are listed the same way: id, one-phrase reason, and the concrete
 unblock condition.
+
+### Final report (required when the loop stops)
+
+The final report is the only record the owner and the next session get, so
+write it for a reader who has not seen this run. On top of the last progress
+report and the not-dispatched disclosure above, state:
+
+- why the loop stopped: frontier stop, owner stop, or tracker fault, with the
+  evidence for it
+- every `[decision]` recorded this run: bead id plus the one-line record
+- every open hard-gate escalation: bead id, the question, your recommendation,
+  and the default that applies if the owner does not answer
+- recovery state for the next session: quarantined worktrees, unreconciled
+  lanes, and beads left `in_progress`, each by id
+
+Print each heading with `none` when it is empty.

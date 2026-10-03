@@ -1,4 +1,4 @@
 interface:
   display_name: "Beads Coordinator"
   short_description: "Continuously feed ready Beads issues to cache-warm worker lanes"
-  default_prompt: "Use $beads-coordinator to run an unattended loop that claims ready Beads issues with leases and feeds them one at a time to long-lived, cache-warm worker lanes in isolated worktrees."
+  default_prompt: "Use $beads-coordinator to run an unattended loop that atomically claims ready Beads issues and feeds them one at a time to long-lived, cache-warm worker lanes in isolated worktrees."

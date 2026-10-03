@@ -24,8 +24,9 @@ Coordinator responsibilities:
 # 1. Verify all workers finished or cleaned up
 bd worktree list
 
-# 2. Release stale claims only after verifying the heartbeat is expired (assignee idle)
-bd list --status=in_progress --json
+# 2. Release stale claims only after verifying the heartbeat is expired (assignee idle);
+#    the heartbeat is in each bead's notes (bd show <id>)
+bd list --status=in_progress --json | jq -c '[.[] | {id, title, assignee}]'
 
 # 3. Verify Dolt DB is healthy
 bd dolt status

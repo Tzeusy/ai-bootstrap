@@ -84,10 +84,11 @@ Dispatch plan:
 
 Strategy:
 - A-F are isolated from the orchestrator because each domain's evidence
-  would flood it. Run them as at most 3 investigator lanes (cache-first
-  ceiling): when a lane's domain returns, continue that session on its next
-  domain instead of spawning a cold agent, so the baseline and scan are
-  paid for three times, not six. Merge returned reports meanwhile.
+  would flood it. Run them as at most 3 investigator lanes (inside the
+  cache-first lane ceiling): when a lane's domain returns, continue that
+  session on its next domain instead of spawning a cold agent, so the
+  baseline and scan are paid for three times, not six. Merge returned
+  reports meanwhile.
 - Pass artifact paths plus a compact Phase 0 manifest and scoped scan excerpt;
   do not paste the same full baseline/scan into every prompt. Assign one primary
   evidence owner per concern so overlapping domains cite rather than rescan.

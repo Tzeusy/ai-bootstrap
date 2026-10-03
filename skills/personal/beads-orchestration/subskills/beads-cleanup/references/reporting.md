@@ -76,6 +76,9 @@ Scan status: <success|empty|partial|fatal>
 
 ## Read-Only Command Quick Reference
 
+The rows show the query only. Project every `--json` listing through `jq` to
+the fields the report needs (`../../../references/token-efficiency.md`).
+
 | Evidence | Command |
 |---|---|
 | All `in_progress` Beads | `bd list --status=in_progress --json --limit 0` |

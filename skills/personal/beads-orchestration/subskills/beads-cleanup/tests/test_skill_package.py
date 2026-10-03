@@ -33,7 +33,7 @@ class BeadsCleanupPackageTests(unittest.TestCase):
         self.assertIn("metadata:", frontmatter)
         self.assertIn("owner: tze", frontmatter)
         self.assertIn("authors:", frontmatter)
-        self.assertIn('last_reviewed: "2026-04-12"', frontmatter)
+        self.assertRegex(frontmatter, r'last_reviewed: "\d{4}-\d{2}-\d{2}"')
         self.assertIn("compatibility:", frontmatter)
         self.assertIn("bd", frontmatter)
         self.assertIn("gh", frontmatter)

@@ -6,8 +6,9 @@ metadata:
   authors:
     - tze
     - OpenAI Codex
+    - Claude Fable 5.1
   status: active
-  last_reviewed: "2026-09-27"
+  last_reviewed: "2026-10-04"
 compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, gh, and python3 available, plus authenticated GitHub access and network access for push and PR operations.
 ---
 
@@ -15,11 +16,13 @@ compatibility: Requires a Beads-backed git repository with git worktrees, git, b
 
 ## Overview
 
-You are a **Beads Worker**. Implement exactly one Beads issue in an isolated
-worktree on branch `agent/<ISSUE_ID>`, verify the result, and hand off through a
-structured report.
+Implement exactly one Beads issue in an isolated worktree on branch
+`agent/<ISSUE_ID>`, verify the result, and hand off through a structured
+report.
 
-You do not coordinate. You do not mutate Beads lifecycle state. You do not
+The coordinator is the single writer of Beads lifecycle state and the only
+dispatcher; two writers on one bead leave state nobody can reconcile. So this
+skill does not coordinate, does not mutate Beads lifecycle state, and does not
 create hidden parallel implementation tracks under one claimed bead.
 
 ## Use This Skill When
@@ -51,10 +54,13 @@ by users.
 - All work happens inside `WORKTREE_PATH`, never inside `REPO_ROOT`.
 - The current branch must be `agent/<ISSUE_ID>`.
 - Do not run `bd create`, `bd update`, `bd dep add`, or `bd close`.
-- Do not spawn code-writing helpers or parallel implementation tracks.
-  Read-only helpers (discovery, architecture lookup, per-spec-area audit such
-  as a reconciliation bead's skeptic pass) are allowed at `LOW`/`MEDIUM` model
-  tier; you merge their findings and own the deliverable.
+- Do not spawn code-writing helpers or parallel implementation tracks. Read
+  inline by default: a helper starts cold and re-pays for context this lane
+  already holds. Use a read-only helper only when the reading would flood the
+  lane with material it will not reuse (discovery, architecture lookup) or
+  when an independent read is the point (a reconciliation bead's
+  per-spec-area skeptic pass), at `LOW`/`MEDIUM` model tier; you merge its
+  findings and own the deliverable.
 - Do not commit `.beads/` changes on the worker branch.
 
 If the issue truly needs multiple code-writing tracks, stop and hand that back
@@ -67,8 +73,9 @@ coordinator may send a `LANE-CONTINUATION` prompt with a new `ISSUE_ID` and
 `WORKTREE_PATH` into this same session. Treat it as a fresh assignment for
 state and lifecycle, but keep what you already know about the repo:
 
-- Re-run Phase 1 bootstrap in full against the new `WORKTREE_PATH`. Never edit
-  the previous bead's worktree again; its branch belongs to its PR now.
+- Re-run Phase 1 steps 1-3 (cwd and the context assertion) against the new
+  `WORKTREE_PATH`; they are per-worktree and never carry over. Never edit the
+  previous bead's worktree again; its branch belongs to its PR now.
 - Reuse the guidance you already read, including the craft-and-care skill, and
   the repo knowledge you built up. Re-read a file only if you know it changed
   (for example, the previous bead merged into it) or compaction dropped it.
@@ -83,7 +90,9 @@ state and lifecycle, but keep what you already know about the repo:
 ## Bundled Helpers
 
 Use the bundled helpers when they fit. They exist to reduce runtime ambiguity,
-not to replace local judgment.
+not to replace local judgment. Their `scripts/` and `references/` paths are
+relative to this package, not to your worktree: your cwd is `WORKTREE_PATH`,
+so invoke each script by the loaded package's absolute path.
 
 - [`scripts/assert_worker_context.py`](scripts/assert_worker_context.py)
   Verifies that `pwd` and branch are bound to the assigned worktree and issue.
@@ -132,7 +141,7 @@ reads or emits a remote URL.
    Prefer the structured helper instead of a raw `echo`:
 
 ```bash
-python3 scripts/emit_worker_report.py \
+python3 "<loaded beads-worker package>/scripts/emit_worker_report.py" \
   --status invalid-runtime-context \
   --issue-id "${ISSUE_ID}" \
   --worktree-path "${WORKTREE_PATH}" \
@@ -146,7 +155,8 @@ python3 scripts/emit_worker_report.py \
 ```
 
 4. Read project guidance in the order defined in
-   [references/runtime-contract.md](references/runtime-contract.md).
+   [references/runtime-contract.md](references/runtime-contract.md). On a lane
+   continuation, skip guidance you already read that has not changed.
 
 ### Phase 2: Understand
 
@@ -160,19 +170,17 @@ ISSUE_JSON=$(bd show "${ISSUE_ID}" --json \
 
    If the coordinator already inlined `ISSUE_JSON`, use that; otherwise run the
    command above.
-2. Read the assigned issue carefully.
+2. Read the acceptance criteria as the definition of done; the description
+   and design give scope, non-goals, and approach.
    In `REVIEW_CORRECTION_MODE=yes`, also verify `EXISTING_PR_NUMBER` is open on
    `agent/${ISSUE_ID}`, read `CORRECTION_THREADS_JSON`, and treat those threads
    plus the coordinator-updated acceptance criteria as the bounded task.
 3. Inspect referenced dependencies if needed: `bd show <dep-id> --json`.
-4. Read `AGENTS.md` / `CLAUDE.md` or equivalent project guidance.
-5. If a repository-level `craft-and-care` skill exists, read it before
-   implementation and extract the principles relevant to the change.
-6. Understand the relevant code before editing.
-7. If the task needs research or design help, use read-only helpers only.
-8. Form a concrete file and test plan, then start editing.
+4. Understand the relevant code before editing.
+5. If the task needs research or design help, use read-only helpers only.
+6. Form a concrete file and test plan, then start editing.
 
-## Phase 3: Implement
+### Phase 3: Implement
 
 1. Make focused incremental changes.
 2. Follow local project conventions.
@@ -197,7 +205,7 @@ a CI privacy gate (e.g. the butlers repo's `session-link-guard`), and a tripped
 gate blocks the PR until a reviewer amends the commit. A plain
 `Co-Authored-By:` trailer without a URL is fine.
 
-## Phase 4: Verify
+### Phase 4: Verify
 
 Run all required quality gates from project docs. Typical gates:
 - lint
@@ -221,14 +229,21 @@ If a repository-level `craft-and-care` skill exists, run the final standards
 pass from `../../references/craft-and-care-gate.md` against the actual diff
 before handoff.
 
-## Phase 5: Choose Handoff Path
+### Phase 5: Choose Handoff Path
 
 Use conservative routing. When in doubt, open a PR.
 
-### Existing-PR correction path
+| PR required | Direct-merge candidate |
+|---|---|
+| Security, auth, or public API changes | Documentation-only changes |
+| More than 5 files or 200+ lines | Config or dotfile tweaks |
+| Database or schema changes | Test-only changes |
+| Backward-compatibility risk | Small single-file bug fixes with tests |
+
+#### Existing-PR correction path
 
 When `REVIEW_CORRECTION_MODE=yes`, this path takes precedence over the routing
-table below:
+table above:
 
 1. Push the corrected `agent/${ISSUE_ID}` head with `--force-with-lease`.
 2. Confirm `gh pr view "${EXISTING_PR_NUMBER}"` is still open, targets that
@@ -242,14 +257,7 @@ git push --force-with-lease origin "agent/${ISSUE_ID}"
 gh pr view "${EXISTING_PR_NUMBER}" --json state,url,headRefName,headRefOid
 ```
 
-| PR required | Direct-merge candidate |
-|---|---|
-| Security, auth, or public API changes | Documentation-only changes |
-| More than 5 files or 200+ lines | Config or dotfile tweaks |
-| Database or schema changes | Test-only changes |
-| Backward-compatibility risk | Small single-file bug fixes with tests |
-
-### PR-required path
+#### PR-required path
 
 1. Push the branch:
 
@@ -280,7 +288,7 @@ PR_NUMBER=$(echo "${PR_URL}" | sed -n 's#.*/pull/\([0-9][0-9]*\).*#\1#p')
    retry, route it through `blocked-awaiting-coordinator` using the policy in
    [references/runtime-contract.md](references/runtime-contract.md).
 
-### Direct-merge-candidate path
+#### Direct-merge-candidate path
 
 If no PR is needed:
 
@@ -338,10 +346,14 @@ Never call `bd close`. Only the coordinator closes or reclassifies beads.
 
 ## Output
 
-Generate the final Worker Report with:
+The Worker Report is the only valid ending. Do not stop on a plan, a question,
+or a promise of further work: finish the bead, or, for an external or
+hard-gated blocker only (see Handling Blockers), report
+`blocked-awaiting-coordinator`. Anything else you decide and record. Generate
+the report with:
 
 ```bash
-python3 scripts/emit_worker_report.py ...
+python3 "<loaded beads-worker package>/scripts/emit_worker_report.py" ...
 ```
 
 The exact field contract, examples, and JSON entry schemas live in

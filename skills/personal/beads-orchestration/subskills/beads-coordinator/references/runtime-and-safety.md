@@ -115,7 +115,7 @@ continuing to burn cache-hit polls on nothing:
   rather than polling forever. Any wake that finds real work (even one
   dispatchable bead) resets the no-op counter to zero and returns to the
   near-term-work cadence above.
-- This still respects the mandatory heartbeat-renewal checkpoints below: renew
+- This still respects the mandatory heartbeat-renewal checkpoints above: renew
   the stall heartbeat on any wake that performs a `bd` mutation.
 
 Net shape: fast, cache-cheap polling while there is work to track; slow,
@@ -163,9 +163,9 @@ to medium tier first, then to Opus.
 
 ### Claude Dispatch Binding
 
-Pass model and effort independently. Set effort explicitly: both models default
-to `medium`, which would violate the Sonnet low/high and Opus low/high rows if
-omitted.
+Pass model and effort independently. Where the runtime accepts an effort
+argument, set it explicitly: both models default to `medium`, which would
+violate the Sonnet low/high and Opus high rows if omitted.
 
 | Policy choice | `model` | `effort` |
 |---|---|---|
@@ -173,6 +173,14 @@ omitted.
 | Sonnet 5.5 High | `claude-sonnet-5-5` | `high` |
 | Opus 5.5 Medium | `claude-opus-5-5` | `medium` |
 | Opus 5.5 High | `claude-opus-5-5` | `high` |
+
+Claude Code's `Agent` tool takes `model` as a family alias (`sonnet`, `opus`)
+rather than the full ID, and has no per-dispatch effort argument: a subagent's
+effort comes from its agent definition (`.claude/agents/*.md` frontmatter or
+SDK `agents`). To hold a pairing there, dispatch an agent type whose
+definition sets that effort. Where no such definition exists, the effort
+column is a target, not a guarantee: dispatch the right model and say in the
+final report that effort was not set per dispatch.
 
 ### Codex Dispatch Binding
 
@@ -200,30 +208,6 @@ subagent mechanism:
 | Simple bugfixes | `MEDIUM_COMPLEXITY_MODEL` |
 | Formatting, linting | `TRIVIAL_COMPLEXITY_MODEL` |
 | Probes: bootstrap/status checks, recovery probes, read-only lookups (`Explore`-style) | `TRIVIAL_COMPLEXITY_MODEL`, read-only tools; prefer a script or one composite command over a subagent when the answer is mechanical |
-
-## Review Risk Tiers
-
-Every review verdict is bound to the **exact head SHA** inspected. If the head
-moves, merge readiness expires until that SHA is reviewed.
-
-| Tier | Examples | Review policy |
-|---|---|---|
-| High | auth/authorization, approvals, secrets, cross-schema boundaries, migrations/persisted contracts, concurrency/distributed state, replay/idempotence, data loss | Dedicated independent exact-head review. Any reviewer-authored semantic fix or material risk-changing correction requires a fresh independent reviewer. |
-| Standard | Cohesive product/backend/UI behavior with bounded failure surface | Independent exact-head review; retain the same reviewer for correction rechecks when independence is intact. |
-| Low | Tiny docs, tests, formatting, chore, or mechanical refactor with no observable contract/risk change | Schedule a sequential convoy of 3-4 same-domain review beads to one sticky reviewer identity. Process one PR/SHA and emit one verdict at a time; escalate on any semantic finding. |
-
-**Reviewer lanes.** Standard- and low-tier reviews run on a sticky reviewer
-lane: one reviewer session takes sequential reviews (and their correction
-rechecks) so the repo context it loaded stays cached. A reviewer lane never
-reviews a PR produced by an implementation lane it shares a session with.
-High-tier reviews, and any review that needs a fresh reviewer, retire or
-bypass the reviewer lane and start cold. Independence beats cache.
-
-Risk tiers reduce repeated context loading, never the evidence required for the
-actual change. Do not batch high-risk work or merge an unreviewed moved head.
-"Sequential convoy" never means one multi-PR reviewer worker: the one-bead,
-one-PR report contract remains intact, and the coordinator dispatches the next
-low-risk bead only after the prior verdict returns.
 
 Concrete `TRIVIAL_COMPLEXITY_MODEL` criteria — dispatch at TRIVIAL when **all** hold:
 - docs-only, config/dotfile-only, test-only, or single-file mechanical change
@@ -266,7 +250,7 @@ catch coverage gaps across a large epic.
 Rule: before dispatching a reconciliation bead, resolve its parent epic's
 complexity tier (see `epic-coordination.md` → "Epic Complexity Tiers"). If the
 epic is **medium or higher** (1+ positive classification signal, or it carries
-the `team-coordination` label), you MUST dispatch the reconciliation bead at
+the `team-coordination` label), dispatch the reconciliation bead at
 `EPIC_COMPLEXITY_MODEL` — i.e. Opus on Claude. This is a floor, not a
 target: never drop below it for a qualifying epic, regardless of the bead's
 `task` type. Only a low/trivial epic (0 signals) may reconcile at
@@ -278,6 +262,30 @@ To find the parent epic and its tier:
 EPIC_ID=$(bd show <recon-id> --json | jq -r '.parent // .epic // empty')
 bd show "${EPIC_ID}" --json   # inspect scope + labels for the tier signals
 ```
+
+## Review Risk Tiers
+
+Every review verdict is bound to the **exact head SHA** inspected. If the head
+moves, merge readiness expires until that SHA is reviewed.
+
+| Tier | Examples | Review policy |
+|---|---|---|
+| High | auth/authorization, approvals, secrets, cross-schema boundaries, migrations/persisted contracts, concurrency/distributed state, replay/idempotence, data loss | Dedicated independent exact-head review. Any reviewer-authored semantic fix or material risk-changing correction requires a fresh independent reviewer. |
+| Standard | Cohesive product/backend/UI behavior with bounded failure surface | Independent exact-head review; retain the same reviewer for correction rechecks when independence is intact. |
+| Low | Tiny docs, tests, formatting, chore, or mechanical refactor with no observable contract/risk change | Schedule a sequential convoy of 3-4 same-domain review beads to one sticky reviewer identity. Process one PR/SHA and emit one verdict at a time; escalate on any semantic finding. |
+
+**Reviewer lanes.** Standard- and low-tier reviews run on a sticky reviewer
+lane: one reviewer session takes sequential reviews (and their correction
+rechecks) so the repo context it loaded stays cached. A reviewer lane never
+reviews a PR produced by an implementation lane it shares a session with.
+High-tier reviews, and any review that needs a fresh reviewer, retire or
+bypass the reviewer lane and start cold. Independence beats cache.
+
+Risk tiers reduce repeated context loading, never the evidence required for the
+actual change. Do not batch high-risk work or merge an unreviewed moved head.
+"Sequential convoy" never means one multi-PR reviewer worker: the one-bead,
+one-PR report contract remains intact, and the coordinator dispatches the next
+low-risk bead only after the prior verdict returns.
 
 ## Central Mutation Authority
 
@@ -306,13 +314,15 @@ Workers may not:
 - Use the runtime's native subagent mechanism.
 - Never shell out to `codex` / `claude` / `opencode` / `gemini` binaries
   directly to create workers.
-- When referencing bundled files, prefer relative paths from this skill folder.
+- Inside this package's docs, cross-reference bundled files by relative path.
+  In dispatch prompts and commands, pass absolute paths (see "Discover
+  subskills" in the package router).
 
 ### Runtime Table
 
 | Runtime | Dispatch mechanism | Permission flag |
 |---|---|---|
-| Claude Code | `Agent` tool (formerly `Task`); pass `model` per the tables above, run workers in the background and act on their completion notification | `--dangerously-skip-permissions` on the coordinator session; subagents inherit it |
+| Claude Code | `Agent` tool (formerly `Task`); pass `model` as the family alias for the tables' choice, run workers in the background and act on their completion notification | `--dangerously-skip-permissions` on the coordinator session; subagents inherit it |
 | Codex | built-in subagent | `--yolo` |
 | OpenCode | built-in subagent dispatch | use runtime's full-auto mode |
 

@@ -36,7 +36,7 @@ count drives both the dispatch decision and the reconciliation-model floor.
 
 "Medium or higher" therefore means **1+ positive signals**, or any epic that
 carries the `team-coordination` label. For those epics the terminal
-reconciliation bead MUST be dispatched at `EPIC_COMPLEXITY_MODEL` (Opus on
+reconciliation bead is dispatched at `EPIC_COMPLEXITY_MODEL` (Opus on
 Claude); see "Reconciliation Floor" in `runtime-and-safety.md`.
 
 ## Independent Dispatch
@@ -56,7 +56,11 @@ Claude); see "Reconciliation Floor" in `runtime-and-safety.md`.
    CHILD_ID=$(echo "${CHILD_JSON}" | jq -r '.id // .[0].id')
    bd dep add <epic-id> "${CHILD_ID}"
    ```
-4. Then dispatch the subtasks.
+4. Then dispatch the subtasks through the normal loop. Each child must pass
+   the dispatch-readiness gate in `coordinator-loop.md`: a title-and-description
+   stub like the one above is stamped `needs-shaping`, and the shaping lane
+   there fills in its `design` and `acceptance_criteria` before it can
+   dispatch.
 
 ## Team Coordination Mode
 
@@ -100,19 +104,23 @@ While a Team Lead is active:
 4. Build prompt:
 
 ```text
-You are a Team Lead for an epic-complexity issue. Your job is to architect,
-coordinate sub-workers, integrate their output, and deliver one consolidated
-PR.
+Lead one epic-complexity issue: settle the shared design, coordinate
+sub-workers, integrate their output, and deliver one consolidated PR.
 
 ISSUE_ID: <epic-id>
 WORKTREE_PATH: <team-lead-worktree-path>
 REPO_ROOT: <repo-root>
 TEAM_SIZE: <number of sub-workers you may spawn>
+WORKER_SKILL: <absolute path to beads-worker/SKILL.md>
 
-Issue details:
-<bd show --json output>
+Summary: <2-4 lines plus the acceptance criteria; run `bd show` for more>
 
 Rules:
+- Follow WORKER_SKILL for bootstrap, verification, handoff, and the final
+  Worker Report. This dispatch lifts only its ban on spawning code-writing
+  helpers.
+- Subworkers commit and push their own branch and report to you. They have no
+  bead of their own and open no PR.
 - Do not mutate Beads lifecycle.
 - If you need follow-up beads, report concrete proposals for the coordinator.
 - Every code-writing subworker must get its own worktree and branch.
@@ -125,12 +133,14 @@ Rules:
 
 Recommended naming:
 - Team Lead branch: `agent/<epic-id>`
-- Subworker branch: `agent/<epic-id>/<slice-id>`
+- Subworker branch: `agent/<epic-id>-<slice-id>` (not `agent/<epic-id>/<slice-id>`:
+  Git cannot hold a branch nested under the existing `agent/<epic-id>` ref)
 - Subworker worktree:
   `.worktrees/parallel-agents/<epic-id>-<slice-id>`
 
 The Team Lead integrates subworker branches into `agent/<epic-id>` after each
-subworker completes.
+subworker completes, then removes that slice's worktree and branch so cleanup
+does not later report them as orphans of an unknown bead.
 
 ### Monitoring Team Leads
 

@@ -265,7 +265,7 @@ if require_file "$REVIEW_FIXTURE/expected-gate-output.md" \
     p && /^## [^#]/              { exit }
     p                            { print }
   ' "$GATE_OUT")
-  if echo "$revised_section" | grep -qE '^\|[^|]+\|[^|]+\|\s*(P0|C|Critical)\s*\|'; then
+  if grep -qE '^\|[^|]+\|[^|]+\|\s*(P0|C|Critical)\s*\|' <<<"$revised_section"; then
     _fail "project-review: overclaim check — P0/Critical severity survived the gate in Revised Risk Register"
   else
     _pass "project-review: overclaim check — no P0/Critical rows survived into Revised Risk Register"
@@ -469,7 +469,7 @@ else
 
   rc=0
   out=$(uv run "$TRACE_SCRIPT" "$TRACE_FIXTURES/multiple-restatements" --authoring 2>&1) || rc=$?
-  if [[ $rc -eq 1 ]] && echo "$out" | grep -q "duplicate ID 'REQ-core-auth-001'"; then
+  if [[ $rc -eq 1 ]] && grep -q "duplicate ID 'REQ-core-auth-001'" <<<"$out"; then
     _pass "spec-trace: multiple active deltas cannot restate one main-spec ID"
   else
     _fail "spec-trace: multiple active deltas reused a main-spec ID (exit $rc): $out"

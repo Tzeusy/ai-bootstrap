@@ -14,7 +14,7 @@ Use when dispatching investigation subagents for project direction analysis.
 | D | Alignment review & gap analysis | A + B + C findings (+ review-packet constraints) | Alignment matrix, classification, gaps, push-back list, spec deltas |
 
 **Dispatch strategy**:
-- Launch A, B, C in parallel (B starts with scan output; doesn't need A's full output to read specs). Each is isolated because its evidence set (doctrine, specs, code) would flood the orchestrator; three in flight is the cache-first ceiling, not a target.
+- Launch A, B, C in parallel (B starts with scan output; doesn't need A's full output to read specs). Each is isolated because its evidence set (doctrine, specs, code) would flood the orchestrator; three in flight stays inside the cache-first lane ceiling and is not a target.
 - Launch D after A, B, C complete (it synthesizes their findings).
 - Handoff Output (direction report + beads handoff) is assembled by the orchestrator from all agent outputs; not a numbered phase.
 - **Receiver protocol**: fresh `../../project-review/` packet exists → Agent C's dispatch must explicitly list the dimensions to SKIP (review-scored: typically test confidence, observability, delivery readiness) and narrow C to architectural fitness for the proposed direction.

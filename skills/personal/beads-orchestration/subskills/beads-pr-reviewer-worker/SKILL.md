@@ -6,8 +6,9 @@ metadata:
   authors:
     - tze
     - OpenAI Codex
+    - Claude Fable 5.1
   status: active
-  last_reviewed: "2026-09-27"
+  last_reviewed: "2026-10-04"
 compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, gh, and python3 available, plus authenticated GitHub access and network access for review, push, and merge operations.
 ---
 
@@ -15,12 +16,9 @@ compatibility: Requires a Beads-backed git repository with git worktrees, git, b
 
 ## Overview
 
-You are a **Beads PR Reviewer Worker**. Process exactly one dedicated
-`pr-review-task` bead tied to a GitHub PR.
-
-Your job is to:
+Process exactly one dedicated `pr-review-task` bead tied to a GitHub PR:
 - resolve the original implementation bead and canonical PR,
-- review unresolved feedback and new notable issues,
+- review the exact head's diff, its unresolved threads, and its tests,
 - leave actionable, resolvable findings for the implementation/recovery lane,
 - decide whether the PR is mergeable,
 - report the outcome in a machine-readable form for the coordinator.
@@ -72,7 +70,8 @@ against the diff before handoff.
 
 ## Bundled Helpers
 
-Use the bundled helpers in `scripts/` for deterministic read-only operations:
+Use the bundled helpers for deterministic operations (prepare, reply, resolve,
+and comment mutate GitHub or push), each by the loaded package's absolute path:
 
 - [`scripts/resolve_review_context.py`](scripts/resolve_review_context.py)
   Resolves the original bead, PR number, repo, branches, and current PR state.
@@ -137,7 +136,9 @@ python3 "${ASSERT_WORKER_CONTEXT}" \
 Resolve the helper from the loaded `beads-worker/SKILL.md` path. It derives the
 branch and repository identity without inherited `GIT_*` overrides. Run it and
 later Git/worktree commands with actual cwd set to `WORKTREE_PATH`; `bd -C`
-does not set Git's cwd.
+does not set Git's cwd. On a re-review hand-back the worktree is already on
+`agent/<original-id>` (the ID is in the review bead's notes): pass that ID as
+`--issue-id`.
 
 4. Confirm GitHub access before doing anything expensive:
 
@@ -165,7 +166,7 @@ If review context cannot be resolved, stop and report
 Concrete invocation:
 
 ```bash
-CONTEXT_JSON=$(python3 scripts/resolve_review_context.py --issue-id "${ISSUE_ID}")
+CONTEXT_JSON=$(python3 "<loaded beads-pr-reviewer-worker package>/scripts/resolve_review_context.py" --issue-id "${ISSUE_ID}")
 ```
 
 ### Phase 2: Prepare The PR Branch
@@ -180,7 +181,7 @@ bd worktree remove "${REPO_ROOT}/.worktrees/parallel-agents/${ORIGINAL_ID}" 2>/d
 2. Prepare the PR branch with the bundled helper:
 
 ```bash
-PREP_JSON=$(python3 scripts/prepare_pr_branch.py \
+PREP_JSON=$(python3 "<loaded beads-pr-reviewer-worker package>/scripts/prepare_pr_branch.py" \
   --base-branch "${PR_BASE_BRANCH}" \
   --head-branch "${PR_HEAD_BRANCH}")
 ```
@@ -209,7 +210,7 @@ Never stash, check out `main`, or push `main` from the worktree.
 1. Fetch review threads with:
 
 ```bash
-THREADS_JSON=$(python3 scripts/list_review_threads.py \
+THREADS_JSON=$(python3 "<loaded beads-pr-reviewer-worker package>/scripts/list_review_threads.py" \
   --owner "${OWNER}" \
   --repo "${REPO}" \
   --pr-number "${PR_NUMBER}")
@@ -229,7 +230,7 @@ THREADS_JSON=$(python3 scripts/list_review_threads.py \
 4. Use the bundled thread helpers instead of raw ad hoc API calls:
 
 ```bash
-python3 scripts/reply_to_review_thread.py \
+python3 "<loaded beads-pr-reviewer-worker package>/scripts/reply_to_review_thread.py" \
   --owner "${OWNER}" \
   --repo "${REPO}" \
   --pr-number "${PR_NUMBER}" \
@@ -238,24 +239,26 @@ python3 scripts/reply_to_review_thread.py \
   --body "${BODY}" \
   --dedupe-key "${ISSUE_ID}:${THREAD_ID}:reply"
 
-python3 scripts/resolve_review_thread.py \
+python3 "<loaded beads-pr-reviewer-worker package>/scripts/resolve_review_thread.py" \
   --thread-id "${THREAD_ID}"
 ```
 
-5. If you discover a new notable issue not already tracked in a thread, leave a
-   line-level review comment so it creates a resolvable thread. Use
-   the bundled helper:
+5. Review the exact-head diff against the original bead's acceptance criteria
+   and governing spec; threads alone are not the review. Leave a line-level
+   comment (a resolvable thread) for each untracked verdict-changing issue:
+   correctness, contract, acceptance, the craft-and-care bar, or a test-growth
+   gate. When unsure, thread it; the rest go to `Discovered-Follow-Ups-JSON`:
 
 ```bash
-python3 scripts/create_inline_review_comment.py \
+python3 "<loaded beads-pr-reviewer-worker package>/scripts/create_inline_review_comment.py" \
   --owner "${OWNER}" \
   --repo "${REPO}" \
   --pr-number "${PR_NUMBER}" \
   --commit-id "${HEAD_SHA}" \
-  --path "${PATH}" \
+  --path "${FILE_PATH}" \
   --line "${LINE}" \
   --body "${BODY}" \
-  --dedupe-key "${ISSUE_ID}:${PATH}:${LINE}"
+  --dedupe-key "${ISSUE_ID}:${FILE_PATH}:${LINE}"
 ```
 
 6. Review the tests as part of the diff using
@@ -312,7 +315,7 @@ all gates affected by any exceptional code change. Typical gates:
 If project docs do not name the commands clearly, use:
 
 ```bash
-python3 scripts/discover_quality_gates.py
+python3 "<loaded beads-pr-reviewer-worker package>/scripts/discover_quality_gates.py"
 ```
 
 Treat discovered commands as candidates that still need judgment, not blind
@@ -323,16 +326,12 @@ gate stdout to a log file and read back only the exit status plus the failure
 tail, and while iterating on a fix run only the tests covering it — the full
 defined gate runs once, immediately before the merge decision.
 
-If a repository-level `craft-and-care` skill exists, run the final standards
-pass from `../../references/craft-and-care-gate.md` against the actual diff
-before handoff.
-
 ### Phase 5: Merge Or Report Retry
 
 1. Evaluate merge readiness with:
 
 ```bash
-MERGE_JSON=$(python3 scripts/evaluate_merge_readiness.py \
+MERGE_JSON=$(python3 "<loaded beads-pr-reviewer-worker package>/scripts/evaluate_merge_readiness.py" \
   --owner "${OWNER}" \
   --repo "${REPO}" \
   --pr-number "${PR_NUMBER}")
@@ -400,8 +399,9 @@ loop whenever you materially change this skill.
 
 ## Output Format
 
-When you finish, produce exactly this high-level structure. Scalar fields are
-plain text. Collections are compact valid JSON arrays.
+This report is the only valid ending; never stop on a plan or a question. Only
+an external or hard-gated blocker is `blocked-awaiting-coordinator`. Produce
+exactly this high-level structure: plain-text scalars, compact JSON arrays.
 
 ````text
 ## PR Reviewer Report: <ISSUE_ID>

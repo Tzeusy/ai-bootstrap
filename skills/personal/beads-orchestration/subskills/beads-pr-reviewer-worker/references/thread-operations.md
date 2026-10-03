@@ -7,9 +7,9 @@ machine-readable. Prefer review-thread comments over top-level PR comments when
 the issue is anchored to code.
 
 Helper scripts:
-- `python3 scripts/reply_to_review_thread.py ...`
-- `python3 scripts/resolve_review_thread.py ...`
-- `python3 scripts/create_inline_review_comment.py ...`
+- `python3 "<loaded beads-pr-reviewer-worker package>/scripts/reply_to_review_thread.py" ...`
+- `python3 "<loaded beads-pr-reviewer-worker package>/scripts/resolve_review_thread.py" ...`
+- `python3 "<loaded beads-pr-reviewer-worker package>/scripts/create_inline_review_comment.py" ...`
 
 ## Reply To An Existing Review Thread
 
@@ -22,7 +22,9 @@ gh api "repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}/comments" \
 ```
 
 Guidance:
-- use `fixed`, `answered`, or `won't-fix` language explicitly
+- state the verdict explicitly: `correction-required`, `answered`,
+  `won't-fix`, or `duplicate`; say `fixed` only once the corrected head is
+  verified
 - reference the concrete change or rationale
 - do not resolve the thread until the reply is truthful
 - include a stable `--dedupe-key` on retries so duplicate replies are skipped
@@ -56,14 +58,14 @@ HEAD_SHA=$(gh pr view "${PR_NUMBER}" --json headRefOid -q .headRefOid)
 gh api "repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}/comments" \
   -f body="${BODY}" \
   -f commit_id="${HEAD_SHA}" \
-  -f path="${PATH}" \
+  -f path="${FILE_PATH}" \
   -F side='RIGHT' \
   -F line="${LINE}"
 ```
 
 Guidance:
 - prefer concise, actionable comments
-- use this only for notable issues that should become resolvable threads
+- use this only for verdict-changing issues that should become resolvable threads
 - do not use top-level timeline comments for merge-readiness tracking when a
   code anchor exists
 - include a stable `--dedupe-key` on retries so duplicate comments are skipped

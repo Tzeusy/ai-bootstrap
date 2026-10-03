@@ -15,7 +15,7 @@ Do not invent synonyms such as `done`, `blocked`, or `needs-review`.
 ## Standard Usage
 
 ```bash
-python3 scripts/emit_worker_report.py \
+python3 "<loaded beads-worker package>/scripts/emit_worker_report.py" \
   --status completed-direct-merge-candidate \
   --issue-id "${ISSUE_ID}" \
   --worktree-path "${WORKTREE_PATH}" \

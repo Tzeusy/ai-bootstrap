@@ -59,5 +59,5 @@ more were free. Tests are production code with a run-time cost on every PR.
 ## Not covered here
 
 Coverage thresholds, mutation testing, and the periodic condensation pass live
-in `th-engineering/subskills/test-rigor/references/suite-discipline.md`. This
+in `../../th-engineering/subskills/test-rigor/references/suite-discipline.md`. This
 gate only stops the autonomous lane from growing the suite without thinking.
