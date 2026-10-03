@@ -32,7 +32,7 @@ MERGE_QUEUE=$(gh api "repos/{owner}/{repo}/rules/branches/${BASE}" \
 
 | Constraint | Value |
 |---|---|
-| Worker lanes | 1 by default; open a 2nd/3rd only under `../../../references/token-efficiency.md` → "Cache-first execution"; ceiling 3 unless the owner explicitly asks for more |
+| Worker lanes | 1 by default; open a 2nd-4th only under `../../../references/token-efficiency.md` → "Cache-first execution"; ceiling 4 (owner-raised from 3) unless the owner explicitly asks for more |
 | Lane unit | one long-lived worker session running one bead at a time; each bead keeps its own claim, worktree, branch, PR, and report |
 | Slot | an idle lane, or unused capacity to open one within the lane limit; implementation and reviewer lanes are separate |
 | Worker isolation | each worker gets its own beads worktree and branch |

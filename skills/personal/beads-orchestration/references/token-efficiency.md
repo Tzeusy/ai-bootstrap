@@ -32,7 +32,7 @@ Default to the second shape:
   Continue the lane's session for the next bead (Claude Code: `SendMessage` to
   the worker's agent id/name; Codex: send input to the same thread) instead of
   spawning a fresh worker.
-- **Default one lane.** Run a second lane (the ceiling stays 3) only when a
+- **Default one lane.** Run a second lane (the ceiling is 4; the owner raised it from 3) only when a
   ready chain has none of the cohesion signals in
   `../../th-projects/references/work-allocation.md` with the active lane, **and**
   either the owner asked for throughput or the active lane is idle, waiting on
