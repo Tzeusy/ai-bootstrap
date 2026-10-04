@@ -1,6 +1,8 @@
 personality = "pragmatic"
-model = "gpt-5.4"
+model = "gpt-6.1-sol"
 model_reasoning_effort = "high"
+model_context_window = 400000
+model_auto_compact_token_limit = 260000
 project_doc_fallback_filenames = ["CLAUDE.md", "COPILOT.md"]
 
 # Add your project paths here:
