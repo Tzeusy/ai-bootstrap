@@ -1,7 +1,8 @@
 {
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "ENABLE_TOOL_SEARCH": "1"
+    "ENABLE_TOOL_SEARCH": "1",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "400000"
   },
   "permissions": {
     "deny": [
@@ -47,12 +48,12 @@
     "type": "command",
     "command": "bash ~/.claude/statusline.sh"
   },
+  "outputStyle": "tree",
   "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
   "autoCompactEnabled": true,
   "autoContinueAtUsageLimit": true,
   "teammateMode": "in-process",
   "remoteControlAtStartup": true,
-  "compactModel": "sonnet",
-  "outputStyle": "tree"
+  "compactModel": "sonnet"
 }
