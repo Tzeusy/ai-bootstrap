@@ -1,6 +1,6 @@
 ---
 name: user-run
-description: 'Use when a step needs privileges this session lacks (docker, another user''s checkout or secrets, host access) and the owner must run it as tze. Writes a reviewable /home/orca/.tmp/<slug>/run.sh that impersonates tze (USER_TO_IMPERSONATE overrides), tees timestamped logs plus latest.log and collects artifacts there; Claude presents it with a risk and time brief, then continues from the logs. Triggers: "I''ll run it for you", "permission denied on docker.sock", "run as tze", "/user-run".'
+description: 'Use when a step needs privileges this session lacks (docker, sudo, another user''s checkout or secrets, host access) and the owner must run it as tze. Writes a reviewable /home/orca/.tmp/<slug>/run.sh that impersonates tze (USER_TO_IMPERSONATE overrides), tees timestamped logs plus latest.log and collects artifacts there; Claude presents it with a risk and time brief, then continues from the logs. Triggers: "I''ll run it for you", "permission denied on docker.sock", "needs sudo", "sudo: a password is required", "run as tze", "/user-run".'
 metadata:
   owner: tze
   authors:
