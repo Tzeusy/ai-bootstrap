@@ -19,7 +19,7 @@
       "ExitWorktree"
     ]
   },
-  "model": "sonnet",
+  "model": "opus",
   "hooks": {
     "PreCompact": [
       {
