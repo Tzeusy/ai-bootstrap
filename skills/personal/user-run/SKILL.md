@@ -36,7 +36,8 @@ the payload; never `~`, which expands to `/home/tze` there.
   run.sh                   harness + PAYLOAD heredoc
   .lock                    held while a run is in progress (one run at a time)
   <RUN_ID>.log             full stdout+stderr of one run (RUN_ID = YYYYmmddHHMMSS)
-  <RUN_ID>.exit            payload exit code; absent if the run died
+  <RUN_ID>.exit            exit code; absent if the run died
+  <RUN_ID>.started         written once su succeeded and the payload began
   payload.<RUN_ID>.sh      the payload exactly as executed
   latest.log, latest.exit  symlinks to the newest run (latest.exit absent while running)
   artifacts/<RUN_ID>/      $ARTIFACTS for that run; artifacts/latest -> newest
@@ -55,11 +56,17 @@ and write everything. Earlier runs' artifacts stay readable under
    idempotent, never overwrites `run.sh`, and first prunes user-run state
    older than 7 days ([cleanup](#cleanup)).
 3. **Write the payload.** Edit only the `PAYLOAD` heredoc in `run.sh`:
-   - Keep `set -euo pipefail`. Add `set -o pipefail` before any `$(… | tail)`.
-   - Use absolute paths, `cd` explicitly, and use `/home/tze/...` for tze's
-     checkouts. No line may be exactly `PAYLOAD`; it ends the heredoc.
+   - Keep the `set -euo pipefail` and `shopt -s inherit_errexit` lines (the
+     latter makes `set -e` apply inside `$(…)`).
+   - Use absolute paths and `cd` explicitly first: the starting directory is
+     the owner's cwd when run directly, `/home/tze` under `su -`. Use
+     `/home/tze/...` for tze's checkouts. No line may be exactly `PAYLOAD`;
+     it ends the heredoc.
    - Stdin is `/dev/null`: nothing may wait for typed input except `sudo`,
-     which prompts on the terminal. Use `--yes`/`-y` style flags.
+     which prompts on the terminal. Use `--yes`/`-y` style flags. Pagers and
+     colour are off (`PAGER=cat`, `GIT_PAGER=cat`, `SYSTEMD_PAGER=cat`,
+     `NO_COLOR=1`); stdout may still be a terminal, so pass `--no-pager` or
+     `--quiet` to tools that ignore those.
    - Write machine-readable results (tags, SHAs, JSON) to `"$ARTIFACTS/…"`, and
      `echo` a one-line `RESULT key=value` summary at the end.
    - Never print secrets. Load them with `set -a; . <envfile>; set +a` or
@@ -71,11 +78,16 @@ and write everything. Earlier runs' artifacts stay readable under
 4. **Validate**: `bash -n run.sh`, and re-read the payload once.
 5. **Present it** to the owner using the brief below, then stop and wait.
 6. **When the owner says it ran**, run `bash <skill-dir>/scripts/status.sh <slug>`:
-   it reports `running`, `done exit=N` or `died`, the `RESULT` lines, the
-   artifacts and the log tail. Read more of the log only if that is not
-   enough. Then continue the task on your own. On failure, diagnose from the
-   log, fix the payload, and present the delta. Re-present the whole brief
-   only if the risk changed. `exit=130`/`143` means it was interrupted or killed.
+   it reports the state, the `RESULT` lines, the artifacts and the log tail.
+   Read more of the log only if that is not enough. States:
+   - `done exit=N`: the payload ran; N is its exit code (130 = Ctrl-C).
+   - `not-started`: `su` failed (wrong password); the payload never ran.
+   - `died`: no exit code (killed, or the terminal closed mid-run).
+   - `running`: wait, or ask the owner.
+
+   Then continue the task on your own. On failure, diagnose from the log,
+   fix the payload, and present the delta. Re-present the whole brief only
+   if the risk changed.
 
 ## Presentation brief (every time)
 
@@ -109,11 +121,17 @@ Lead with the command, then:
   are harmless). A plain `su -c` misses it, which is how `bws` went missing on
   2026-10-09.
 - One `tee` captures everything, including the payload's stderr, with start
-  and end markers and the exit code. Ctrl-C still records `exit=130` and keeps
-  the log tail. A second run of the same slug while one is in progress is
-  refused.
+  and end markers and the exit code. Ctrl-C, TERM and hangup are noted in the
+  log and the payload's own exit code is recorded (130 unless the payload
+  traps the signal). Under `su --pty` the log has CRLF line endings;
+  `status.sh` strips them.
+- A second run of the same slug while one is in progress is refused. The
+  whole harness is parsed before it runs, so editing `run.sh` mid-run is
+  safe and takes effect on the next run.
 - It refuses early, with a reason, when the slug dir is not writable by the
-  invoker, the target user does not exist, or `su` would have no terminal.
+  invoker, the target user does not exist, `su` would have no terminal, the
+  payload can't be written in full (disk full), or the payload has a syntax
+  error.
 
 ## Cleanup
 
@@ -121,9 +139,16 @@ Lead with the command, then:
 default 7 days) removes, under `<base>`, slug dirs with no file modified in N
 days, and older runs (log, exit, payload copy, artifacts) inside live slug
 dirs, always keeping the latest run. It touches only dirs whose `run.sh`
-carries the `# user-run:` header, and skips slugs with a run in progress.
-Files the payload left without group write permission can't be removed; it
-reports them and carries on.
+carries the `# user-run:` header, and holds each slug's lock while pruning
+it: it skips a run in progress, and a run started meanwhile is refused. Files the
+payload left without group write permission can't be removed; it reports
+them, keeps `run.sh` so the next cleanup retries, and carries on.
+
+## Tests
+
+`tests/harness.sh` runs the harness end to end in a throwaway dir (direct
+branch only; `su --pty` needs a password). Run it after changing the
+template or scripts.
 
 ## Template
 

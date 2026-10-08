@@ -22,16 +22,18 @@ if [ -e "$dir/.lock" ]; then
 fi
 if [ "$running" = 1 ]; then
   state=running
+elif [ -e "$dir/$run_id.exit" ] && [ ! -e "$dir/$run_id.started" ]; then
+  state="not-started exit=$(cat "$dir/$run_id.exit") (su failed: wrong password or no terminal; payload never ran)"
 elif [ -e "$dir/$run_id.exit" ]; then
   state="done exit=$(cat "$dir/$run_id.exit")"
 else
-  state="died (no exit code: killed, terminal closed, or su failed before start)"
+  state="died (no exit code: killed or terminal closed mid-run)"
 fi
 
 echo "run=$run_id state=$state"
 echo "log=$dir/$run_id.log ($(wc -l < "$dir/$run_id.log") lines)"
 echo "--- RESULT lines"
-grep -a '^RESULT' "$dir/$run_id.log" || echo "(none)"
+tr -d '\r' < "$dir/$run_id.log" | grep -a '^RESULT' || echo "(none)"
 echo "--- artifacts ($dir/artifacts/$run_id)"
 ls -la "$dir/artifacts/$run_id" 2>/dev/null | tail -n +4 || echo "(none)"
 echo "--- log tail ($lines)"

@@ -5,9 +5,14 @@
 #
 #   Run:      bash __SLUG_DIR__/run.sh
 #   Logs:     __SLUG_DIR__/<RUN_ID>.log, latest.log -> newest
-#   Exit:     __SLUG_DIR__/latest.exit (payload exit code; absent while running)
+#   Exit:     __SLUG_DIR__/latest.exit (exit code; absent while running)
 #   Outputs:  __SLUG_DIR__/artifacts/<RUN_ID>/ ($ARTIFACTS), artifacts/latest -> newest
+#
+# The body is one function, parsed whole before it runs, so editing this file
+# during a run cannot change what the run executes.
 [ -n "${BASH_VERSION:-}" ] || exec /usr/bin/env bash "$0" "$@"
+
+main() {
 set -uo pipefail
 
 RUN_USER="${USER_TO_IMPERSONATE:-tze}"
@@ -24,8 +29,10 @@ if [ "$INVOKER" != "$RUN_USER" ] && [ ! -t 0 ]; then
 fi
 
 # One run per slug at a time. fd 9 holds the lock for the whole run and is
-# closed for the payload, so background children cannot keep it held.
-exec 9>>"$SLUG_DIR/.lock"
+# closed for the payload and tee, so background children cannot keep it held.
+# A read fd is enough for flock, whoever created the lock file.
+[ -e "$SLUG_DIR/.lock" ] || : >> "$SLUG_DIR/.lock"
+exec 9< "$SLUG_DIR/.lock" || die "cannot open $SLUG_DIR/.lock"
 flock -n 9 || die "another run of __SLUG__ is in progress"
 
 RUN_ID="$(date +%Y%m%d%H%M%S)"
@@ -36,9 +43,6 @@ PAYLOAD_FILE="$SLUG_DIR/payload.$RUN_ID.sh"
 
 mkdir -p "$ARTIFACTS" || die "cannot create $ARTIFACTS"
 : > "$LOG" || die "cannot write $LOG"
-rm -f "$SLUG_DIR/latest.exit"
-ln -sfn "$RUN_ID.log" "$SLUG_DIR/latest.log"
-ln -sfn "$RUN_ID" "$SLUG_DIR/artifacts/latest"
 
 # ---------------------------------------------------------------- PAYLOAD
 # Runs as $RUN_USER under that user's interactive shell config (PATH from
@@ -46,34 +50,51 @@ ln -sfn "$RUN_ID" "$SLUG_DIR/artifacts/latest"
 # Available: $ARTIFACTS (this run's dir), $SLUG_DIR, $RUN_ID. Keep `set -e`.
 # Never print secret values; this log is read back by Claude.
 # No line may be exactly PAYLOAD: it ends the heredoc.
-cat > "$PAYLOAD_FILE" <<'PAYLOAD'
+cat > "$PAYLOAD_FILE" <<'PAYLOAD' || die "cannot write $PAYLOAD_FILE (disk full?)"
 set -euo pipefail
+shopt -s inherit_errexit
 echo "payload: replace me"
 PAYLOAD
 # ---------------------------------------------------------------- /PAYLOAD
-chmod 0660 "$PAYLOAD_FILE"
+chmod 0660 "$PAYLOAD_FILE" || die "cannot chmod $PAYLOAD_FILE"
+bash -n "$PAYLOAD_FILE" || die "payload has a syntax error"
 
-finish() {
-  echo "== end=$(date -Is) exit=$1"
-  echo "$1" > "$SLUG_DIR/$RUN_ID.exit"
-  ln -sfn "$RUN_ID.exit" "$SLUG_DIR/latest.exit"
-}
+rm -f "$SLUG_DIR/latest.exit"
+ln -sfn "$RUN_ID.log" "$SLUG_DIR/latest.log"
+ln -sfn "$RUN_ID" "$SLUG_DIR/artifacts/latest"
 
 {
-  trap 'finish 130; exit 130' INT
-  trap 'finish 143; exit 143' TERM HUP
+  finish() {
+    # Files first: if the terminal hung up, tee is gone and echo dies of SIGPIPE.
+    echo "$1" > "$SLUG_DIR/$RUN_ID.exit"
+    ln -sfn "$RUN_ID.exit" "$SLUG_DIR/latest.exit"
+    echo "== end=$(date -Is) exit=$1"
+  }
+  # Signals are noted, not acted on: the child gets them too, and its own exit
+  # code (which may come from its own cleanup trap) is what gets recorded.
+  sig=""
+  trap 'sig=INT' INT
+  trap 'sig=TERM' TERM
+  trap 'sig=HUP' HUP
   echo "== user-run __SLUG__ run=$RUN_ID as=$RUN_USER invoked_by=$INVOKER host=$(hostname) start=$(date -Is)"
-  inner="umask 002; export ARTIFACTS='$ARTIFACTS' SLUG_DIR='$SLUG_DIR' RUN_ID='$RUN_ID'; exec bash '$PAYLOAD_FILE' </dev/null"
+  # The .started marker proves authentication succeeded and the payload began.
+  inner="umask 002; export ARTIFACTS='$ARTIFACTS' SLUG_DIR='$SLUG_DIR' RUN_ID='$RUN_ID'"
+  inner+=" PAGER=cat GIT_PAGER=cat SYSTEMD_PAGER=cat NO_COLOR=1;"
+  inner+=" : > '$SLUG_DIR/$RUN_ID.started'; exec bash '$PAYLOAD_FILE' </dev/null"
   if [ "$INVOKER" = "$RUN_USER" ]; then
-    "${SHELL:-/bin/bash}" -ic "$inner" </dev/null 9>&-
+    "${SHELL:-/bin/bash}" -ic "$inner" </dev/null 9<&-
   else
     # su prompts for $RUN_USER's password on this terminal. --pty gives the
     # payload a controlling terminal: plain `su -c` starts a new session
     # without one, and sudo inside the payload then cannot prompt.
-    su --pty - "$RUN_USER" -c "exec \"\${SHELL:-/bin/bash}\" -ic \"$inner\" </dev/null" 9>&-
+    su --pty - "$RUN_USER" -c "exec \"\${SHELL:-/bin/bash}\" -ic \"$inner\" </dev/null" 9<&-
   fi
   rc=$?
   finish "$rc"
+  [ -z "$sig" ] || echo "== signal: $sig"
   exit "$rc"
-} 2>&1 | tee -ai "$LOG" 9>&-
+} 2>&1 | tee -ai "$LOG" 9<&-
 exit "${PIPESTATUS[0]}"
+}
+main "$@"
+exit

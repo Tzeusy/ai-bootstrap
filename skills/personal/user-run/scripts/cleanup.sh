@@ -19,6 +19,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 [[ "$days" =~ ^[0-9]+$ ]] && [ "$days" -ge 1 ] || { echo "bad --days: $days" >&2; exit 2; }
+umask 002
 base="${USER_RUN_BASE:-$HOME/.tmp}"
 [ -d "$base" ] || exit 0
 mins=$((days * 1440))
@@ -27,7 +28,7 @@ status=0
 say() { [ "$quiet" = 1 ] || echo "$@"; }
 remove() {
   if [ "$dry" = 1 ]; then echo "would remove: $*"; return 0; fi
-  rm -rf -- "$@" && say "removed: $*" || { echo "failed to remove: $*" >&2; status=1; }
+  if rm -rf -- "$@"; then say "removed: $*"; else echo "failed to remove: $*" >&2; status=1; return 1; fi
 }
 
 for dir in "$base"/*/; do
@@ -38,13 +39,20 @@ for dir in "$base"/*/; do
   head -n 2 "$dir/run.sh" 2>/dev/null | grep -q '^# user-run: ' || continue
   for k in "${keep[@]}"; do [ "$k" = "$slug" ] && continue 2; done
 
-  # Skip (and hold off new runs of) a slug while we prune it.
-  exec 9>>"$dir/.lock" 2>/dev/null || continue
-  if ! flock -n 9; then say "skip (running): $slug"; exec 9>&-; continue; fi
+  # Hold the slug's lock while pruning it: skips a run in progress, and
+  # refuses a new run until we are done.
+  [ -e "$dir/.lock" ] || : >> "$dir/.lock" || continue
+  exec 9< "$dir/.lock" || continue
+  if ! flock -n 9; then say "skip (running): $slug"; exec 9<&-; continue; fi
 
   if [ -z "$(find "$dir" -mindepth 1 \( -type f -o -type l \) ! -name .lock -mmin -"$mins" -print -quit 2>/dev/null)" ]; then
-    exec 9>&-
-    remove "$dir"
+    # Stale slug: run.sh (the user-run marker) goes last, so a partial
+    # failure leaves a dir the next cleanup still recognises and retries.
+    mapfile -d '' entries < <(find "$dir" -mindepth 1 -maxdepth 1 ! -name run.sh ! -name .lock -print0)
+    if [ "${#entries[@]}" -eq 0 ] || remove "${entries[@]}"; then
+      [ "$dry" = 1 ] && echo "would remove: $dir" || { rm -rf -- "$dir" && say "removed: $dir" || { echo "failed to remove: $dir" >&2; status=1; }; }
+    fi
+    exec 9<&-
     continue
   fi
 
@@ -53,9 +61,9 @@ for dir in "$base"/*/; do
   while IFS= read -r log; do
     id="$(basename "$log" .log)"
     [ "$id" = "$latest" ] && continue
-    remove "$log" "$dir/$id.exit" "$dir/payload.$id.sh" "$dir/artifacts/$id"
+    remove "$log" "$dir/$id.exit" "$dir/$id.started" "$dir/payload.$id.sh" "$dir/artifacts/$id"
   done < <(find "$dir" -maxdepth 1 -type f -regextype posix-extended \
              -regex '.*/[0-9]{14}\.log' -mmin +"$mins" 2>/dev/null)
-  exec 9>&-
+  exec 9<&-
 done
 exit "$status"
