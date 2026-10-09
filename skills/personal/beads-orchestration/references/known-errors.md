@@ -2299,3 +2299,10 @@ beads (`bu-atsax`, `bu-m09qm`) whose prior coordinator session's heartbeat was
 ## tze-hud: `gh pr merge --squash --auto` fails "Auto merge is not allowed"
 - **Symptom**: reviewer cannot enter the merge queue; repo has enablePullRequestAutoMerge off.
 - **Workaround**: enqueue directly with GraphQL `mutation{enqueuePullRequest(input:{pullRequestId:$id}){mergeQueueEntry{position}}}` (queue still enforces required checks). Observed: 2026-10-03, tze-hud PR #1247.
+
+
+### Guarded label-only updates need a covered field
+- **Symptom**: `bd update ID --if-assignee ACTOR --add-label LABEL` rejects with `--if-assignee/--if-status require at least one field update ... label and parent edits are not covered by the guard`.
+- **Fix**: confirm the current assignee/status, then include the same existing `--status` (a covered field) with the label edit. The label itself is not guarded, so only the sole coordinator writer should do this; do not infer cross-actor mutation authority.
+- **Related**: normalization expects every `pr-review-task` to also have the `pr-review` label; omitting it makes the total inventory partial with `invalid-record`. Repair the existing canonical task, never create a duplicate.
+- Observed: 2026-10-07, bd 1.0.4.
