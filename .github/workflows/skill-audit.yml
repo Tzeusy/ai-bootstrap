@@ -29,6 +29,7 @@ jobs:
           uv run skills/personal/beads-orchestration/subskills/beads-cleanup/tests/test_cleanup_scan.py
           uv run skills/personal/beads-orchestration/subskills/beads-pr-reviewer-worker/tests/test_skill_package.py
           uv run skills/personal/beads-orchestration/subskills/beads-pr-reviewer-worker/tests/test_scripts.py
+          uv run skills/personal/beads-orchestration/subskills/beads-looper/tests/test_skill_package.py
       - name: Audit personal skill packages
         # --strict: skills/personal is warning-free as of dotfiles-hyd; keep it that way.
         run: >

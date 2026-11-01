@@ -164,6 +164,14 @@ below stops one coordinator from duplicating or undoing another's work.
   Adopt a PR's original bead first and its review bead after; if the original
   exits 13, leave the review bead to whoever won. A review bead stays
   `blocked`; never release it to `open`.
+- **Loopers.** A `beads-looper` session registers here as a coordinator with
+  one lane, so it counts against the budget and its dead claims are
+  adoptable. Its PR units are the one exception to "A PR is one ownership
+  unit": an implement looper releases a wired unit (original `blocked`, review
+  bead created without `--assignee`), and a review looper takes it with
+  `--if-assignee ''` (`../../beads-looper/references/review-cycle.md`). A
+  coordinator never takes an unassigned PR unit; it leaves those to the review
+  looper.
 - **Rollout.** Coordinators started before this section existed neither
   register nor pass `--actor`. Restart every running coordinator onto this
   revision at a bead boundary; a mixed fleet can adopt a live old

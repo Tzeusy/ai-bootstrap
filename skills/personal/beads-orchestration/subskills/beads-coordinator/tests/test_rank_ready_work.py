@@ -423,13 +423,14 @@ class ExclusionTests(unittest.TestCase):
             led,
             bead("bd-led.1", parent="bd-led"),
             bead("bd-rev", labels=["pr-review-task"]),
+            bead("bd-fix", labels=["review-correction"]),
             bead("bd-solo"),
         ]
 
         payload = ranking.rank(snapshot(live, [status(led, total=1, closed=0)]), now=NOW)
 
         self.assertEqual(queue_ids(payload), ["bd-solo"])
-        self.assertEqual(payload["excluded"]["review"], 1)
+        self.assertEqual(payload["excluded"]["review"], 2)
         self.assertEqual(payload["excluded"]["team_lead"], 1)
 
     def test_epic_claimed_for_shaping_keeps_its_ready_children_queued(self) -> None:

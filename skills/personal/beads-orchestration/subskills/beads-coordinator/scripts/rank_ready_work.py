@@ -56,7 +56,9 @@ Excluded from the queue, with counts or ids in `excluded`:
 - epics themselves, and every descendant of an `in_progress` epic labelled
   `team-coordination` (a Team Lead holds it; a plain epic claim held for
   shaping or decomposition hides nothing);
-- `pr-review` and `pr-review-task` beads (Step 0 owns them);
+- `pr-review` and `pr-review-task` beads (Step 0 owns them), and
+  `review-correction` beads (an implement looper takes them by label, in
+  correction mode on the existing PR);
 - `needs-shaping` beads (listed per epic, standalone ones by priority);
 - beads with an assignee. Exceptions: an open bead assigned to `--coordinator`
   is queued (a release that kept the assignee), and an open bead whose
@@ -90,7 +92,9 @@ COORDINATOR_PREFIX = "coordinator:"
 FOCUS_LABEL = "focus"
 SHAPING_LABEL = "needs-shaping"
 TEAM_LEAD_LABEL = "team-coordination"
-REVIEW_LABELS = frozenset({"pr-review", "pr-review-task"})
+# `review-correction` marks a looper PR original returned for corrections: only an
+# implement looper may take it, in correction mode on the existing PR.
+REVIEW_LABELS = frozenset({"pr-review", "pr-review-task", "review-correction"})
 DEFAULT_MAX_LANES_PER_EPIC = 2
 DEFAULT_LIMIT = 10
 LIST_LIMIT = 10

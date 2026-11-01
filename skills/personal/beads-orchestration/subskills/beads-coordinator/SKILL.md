@@ -37,6 +37,8 @@ reference that owns each detailed procedure. Load only the reference you need.
 
 ## Do Not Use This Skill When
 
+- running as one self-paced lane with no central coordinator (`/loop`,
+  tmux panes): use `../beads-looper/SKILL.md`
 - implementing a single assigned issue yourself: use `../beads-worker/SKILL.md`
 - reviewing one open PR: use `../beads-pr-reviewer-worker/SKILL.md`
 - only reconciling stale state before a run: use `../beads-cleanup/SKILL.md`

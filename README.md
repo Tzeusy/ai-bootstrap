@@ -126,6 +126,7 @@ This repo is intended to work standalone. Do not assume an enclosing parent repo
 ## Recommended Entry Points
 
 - Want continuous issue execution: start with `beads-coordinator`
+- Want independent self-paced lanes (`/loop`, one tmux pane each) with no central coordinator: run `beads-looper`, implement mode per pane plus one review-mode pane
 - Want to implement one already-assigned issue in a worktree: use `beads-worker`
 - Want PR review follow-up and merge handling: use `beads-pr-reviewer-worker`
 - Want to create or decompose backlog work: use `beads-writer`
