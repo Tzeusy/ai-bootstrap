@@ -7,7 +7,14 @@ heartbeat rules, worker bootstrap rules, monitoring details, or adaptive polling
 
 - Before entering the loop, run `../../beads-cleanup/SKILL.md`. This is mandatory.
 - Run `bd doctor` once at startup and again after any unexpected `bd` error;
-  do not spend worker cycles on a sick tracker.
+  do not spend worker cycles on a sick tracker. The tracker is sick only when
+  `bd` cannot read or write: `rank_ready_work.py` returns `fatal`, or a `bd`
+  command still fails after the transient-timeout retry in
+  `../../../references/known-errors.md`. Doctor errors and warnings that leave
+  reads and writes working (a repo-fingerprint mismatch, an old schema
+  version, gitignore drift) go in the report and never halt the run. Never
+  apply doctor's destructive remedies (`rm -rf .beads`, `bd init`) to a
+  tracker on a shared server.
 - Mint this run's `COORDINATOR_ID` and register it, then pass
   `--actor "$COORDINATOR_ID"` on every `bd` command
   (`runtime-and-safety.md` → "Parallel Coordinators"):
@@ -327,9 +334,14 @@ step needs; `bd show` only the bead you are about to claim. Act on it this way:
 - `status: empty` with `held` entries: nothing in focus is runnable, and each
   entry names its blockers. `totals.ready` versus `totals.ready_in_scope`
   separates "nothing in my scope" from "nothing in the repository".
-- `unowned_claims` and `stranded`: adoption candidates; act on them only
-  under `runtime-and-safety.md` → "Parallel Coordinators" → "Adopt the dead,
-  guarded".
+- `unowned_claims`, `stranded`, and `orphaned_blocked`: adoption candidates;
+  act on them only under `runtime-and-safety.md` → "Parallel Coordinators" →
+  "Adopt the dead, guarded". An `orphaned_blocked` row of kind `pr` is a PR
+  unit, adopted together with its review bead. Kind `gate` is blocked by
+  status alone and waits on the owner, so report it instead.
+- `excluded.no_dispatch` (tracking beads) and `excluded.local_state`
+  (gitignored-state work no worktree reaches) are never dispatched
+  (`../../beads-writer/SKILL.md`). List `local_state` ids for the owner.
 - `closable_epics`: epics whose children are all closed; Step 0's
   `close-eligible` run closes them.
 - `focus`, `held`, `coordinators`, `capacity.by_assignee`,
@@ -339,7 +351,7 @@ step needs; `bd show` only the bead you are about to claim. Act on it this way:
 Pass `--scope-epic <id>` (repeatable) only when the owner pins this
 coordinator to specific epics; P0 work still reaches every coordinator.
 
-If the queue is empty and nothing else is dispatchable, you are at the
+If no row is claimable and nothing else is dispatchable, you are at the
 no-progress frontier (Step 8).
 
 ### Dispatch readiness gate

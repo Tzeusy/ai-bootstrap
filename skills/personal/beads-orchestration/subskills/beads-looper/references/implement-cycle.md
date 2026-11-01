@@ -4,7 +4,8 @@ One iteration of an implement lane: take one bead, finish it, and then either
 land it or hand its PR to the review lane. The worktree is gone by the end of
 the iteration. `CO` below is the absolute path of the `beads-coordinator`
 package, and `WK` the absolute path of the `beads-worker` package. Resolve
-both from this file's location, never from your cwd.
+both from this file's location, never from your cwd. Resolve `REPO_ROOT` with
+the command in `../SKILL.md` → "Launch".
 
 ## 1. Select
 
@@ -21,6 +22,9 @@ both from this file's location, never from your cwd.
    `stranded` row with the guarded commands in
    `$CO/references/runtime-and-safety.md` → "Parallel Coordinators" → "Adopt
    the dead, guarded". Exit 13 means a peer got there first, so move on.
+   `orphaned_blocked` rows are not yours to adopt. Kind `pr` belongs to the
+   review lane. Kind `gate` is blocked by status alone, which only the owner
+   lifts, so it goes in the report under "Needs owner".
 3. **Corrections first.** Start here only while `capacity.free > 0`. A
    returned PR is the outcome closest to done. The ranker leaves these beads
    out of its queue, so you have to ask for them:
@@ -34,9 +38,20 @@ both from this file's location, never from your cwd.
    worked (`$CO/references/coordinator-loop.md` → "Step 2: Select Next
    Issue"). Gate each row before claiming it:
    - Apply the dispatch-readiness gate (`$CO/references/coordinator-loop.md`
-     → "Dispatch readiness gate"). If a row fails, stamp it per "Stamp every
-     rejection" and take the next row. Shaping belongs to `beads-writer`;
-     never re-scope a bead to keep the lane busy.
+     → "Dispatch readiness gate"). If a row fails, stamp it under that
+     section's "Stamp every rejection" idempotence rules, then take the next
+     row. This is the one write a looper makes on a bead it does not hold, so
+     guard it:
+
+     ```bash
+     bd --actor "$LOOPER_ID" update <id> --if-assignee '' --add-label needs-shaping \
+       --append-notes "dispatch-readiness <YYYY-MM-DD> $LOOPER_ID: missing <field list>" --json
+     ```
+
+     The stamp takes the bead out of every lane's queue and lists it under
+     `excluded.needs_shaping_standalone` or its epic's `needs_shaping`.
+     Shaping belongs to `beads-writer`; never re-scope a bead to keep the lane
+     busy.
    - Skip a row whose required model tier exceeds this session's model.
    - Never claim an epic. Report `childless_epics` for the writer and leave
      Team Lead mode to coordinators.
@@ -241,3 +256,22 @@ remote.
 Build artifacts follow their bead. On a direct merge, copy the receipts to the
 bead's evidence and delete the `<id>-*` artifact directories now. On a PR
 hand-off, leave them: the review lane deletes them when it closes the bead.
+
+## Local-State Beads
+
+A `scope:local-state` bead changes state that git does not track and that
+exists only in `REPO_ROOT`: `.beads/` leftovers, caches, local databases. No
+worktree can reach it, so the ranker leaves it out. A lane takes one only when
+the owner names it, in the launch prompt or on the bead. Then:
+
+- Claim it by id, as in step 1.
+- Do any tracked-file part in a worktree as usual. It lands, or opens a PR,
+  like any other change.
+- Do the local-state part in `REPO_ROOT`, touching only the paths the bead
+  names. Move, never delete: rename each target to
+  `<path>.retired-<UTC timestamp>`, so the owner can restore it. Never touch
+  tracked files, the checkout, or the live Dolt data, and never run
+  `bd init`.
+- Record every move on the bead (`[local-state] moved <path> -> <new path>`),
+  then run the bead's verification.
+- Close the bead only once its tracked-file part, if any, has merged.

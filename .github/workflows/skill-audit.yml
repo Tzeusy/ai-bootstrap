@@ -23,6 +23,7 @@ jobs:
         run: uv run skills/personal/th-engineering/subskills/skill-standards/tests/run_tests.py
       - name: Run report-only Beads safety suites
         run: |
+          uv run skills/personal/beads-orchestration/subskills/beads-coordinator/tests/test_coordinator_registry.py
           uv run skills/personal/beads-orchestration/subskills/beads-coordinator/tests/test_normalize_pr_review_state.py
           uv run skills/personal/beads-orchestration/subskills/beads-coordinator/tests/test_rank_ready_work.py
           uv run skills/personal/beads-orchestration/subskills/beads-coordinator/tests/test_workflow_contract.py

@@ -31,6 +31,13 @@ It emits one compact `beads-cleanup-scan/v1` JSON envelope. `claims`,
 permissions. Never include raw command stderr, notes, descriptions, paths, or
 tracebacks in the human report. Preserve any indicated unpublished work.
 
+Error codes say why a command failed without forwarding its output:
+`server-timeout` is a transient server blip (rerun the scan),
+`connection-refused` is a missing host override (fix the environment),
+`doctor-<check>` names a failing `bd doctor` check (look it up in
+`../../../references/known-errors.md`; most leave reads and writes working),
+and `command-failed` is anything else.
+
 ```text
 ## Beads Cleanup Report
 

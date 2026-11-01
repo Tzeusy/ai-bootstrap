@@ -373,6 +373,25 @@ class ParallelCoordinatorTests(unittest.TestCase):
         self.assertEqual(payload["stranded"], ["bd-dead"])
         self.assertEqual(payload["excluded"]["claimed"], 2)
 
+    def test_blocked_beads_of_dead_coordinators_are_orphaned_by_kind(self) -> None:
+        kv = {"beads.coordinator.coordinator:peer": "2026-10-27T05:00:00Z"}
+        live = [
+            bead("bd-gate", status="blocked", assignee="coordinator:01a13679-0000-4000-8000-000000000000"),
+            bead("bd-pr", status="blocked", assignee="coordinator:gone", external_ref="gh-pr:7"),
+            bead("bd-rev", status="blocked", assignee="coordinator:gone", labels=["pr-review-task"]),
+            bead("bd-live", status="blocked", assignee="coordinator:peer"),
+            bead("bd-human", status="blocked", assignee="tze"),
+            bead("bd-free", status="blocked"),
+        ]
+
+        payload = ranking.rank(snapshot(live, kv=kv, ready=[]), now=NOW)
+
+        self.assertEqual(
+            [(entry["id"], entry["kind"]) for entry in payload["orphaned_blocked"]],
+            [("bd-gate", "gate"), ("bd-pr", "pr"), ("bd-rev", "pr")],
+        )
+        self.assertEqual(payload["orphaned_blocked"][0]["assignee"], live[0]["assignee"])
+
     def test_unregistered_coordinator_is_reported_in_self(self) -> None:
         live, epics = self.live_with_three_claims()
 
@@ -432,6 +451,19 @@ class ExclusionTests(unittest.TestCase):
         self.assertEqual(queue_ids(payload), ["bd-solo"])
         self.assertEqual(payload["excluded"]["review"], 2)
         self.assertEqual(payload["excluded"]["team_lead"], 1)
+
+    def test_no_dispatch_and_local_state_beads_stay_out_of_the_queue(self) -> None:
+        live = [
+            bead("bd-trial", priority=1, labels=["no-dispatch"]),
+            bead("bd-local", priority=1, labels=["scope:local-state"]),
+            bead("bd-solo"),
+        ]
+
+        payload = ranking.rank(snapshot(live), now=NOW)
+
+        self.assertEqual(queue_ids(payload), ["bd-solo"])
+        self.assertEqual(payload["excluded"]["no_dispatch"], 1)
+        self.assertEqual(payload["excluded"]["local_state"], ["bd-local"])
 
     def test_epic_claimed_for_shaping_keeps_its_ready_children_queued(self) -> None:
         held = epic("bd-shape")

@@ -43,6 +43,22 @@ debugging cost again unless it lands here.
   `ai-bootstrap` and `dotfiles` were found still pointing at localhost while
   `homelab`/`gt` had been repointed. bd 1.0.4.
 
+### Transient `i/o timeout` from the shared server
+- **Symptom**: a `bd` call that worked seconds earlier fails with a Dolt
+  `i/o timeout`; the next identical call succeeds. Wrapped by
+  `coordinator_registry.py`, it used to surface only as
+  `{"action":"failed"}`. (Paraphrased by the reporting session; the verbatim
+  text was not captured.)
+- **Cause**: a blip on the Tailscale path to the k8s Dolt server, not a
+  config fault. Contrast `connection refused`, above, which is a missing
+  override and never clears by retrying.
+- **Fix**: retry the same command up to twice, a second or two apart, before
+  treating the tracker as sick. `coordinator_registry.py` now does this itself
+  and reports `error: server-timeout` with the last stderr line;
+  `cleanup_scan.py` reports the same code. Three failures in a row is a real
+  outage: stop.
+- Observed: 2026-11-01, beads-looper canary (`aib-w72`, `aib-9js`). bd 1.3.1.
+
 ## Deprecated / removed commands and flags
 
 Deprecations land without much warning between releases. When a documented
@@ -71,6 +87,21 @@ assuming breakage, then record the rename here AND fix the subskill docs.
   and re-import data (see next entry). Note bd may normalize the prefix
   (`.dotfiles` became `dotfiles`).
 - Observed: 2026-06-12, bd 1.0.4.
+
+### `bd doctor`: "Repo Fingerprint: Database belongs to different repository"
+- **Symptom**: `bd doctor` exits 1 with `Repo Fingerprint` status `error`,
+  detail `stored: 067759f4, current: 428ba74b`, and fix text "Run 'bd migrate
+  --update-repo-id' if URL changed, or 'rm -rf .beads && bd init' if wrong
+  database", while every `bd` read and write works.
+- **Cause**: the stored repo id was computed from an earlier remote URL form,
+  before the move to the shared server. The database is the right one.
+- **Fix**: none needed to keep working; it is not a halt condition
+  (`beads-coordinator/references/coordinator-loop.md` → "Preflight"). Never
+  run `rm -rf .beads && bd init`: it discards the repo's server config, not
+  just the fingerprint. `bd migrate --update-repo-id` writes shared-server
+  metadata, so it is the owner's call, and only after confirming every clone
+  uses the same remote URL form.
+- Observed: 2026-11-01, `aib`, beads-looper canary. bd 1.3.1.
 
 ### Auto-export daemon overwrites `.beads/issues.jsonl` within seconds
 - **Symptom**: you restore a historical `issues.jsonl` (e.g. from git) to

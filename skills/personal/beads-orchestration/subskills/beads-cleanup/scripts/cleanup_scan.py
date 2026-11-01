@@ -24,7 +24,7 @@ CANONICAL_COORDINATOR_SCRIPTS = (
 if str(CANONICAL_COORDINATOR_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(CANONICAL_COORDINATOR_SCRIPTS))
 
-from coordinator_registry import live_coordinator_ids  # noqa: E402
+from coordinator_registry import classify_failure, live_coordinator_ids  # noqa: E402
 from review_relation_graph import normalized_finding_relation_error  # noqa: E402
 
 
@@ -102,10 +102,40 @@ def run_command(argv: list[str], repo_root: Path) -> subprocess.CompletedProcess
         return None
 
 
+def failure_code(result: subprocess.CompletedProcess[str] | None) -> str:
+    """Classify a failed command (`server-timeout`, `connection-refused`,
+    `command-failed`) without forwarding its output."""
+    if result is None:
+        return "command-failed"
+    return classify_failure(result.returncode, result.stderr)
+
+
+def doctor_failure_codes(result: subprocess.CompletedProcess[str] | None) -> list[str]:
+    """Name each failing `bd doctor --json` check as `doctor-<check>`.
+
+    A doctor that ran and reported findings differs from one that could not
+    run; an empty list means its output gave no usable check names.
+    """
+    try:
+        payload = json.loads(result.stdout) if result is not None else None
+    except json.JSONDecodeError:
+        return []
+    checks = payload.get("checks") if isinstance(payload, dict) else None
+    codes: list[str] = []
+    for check in checks if isinstance(checks, list) else []:
+        if not isinstance(check, dict) or check.get("status") not in {"error", "fail"}:
+            continue
+        slug = re.sub(r"[^a-z0-9]+", "-", str(check.get("name") or "").lower()).strip("-")[:48].strip("-")
+        code = f"doctor-{slug}" if slug else "doctor-check-failed"
+        if code not in codes:
+            codes.append(code)
+    return codes
+
+
 def command_json(argv: list[str], repo_root: Path) -> tuple[object | None, str | None]:
     result = run_command(argv, repo_root)
     if result is None or result.returncode != 0:
-        return None, "command-failed"
+        return None, failure_code(result)
     try:
         return json.loads(result.stdout), None
     except json.JSONDecodeError:
@@ -187,7 +217,7 @@ def heartbeat_state(record: dict[str, Any], now: datetime) -> str:
 def remote_branch_exists(issue_id: str, repo_root: Path) -> tuple[bool | None, str | None]:
     result = run_command(["git", "ls-remote", "--heads", "origin", f"agent/{issue_id}"], repo_root)
     if result is None or result.returncode != 0:
-        return None, "command-failed"
+        return None, failure_code(result)
     return bool(result.stdout.strip()), None
 
 
@@ -199,7 +229,7 @@ def unpublished_work(worktree: Path, repo_root: Path) -> tuple[bool | None, str 
         repo_root,
     )
     if result is None or result.returncode != 0:
-        return None, "command-failed"
+        return None, failure_code(result)
     return bool(result.stdout.strip()), None
 
 
@@ -1164,13 +1194,15 @@ def scan(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         names, branch_path_ids, ambiguous_worktree_ids = worktree_listing(worktree_entries(worktree_payload))
 
     dolt_result = run_command(["bd", "-C", str(repo_root), "dolt", "status"], repo_root)
-    doctor_result = run_command(["bd", "-C", str(repo_root), "doctor"], repo_root)
+    doctor_result = run_command(["bd", "-C", str(repo_root), "doctor", "--json"], repo_root)
     dolt_status = "healthy" if dolt_result is not None and dolt_result.returncode == 0 else "unhealthy"
     doctor_status = "healthy" if doctor_result is not None and doctor_result.returncode == 0 else "unhealthy"
     if dolt_status != "healthy":
-        report_error(errors, "command-failed", "dolt-status")
+        report_error(errors, failure_code(dolt_result), "dolt-status")
     if doctor_status != "healthy":
-        report_error(errors, "command-failed", "dolt-doctor")
+        # A doctor that ran names its failing checks; one that could not run gets a classified code.
+        for code in doctor_failure_codes(doctor_result) or [failure_code(doctor_result)]:
+            report_error(errors, code, "dolt-doctor")
 
     core_results = (claims_records, blocked_records, lock_records, names)
     if all(result is None for result in core_results) and dolt_status == "unhealthy" and doctor_status == "unhealthy":

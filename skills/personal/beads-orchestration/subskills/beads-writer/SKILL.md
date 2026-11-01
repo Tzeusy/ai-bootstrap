@@ -54,6 +54,15 @@ Every bead must be a self-contained handoff for a future independent session. Su
   honestly: `low` is docs/config/test-only or single-file mechanical work with
   no design judgment; when in doubt between two tiers, pick the lower — the
   coordinator escalates on evidence.
+- Keep non-lane work out of the dispatch queue with one of two labels, which
+  `rank_ready_work.py` excludes:
+  - `no-dispatch` for tracking or meta beads, such as a trial log, a decision
+    record, or an owner checklist.
+  - `scope:local-state` for work on gitignored state that exists only in the
+    main checkout (`.beads/` leftovers, caches, local databases), which no
+    worktree reaches. Split a mixed bead so the tracked-file part stays
+    ordinary lane work; the owner does the local-state part, or names a
+    looper for it.
 
 ## Read Order
 

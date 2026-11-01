@@ -215,4 +215,9 @@ bd create "Upgrade Node.js from 18 to 20 LTS" \
 ### By Platform
 `mobile`, `desktop`, `ios`, `android`, `linux`, `macos`
 
+### By Dispatch (read by the coordinator's ranker)
+`no-dispatch` (tracking/meta bead, never claimed), `scope:local-state`
+(gitignored local state; owner work), `needs-shaping` (set by the readiness
+gate, not at creation)
+
 Prefer consistent, lowercase, hyphenated labels. Avoid proliferating one-off labels — reuse existing ones where possible.

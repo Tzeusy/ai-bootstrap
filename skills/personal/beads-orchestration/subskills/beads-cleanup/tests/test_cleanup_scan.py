@@ -134,6 +134,10 @@ def install_fakes(fake_bin: FakeBinDir) -> None:
             raise SystemExit(0)
         if argv[:1] == ["doctor"]:
             fail("bd-doctor")
+            report = fixture.get("doctor_report")
+            if report is not None:
+                print(json.dumps(report))
+                raise SystemExit(int(fixture.get("doctor_exit", 1)))
             print("healthy")
             raise SystemExit(0)
         print("unmatched bd command", file=sys.stderr)
@@ -1838,7 +1842,7 @@ class CleanupScanTests(unittest.TestCase):
             {"tool": "bd", "argv": ["-C", repo_root, "list", "--label", "review-running", "--json", "--limit", "0"]},
             {"tool": "bd", "argv": ["-C", repo_root, "worktree", "list", "--json"]},
             {"tool": "bd", "argv": ["-C", repo_root, "dolt", "status"]},
-            {"tool": "bd", "argv": ["-C", repo_root, "doctor"]},
+            {"tool": "bd", "argv": ["-C", repo_root, "doctor", "--json"]},
             {"tool": "git", "argv": ["ls-remote", "--heads", "origin", f"agent/{claim_id}"]},
             {"tool": "git", "argv": ["-C", claim_worktree, "log", "--oneline", "origin/HEAD..HEAD"]},
             {"tool": "bd", "argv": ["dep", "list", blocker_id, "--json"]},
@@ -1983,6 +1987,66 @@ class CleanupScanTests(unittest.TestCase):
         self.assertEqual(json.loads(fatal.stdout)["status"], "fatal")
         for forbidden in ("TOKEN=top-secret", "/private/absolute/path", "Traceback"):
             self.assertNotIn(forbidden, fatal.stdout + fatal.stderr)
+
+    def test_failures_carry_a_classified_code_but_never_the_message(self) -> None:
+        fixture = {
+            "in_progress": [],
+            "blocked": [],
+            "review_running": [],
+            "blocked_pr_review": [],
+            "blocked_pr_review_tasks": [],
+            "open_prs": [],
+            "failures": {
+                "bd-kv-list": "Error: dial tcp dolt.example.invalid:3307: i/o timeout",
+                "bd-worktree-list": "Error: dial tcp dolt.example.invalid:3307: connect: connection refused",
+                "bd-dolt-status": "Error: context deadline exceeded",
+                "bd-doctor": "TOKEN=top-secret Traceback",
+            },
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "partial")
+        for expected in (
+            {"code": "server-timeout", "scope": "registry"},
+            {"code": "connection-refused", "scope": "worktrees"},
+            {"code": "server-timeout", "scope": "dolt-status"},
+            {"code": "command-failed", "scope": "dolt-doctor"},
+        ):
+            self.assertIn(expected, payload["errors"])
+        for forbidden in ("dolt.example.invalid", "deadline", "TOKEN=top-secret", "Traceback"):
+            self.assertNotIn(forbidden, result.stdout + result.stderr)
+
+    def test_doctor_findings_are_named_per_failing_check(self) -> None:
+        fixture = {
+            "in_progress": [],
+            "blocked": [],
+            "review_running": [],
+            "blocked_pr_review": [],
+            "blocked_pr_review_tasks": [],
+            "open_prs": [],
+            "doctor_report": {
+                "checks": [
+                    {"name": "Repo Fingerprint", "status": "error", "detail": "stored: 067759f4, current: 428ba74b"},
+                    {"name": "Dolt Locks!", "status": "fail", "fix": "rm -rf .beads && bd init"},
+                    {"name": "Git Hooks", "status": "warning"},
+                    {"name": "Database", "status": "ok"},
+                ],
+                "overall_ok": False,
+            },
+        }
+
+        result, _, _ = self.run_fixture(fixture)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["dolt"], {"doctor": "unhealthy", "status": "healthy"})
+        doctor_errors = [item["code"] for item in payload["errors"] if item["scope"] == "dolt-doctor"]
+        self.assertEqual(sorted(doctor_errors), ["doctor-dolt-locks", "doctor-repo-fingerprint"])
+        for forbidden in ("067759f4", "rm -rf", "Git Hooks"):
+            self.assertNotIn(forbidden, result.stdout)
 
     def test_invalid_bootstrap_never_echoes_a_secret_or_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

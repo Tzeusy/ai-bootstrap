@@ -92,6 +92,26 @@ class BeadsLooperPackageTests(unittest.TestCase):
         # The review lane frees the PR branch before handing corrections back.
         self.assertIn("Tear down the review worktree **first**", read(REVIEW))
 
+    def test_canary_gaps_stay_closed(self) -> None:
+        skill, implement, review = read(SKILL_MD), read(IMPLEMENT), read(REVIEW)
+        # REPO_ROOT resolves from any worktree or submodule, and survives compaction.
+        self.assertIn('git -C "$COMMON" rev-parse --show-toplevel 2>/dev/null || dirname "$COMMON"', skill)
+        self.assertIn("`LOOPER_ID` and\n  `REPO_ROOT` in every iteration report", skill)
+        for path in (IMPLEMENT, REVIEW):
+            self.assertIn('`../SKILL.md` → "Launch"', " ".join(read(path).split()), path.name)
+        # The readiness stamp is the one write on an unheld bead, so it is CAS-guarded.
+        self.assertIn("readiness-gate rejection stamp", skill)
+        self.assertRegex(implement, r"update <id> --if-assignee '' --add-label needs-shaping")
+        # Dead coordinators' blocked beads have an owner; what no lane owns is reported.
+        self.assertIn("orphaned_blocked", implement)
+        self.assertIn("`orphaned_blocked` rows of kind `pr`", review)
+        self.assertIn('"Needs owner"', skill)
+        # Local-state beads: owner-named only, moved aside, never deleted.
+        self.assertIn("`scope:local-state`", skill)
+        self.assertIn("Move, never delete", implement)
+        # "Nothing claimable" is defined by claimable rows, not an empty queue.
+        self.assertIn("no claimable row", " ".join(read(SAFETY).split()))
+
     def test_verifier_is_fresh_read_only_and_capped(self) -> None:
         verifier = read(VERIFIER)
         self.assertIn("Give it the work, not your conclusions", verifier)

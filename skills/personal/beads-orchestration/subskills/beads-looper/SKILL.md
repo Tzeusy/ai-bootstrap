@@ -48,6 +48,15 @@ run one review lane per tracker. Load only your mode's references.
 
 ## Launch
 
+Every command below runs against `REPO_ROOT`, the main checkout all panes
+share. Resolve it the same way from any cwd, including inside a worktree or a
+submodule, where `git rev-parse --show-toplevel` names the wrong directory:
+
+```bash
+COMMON=$(git rev-parse --path-format=absolute --git-common-dir)
+REPO_ROOT=$(git -C "$COMMON" rev-parse --show-toplevel 2>/dev/null || dirname "$COMMON")
+```
+
 Size the lane budget to the panes first. Every looper spends one lane while it
 holds an `in_progress` bead, the review lane included. Only the owner sets
 `beads.max_lanes` (`../beads-coordinator/references/runtime-and-safety.md` →
@@ -75,16 +84,20 @@ Start each pane with one line naming the mode and, optionally, a focus epic:
   wake, and also at the heartbeat checkpoints during long work, with
   `--wake-minutes` sized to cover the next stretch. A looper that is busy but
   silent reads as dead, and a peer adopts its bead. Pass
-  `--actor "$LOOPER_ID"` on every `bd` command. Print `LOOPER_ID` in every
-  iteration report so it survives compaction. If it is lost anyway, mint a new
-  id; the old claims return through guarded adoption once their registration
-  lapses.
+  `--actor "$LOOPER_ID"` on every `bd` command. Print `LOOPER_ID` and
+  `REPO_ROOT` in every iteration report so they survive compaction. If the
+  id is lost anyway, mint a new one; the old claims return through guarded
+  adoption once their registration lapses.
 - **One bead at a time, inside the budget.** Claim only while
   `rank_ready_work.py` reports `capacity.free > 0`, always with the atomic
   `--claim`. A refused claim means a peer won the bead: take the next row and
   never contest it.
 - **Hold-only mutation authority.** You may mutate only the beads assigned to
-  `LOOPER_ID`, plus the beads you create. You take a bead over only by claim,
+  `LOOPER_ID`, plus the beads you create. The one exception is the
+  readiness-gate rejection stamp on an unassigned row you just rejected
+  (`implement-cycle.md` → "Select"): it only adds `needs-shaping` and a note,
+  and it moves the bead out of every lane's queue to where the writer and the
+  owner see it. You take a bead over only by claim,
   by guarded adoption of a dead peer's bead, or by a compare-and-swap on a
   handed-off one (`--if-assignee ''`, where exit 13 means a peer got there
   first).
@@ -105,7 +118,10 @@ Start each pane with one line naming the mode and, optionally, a focus epic:
   closed, handed off, or released, remove the worktree and its local branch.
   The remote branch carries whatever state the next holder needs. Never edit
   in `REPO_ROOT` and never move its checkout, because every pane shares it.
-  Quarantine unpublished work rather than deleting it.
+  Quarantine unpublished work rather than deleting it. A bead labelled
+  `scope:local-state` changes gitignored state that exists only in
+  `REPO_ROOT`, so the ranker leaves it out; take one only when the owner names
+  it (`implement-cycle.md` → "Local-State Beads").
 - **Verify before anything leaves the lane.** An implementation lands or opens
   a PR only after a fresh, read-only adversarial verifier has checked it
   against its acceptance criteria. A lane never reviews work it authored.
@@ -120,13 +136,23 @@ Start each pane with one line naming the mode and, optionally, a focus epic:
 
 ## Iteration Skeleton
 
-1. **Wake.** Renew the registration, and recover dead peers' claims from the
-   ranker's `unowned_claims` and `stranded` rows (guarded). On the first
-   iteration, also run the preflight: `bd doctor`, the `beads-cleanup` scan
-   (`../beads-cleanup/scripts/cleanup_scan.py`, report-only), and
-   `MERGE_QUEUE` detection (`../beads-coordinator/references/coordinator-loop.md`
-   → "Preflight"). Read the target repo's `AGENTS.md`/`CLAUDE.md`. Act on
-   cleanup findings only where "Parallel Coordinators" allows adoption.
+1. **Wake.**
+   - Renew the registration. Recover dead peers' beads from the ranker's
+     `unowned_claims`, `stranded`, and `orphaned_blocked` rows, guarded; your
+     mode's reference says which rows are yours.
+   - On the first iteration, run the preflight: `bd doctor`, the
+     `beads-cleanup` scan (`../beads-cleanup/scripts/cleanup_scan.py`,
+     report-only), and `MERGE_QUEUE` detection
+     (`../beads-coordinator/references/coordinator-loop.md` → "Preflight",
+     which also names the only tracker faults that halt a run). Read the
+     target repo's `AGENTS.md`/`CLAUDE.md`.
+   - Act on cleanup findings only where "Parallel Coordinators" allows
+     adoption. List everything no lane may act on under "Needs owner" in the
+     first iteration's report: cleanup's manual-triage rows (a PR without a
+     bead, a worktree holding unpublished work), `orphaned_blocked` rows of
+     kind `gate`, `excluded.local_state`, and
+     `excluded.needs_shaping_standalone`. No lane repairs them; the owner runs
+     `beads-cleanup` or a coordinator.
 2. **Select and claim.** Follow the steps for your mode.
 3. **Work.** Follow the execution subskill's phases inside the bead's
    worktree. Its "never mutate Beads" boundary binds lifecycle writes in this
@@ -137,9 +163,9 @@ Start each pane with one line naming the mode and, optionally, a focus epic:
 5. **Tear down, then release.** Remove the worktree and local branch, and
    delete build artifacts the outcome retired. Then make the guarded release
    that hands the bead off.
-6. **Report and schedule.** Write one compact block: `LOOPER_ID`, mode, bead,
-   outcome, PR, epic progress, beads skipped and why, next wake. Then schedule
-   the next wake.
+6. **Report and schedule.** Write one compact block: `LOOPER_ID`,
+   `REPO_ROOT`, mode, bead, outcome, PR, epic progress, beads skipped and why,
+   next wake. Then schedule the next wake.
 
 ## Wake Cadence
 
@@ -147,8 +173,11 @@ Start each pane with one line naming the mode and, optionally, a focus epic:
   because more work is likely.
 - When nothing is claimable, follow
   `../beads-coordinator/references/runtime-and-safety.md` → "Orchestrator
-  Wake Cadence" and its "No-progress frontier", stop rule included. A review
-  lane holding merge-queued PRs has near-term work.
+  Wake Cadence" and its "No-progress frontier", stop rule included. Nothing
+  claimable means no row survives this lane's gates: rows that fail the
+  readiness gate, exceed this session's model tier, sit outside the focus
+  epic, or are excluded by the owner leave the queue non-empty but the wake a
+  no-op. A review lane holding merge-queued PRs has near-term work.
 - On stop, deregister and write a final report. Under `/loop`, stop by ending
   the loop, and pass the same `/loop` prompt back on every wake.
 
@@ -167,7 +196,7 @@ and stop with a `retired` report. The operator restarts the pane cold
 
 | File | Read when |
 |---|---|
-| [`references/implement-cycle.md`](references/implement-cycle.md) | implement mode: selection, worktree, work, landing, PR hand-off, blockers, corrections |
+| [`references/implement-cycle.md`](references/implement-cycle.md) | implement mode: selection, worktree, work, landing, PR hand-off, blockers, corrections, owner-named local-state beads |
 | [`references/review-cycle.md`](references/review-cycle.md) | review mode: sweeps, taking a unit, review, merge and closure, correction hand-back |
 | [`references/adversarial-verifier.md`](references/adversarial-verifier.md) | implement mode, before anything leaves the lane |
 | [`../beads-coordinator/references/runtime-and-safety.md`](../beads-coordinator/references/runtime-and-safety.md) | claim, heartbeat, registry, adoption, budget, cadence, closure rules (canonical numbers live here) |

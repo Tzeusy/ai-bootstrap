@@ -23,6 +23,13 @@ coordinator stays "live" for a day or a live one reads as dead:
 when the stored entry would lapse before the next wake or its `extra_lanes`
 changed, so routine wakes add no tracker history. `--startup` refuses an id
 that is already live: two sessions sharing an id share every claim.
+
+A failed `bd` call prints `{"action": "failed", "step": ..., "error": <code>,
+"detail": <last stderr line>, "attempts": N}`. `classify_failure` names the
+code: `server-timeout` (a transient Dolt server blip, retried up to three
+attempts in all), `connection-refused` (never retried: on the shared server it
+means the host override is missing, not a blip), or `command-failed`.
+`cleanup_scan.py` reuses the classifier for its sanitized error codes.
 """
 
 from __future__ import annotations
@@ -33,6 +40,7 @@ import re
 import secrets
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -46,6 +54,23 @@ RENEW_MARGIN = timedelta(minutes=5)
 # minutes plus grace), so a value beyond it is a bad write and is not live.
 MAX_AHEAD = timedelta(hours=3)
 RUNTIME_RE = re.compile(r"[a-z][a-z0-9-]{0,15}\Z")
+# Seconds slept between attempts of a `bd` call that hit a transient server
+# error; three attempts in all. Tests patch `sleep`.
+RETRY_DELAYS = (1.0, 2.0)
+DETAIL_LIMIT = 200
+REFUSED_MARKERS = ("connection refused",)
+TRANSIENT_MARKERS = (
+    "i/o timeout",
+    "deadline exceeded",
+    "context deadline",
+    "timed out",
+    "connection reset",
+    "broken pipe",
+    "unexpected eof",
+    "bad connection",
+    "invalid connection",
+)
+sleep = time.sleep
 
 
 def parse_time(value: object) -> datetime | None:
@@ -136,14 +161,58 @@ def plan_registration(
     return "write", value
 
 
-def bd(argv: list[str], repo_root: Path, actor: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["bd", "-C", str(repo_root), "--actor", actor, *argv],
-        capture_output=True,
-        cwd=repo_root,
-        text=True,
-        check=False,
-    )
+def classify_failure(returncode: int | None, stderr: str | None) -> str:
+    """Name a failed command's cause with a sanitized code.
+
+    `returncode` is the exit status, or None when the command never started.
+    Only `server-timeout` is worth retrying.
+    """
+    message = (stderr or "").lower()
+    if returncode is not None and any(marker in message for marker in REFUSED_MARKERS):
+        return "connection-refused"
+    if returncode is not None and any(marker in message for marker in TRANSIENT_MARKERS):
+        return "server-timeout"
+    return "command-failed"
+
+
+def last_line(text: str | None) -> str:
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    return lines[-1][:DETAIL_LIMIT] if lines else ""
+
+
+def failure_text(result: subprocess.CompletedProcess[str]) -> str:
+    # bd reports most errors on stderr; fall back to stdout when it stays silent.
+    return result.stderr if (result.stderr or "").strip() else (result.stdout or "")
+
+
+def bd(argv: list[str], repo_root: Path, actor: str) -> tuple[subprocess.CompletedProcess[str], int]:
+    """Run one `bd` call, retrying transient server errors; return it and the attempt count."""
+    attempts = 0
+    while True:
+        attempts += 1
+        result = subprocess.run(
+            ["bd", "-C", str(repo_root), "--actor", actor, *argv],
+            capture_output=True,
+            cwd=repo_root,
+            text=True,
+            check=False,
+        )
+        retryable = classify_failure(result.returncode, failure_text(result)) == "server-timeout"
+        if result.returncode == 0 or not retryable or attempts > len(RETRY_DELAYS):
+            return result, attempts
+        sleep(RETRY_DELAYS[attempts - 1])
+
+
+def failure(step: str, coordinator_id: str, result: subprocess.CompletedProcess[str], attempts: int) -> dict[str, Any]:
+    text = failure_text(result)
+    return {
+        "action": "failed",
+        "attempts": attempts,
+        "detail": last_line(text),
+        "error": classify_failure(result.returncode, text),
+        "id": coordinator_id,
+        "step": step,
+    }
 
 
 def main() -> int:
@@ -175,17 +244,23 @@ def main() -> int:
     key = REGISTRY_PREFIX + args.id
     repo_root = args.repo_root.resolve()
     if args.command == "deregister":
-        result = bd(["kv", "clear", key], repo_root, args.id)
-        print(json.dumps({"action": "cleared" if result.returncode == 0 else "failed", "id": args.id}))
-        return 0 if result.returncode == 0 else 1
+        result, attempts = bd(["kv", "clear", key], repo_root, args.id)
+        if result.returncode != 0:
+            print(json.dumps(failure("kv-clear", args.id, result, attempts)))
+            return 1
+        print(json.dumps({"action": "cleared", "id": args.id}))
+        return 0
 
-    listing = bd(["kv", "list", "--json"], repo_root, args.id)
+    listing, attempts = bd(["kv", "list", "--json"], repo_root, args.id)
+    if listing.returncode != 0:
+        print(json.dumps(failure("kv-list", args.id, listing, attempts)))
+        return 1
     try:
-        kv = json.loads(listing.stdout) if listing.returncode == 0 else None
+        kv = json.loads(listing.stdout)
     except json.JSONDecodeError:
         kv = None
     if not isinstance(kv, dict):
-        print(json.dumps({"action": "failed", "error": "kv-list-failed", "id": args.id}))
+        print(json.dumps({"action": "failed", "attempts": attempts, "detail": "", "error": "invalid-json", "id": args.id, "step": "kv-list"}))
         return 1
     action, value = plan_registration(
         kv,
@@ -201,9 +276,12 @@ def main() -> int:
     if action == "skip":
         print(json.dumps({"action": "skipped", "id": args.id}))
         return 0
-    result = bd(["kv", "set", key, json.dumps(value, separators=(",", ":"))], repo_root, args.id)
-    print(json.dumps({"action": "written" if result.returncode == 0 else "failed", "id": args.id, **(value or {})}))
-    return 0 if result.returncode == 0 else 1
+    result, attempts = bd(["kv", "set", key, json.dumps(value, separators=(",", ":"))], repo_root, args.id)
+    if result.returncode != 0:
+        print(json.dumps({**failure("kv-set", args.id, result, attempts), **(value or {})}))
+        return 1
+    print(json.dumps({"action": "written", "id": args.id, **(value or {})}))
+    return 0
 
 
 if __name__ == "__main__":

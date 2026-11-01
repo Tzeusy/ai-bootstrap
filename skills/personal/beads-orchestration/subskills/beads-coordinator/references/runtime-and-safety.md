@@ -142,8 +142,11 @@ below stops one coordinator from duplicating or undoing another's work.
   assignee as `owner=`: only coordinators write that block. An
   `in_progress` bead also needs a bead heartbeat past the stall threshold;
   `open` and `blocked` beads qualify on the registration test alone.
-  `rank_ready_work.py` lists the candidates it can see: `unowned_claims`
-  (`in_progress`, still spending a lane) and `stranded` (ready but assigned).
+  `rank_ready_work.py` lists the candidates: `unowned_claims`
+  (`in_progress`, still spending a lane), `stranded` (ready but assigned),
+  and `orphaned_blocked` (`blocked`, with `kind` `pr` or `gate`). It treats
+  every `coordinator:` id format alike, including pre-registry
+  `coordinator:<uuid>` ids, which never register and so are never live.
   The `--if-assignee` / `--if-status` guards make
   adoption a compare-and-swap, so two coordinators adopting at once cannot
   both win; exit code 13 means the precondition no longer held (a peer got
@@ -211,11 +214,13 @@ Runtime binding (use whichever wake primitive the session exposes):
 
 ### No-progress frontier
 
-Once a poll finds genuinely nothing to do — queue empty, no dispatchable
-`pr-review-task`, no active workers, no near-term PR cooldown, no decision-sweep
-work — the cache-preserving fallback cadence stops paying for itself: there is no
-real work to keep warm a cache *for*. At that frontier, switch modes instead of
-continuing to burn cache-hit polls on nothing:
+Once a poll finds genuinely nothing to do — no claimable row (the queue is
+empty, or every row fails the readiness gate, the model tier, the scope, or an
+owner exclusion), no dispatchable `pr-review-task`, no active workers, no
+near-term PR cooldown, no decision-sweep work — the cache-preserving fallback
+cadence stops paying for itself: there is no real work to keep warm a cache
+*for*. At that frontier, switch modes instead of continuing to burn cache-hit
+polls on nothing:
 
 - Widen the wake interval to **60 minutes** and run the safety sweep on each
   wake.

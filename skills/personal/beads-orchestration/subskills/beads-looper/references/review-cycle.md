@@ -6,7 +6,8 @@ Tiers": one session reviews PR after PR, which keeps the repo context cached.
 It owns PR state for every unit that implement lanes hand off. It never
 authors fixes, so this mode has no reviewer-as-fixer path. `CO` is the
 absolute path of the `beads-coordinator` package, and `RV` the absolute path
-of the `beads-pr-reviewer-worker` package. Renew the stall heartbeat and the
+of the `beads-pr-reviewer-worker` package. Resolve `REPO_ROOT` with the
+command in `../SKILL.md` → "Launch". Renew the stall heartbeat and the
 registration through long reviews and CI waits, exactly as the implement
 cycle's "Work" step says.
 
@@ -50,8 +51,10 @@ over, then reconcile them as in step 1 within the same wake:
   An unassigned original whose `OPEN` PR has a review bead is not an orphan.
   It is a unit waiting for review, and step 3 handles it.
 - **Held by a dead coordinator** under "Parallel Coordinators", whatever the
-  PR state. Adopt it with `--if-assignee '<dead-id>'`. Adopt its review bead
-  in the same way, original first and review bead second.
+  PR state. The ranker lists these as `orphaned_blocked` rows of kind `pr`
+  (`$CO/scripts/rank_ready_work.py`). Adopt each with
+  `--if-assignee '<dead-id>'`. Adopt its review bead in the same way,
+  original first and review bead second.
 
 ## 3. Select The Next Review
 

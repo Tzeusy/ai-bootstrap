@@ -60,10 +60,18 @@ Excluded from the queue, with counts or ids in `excluded`:
   `review-correction` beads (an implement looper takes them by label, in
   correction mode on the existing PR);
 - `needs-shaping` beads (listed per epic, standalone ones by priority);
+- `no-dispatch` beads (tracking or meta beads no lane works; counted) and
+  `scope:local-state` beads (work on a checkout's gitignored state, which no
+  worktree reaches; listed for the owner);
 - beads with an assignee. Exceptions: an open bead assigned to `--coordinator`
   is queued (a release that kept the assignee), and an open bead whose
   `coordinator:` assignee has no live registration is listed as `stranded`
   for guarded recovery.
+
+Blocked beads whose `coordinator:` assignee (any format, including
+pre-registry `coordinator:<uuid>` ids) has no live registration are listed as
+`orphaned_blocked`, each with `kind`: `pr` (it carries `gh-pr:<N>` or a review
+label, so the review lane adopts it) or `gate` (blocked by status alone).
 
 Also reported: `held` epics (progress or a pin, no runnable work, with what
 they wait on), `childless_epics` for decomposition, and `closable_epics`
@@ -95,6 +103,10 @@ TEAM_LEAD_LABEL = "team-coordination"
 # `review-correction` marks a looper PR original returned for corrections: only an
 # implement looper may take it, in correction mode on the existing PR.
 REVIEW_LABELS = frozenset({"pr-review", "pr-review-task", "review-correction"})
+# Beads no lane takes: tracking/meta beads, and work on gitignored local state
+# that only exists in one checkout (the owner does it, or names a lane for it).
+NO_DISPATCH_LABEL = "no-dispatch"
+LOCAL_STATE_LABEL = "scope:local-state"
 DEFAULT_MAX_LANES_PER_EPIC = 2
 DEFAULT_LIMIT = 10
 LIST_LIMIT = 10
@@ -271,9 +283,17 @@ def rank(
     by_assignee: dict[str, int] = {}
     other_claims = 0
     unowned: list[str] = []
+    orphaned: list[dict[str, str]] = []
     for row in snapshot["live"]:
         bead_id, assignee = row["id"], text(row.get("assignee"))
         epic_id = outcome_of(bead_id)
+        if (
+            row.get("status") == "blocked"
+            and assignee.startswith(COORDINATOR_PREFIX)
+            and not is_live_coordinator(assignee)
+        ):
+            on_pr = text(row.get("external_ref")).startswith("gh-pr:") or bool(labels_of(row) & REVIEW_LABELS)
+            orphaned.append({"assignee": assignee, "id": bead_id, "kind": "pr" if on_pr else "gate"})
         if row.get("status") == "in_progress" and assignee:
             if assignee.startswith(COORDINATOR_PREFIX):
                 by_assignee[assignee] = by_assignee.get(assignee, 0) + 1
@@ -296,7 +316,8 @@ def rank(
     standalone: list[dict[str, Any]] = []
     shaping_standalone: list[dict[str, Any]] = []
     stranded: list[str] = []
-    excluded = {"claimed": 0, "review": 0, "team_lead": 0}
+    local_state: list[dict[str, Any]] = []
+    excluded = {"claimed": 0, "no_dispatch": 0, "review": 0, "team_lead": 0}
     runnable: list[dict[str, Any]] = []
     for row in ready_rows:
         assignee = text(row.get("assignee"))
@@ -308,6 +329,12 @@ def rank(
             continue
         if labels_of(row) & REVIEW_LABELS:
             excluded["review"] += 1
+            continue
+        if NO_DISPATCH_LABEL in labels_of(row):
+            excluded["no_dispatch"] += 1
+            continue
+        if LOCAL_STATE_LABEL in labels_of(row):
+            local_state.append(row)
             continue
         if set(ancestors(row["id"])) & team_led:
             excluded["team_lead"] += 1
@@ -557,6 +584,7 @@ def rank(
         "errors": [],
         "excluded": {
             **excluded,
+            "local_state": [row["id"] for row in sorted(local_state, key=bead_key)[:LIST_LIMIT]],
             "needs_shaping_standalone": [
                 row["id"] for row in sorted(shaping_standalone, key=bead_key)[:LIST_LIMIT]
             ],
@@ -565,6 +593,7 @@ def rank(
         "generated_at": generated_at,
         "held": held[:LIST_LIMIT],
         "held_total": len(held),
+        "orphaned_blocked": sorted(orphaned, key=lambda entry: entry["id"])[:LIST_LIMIT],
         "queue": emitted,
         "queue_total": len(queue),
         "schema": SCHEMA,
