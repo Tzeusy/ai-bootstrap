@@ -41,6 +41,7 @@ change done", "is this good enough to merge", "what does done require here",
 - Deep work in one subdomain — route to the sibling subskill
   ([code-readability](../code-readability/SKILL.md),
   [test-rigor](../test-rigor/SKILL.md),
+  [ci-discipline](../ci-discipline/SKILL.md),
   [dependency-hygiene](../dependency-hygiene/SKILL.md),
   [cruft-cleanup](../cruft-cleanup/SKILL.md),
   [greenfield-parity](../greenfield-parity/SKILL.md))
@@ -88,9 +89,12 @@ biases apply:
    than assuming the first pass sufficed, and high-risk ones an independent
    one (fresh-context reviewer). The same agent does not re-run an identical
    passing check on an unchanged head for reassurance; independent
-   verification and flake measurement are not that. Evidence (command
-   output, test runs, rendered artifacts) beats assertion.
-   ([test-rigor](../test-rigor/SKILL.md) operationalizes the testing half.)
+   verification and flake measurement are not that. A second actor
+   recomputing a hosted verdict on the same tree is that waste. Evidence
+   (command output, test runs, rendered artifacts) beats assertion.
+   ([test-rigor](../test-rigor/SKILL.md) operationalizes the testing half;
+   [ci-discipline](../ci-discipline/SKILL.md) where and how often checks
+   run.)
 9. **Take pride in the work, but evaluate feedback on merit** — Defend good
    work with rigor, not ego. Incorporate valid feedback quickly, stay humble
    about blind spots, push back clearly on incorrect, weak, or scope-distorting

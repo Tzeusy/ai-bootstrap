@@ -48,7 +48,8 @@ Against [`quality-bar.md`](./quality-bar.md), answer:
 9. Are the prescribed commands token-efficient at realistic scale
    (quality-bar section 9)? Structured output projected to named fields,
    verbose gates routed to log files with failure-tail readback, targeted
-   tests while iterating with one full gate before completion, polls batched,
+   tests while iterating with one full gate per tree where the repo places
+   it (no local copy of a hosted gate), polls batched,
    catalogs consumed grep-first, subagent dispatches right-sized and compact?
 10. Is the skill written for current models (quality-bar section 12)?
     Reasons instead of personas or shouted emphasis, effort tiers instead of

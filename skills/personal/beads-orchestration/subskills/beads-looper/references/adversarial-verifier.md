@@ -8,7 +8,8 @@ purpose.
 
 ## When
 
-- After the full quality gate passes, before the worker's Phase 5 hand-off.
+- After the gate assigned to the local tier passes (full, or scoped when a
+  required hosted check gates landing), before the worker's Phase 5 hand-off.
 - Again after any fix made for a blocking finding.
 - After a correction pass, scoped to the correction diff and its threads.
 
@@ -27,7 +28,7 @@ to confirm it. The prompt carries only:
 - `ISSUE_ID`, `WORKTREE_PATH`, and the diff range `origin/<base>...HEAD`
 - the acceptance criteria verbatim, plus the description's scope and
   non-goals (`bd show <id> --json | jq '{acceptance_criteria, description, design}'`)
-- the path of the full-gate log
+- the path of the local gate log, labelled `full` or `scoped`
 - the rules: read-only, meaning no edits, commits, pushes, `bd` writes, or
   `gh` writes, with test output routed to files outside the worktree
 
@@ -64,7 +65,7 @@ The verifier ends with exactly one JSON object:
 - **Blocking finding or unmet criterion.** Either fix it, or dispute it with
   evidence (a test, a spec line, a repro that disproves it) and record the
   dispute as a `[decision]`. After fixes, re-run the targeted tests, then the
-  full gate once, then the verifier. Continue the same verifier session for
+  local-tier gate once, then the verifier. Continue the same verifier session for
   re-checks, since it already holds the findings.
 - **Non-blocking finding.** Fix it if it takes less than two minutes.
   Otherwise list it under `Discovered-Follow-Ups-JSON`.

@@ -70,7 +70,12 @@ Determine required verification in this order:
 3. Existing CI config if local docs still leave ambiguity.
 
 Do not invent lighter substitute gates when the repository already defines
-stricter ones.
+stricter ones. Equally, honor the repository's placement of each gate: when it
+assigns broad lanes to hosted CI or a merge queue and the change lands through
+a required hosted check, the local gate is the scoped one plus the cheap
+pre-push checks below, and the hosted run is the broad evidence. A
+direct-merge candidate without a merge queue has no hosted gate before it
+lands, so it runs the full gate locally (`../../../../th-engineering/subskills/ci-discipline/SKILL.md`).
 
 ## Read-Only Helper Boundary
 

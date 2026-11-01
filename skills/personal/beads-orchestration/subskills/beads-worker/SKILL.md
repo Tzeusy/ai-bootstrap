@@ -226,8 +226,13 @@ justify the raise in the PR body; never bump the budget silently.
 Run gates token-efficiently (see `../../references/token-efficiency.md`):
 - While iterating, run only the tests covering your changed area (specific test
   files, package paths, or `-k`/`--filter` selection).
-- Run the full defined gate exactly once, immediately before handoff, with the
-  runner's quiet flag. Never substitute the targeted subset for this final run.
+- Run the full defined gate once per tree. Skip the local run only when the
+  repo assigns broad lanes to hosted CI or a merge queue **and** your handoff
+  is a PR whose required hosted check covers the landing tree; then the
+  hosted run is the gate. Otherwise run it locally, once, immediately before
+  handoff, with the runner's quiet flag. A direct-merge candidate always
+  runs it locally: the coordinator may fast-forward it with nothing hosted
+  in between. Never substitute the targeted subset for the defined gate.
 - Route gate stdout to a log file and read back only the exit status plus the
   failure tail; on failure, iterate on the failing subset (`--lf` or named test
   ids), then re-run the full gate once more.
@@ -305,7 +310,9 @@ git push -u origin agent/${ISSUE_ID}
 
 The coordinator decides how the branch lands: a fast-forward push when the
 base is unprotected, or a `queue-direct` PR enqueued to the merge queue when
-the base has one. Do not open that PR yourself.
+the base has one. Do not open that PR yourself. Report the local full gate
+as a `full:` entry (worker-report); without a merge queue that run is the
+only gate before the fast-forward.
 
 If push fails and you cannot repair it with one quick local retry, route it
 through `blocked-awaiting-coordinator`.

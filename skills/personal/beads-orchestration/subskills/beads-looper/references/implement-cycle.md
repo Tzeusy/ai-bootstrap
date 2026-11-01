@@ -123,11 +123,13 @@ from the PR's unresolved threads.
 
 Keep your liveness fresh through long work. Renew the stall heartbeat and the
 registration (`register --wake-minutes` sized to cover the next stretch) at
-the runtime-and-safety checkpoints: after the full gate, after each verifier
+the runtime-and-safety checkpoints: after the local gate, after each verifier
 round, and after any long `gh` wait. These are liveness writes, not lifecycle
 writes. Without them, a busy looper reads as dead, and a peer adopts its bead.
 
-When the full gate passes, run the verifier
+When the gate assigned to the local tier passes (the full gate, or the scoped
+run when a required hosted check gates landing; see the worker's Phase 4), run
+the verifier
 ([`adversarial-verifier.md`](adversarial-verifier.md)). Then choose the
 hand-off path with the worker's Phase 5 table and emit its Worker Report with
 `$WK/scripts/emit_worker_report.py`. That report is the input to step 4.
@@ -169,8 +171,10 @@ Your work is already pushed or quarantined.
   git push origin "HEAD:refs/heads/$BASE"     # fast-forward only; a rejection means a peer landed first
   ```
 
-  If the base had moved, the pushed head is no longer the verified head. In
-  that case, re-run the full gate after the rebase and force-push
+  This path has no hosted gate before landing, so the head pushed to the base
+  must carry a passing local full-gate run; a scoped-only run does not
+  qualify. If the base had moved, the pushed head is no longer the verified
+  head. In that case, re-run the full gate after the rebase and force-push
   `agent/<id>` with `--force-with-lease` before pushing to the base. If the
   rebase conflicts, resolve it and also re-run the verifier. A rejected push
   means another lane landed first: retry once. If the second push also loses,

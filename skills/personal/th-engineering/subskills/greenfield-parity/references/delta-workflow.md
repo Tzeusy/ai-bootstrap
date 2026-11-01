@@ -75,7 +75,7 @@ here).
 | layer inflation | pass-through that renames and forwards; service → manager → handler chains |
 | defensive excess | validation or fallback for states the types or caller already exclude |
 | narration | comments restating code, docstrings on obvious functions, changelog-in-comments |
-| tooling sprawl | build/CI/lint surface larger than the code it guards; single-caller scripts |
+| tooling sprawl | build/CI/lint surface larger than the code it guards; single-caller scripts; a check run in two tiers for the same tree ([ci-discipline](../../ci-discipline/SKILL.md)) |
 | test bloat | tests of mocks, unread snapshots, fixtures duplicating fixtures |
 
 ## Step 4 — Justify or cut

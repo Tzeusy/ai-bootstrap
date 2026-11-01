@@ -74,9 +74,13 @@ Commands are pytest exemplars; adapt flags per stack, keep the shape.
   ```bash
   pytest tests/unit/<area> -q -x --tb=short
   ```
-- **Gate**: the full defined suite exactly once before completion,
-  routed to a log; read back exit status plus the failure tail, never
-  the stream:
+- **Gate**: the full defined suite once per tree, wherever the repo's
+  placement policy puts it. When the repo assigns the broad run to hosted
+  CI or a merge queue **and** a required hosted check covers the tree that
+  lands, that run is the gate and no local broad run precedes it
+  ([ci-discipline](../../ci-discipline/SKILL.md)); otherwise the local run
+  is mandatory. Route a local gate to a log; read back exit status plus
+  the failure tail, never the stream:
   ```bash
   pytest -q --tb=short >"$LOG" 2>&1 || tail -40 "$LOG"
   ```
@@ -89,6 +93,12 @@ Commands are pytest exemplars; adapt flags per stack, keep the shape.
 
 Write-time rules; each is reviewable:
 
+- **Budget the clock; count is a tripwire** — the cost a suite imposes
+  is critical-path runtime per run, not test count. A count ratchet is a
+  cheap prompt to measure; when it trips, check runtime and selection
+  before condensing ([ci-discipline](../../ci-discipline/SKILL.md) fix
+  ladder). With affected-only selection, a larger suite need not slow a
+  PR.
 - **Worth-adding** — bar 10: a test is added only if it catches a
   plausible bug no existing test catches. Search first; extend the
   nearest existing test when one pins the behavior.
@@ -110,7 +120,10 @@ Write-time rules; each is reviewable:
 ## Condensation Cadence
 
 Schedule a recurring pass (monthly under heavy feature work); do not
-wait for crisis. Per pass:
+wait for crisis. Condensation buys suite legibility and maintenance cost;
+when the complaint is CI speed, it is the last rung of ci-discipline's fix
+ladder, after duplicate runs, selection, setup, sharding, and capacity.
+Per pass:
 
 1. **Measure** — count per domain; compare to last pass.
 2. **Classify** — walk each test through the keep/delete/rewrite decision

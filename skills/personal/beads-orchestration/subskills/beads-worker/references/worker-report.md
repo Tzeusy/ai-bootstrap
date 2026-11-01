@@ -27,8 +27,16 @@ python3 "<loaded beads-worker package>/scripts/emit_worker_report.py" \
   --quality-gate typecheck=pass \
   --quality-gate tests=pass \
   --changes "path/to/file: what changed" \
-  --tests "pytest path/to/test.py: pass"
+  --tests "full: <gate command>: pass"
 ```
+
+`tests=pass` reports the test gate assigned to the local tier. Name its scope
+first in `--tests`: `full: <command>: pass` when the full defined gate ran
+locally, or `scoped: <paths>: pass; broad: hosted` when the repo's required
+hosted run is the broad gate (PR handoff only). Emit the report after the
+gate: a commit after the gate invalidates its `full:` entry, because
+`--head-commit` is the head that entry vouches for. The coordinator
+fast-forwards a direct-merge candidate only on a `full:` entry.
 
 For PR handoff add:
 

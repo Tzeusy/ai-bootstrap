@@ -321,10 +321,10 @@ python3 "<loaded beads-pr-reviewer-worker package>/scripts/discover_quality_gate
 Treat discovered commands as candidates that still need judgment, not blind
 truth. Do not claim completion with failing gates.
 
-Run gates token-efficiently (see `../../references/token-efficiency.md`): route
-gate stdout to a log file and read back only the exit status plus the failure
-tail, and while iterating on a fix run only the tests covering it — the full
-defined gate runs once, immediately before the merge decision.
+Run gates token-efficiently (`../../references/token-efficiency.md`): log to a
+file, read exit status plus failure tail, iterate on covering tests only. Hosted
+CI on the exact reviewed head is the broad evidence; recompute it locally only if
+the repo names a local broad gate, no hosted run covers it, or to reproduce one.
 
 ### Phase 5: Merge Or Report Retry
 

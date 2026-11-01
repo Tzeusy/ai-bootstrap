@@ -4,7 +4,8 @@ description: >
   Use when judging or improving the quality of tests — whether they assert behavior,
   cover edge and failure paths, protect against regressions, and stay trustworthy —
   in a diff, test suite, or review; also suite-level health: tier structure
-  (unit/component/integration), targeted runnability, runtime, and growth control.
+  (unit/component/integration), targeted runnability, per-test runtime cost, and
+  growth control.
   Complements process skills like test-driven-development: this is the bar for what
   tests are worth, not when to write them.
 metadata:
@@ -13,8 +14,9 @@ metadata:
     - tze
     - Claude Fable 5
     - Claude Fable 5.1
+    - Claude Opus 5.5
   status: active
-  last_reviewed: "2026-10-03"
+  last_reviewed: "2026-11-01"
 ---
 
 # Test Rigor
@@ -37,6 +39,8 @@ actually have, and can a maintainer believe a green run?
 - Diagnosing a failing test's root cause — [diagnosis](../diagnosis/SKILL.md)
   (evidence bar) or `/systematic-debugging` (process)
 - Production-code clarity — [code-readability](../code-readability/SKILL.md)
+- Where checks run, duplicate CI runs, slow or queued pipelines —
+  [ci-discipline](../ci-discipline/SKILL.md)
 
 ## Core Rule
 
@@ -88,9 +92,11 @@ Reviewable expectations — cite the one violated, with file:line evidence:
    setup is factored deliberately; unreadable tests are a finding.
 9. **Suite is tiered and targetable** — Every test maps to one tier
    (unit / component / integration); network only above unit, enforced
-   mechanically. Iteration runs a scoped subset; the full gate runs exactly
-   once before completion. Tier definitions, budgets, run commands:
-   [suite-discipline](references/suite-discipline.md).
+   mechanically. Iteration runs a scoped subset; the full gate runs once
+   per tree, in the tier the repo's placement policy assigns it — often the
+   hosted merge-queue run, not a local one
+   ([ci-discipline](../ci-discipline/SKILL.md)). Tier definitions, budgets,
+   run commands: [suite-discipline](references/suite-discipline.md).
 10. **Growth is governed** — A test is worth *adding* only if it catches a
     plausible bug no existing test catches: search for the nearest existing
     test first and prefer extending it. Scratch checks run while iterating

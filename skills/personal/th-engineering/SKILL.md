@@ -3,13 +3,14 @@ name: th-engineering
 description: >
   Use for engineering-quality work on any change or codebase — holding an
   implementation or review to the engineering quality bar, code readability,
-  test-suite rigor, module boundaries and dependency chains, diagnosing hard
+  test-suite rigor, CI pipeline discipline (where checks run, duplicate
+  runs, slow or clogged CI), module boundaries and dependency chains, diagnosing hard
   bugs and flaky failures to root cause, post-refactor cruft cleanup,
   codebase documentation, scaffolding or reviewing skills against the skill
   quality bar, greenfield-parity complexity audits that re-run without
   duplicating beads, or Excalidraw diagrams. Triggers: "hold
   this to the engineering bar", "is this code readable", "review these
-  tests", "untangle these dependencies", "diagnose this", "flaky test",
+  tests", "CI is too slow", "why does CI run twice", "untangle these dependencies", "diagnose this", "flaky test",
   "clean up this refactor", "would we build it this way from scratch",
   "is this over-engineered", "document this service", "audit the docs",
   "review this skill", "create a skill", "draw a diagram".
@@ -20,14 +21,15 @@ metadata:
     - Claude Fable 5
     - Claude Fable 5.1
     - OpenAI Codex
+    - Claude Opus 5.5
   status: active
-  last_reviewed: "2026-10-20"
+  last_reviewed: "2026-11-01"
 compatibility: skill-standards auditing and excalidraw rendering require uv and Python 3.11+; excalidraw-diagram additionally requires Playwright Chromium setup on first render.
 ---
 
 # TH Engineering
 
-Superskill router for the engineering quality bar. Eleven subskills live under
+Superskill router for the engineering quality bar. Twelve subskills live under
 `subskills/`, each a complete skill package. **Not** in the global
 catalog — discover lazily, load **at most one** subskill body per
 subdomain, and apply several in sequence in your own session when a task
@@ -53,6 +55,7 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 | Holistic quality bar: default engineering biases, definition of done; the source projects' craft-and-care pillars adopt by reference. | [subskills/engineering-bar/SKILL.md](subskills/engineering-bar/SKILL.md) | "hold this to the engineering bar", "is this change complete" |
 | Readability and maintainability: naming, function shape, abstraction altitude, comments, simplicity over cleverness. | [subskills/code-readability/SKILL.md](subskills/code-readability/SKILL.md) | "is this readable", "simplify this code" |
 | Test quality: behavior-focused assertions, edge/failure coverage, regression tests, tautology and flake elimination. | [subskills/test-rigor/SKILL.md](subskills/test-rigor/SKILL.md) | "review these tests", "what coverage is missing" |
+| CI/CD pipeline discipline: gate tiers by cost, each verdict once per tree, affected-only PR runs, merge-queue topology, queue-wait vs execution diagnosis, runtime budgets, agent push/run habits. | [subskills/ci-discipline/SKILL.md](subskills/ci-discipline/SKILL.md) | "CI is too slow", "why does CI run twice", "pre-commit or CI?" |
 | Module boundaries and dependency chains: direction, layering, cycles, public surface, third-party policy. | [subskills/dependency-hygiene/SKILL.md](subskills/dependency-hygiene/SKILL.md) | "untangle these dependencies", "should we add this library" |
 | Codebase documentation: synthesis, diagrams, contract-level code-cited facts, interface semantics cards, human-readable doc sites. | [subskills/documentation/SKILL.md](subskills/documentation/SKILL.md) | "document this service", "audit docs for stale claims" |
 | Evidence bar for diagnosing hard bugs, flaky failures, and perf regressions: feedback loop, ranked hypotheses, tagged instrumentation, regression test at the correct seam. | [subskills/diagnosis/SKILL.md](subskills/diagnosis/SKILL.md) | "diagnose this", "fails one run in twenty", "find the regression" |
@@ -66,6 +69,10 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 
 - **Bar vs. subdomain**: holistic "is this good/done" → engineering-bar; an
   ask naming one subdomain → that subskill directly.
+- **Test worth vs. pipeline placement**: whether a test should exist, suite
+  tiers, condensation → test-rigor; where and how often checks run, slow or
+  duplicated CI, merge queues → ci-discipline (which sends condensation back
+  to test-rigor as its last rung). A red or flaky run → diagnosis.
 - **Change-level vs. project-level**: changes, diffs, PRs, modules → here.
   Repo-wide audits, specs, prioritization, knowledge architecture →
   `/th-projects` (whose craft-and-care pillar adopts engineering-bar by

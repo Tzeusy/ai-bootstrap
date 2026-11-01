@@ -101,13 +101,21 @@ Default to the second shape:
 ## Verification discipline
 
 - While iterating, run only the tests covering the changed area (test file,
-  package, or `-k` selection). Run the repository's full required gate exactly
-  once, immediately before handoff, with the runner's quiet flag (`-q`,
-  `--quiet`, `--silent`).
+  package, or `-k` selection).
+- The full required gate runs once per tree, in the tier the repository's
+  test-scope or CI policy assigns it (`../../th-engineering/subskills/ci-discipline/SKILL.md`).
+  Skip the local run only when the repository assigns broad lanes to hosted
+  CI or a merge queue **and** a required hosted check covers the tree that
+  lands; then the hosted run is the gate and no local copy precedes it.
+  Otherwise (no hosted CI, CI not required, a direct push to the base) run it
+  exactly once, immediately before handoff, with the runner's quiet flag
+  (`-q`, `--quiet`, `--silent`).
 - On a full-gate failure, iterate on the failing subset (`--lf`, named test
   ids), then re-run the full gate once more.
 - This narrows iteration only — it never substitutes a lighter gate for one the
-  repository defines. The final pre-handoff run is always the full defined gate.
+  repository defines, and never adds a heavier local run than the repository's
+  placement policy calls for. Nobody re-runs a passing gate on an unchanged
+  tree: implementer and reviewer share the hosted verdict for the exact head.
 
 ## Model right-sizing
 

@@ -108,7 +108,8 @@ resolves against the wrong tree.
   share context, one at a time, rides autocompaction, and keeps its cache warm,
   instead of spawning a fresh cold worker per bead. A bead stays the unit of
   claim, PR, review, and closure. Also: project JSON through `jq`, route gate
-  output to files, run targeted tests before the single full gate, and keep one
+  output to files, run targeted tests before the full gate's one run per tree
+  (in the tier the repo's test-scope policy assigns it), and keep one
   model per lane. Load it once per session before the first `bd`/`gh` query
   loop.
 - **Quality gates travel with the work.** `beads-worker` and

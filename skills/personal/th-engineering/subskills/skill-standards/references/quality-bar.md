@@ -193,8 +193,11 @@ Exemplar doctrine: `beads-orchestration/references/token-efficiency.md`.
   installs): redirect to a file, read back exit status plus the failure tail,
   never the full log.
 - Verification workflows prescribe targeted iteration: run the subset covering
-  the change while iterating, the full defined gate exactly once before
-  completion (quiet flags). The subset never substitutes for the gate.
+  the change while iterating, the full defined gate once per tree in the tier
+  the repo assigns it (quiet flags when local). The subset never substitutes
+  for the gate, and a skill never adds a local broad run the repo assigned to
+  a required hosted check covering the landing tree (CI or a merge queue)
+  ([ci-discipline](../../ci-discipline/SKILL.md)).
 - Loop or polling workflows batch each cycle's checks into one composite
   command emitting a compact summary, and gate any status report on actual
   state change.

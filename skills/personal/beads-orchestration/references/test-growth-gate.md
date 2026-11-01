@@ -35,8 +35,14 @@ more were free. Tests are production code with a run-time cost on every PR.
    exceeding it is fixed in the same PR by condensing, or the budget raise is
    justified in the PR body with the delta line. Never raise it silently.
 7. **Scope the local run.** Follow the repo's test-scope policy while
-   iterating; run the repo's defined full gate exactly once before handoff
-   (see `token-efficiency.md`). Do not invent a lighter final gate.
+   iterating. The full gate runs once per tree. Skip the local full run only
+   when the repo assigns broad lanes to hosted CI or a merge queue **and** a
+   required hosted check covers the tree that lands; the hosted run is then
+   the evidence and no local copy precedes it. Otherwise (no hosted CI, CI
+   not required, a direct push to the base) the local full run is mandatory
+   (see `token-efficiency.md` and
+   `../../th-engineering/subskills/ci-discipline/SKILL.md`). Do not invent a
+   lighter final gate.
 
 ## Review-time rules (reviewer)
 

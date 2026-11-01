@@ -680,7 +680,12 @@ Report first, then verify the reported branch / PR state:
        `external_ref=gh-pr:<N>`, and let Step 0b close it on `MERGED`. The
        merge-group CI run is the gate; the `queue-direct` label tells Step 0c
        not to create a review bead
-     - otherwise attempt fast-forward merge:
+     - otherwise attempt fast-forward merge, but only when the worker
+       report's `Tests` carries a passing `full:` entry and its
+       `Head-Commit` equals `git rev-parse origin/agent/<id>` after
+       `git fetch origin`; nothing
+       hosted gates this path. Missing or stale evidence takes the
+       "on failure" route below:
        ```bash
        git fetch origin
        git checkout main && git pull --ff-only

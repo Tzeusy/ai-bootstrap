@@ -29,7 +29,11 @@ Guide completion of development work by presenting clear options and handling ch
 Run the gate the repository defines, not a default. If `AGENTS.md`, a
 `Makefile`, or CI names a test-scope policy (scoped local run, broad run in
 CI or a merge queue), follow it; only run the whole suite locally when the
-repo names that as the pre-PR gate.
+repo names that as the pre-PR gate, or when no required hosted check will
+judge the tree that lands (no CI, or CI not required). A broad verdict is
+computed once per tree
+(`../../../th-engineering/subskills/ci-discipline/SKILL.md`): never re-run a
+passing gate on an unchanged tree.
 
 ```bash
 # Repo-defined gate, e.g. make test-plan / make check; otherwise:
@@ -92,8 +96,13 @@ git pull
 # Merge feature branch
 git merge <feature-branch>
 
-# Verify tests on merged result
+# Verify tests on the merged result: it is a new tree, the one that lands.
+# Skip only if the merge fast-forwarded to a head whose full gate already
+# passed in Step 1 (same tree).
 <test command>
+
+# If tests fail on the merged tree, undo the merge and fix on the branch:
+#   git reset --merge ORIG_HEAD && git checkout <feature-branch>
 
 # If tests pass
 git branch -d <feature-branch>

@@ -35,6 +35,8 @@ carry before a fix is trusted.
 - The step-by-step debugging walkthrough — `/systematic-debugging` (process);
   this subskill grades the evidence that process produces
 - Judging the test suite itself — [test-rigor](../test-rigor/SKILL.md)
+- Pipeline-wide slowness (CI got slower, PRs queue) —
+  [ci-discipline](../ci-discipline/SKILL.md)
 - The post-fix definition of done —
   [engineering-bar](../engineering-bar/SKILL.md)
 
