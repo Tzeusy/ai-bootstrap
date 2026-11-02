@@ -22,6 +22,7 @@ if [ ! -e "$dir/run.sh" ]; then
     "$here/../assets/run.sh.template" > "$dir/run.sh.tmp"
   mv "$dir/run.sh.tmp" "$dir/run.sh"
 fi
-chmod 0770 "$dir/run.sh"
+# World-readable and executable so the owner can run it directly (./run.sh).
+chmod 0775 "$dir/run.sh"
 bash -n "$dir/run.sh"
 echo "$dir/run.sh"
