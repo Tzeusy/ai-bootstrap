@@ -126,7 +126,9 @@ def _make_gh_evaluate(bin_dir: FakeBinDir, *, pr_state: str = "OPEN",
                        review_decision: str | None = None, unresolved: int = 0,
                        check_states: list[str] | None = None,
                        checks_error: str | None = None,
-                       merge_queue_rules: int | None = None) -> None:
+                       merge_queue_rules: int | None = None,
+                       label_pages: list | None = None,
+                       labels_error: bool = False) -> None:
     """Configure a fake `gh` for evaluate_merge_readiness tests.
 
     ``merge_queue_rules`` is the number of ``merge_queue`` rules the branch
@@ -150,6 +152,10 @@ def _make_gh_evaluate(bin_dir: FakeBinDir, *, pr_state: str = "OPEN",
         checks_json = json.dumps([{"state": s} for s in check_states])
     checks_error_body = f'print({repr(checks_error)}, file=__import__("sys").stderr); raise SystemExit(1)' if checks_error else ""
 
+    if label_pages is None:
+        label_pages = [{"nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}}]
+    labels_json = json.dumps(label_pages)
+
     bin_dir.add("gh", f"""
 import sys
 import json
@@ -169,6 +175,15 @@ if 'api' in argv and any(a.startswith('repos/') and '/rules/branches/' in a for 
         print('gh: Not Found (HTTP 404)', file=sys.stderr)
         sys.exit(1)
     print({merge_queue_rules!r})
+    sys.exit(0)
+
+if 'api' in argv and 'graphql' in argv and any('labels(first:100' in a for a in argv):
+    if {labels_error!r}:
+        print('label read failed', file=sys.stderr)
+        sys.exit(1)
+    pages = json.loads({labels_json!r})
+    index = 1 if 'after=next' in argv else 0
+    print(json.dumps({{"data": {{"repository": {{"pullRequest": {{"labels": pages[index]}}}}}}}}))
     sys.exit(0)
 
 if 'api' in argv and 'graphql' in argv:
@@ -218,17 +233,49 @@ class EvaluateMergeReadinessTests(unittest.TestCase):
         self.assertEqual(payload["merge_command"], "gh pr merge --squash")
 
     def test_merge_ok_when_all_conditions_green(self) -> None:
-        with FakeBinDir() as fbd:
-            _make_gh_evaluate(fbd, pr_state="OPEN", is_draft=False,
-                              merge_state="CLEAN", unresolved=0,
-                              check_states=["SUCCESS"])
-            result = run_script("evaluate_merge_readiness.py",
-                                ["--owner", "owner", "--repo", "repo", "--pr-number", "42"],
-                                env=fbd.env())
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        self.assertTrue(payload["merge_ok"])
-        self.assertEqual(payload["reasons"], [])
+        def page(names, more=False, cursor=None):
+            return {"nodes": [{"name": name} for name in names],
+                    "pageInfo": {"hasNextPage": more, "endCursor": cursor}}
+
+        # Reconfigure the same PR between calls: removal must be visible on the
+        # next evaluation, without a persistent hold latch. Queue detection
+        # must never bypass the hold or fail-closed evidence handling.
+        cases = [
+            ([page([])], False, False),
+            ([page(["owner-merge-soon", "Owner-Merge"])], False, False),
+            ([page(["owner-merge"])], True, False),
+            ([page([f"tag-{i}" for i in range(100)], True, "next"),
+              page(["owner-merge"])], True, False),
+            ([page([])], False, False),
+            ([None], False, True),
+            ([{"nodes": []}], False, True),
+            ([page([None])], False, True),
+            ([page([], True, None)], False, True),
+            ([page([], True, "next"), page([], True, "next")], False, True),
+        ]
+        for queue in (0, 1):
+            with FakeBinDir() as fbd:
+                for pages, held, invalid in cases:
+                    with self.subTest(queue=queue, pages=pages):
+                        _make_gh_evaluate(fbd, review_decision="APPROVED",
+                                          merge_queue_rules=queue, label_pages=pages)
+                        result = run_script("evaluate_merge_readiness.py",
+                                            ["--owner", "owner", "--repo", "repo", "--pr-number", "42"],
+                                            env=fbd.env())
+                        if invalid:
+                            self.assertNotEqual(result.returncode, 0, result.stdout)
+                            self.assertFalse(json.loads(result.stderr)["ok"])
+                        else:
+                            self.assertEqual(result.returncode, 0, result.stderr)
+                            payload = json.loads(result.stdout)
+                            self.assertEqual(payload["merge_ok"], not held)
+                            self.assertEqual(payload["reasons"], ["held-for-owner"] if held else [])
+                _make_gh_evaluate(fbd, labels_error=True)
+                result = run_script("evaluate_merge_readiness.py",
+                                    ["--owner", "owner", "--repo", "repo", "--pr-number", "42"],
+                                    env=fbd.env())
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(json.loads(result.stderr)["ok"])
 
     def test_merge_blocked_by_unresolved_threads(self) -> None:
         with FakeBinDir() as fbd:

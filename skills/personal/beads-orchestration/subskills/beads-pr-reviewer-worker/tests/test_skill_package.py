@@ -74,12 +74,21 @@ class BreadsPrReviewerWorkerPackageTests(unittest.TestCase):
         for status in (
             "merged-pr",
             "merge-queued",
+            "held-for-owner",
             "corrections-required",
             "pushed-review-fixes",
             "blocked-awaiting-coordinator",
             "invalid-runtime-context",
         ):
             self.assertIn(status, contents, f"SKILL.md should document status: {status}")
+        for document in (SKILL_MD, FAILURE_PROTOCOL_MD, EVALUATION_MD):
+            self.assertIn("held-for-owner", document.read_text(encoding="utf-8"))
+        for document in (SKILL_MD, FAILURE_PROTOCOL_MD):
+            text = document.read_text(encoding="utf-8")
+            self.assertIn("Merge-Performed: no", text)
+            self.assertIn("PR-Closed: no", text)
+        for document in (SKILL_MD, FAILURE_PROTOCOL_MD, THREAD_OPERATIONS_MD):
+            self.assertIn("coordinator-loop.md#owner-merge-hold", document.read_text(encoding="utf-8"))
 
     def test_openai_yaml_exists_with_required_fields(self) -> None:
         self.assertTrue(OPENAI_YAML.exists(), OPENAI_YAML)

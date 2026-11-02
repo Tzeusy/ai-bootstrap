@@ -72,6 +72,139 @@ Before any `bd` mutation: confirm you are the bead's `assignee`, renew the stall
 heartbeat if near expiry, then mutate. Never mutate a bead assigned to another
 live actor.
 
+## Owner merge hold
+
+The exact label `owner-merge` reserves an OPEN PR for the owner. This overlay
+outranks normalizer v1 recommendations, queue-direct, and earlier readiness or
+inventory observations. Resolve `OWNER`/`REPO` to the target repository; load
+these Bash functions in the acting shell. They perform reads only. The projection
+validates every page before emitting a verdict or inventory; missing, partial,
+or malformed evidence fails closed.
+
+```bash
+# owner-merge-procedure: begin
+owner_merge_projection() {
+  jq -er --arg mode "$1" '
+    def connection: if $mode == "guard" then .data.repository.pullRequest.labels else .data.repository.pullRequests end;
+    if type != "array" or length == 0 then error("missing pages") else . end
+    | if all(.[]; (.errors == null or (.errors | type == "array" and length == 0))
+        and (connection | type == "object")
+        and (connection.nodes | type == "array")
+        and (connection.pageInfo.hasNextPage | type == "boolean")
+        and (connection.pageInfo | has("endCursor"))
+        and (connection.pageInfo.endCursor == null or (connection.pageInfo.endCursor | type == "string")))
+      and all(.[0:-1][]; connection.pageInfo.hasNextPage == true
+        and (connection.pageInfo.endCursor | type == "string" and length > 0))
+      and (.[-1] | connection.pageInfo.hasNextPage == false)
+      and (([.[0:-1][] | connection.pageInfo.endCursor] | unique | length) == (length - 1))
+      then . else error("incomplete pages") end
+    | if $mode == "guard" then
+        if all(.[]; (.data.repository.pullRequest.state | IN("OPEN", "MERGED", "CLOSED"))
+            and all(connection.nodes[]; type == "object" and (.name | type == "string")))
+          and ([.[].data.repository.pullRequest.state] | unique | length) == 1
+        then if .[0].data.repository.pullRequest.state != "OPEN" then "terminal-pr"
+          elif any(.[] | connection.nodes[]; .name == "owner-merge") then "held-for-owner"
+          else "unheld" end
+        else error("invalid PR labels/state") end
+      else
+        if all(.[] | connection.nodes[]; type == "object" and .state == "OPEN"
+            and (.number | type == "number" and . > 0 and floor == .)
+            and (.title | type == "string"))
+        then if $mode == "branch" then
+          if all(.[]; (connection.nodes | length) == 0) then "unheld"
+          else "existing-open-pr" end
+        else [.[] | connection.nodes[] | {number, title,
+          ci_state: (if (.statusCheckRollup | type) == "object"
+            and (.statusCheckRollup.state | IN("SUCCESS", "FAILURE", "PENDING", "ERROR", "EXPECTED"))
+            then .statusCheckRollup.state else "UNKNOWN" end)}]
+          | if length == 0 then "Held PRs: none"
+            else .[] | "Held PR: " + tojson end
+        end
+        else error("invalid held PR inventory") end
+      end'
+}
+
+owner_merge_guard() (
+  set -o pipefail
+  local pages verdict
+  pages=$(gh api graphql --paginate --slurp \
+    -f query='query($owner:String!,$name:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){state labels(first:100,after:$endCursor){nodes{name} pageInfo{hasNextPage endCursor}}}}}' \
+    -F owner="$OWNER" -F name="$REPO" -F number="$1") \
+    || { printf '%s\n' 'owner-merge: unavailable' >&2; exit 1; }
+  verdict=$(printf '%s\n' "$pages" | owner_merge_projection guard) \
+    || { printf '%s\n' 'owner-merge: unavailable' >&2; exit 1; }
+  case "$verdict" in
+    unheld) exit 0 ;;
+    held-for-owner) printf '%s\n' "$verdict" >&2; exit 3 ;;
+    *) printf '%s\n' "$verdict" >&2; exit 1 ;;
+  esac
+)
+
+owner_merge_inventory() (
+  set -o pipefail
+  local pages report
+  pages=$(gh api graphql --paginate --slurp \
+    -f query='query($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:100,after:$endCursor,states:OPEN,labels:["owner-merge"]){nodes{number title state statusCheckRollup{state}} pageInfo{hasNextPage endCursor}}}}' \
+    -F owner="$OWNER" -F name="$REPO") \
+    || { printf '%s\n' 'Held PRs: unavailable/partial'; exit 1; }
+  report=$(printf '%s\n' "$pages" | owner_merge_projection inventory) \
+    || { printf '%s\n' 'Held PRs: unavailable/partial'; exit 1; }
+  printf '%s\n' "$report"
+)
+owner_merge_branch_guard() (
+  set -o pipefail
+  local pages verdict
+  pages=$(gh api graphql --paginate --slurp \
+    -f query='query($owner:String!,$name:String!,$branch:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:100,after:$endCursor,states:OPEN,headRefName:$branch){nodes{number title state} pageInfo{hasNextPage endCursor}}}}' \
+    -F owner="$OWNER" -F name="$REPO" -f branch="$1") \
+    || { printf '%s\n' 'branch PRs: unavailable' >&2; exit 1; }
+  verdict=$(printf '%s\n' "$pages" | owner_merge_projection branch) \
+    || { printf '%s\n' 'branch PRs: unavailable' >&2; exit 1; }
+  if [ "$verdict" = unheld ]; then exit 0; fi
+  printf '%s\n' 'existing-open-pr: route through existing PR lane' >&2
+  exit 3
+)
+# owner-merge-procedure: end
+```
+
+Immediately before **every** enqueue, merge, or close-PR attempt, run
+`owner_merge_guard "$PR_NUMBER" && <action>` in the same shell. Exit 3 means
+`held-for-owner`; any other nonzero means unavailable/terminal: stop that action
+and freshly reconcile state. This includes reviewer direct `gh pr merge`,
+`--auto`, a GraphQL `enqueuePullRequest` fallback, queue-direct initial
+enrollment, re-enrollment, and every retry. A failed attempt does not authorize
+the next one: recheck immediately before its fallback/retry. For close, comment
+first, then guard again immediately before `gh pr close`. Preserve all existing
+exact-head, CI, independence, cooldown and dedupe gates; a guard exit 0 alone
+never authorizes the action. Label read and action are separate remote requests:
+there is a residual TOCTOU race, with no atomic server guarantee.
+
+Before each direct fast-forward/base push or queue-direct creation, run
+`owner_merge_branch_guard "$HEAD_BRANCH" && <base-push-or-create>` to freshly
+enumerate **all** existing OPEN PRs for that exact branch. Errors stop the push.
+If one exists, route through its existing PR lane and run the fresh hold guard
+there; never bypass it with a base push or duplicate PR. Only a successfully
+verified empty branch-PR collection permits the direct path.
+
+For OPEN held PRs, review and already-authorized corrections remain allowed;
+do not enqueue, merge, or close them. Keep one canonical original/review
+relationship, release `review-running` when review ends, and record
+`held-for-owner` without creating a hold-only blocker bead or repeatedly
+redispatching the same head solely to attempt merge. Preserve actionable
+findings and correction handoffs; exceptional pushed fixes still require a
+fresh independent reviewer. Recompute the hold next fresh cycle: label removal
+resumes normal rules without a persistent Beads hold latch or extra reset.
+An already queued/auto-merge-armed held PR is reported with no further fleet
+action; automatic dequeue/cancellation is outside this procedure. Actual
+owner-performed MERGED/CLOSED state still follows terminal reconciliation,
+even if the label remains; never freeze truthful Beads closure/re-triage.
+
+Run `owner_merge_inventory` independently on **every cycle**, including frontier
+and final reports, across all ownership/branch prefixes. Show every number,
+title and actual CI state; missing CI is UNKNOWN. Successful emptiness is
+`Held PRs: none`; failed/partial enumeration is unavailable/partial, never
+none or green. Listing a foreign PR grants no ownership or mutation rights.
+
 ## Step 0: Normalize PR-Review State
 
 Step 0 is the **sole PR-state mutator** in the system. Only the coordinator
@@ -196,17 +329,20 @@ If GraphQL or the projection fails, log a warning and skip every mutation for
 that PR this cycle. A successful projection distinguishes actual queue
 membership from auto-merge merely being armed.
 
-Handle each case:
+Handle each case. For OPEN state, apply [Owner merge hold](#owner-merge-hold)
+first using complete fresh labels; `labels(first:20)` above is queue metadata
+only and cannot prove absence of the hold:
 
 | PR State | Action |
 |---|---|
 | `MERGED` | renew heartbeat, then close review/original beads as appropriate (a `queue-direct` PR has only an original bead); then run the post-closure branch/worktree cleanup below |
 | `CLOSED` and not merged | renew heartbeat, then reopen original for re-triage; block/close review bead as appropriate |
+| `OPEN` with `owner-merge` | report held-for-owner; preserve review/correction work, perform no enqueue/merge/close; do not redispatch solely to merge |
 | `OPEN` and `merge_queue_entry` non-null | queued: do nothing this cycle, regardless of `auto_merge_armed`; re-check on the next wake |
 | `OPEN`, `merge_queue_entry` null, and `auto_merge_armed` true | auto-merge is armed but the PR is not yet confirmed in the queue: remove any stale `merge-queued` label, then wait and re-check; do not dispatch or rebase |
 | `OPEN`, review bead labelled `merge-queued`, `merge_queue_entry` null, and `auto_merge_armed` false | membership is absent, but absence alone does not prove why: remove `merge-queued` and treat it as an `OPEN` `pr-review-task`; do not authorize `--force-rebase` without a textual merge conflict or a justified reviewer request |
 | `OPEN` with `pr-review-task` | wait for cooldown; once elapsed, atomically claim the review bead with `bd --actor "$COORDINATOR_ID" update <id> --claim`, then dispatch review worker if slot is open |
-| `OPEN` labelled `queue-direct` | no review bead by design; if `merge_queue_entry` is null and `auto_merge_armed` is false, re-run `gh pr merge <n> --squash --auto`; after two failed enrollment attempts drop the label and route through the normal review lane, without authorizing a rebase from queue metadata alone |
+| `OPEN` labelled `queue-direct` | no review bead by design; if `merge_queue_entry` is null and `auto_merge_armed` is false, run a fresh hold guard immediately before each attempt to re-run `gh pr merge <n> --squash --auto`; after two failed enrollment attempts drop the label and route through the normal review lane, without authorizing a rebase from queue metadata alone |
 | `OPEN` without `pr-review-task` | ensure exactly one dedicated review bead exists |
 | `gh` failure | log warning, skip; do not mutate on transient errors |
 
@@ -668,13 +804,17 @@ Report first, then verify the reported branch / PR state:
        classification below)
      - re-run Step 0 immediately so review/merge is prioritized
    - `completed-direct-merge-candidate`:
-     - require `Branch-Pushed=yes` and no open PR
+     - require `Branch-Pushed=yes`; apply [Owner merge hold](#owner-merge-hold)
+       branch-PR check before any base push or PR creation; route an existing
+       OPEN PR through its lane rather than creating a duplicate or bypassing it
      - if `MERGE_QUEUE=yes`: the base rejects direct pushes, so open a PR and
        hand it to the queue without a review bead:
        ```bash
-       PR_URL=$(gh pr create --base main --head agent/<id> --label queue-direct \
-         --title "<worker title> [<id>]" --body "<worker summary>")
-       gh pr merge "${PR_URL}" --squash --auto
+       owner_merge_branch_guard "agent/<id>" &&
+         PR_URL=$(gh pr create --base main --head agent/<id> --label queue-direct \
+           --title "<worker title> [<id>]" --body "<worker summary>") &&
+         PR_NUMBER=${PR_URL##*/} &&
+         owner_merge_guard "$PR_NUMBER" && gh pr merge "${PR_URL}" --squash --auto
        ```
        then renew heartbeat, block the original bead with
        `external_ref=gh-pr:<N>`, and let Step 0b close it on `MERGED`. The
@@ -690,11 +830,12 @@ Report first, then verify the reported branch / PR state:
        git fetch origin
        git checkout main && git pull --ff-only
        git merge --ff-only origin/agent/<id>
-       git push origin main
+       owner_merge_branch_guard "agent/<id>" && git push origin main
        ```
      - on success: renew heartbeat, then `bd --actor "$COORDINATOR_ID" close <id> --reason "Simple change merged to main"`
-     - on failure: open a PR, set `external_ref`, ensure the review bead, and
-       route through the PR-review lane
+     - on failure: if a branch PR exists, reuse its lane; a failed branch-PR
+       read stops this path. Otherwise open a PR, set `external_ref`, ensure
+       the review bead, and route through the PR-review lane
    - `blocked-awaiting-coordinator`:
      - do not treat this as stalled
      - renew heartbeat
@@ -767,6 +908,7 @@ Reviewer-worker report contract:
 - accepted `Status` values:
   - `merged-pr`
   - `merge-queued`
+  - `held-for-owner`
   - `corrections-required`
   - `pushed-review-fixes`
   - `blocked-awaiting-coordinator`
@@ -790,6 +932,13 @@ Reviewer-worker report contract:
   resulting head
 
 When a reviewer worker completes:
+- if it reports `held-for-owner`, freshly verify OPEN + complete held labels,
+  require `Merge-Performed: no` and `PR-Closed: no`, remove `review-running`,
+  preserve the canonical original/review relationship and record the hold.
+  Keep identity, exact-head/risk evidence, findings, correction handoffs and any
+  fresh-independent-review requirement; do not create a hold-only blocker or
+  retry the same head solely to merge. If GitHub is now MERGED/CLOSED, use Step
+  0b terminal reconciliation instead. Recompute next cycle, including removal.
 - if it reports `merged-pr`, confirm the PR is merged, then renew the heartbeat,
   close the review and original beads, and run the post-closure branch/worktree
   cleanup in Step 0b (delete the `ORIGINAL_ID` PR branch, remove the
@@ -954,6 +1103,9 @@ After each cycle, return to Step 0.
 
 ## Progress Report
 
+Every cycle must include the [Owner merge hold](#owner-merge-hold) inventory,
+including frontier and final reports, even when the outcome report is skipped.
+
 Render a progress report only when bead status actually changed since the last
 report. Never derive the report from an unfiltered `bd list --json`; use
 filtered queries plus targeted checks of the ids dispatched this cycle.
@@ -1000,6 +1152,7 @@ Beads this cycle (outcomes only; running beads show under Next)
 | 3 | beads-051 | Shape refund children    | planning                   | —               |
 
 Delivered this session: 1 epic closed (beads-031); 3 merged source; 1 partial
+Held PRs: <owner_merge_inventory output: every number/title/CI, none, or unavailable/partial>
 Lanes: 3 / 5 in use (this coordinator 2, coordinator:codex-YYYYMMDD-xxxxxxxx 1); 1 human claim
 ═══════════════════════════════════════════════════════════════
 ```
@@ -1043,6 +1196,7 @@ The final report is the only record the owner and the next session get, so
 write it for a reader who has not seen this run. On top of the last progress
 report and the not-dispatched disclosure above, state:
 
+- fresh held PR inventory from `owner_merge_inventory` (also at frontier)
 - why the loop stopped: frontier stop, owner stop, or tracker fault, with the
   evidence for it
 - delivery by the categories above: epics closed this run, each focus epic's
