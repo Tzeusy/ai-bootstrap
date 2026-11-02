@@ -346,7 +346,11 @@ MERGE_JSON=$(python3 "<loaded beads-pr-reviewer-worker package>/scripts/evaluate
    - required checks are green or neutral/skipped
    - `reviewDecision` is not `CHANGES_REQUESTED`
    - `mergeStateStatus` is one of `CLEAN`, `HAS_HOOKS`, or `UNSTABLE`
-3. Never call `gh pr merge` unless the merge-readiness helper returns
+3. Apply the canonical [Owner merge hold](../beads-coordinator/references/coordinator-loop.md#owner-merge-hold)
+   immediately before every direct/auto merge, GraphQL enqueue fallback and
+   retry: `owner_merge_guard "$PR_NUMBER" && <action>`. No action on nonzero.
+   Exact OPEN held PRs report `held-for-owner`; unavailable labels fail closed.
+   Never call `gh pr merge` unless the merge-readiness helper returns
    `merge_ok: true`. If required checks could not be fetched or validated, that
    is a blocker and must fail closed.
 4. If the head moved after review, stop and report
@@ -355,8 +359,8 @@ MERGE_JSON=$(python3 "<loaded beads-pr-reviewer-worker package>/scripts/evaluate
    branch; `MERGE_QUEUE=yes` from the coordinator overrides a `null` detection):
 
 ```bash
-gh pr merge "${PR_NUMBER}" --squash          # no queue; confirm state=MERGED -> merged-pr
-gh pr merge "${PR_NUMBER}" --squash --auto   # queue; confirm mergeQueueEntry -> merge-queued
+owner_merge_guard "$PR_NUMBER" && gh pr merge "${PR_NUMBER}" --squash          # no queue; confirm state=MERGED -> merged-pr
+owner_merge_guard "$PR_NUMBER" && gh pr merge "${PR_NUMBER}" --squash --auto   # queue; confirm mergeQueueEntry -> merge-queued
 ```
 
    Under a queue the reviewer's job ends at `merge-queued`; the queue rebuilds
@@ -371,25 +375,14 @@ gh pr merge "${PR_NUMBER}" --squash --auto   # queue; confirm mergeQueueEntry ->
    create or wire the right follow-up work.
 
 7. If you intentionally close the PR instead of merging it, leave an
-   explanatory comment first, then close the PR.
+   explanatory comment first, then freshly guard immediately before closing
+   (see [thread operations](references/thread-operations.md#close-a-pr-instead-of-merging)).
 
 ## Failure Protocol
 
-Use [`references/failure-protocol.md`](references/failure-protocol.md) when
-something goes wrong. The short version:
-
-- unexpected runtime/bootstrap failure -> `invalid-runtime-context`
-- actionable current-outcome findings left for implementation ->
-  `corrections-required`
-- unresolved context, rebase conflicts, missing permissions, or external gate
-  failures -> `blocked-awaiting-coordinator`
-- review fixes pushed but merge still not safe -> `pushed-review-fixes`
-- merge completed and confirmed -> `merged-pr`
-- exact head approved and handed to the base branch's merge queue
-  (`mergeQueueEntry` confirmed) -> `merge-queued`
-
-Do not mutate Beads state on failure paths. Report the state and let the
-coordinator reconcile it.
+Use [`references/failure-protocol.md`](references/failure-protocol.md) for
+status selection, owner holds, failures and confirmed merge/queue outcomes.
+Do not mutate Beads lifecycle state; the coordinator reconciles the report.
 
 ## Validation
 
@@ -406,7 +399,7 @@ exactly this high-level structure: plain-text scalars, compact JSON arrays.
 ````text
 ## PR Reviewer Report: <ISSUE_ID>
 
-Status: merged-pr | merge-queued | corrections-required | pushed-review-fixes | blocked-awaiting-coordinator | invalid-runtime-context
+Status: merged-pr | merge-queued | held-for-owner | corrections-required | pushed-review-fixes | blocked-awaiting-coordinator | invalid-runtime-context
 Issue: <ISSUE_ID>
 Original-Issue: <original bead id or unknown>
 Branch: <head branch or n/a>
@@ -452,6 +445,9 @@ Rules:
   enqueued with `gh pr merge --squash --auto` (confirmed via an actual
   `mergeQueueEntry`); `Merge-Performed: queued`; the coordinator confirms the
   eventual merge and performs closure
+- `held-for-owner` means an OPEN owner hold; `Merge-Performed: no` and
+  `PR-Closed: no`; preserve all findings, identity/head/risk and correction
+  evidence per the failure protocol (including fresh-independent-review needs)
 - `corrections-required` means actionable unresolved threads were returned to
   the original author or recovery worker; the reviewer did not author semantic
   corrections

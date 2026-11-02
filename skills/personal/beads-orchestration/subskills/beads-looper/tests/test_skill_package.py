@@ -81,6 +81,15 @@ class BeadsLooperPackageTests(unittest.TestCase):
         # Corrections go back to the implement lanes; the reviewer never fixes.
         self.assertIn("--add-label review-correction", review)
         self.assertIn("never\nauthors fixes", review)
+        for document in (implement, review):
+            self.assertIn("coordinator-loop.md#owner-merge-hold", document)
+            self.assertIn("held-for-owner", document)
+            self.assertIn("cycle", document)
+            self.assertIn("frontier/final", document)
+        self.assertIn("Merge-Performed: no", review)
+        self.assertIn("PR-Closed: no", review)
+        self.assertIn("same-head review solely to merge", review)
+        self.assertIn("owner already MERGED/CLOSED", review)
 
     def test_worktrees_never_touch_repo_root_and_die_with_the_bead(self) -> None:
         skill, implement = read(SKILL_MD), read(IMPLEMENT)

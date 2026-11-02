@@ -72,11 +72,14 @@ Guidance:
 
 ## Close A PR Instead Of Merging
 
-If the correct outcome is to close the PR:
+If the correct outcome is to close the PR, load the canonical
+[Owner merge hold](../../beads-coordinator/references/coordinator-loop.md#owner-merge-hold)
+procedure. Comment first, then check fresh complete labels immediately before
+close (including every retry). A held or unavailable result suppresses close:
 
 ```bash
 gh pr comment "${PR_NUMBER}" --body "Closing PR #${PR_NUMBER}: <clear reason>."
-gh pr close "${PR_NUMBER}"
+owner_merge_guard "$PR_NUMBER" && gh pr close "${PR_NUMBER}"
 ```
 
 Always comment before closing.

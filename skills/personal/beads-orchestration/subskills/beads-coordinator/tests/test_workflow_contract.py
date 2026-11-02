@@ -5,6 +5,9 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import tempfile
 import re
 import subprocess
 import unittest
@@ -35,6 +38,153 @@ BD_MUTATION = re.compile(
 
 
 class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
+    def test_owner_hold_guards_and_inventory_execute_documented_procedure(self) -> None:
+        contents = LOOP.read_text(encoding="utf-8")
+        procedure = contents.split("# owner-merge-procedure: begin", 1)[1].split(
+            "# owner-merge-procedure: end", 1
+        )[0]
+        real_jq = shutil.which("jq")
+        self.assertIsNotNone(real_jq)
+
+        def run(responses, body, fail_direct=False):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                fixture = {"responses": responses, "fail_direct": fail_direct}
+                (root / "fixture.json").write_text(json.dumps(fixture))
+                fake_gh = '''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+root = Path(os.environ["FAKE_ROOT"])
+args = sys.argv[1:]
+fixture = json.loads((root / "fixture.json").read_text())
+if args[:2] == ["api", "graphql"] and any(a.startswith("query=query(") for a in args):
+    assert "--paginate" in args and "--slurp" in args, args
+    query = next(a for a in args if a.startswith("query="))
+    assert "first:100" in query and "$endCursor" in query and "pageInfo" in query, query
+    count_file = root / "reads"
+    index = int(count_file.read_text()) if count_file.exists() else 0
+    count_file.write_text(str(index + 1))
+    item = fixture["responses"][index]
+    if item == "FAIL":
+        sys.exit(1)
+    print(json.dumps(item))
+    sys.exit(0)
+with (root / "actions").open("a") as output:
+    output.write(json.dumps(args) + "\\n")
+if fixture["fail_direct"] and args[:2] == ["pr", "merge"] and "--auto" not in args:
+    sys.exit(1)
+'''
+                (root / "gh").write_text(fake_gh)
+                # Exercise real jq semantics through a fake PATH executable,
+                # exactly as the published projection runs in an acting shell.
+                (root / "jq").write_text(
+                    "#!/usr/bin/env python3\nimport os, sys\nos.execv("
+                    + repr(real_jq) + ", [" + repr(real_jq) + "] + sys.argv[1:])\n"
+                )
+                (root / "git").write_text(
+                    '#!/usr/bin/env python3\nimport os\nfrom pathlib import Path\n'
+                    'with (Path(os.environ["FAKE_ROOT"]) / "actions").open("a") as f: f.write("base-push\\n")\n'
+                )
+                for command in ("gh", "jq", "git"):
+                    (root / command).chmod(0o755)
+                result = subprocess.run(
+                    ["bash", "-c", procedure + "\nOWNER=owner\nREPO=repo\n" + body],
+                    env={**os.environ, "PATH": str(root) + os.pathsep + os.environ["PATH"],
+                         "FAKE_ROOT": str(root)}, capture_output=True, text=True,
+                )
+                actions = (root / "actions").read_text().splitlines() if (root / "actions").exists() else []
+                return result, actions
+
+        def page(nodes, more=False, cursor=None, *, state="OPEN", inventory=False):
+            connection = {"nodes": nodes, "pageInfo": {"hasNextPage": more, "endCursor": cursor}}
+            pr = {"pullRequests": connection} if inventory else {"pullRequest": {"state": state, "labels": connection}}
+            return {"data": {"repository": pr}}
+
+        unheld = [page([])]
+        held = [page([{"name": "owner-merge"}])]
+        late_hold = [page([{"name": f"tag-{i}"} for i in range(100)], True, "next"),
+                     page([{"name": "owner-merge"}])]
+        malformed = [page([{"name": None}])]
+        partial = [page([], True, "next")]
+        errors = [{**page([]), "errors": [{"message": "partial response"}]}]
+        invalid = ("FAIL", [], malformed, partial, errors, [None],
+                   [page([], True, "same"), page([], True, "same"), page([])])
+        direct = 'owner_merge_guard 42 && gh pr merge 42 --squash'
+        auto = direct + ' --auto'
+        enqueue = "owner_merge_guard 42 && gh api graphql -f 'query=mutation{enqueuePullRequest}'"
+        close = 'gh pr comment 42 --body reason\nowner_merge_guard 42 && gh pr close 42'
+        for action in (direct, auto, enqueue):
+            # Includes queue-direct initial enrollment; re-enrollment/retry is
+            # a separate action with a separate label observation below.
+            for evidence in (held, late_hold, *invalid):
+                with self.subTest(action=action, evidence=evidence):
+                    result, actions = run([evidence], action)
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
+                    self.assertEqual(actions, [])
+            result, actions = run([unheld], action)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(len(actions), 1)
+            # Label added after earlier readiness or inventory suppresses the
+            # actual attempt. Every fallback and queue-direct retry rechecks.
+            result, actions = run([unheld, held], 'owner_merge_guard 42\n' + action)
+            self.assertEqual(result.returncode, 3, result.stderr)
+            self.assertEqual(actions, [])
+        for fallback in (auto, enqueue):
+            result, actions = run([unheld, held], direct + '\n' + fallback, fail_direct=True)
+            self.assertEqual(result.returncode, 3, result.stderr)
+            self.assertEqual(len(actions), 1, actions)
+            self.assertNotIn("--auto", actions[0])
+        result, actions = run([unheld, held], auto + '\n' + auto)
+        self.assertEqual(result.returncode, 3, result.stderr)
+        self.assertEqual(len(actions), 1)
+        result, actions = run([held], close)
+        self.assertEqual(result.returncode, 3, result.stderr)
+        self.assertEqual(len(actions), 1)
+        self.assertIn('"comment"', actions[0])
+        # Removal is effective on the next call, without a local marker reset.
+        result, actions = run([held, unheld], direct + '\n' + direct)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(actions), 1)
+        for state in ("MERGED", "CLOSED"):
+            result, actions = run([[page([{"name": "owner-merge"}], state=state)]], direct)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("terminal-pr", result.stderr)
+            self.assertEqual(actions, [])
+
+        pr = {"number": 42, "title": "Foreign branch held PR", "state": "OPEN",
+              "statusCheckRollup": {"state": "SUCCESS"}}
+        branch_action = 'owner_merge_branch_guard agent/test && git push origin HEAD:main'
+        for evidence in ([page([pr], inventory=True)], "FAIL", [page([], True, "next", inventory=True)]):
+            result, actions = run([evidence], branch_action)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(actions, [])
+        result, actions = run([[page([], inventory=True)]], branch_action)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(actions, ["base-push"])
+
+        # All prefixes, all pages: never query only the agent/ ownership lane.
+        inventory = [page([{**pr, "number": i} for i in range(1, 101)], True, "next", inventory=True),
+                     page([{**pr, "number": 101, "statusCheckRollup": None},
+                           {**pr, "number": 102, "statusCheckRollup": {"state": "FAILURE"}},
+                           {"number": 103, "title": "Missing CI", "state": "OPEN"}], inventory=True)]
+        result, actions = run([inventory], 'owner_merge_inventory')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        rows = [json.loads(line.removeprefix("Held PR: ")) for line in result.stdout.splitlines()]
+        self.assertEqual(len(rows), 103)
+        self.assertEqual(rows[0], {"number": 1, "title": pr["title"], "ci_state": "SUCCESS"})
+        self.assertEqual([row["ci_state"] for row in rows[-3:]], ["UNKNOWN", "FAILURE", "UNKNOWN"])
+        self.assertEqual(actions, [])
+        result, _ = run([[page([], inventory=True)]], 'owner_merge_inventory')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "Held PRs: none")
+        for evidence in ("FAIL", [], [None], [page([], True, "next", inventory=True)],
+                         [{**page([], inventory=True), "errors": [{"message": "partial"}]}],
+                         [page([{"number": 42}], inventory=True)]):
+            result, actions = run([evidence], 'owner_merge_inventory')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.stdout.strip(), "Held PRs: unavailable/partial")
+            self.assertEqual(actions, [])
+
     def test_dispatch_requires_structured_acceptance_and_cohesion_check(self) -> None:
         contents = LOOP.read_text(encoding="utf-8").lower()
         self.assertIn("dispatch readiness", contents)
@@ -304,6 +454,11 @@ class BeadsCoordinatorWorkflowContractTests(unittest.TestCase):
         self.assertIn("immediately before each actual mutation", contents)
         self.assertIn("sole PR-state mutator", contents)
         self.assertIn("manual-triage", contents)
+        for phrase in ("## Owner merge hold", "held-for-owner", "owner_merge_inventory",
+                       "Merge-Performed: no", "PR-Closed: no", "normalizer v1 recommendations",
+                       "hold-only blocker", "MERGED/CLOSED", "no atomic server guarantee"):
+            self.assertIn(phrase, contents)
+        self.assertIn("coordinator-loop.md#owner-merge-hold", SAFETY.read_text(encoding="utf-8"))
         # The fail-closed contract is canonical in the script docstring, not the
         # loop doc, so the coordinator does not re-read it every cycle.
         self.assertIn("module docstring", contents)

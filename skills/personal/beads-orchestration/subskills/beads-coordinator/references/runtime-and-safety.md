@@ -501,6 +501,12 @@ Rules:
 
 ## Bead Closure Rule
 
+Apply the canonical [Owner merge hold](coordinator-loop.md#owner-merge-hold)
+before every enqueue/merge/close-PR attempt and before a direct base push.
+An OPEN held PR cannot be closed by the fleet. This does not freeze Beads
+bookkeeping: freshly verified owner-performed MERGED/CLOSED state follows the
+normal terminal closure/re-triage rules even if `owner-merge` remains.
+
 A bead may only be closed by the coordinator when one of these conditions is
 met:
 

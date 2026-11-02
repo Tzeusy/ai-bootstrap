@@ -153,6 +153,18 @@ Your work is already pushed or quarantined.
 
 ### `completed-direct-merge-candidate`
 
+Apply [Owner merge hold](../../beads-coordinator/references/coordinator-loop.md#owner-merge-hold):
+freshly run `owner_merge_branch_guard "agent/$ID"` immediately before each
+base push or queue-direct creation. An existing OPEN branch PR routes through
+that PR lane, preserving any hold; never bypass it or create a duplicate.
+Unavailable/partial branch evidence stops the action. Immediately before every
+queue-direct initial enrollment, fallback, re-enrollment or retry, run
+`owner_merge_guard "$PR_NUMBER" && <action>`; nonzero suppresses the action.
+Report held-for-owner rather than merge/close, preserve authorized corrections,
+and let the review lane reconcile. Label removal resumes normal rules next
+fresh cycle; owner MERGED/CLOSED terminal bookkeeping remains valid.
+Run the same complete held inventory on each cycle/frontier/final report.
+
 - **Base behind a merge queue.** Open a `queue-direct` PR and enable
   auto-merge, as in Step 7. Tear down, then hand the original off without a
   review bead:
@@ -168,7 +180,7 @@ Your work is already pushed or quarantined.
   ```bash
   git fetch origin "$BASE"
   git merge-base --is-ancestor "origin/$BASE" HEAD || git rebase "origin/$BASE"
-  git push origin "HEAD:refs/heads/$BASE"     # fast-forward only; a rejection means a peer landed first
+  owner_merge_branch_guard "agent/$ID" && git push origin "HEAD:refs/heads/$BASE"     # fast-forward only; a rejection means a peer landed first
   ```
 
   This path has no hosted gate before landing, so the head pushed to the base

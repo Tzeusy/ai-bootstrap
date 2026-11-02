@@ -13,6 +13,15 @@ cycle's "Work" step says.
 
 ## 1. Sweep Every Unit You Hold
 
+Run the canonical [Owner merge hold](../../beads-coordinator/references/coordinator-loop.md#owner-merge-hold)
+inventory on every cycle, including frontier/final reports: all OPEN held PRs,
+number/title/actual CI or UNKNOWN; none only after a successful empty read.
+Foreign PRs are listed without adoption. Partial/error inventory is unavailable.
+Apply its fresh guard immediately before every enqueue/merge/close, including
+queue-direct re-enrollment and each retry; cached normalizer advice is never
+authorization. Owner-performed terminal MERGED/CLOSED state still reconciles
+normally even with the label remaining.
+
 Start each wake with every original assigned to `LOOPER_ID`. Reconcile each
 one against its PR using the `$CO/references/coordinator-loop.md` → "0b.
 Reconcile blocked PR-review beads" table:
@@ -30,8 +39,13 @@ Reconcile blocked PR-review beads" table:
     --assignee '' --remove-label pr-review --append-notes "[pr-closed] <why>" --json
   ```
 
-- **`OPEN`**: apply the table's queue rows. If the PR is queued, wait; it
-  counts as near-term work for the wake cadence. If auto-merge is armed but
+- **`OPEN` + `owner-merge`**: keep the canonical unit, report held-for-owner,
+  and perform no enrollment/merge/close action, including queued/armed PRs.
+  Preserve authorized correction/review work; no auto-dequeue, hold-only blocker
+  or repeated review of the same head solely to merge. Check again next cycle;
+  label removal resumes normal rules without another reset.
+- **`OPEN`**: apply the table's queue rows after the fresh hold overlay. If
+  the PR is queued, wait; it counts as near-term work for the wake cadence. If auto-merge is armed but
   the PR is not queued, clear the stale label and wait. A `queue-direct` PR
   that is not enrolled gets enrolled again. Any other held unit goes to step
   3 as a retry once its review bead has no open blockers.
@@ -65,7 +79,9 @@ uv run "$CO/scripts/normalize_pr_review_state.py" --repo-root "$REPO_ROOT"
 The scan is the inventory and the fail-closed gate. On `partial` or `fatal`,
 review nothing this wake. Its recommendations do not authorize anything;
 re-read the live `bd`/`gh` state before each mutation. A unit is reviewable
-only when all of these hold:
+only when all of these hold. The fresh owner-hold overlay outranks dispatch
+recommendations: a held PR may receive authorized review/corrections, but skip
+same-head redispatch whose sole purpose is a merge attempt:
 
 - Its PR is `OPEN`, not in a merge queue, and past the cooldown
   (`$CO/references/coordinator-loop.md` → "Constraints").
@@ -126,6 +142,14 @@ step 6.
 Follow `$CO/references/coordinator-loop.md` → "When a reviewer worker
 completes", with these looper-specific differences:
 
+- **`held-for-owner`**: freshly verify OPEN + held labels; require
+  `Merge-Performed: no` and `PR-Closed: no`. Remove `review-running`, keep the
+  canonical original/review relationship, and record the hold without a
+  hold-only blocker. Retain Head-Commit, Reviewed-Head-Commit, Reviewer-Identity,
+  Risk-Tier, Review-Actions-JSON and findings; actionable corrections still go
+  to the implement lane, and exceptional pushed fixes still require a fresh
+  independent reviewer. Do not repeat same-head review solely to merge.
+  Recompute next cycle; if the owner already MERGED/CLOSED, use step 1 instead.
 - **`merged-pr`**: confirm `MERGED`, then reconcile as in step 1.
 - **`merge-queued`**: confirm the queue entry. Label the review bead
   `merge-queued`, remove `review-running`, and set it back to `blocked`. Keep

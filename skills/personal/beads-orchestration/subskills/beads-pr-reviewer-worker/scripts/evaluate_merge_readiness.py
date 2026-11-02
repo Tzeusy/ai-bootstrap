@@ -25,6 +25,19 @@ query($owner:String!, $repo:String!, $number:Int!, $after:String) {
 }
 """.strip()
 
+LABEL_QUERY = """
+query($owner:String!, $repo:String!, $number:Int!, $after:String) {
+  repository(owner:$owner, name:$repo) {
+    pullRequest(number:$number) {
+      labels(first:100, after:$after) {
+        nodes { name }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}
+""".strip()
+
 ALLOWED_MERGE_STATES = {"CLEAN", "HAS_HOOKS", "UNSTABLE"}
 
 
@@ -71,6 +84,43 @@ def unresolved_count(owner, repo, pr_number):
         if not review_threads["pageInfo"]["hasNextPage"]:
             return total
         after = review_threads["pageInfo"]["endCursor"]
+
+
+def owner_merge_held(owner, repo, pr_number):
+    """Read every label page; absent/partial/malformed evidence is not consent."""
+    after = None
+    seen = set()
+    held = False
+    while True:
+        cmd = [
+            "gh", "api", "graphql", "-f", f"query={LABEL_QUERY}",
+            "-F", f"owner={owner}", "-F", f"repo={repo}",
+            "-F", f"number={pr_number}",
+        ]
+        if after is not None:
+            cmd.extend(["-F", f"after={after}"])
+        payload = run_json(cmd)
+        errors = payload.get("errors")
+        if errors is not None and (not isinstance(errors, list) or errors):
+            raise ValueError("label query returned GraphQL errors")
+        labels = payload["data"]["repository"]["pullRequest"]["labels"]
+        nodes = labels["nodes"]
+        info = labels["pageInfo"]
+        if (
+            not isinstance(nodes, list)
+            or not all(isinstance(node, dict) and isinstance(node.get("name"), str) for node in nodes)
+            or type(info["hasNextPage"]) is not bool
+            or "endCursor" not in info
+            or (info["endCursor"] is not None and not isinstance(info["endCursor"], str))
+        ):
+            raise ValueError("invalid label page")
+        held = held or any(node["name"] == "owner-merge" for node in nodes)
+        if not info["hasNextPage"]:
+            return held
+        after = info["endCursor"]
+        if not isinstance(after, str) or not after or after in seen:
+            raise ValueError("incomplete or repeated label cursor")
+        seen.add(after)
 
 
 def fetch_required_checks(pr_number):
@@ -133,6 +183,7 @@ def main():
             "--json",
             "state,isDraft,mergeStateStatus,reviewDecision,mergedAt,url,baseRefName,headRefName",
         ])
+        held = owner_merge_held(args.owner, args.repo, args.pr_number)
         unresolved = unresolved_count(args.owner, args.repo, args.pr_number)
         checks = fetch_required_checks(args.pr_number)
         merge_queue = detect_merge_queue(args.owner, args.repo, pr.get("baseRefName"))
@@ -148,6 +199,8 @@ def main():
     )
 
     reasons = []
+    if pr.get("state") == "OPEN" and held:
+        reasons.append("held-for-owner")
     if pr.get("state") != "OPEN":
         reasons.append(f"state={pr.get('state')}")
     if pr.get("isDraft"):
