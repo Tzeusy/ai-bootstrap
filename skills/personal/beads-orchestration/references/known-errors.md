@@ -150,6 +150,15 @@ assuming breakage, then record the rename here AND fix the subskill docs.
 
 ## State-transition quirks
 
+### Conditional guards reject label-only updates
+
+`bd update <id> --if-assignee <actor> --if-status in_progress --add-label review-running`
+fails because conditional guards require a field update; label and parent edits
+alone do not qualify. After freshly verifying ownership and status, include the
+unchanged `--status in_progress` field, then reread ownership, labels and the
+canonical fields. Do not treat the label edit itself as guarded. Observed
+2026-10-09 with bd 1.0.4; the claim had succeeded and was preserved during recovery.
+
 Some lifecycle transitions error even though the end state is legitimate.
 When a direct `bd update <id> --status <to>` is rejected:
 
@@ -2358,3 +2367,151 @@ beads (`bu-atsax`, `bu-m09qm`) whose prior coordinator session's heartbeat was
 ## tze-hud: `gh pr merge --squash --auto` fails "Auto merge is not allowed"
 - **Symptom**: reviewer cannot enter the merge queue; repo has enablePullRequestAutoMerge off.
 - **Workaround**: enqueue directly with GraphQL `mutation{enqueuePullRequest(input:{pullRequestId:$id}){mergeQueueEntry{position}}}` (queue still enforces required checks). Observed: 2026-10-03, tze-hud PR #1247.
+
+
+### Guarded label-only updates need a covered field
+- **Symptom**: `bd update ID --if-assignee ACTOR --add-label LABEL` rejects with `--if-assignee/--if-status require at least one field update ... label and parent edits are not covered by the guard`.
+- **Fix**: confirm the current assignee/status, then include the same existing `--status` (a covered field) with the label edit. The label itself is not guarded, so only the sole coordinator writer should do this; do not infer cross-actor mutation authority.
+- **Related**: normalization expects every `pr-review-task` to also have the `pr-review` label; omitting it makes the total inventory partial with `invalid-record`. Repair the existing canonical task, never create a duplicate.
+- Observed: 2026-10-07, bd 1.0.4.
+
+### GitHub CLI refuses log bodies with terminal escape sequences
+
+`gh api .../actions/jobs/<job>/logs` can return nonzero with
+`the response contains terminal escape sequences`. For an authorized diagnostic
+reader, add `--allow-escape-sequences` to `gh api`, capture stdout in memory,
+strip ANSI sequences, and emit only fixed approved categories or source locations.
+Never print or persist raw log bodies as a workaround. Confirmed 2026-10-09.
+
+### Parent cannot be blocked by its descendant
+
+- **Symptom**: `bd dep add PARENT CHILD` refuses: `cannot be blocked by its descendant ... blocked status cascades to descendants ... would inherit the block and never close`.
+- **Fix**: keep the coordinating parent active/in_progress while the child executes; use its existing parent-child relation and explicit completion ledger. The child may depend on finished siblings, but do not add a parent-waits-on-descendant blocks edge or mark that parent blocked in a way that stalls its child. Keep all original parent criteria unchanged and close only after their actual evidence is complete.
+- Confirmed 2026-10-10, bd 1.0.4, butlers gen-1 terminal reconciliation. No dependency was added by the refused command.
+
+### Lease-only renewal stops on transient Dolt write connection timeout
+
+- **Symptom**: guarded `bd update ... --if-assignee ... --notes ... --json` reports `i/o timeout`, then `Error updating <id>: begin write tx: invalid connection`; the lease helper stops and keeps its last successful receipt stale.
+- **Cause**: observed shared Dolt network/write connection timeout. Exact server-side cause remains unknown; this output is not an assignee mismatch or proof that worker processes stopped.
+- **Fix**: preserve the complete failed command output and old failure receipt. Recheck the existing helper is stopped, refresh actual ROOT liveness, then restart only the bounded lease helper under the same canonical mutex. It must read each current canonical record, verify the same assignee, complete real guarded updates, and publish a new successful receipt before lifecycle work resumes. Never waive freshness, forge receipt times, steal a claim, or change shared directory permissions. Confirmed retry renewed 55 owned nonclosed records.
+- **Observed**: 2026-10-11, butlers, bd 1.3.1 (c1c4b642a).
+
+### PR self-heal discovery silently omits older open PRs at the default limit
+
+- **Symptom**: the coordinator normalizer's `self_heal_candidates` drops old PRs after newer PRs appear, while their canonical review findings remain. The normalizer currently calls `gh pr list --state open --json number,headRefName,createdAt` without an explicit limit.
+- **Cause**: `gh pr list` defaults to 30 results. Confirmed 2026-10-13: authenticated complete pagination returned 32 open PRs; the two omitted candidates were independently still OPEN. Candidate disappearance is not merge, closure, or an exhausted frontier.
+- **Workaround**: retain the dated normalizer report and supplement its discovery with authenticated complete paginated open-PR metadata. Preserve omitted candidates and their canonical review/owner dispositions; never close or take over a bead because it disappeared from the capped list. Capture provider responses in memory and retain only required metadata and page counts. Existing unrelated self-heal errors remain separate.
+- **CLI pitfall**: this installed `gh` rejects combining `--slurp` with `--jq` or `--template`. Use `gh api --paginate --slurp` captured in memory, then parse/project the pages, or project individual pages without `--slurp`. Do not print raw PR bodies as a workaround.
+
+### Finite packet retention dereferences intentional test symlink payloads
+
+- **Symptom**: full sealed packet retention reports a size/SHA mismatch on a fixture `snapshot.json`, while repeated worker lstat audits show the original packet is unchanged.
+- **Cause**: a retainer used unconditional `Path.read_bytes()` and `shutil.copy2()` on a manifest entry declared `type=symlink`. These dereference the deliberately planted refusal control, whose sealed body is its lexical link target, rather than the referenced file.
+- **Fix**: qualify the declared type with lstat, hash/read symlink bodies with `os.readlink(...).encode()`, preserve links without dereferencing, and check source/destination containment independently. Retain regular files through their own type/body checks. Do not reseal a correct original, weaken integrity checks, repair permissions, or infer an active writer from this mismatch. Preserve the initial refusal and exact recovery account. Complete typed retention of all5,559 payloads including four symlink controls passed on 2026-10-13 in Butlers; filesystem-mode domains remained separate.
+
+
+### Duplicate original-ID markers refuse review-context resolution
+
+Observed 2026-10-16: `resolve_review_context.py` returned `ambiguous-original-id` when a review description had both `Original implementation bead: <id>` and `Review target bead: <same-id>`. The duplicate explicit matches are rejected even though their values agree. Coordinator verified ownership, removed the duplicate marker (keeping one `Original implementation bead` marker), and the helper passed without source changes. Create review descriptions with exactly one original-ID marker. For dedupe, match the explicit original/PR relation, never arbitrary notes: prerequisite notes can mention another bead without making that bead the review target.
+
+
+## GitHub completed job logs while its workflow is still active
+
+`gh run view RUN --job JOB --log` can refuse a completed job until the whole run ends. Fetch the completed job directly with `gh api --allow-escape-sequences repos/OWNER/REPO/actions/jobs/JOB/logs > /outside-repo/job.raw.log`; the flag is necessary when downloaded test output contains ANSI escapes. Keep output redirected, strip ANSI into a second log, and print only the relevant failure lines. A running workflow or one failed child is not a terminal whole-run receipt. Verified on Butlers run38930617559/job117074252559 (2026-10-16).
+
+
+## `--claim` lease lapses within minutes; the notes heartbeat does not renew it
+
+- **Symptom**: `bd show <id> --json` on a bead the coordinator claimed shows `lease_expires_at` about 5 minutes after `heartbeat_at`, already in the past, even though the `[beads-heartbeat]` notes block was renewed seconds ago.
+- **Cause**: bd 1.3.1 `--claim` grants a short TTL lease in an ephemeral, node-local table. Only `bd heartbeat <id>` (alias `bd hb`) pushes it forward. A `bd update --append-notes` heartbeat block does not. Once the lease is stale, any session on the same node running `bd reclaim` reverts the bead to ready, while status and assignee still look owned.
+- **Fix**: keep a silent background loop for the run. Every 120s, list the coordinator's in_progress beads (`bd list --assignee <actor> --status in_progress --json`) and run `bd --actor <actor> heartbeat <id>` on each, logging only failures. Heartbeats write no Dolt commit, so the cadence costs nothing. Keep the notes block for cross-machine liveness. A failed heartbeat means the lease was reclaimed or the bead closed: stop and re-verify ownership, never re-claim blindly.
+- **Observed**: 2026-10-17, butlers, bd 1.3.1.
+
+## bd update: repeated --append-notes keeps only the last value
+
+- **Symptom**: `bd update <id> --append-notes A --append-notes B` reports success, but only B lands in the notes.
+- **Cause**: bd 1.3.1 treats `--append-notes` as a single-value flag; a repeated flag overwrites the earlier value instead of appending both.
+- **Fix**: one note per `bd update` call, or join both notes into one `--append-notes` value. Verify with `bd show <id> --json | jq -r ".[0].notes" | grep -o "<marker>"`.
+- **Observed**: 2026-10-18, butlers, bd 1.3.1.
+
+
+## `bd search --desc-contains` still requires a positional query
+
+Observed 2026-10-22: `bd search --desc-contains <text> --json` exits 1 with `Error: search query is required`, despite the optional-looking CLI usage. Do not treat this refusal or title-only zero hits as absence. For a complete multi-field dedupe, capture `bd list --all --limit 0 --json` and filter title/description/design/acceptance_criteria/notes in memory; project only matching summaries. The list `--desc-contains` filter covers description only, not the full issue body. This is a query-shape error, not a Dolt outage; no doctor/credential/permission change is needed.
+
+
+### Native heartbeat applies only to in-progress leases
+
+Observed 2026-10-22 with bd1.3.x: a coordinator post-create flow correctly created an owner-assigned blocked action, then failed at `bd heartbeat` on the original blocked bead. `bd heartbeat --help` explicitly limits renewal to an issue held `in_progress`. Treat create as potentially committed: inspect canonical action/original and the once-intent/result before continuing; never repeat create because a later heartbeat failed. For a blocked record, freshly verify assignee/status and refresh its guarded managed-note heartbeat. Reserve native heartbeat for actual in-progress leases. A wrapper that discards stderr leaves the exact refusal reason unknown; do not invent it or mutate ownership to make heartbeat pass.
+
+
+### `bd update` label flags differ from `bd create`
+
+`bd create --labels` is supported; `bd update --labels` is not. Use update `--add-label`, `--remove-label`, or `--set-labels`, per `bd update --help`. If a create/claim/edge sequence hits this parser refusal, inspect actual canonical state and retain completed steps; resume only the corrected guarded update. Observed 2026-10-23, bd 1.0.4, PR4929 bookkeeping.
+
+
+### Atomic claim cannot be combined with conditional field guards
+- **Symptom**: `bd update ID --if-assignee ACTOR --claim` exits 1; prior separate status/notes edits may already have landed. `bd update --help` states conditional guards "cannot combine with --claim".
+- **Cause**: atomic claim and guarded field-edit paths are separate. This parser refusal is not a stale-assignee exit 13.
+- **Fix**: inspect current canonical state, freshly verify the existing owner, call `bd --actor ACTOR update ID --claim` without conditional edit flags, then re-read assignee and in_progress before dispatch. Keep field edits separately guarded; do not unassign a valid own claim or repeat already-landed notes/worktree operations.
+- **Observed**: 2026-10-23, butlers, bd 1.3.1.
+
+
+## Accumulated notes exceed the Linux per-argument limit (E2BIG)
+
+Observed 2026-10-27: a coordinator issue had 131,188 UTF-8 bytes in `notes`.
+A guarded `bd update --notes <complete-value>` failed in Python `Popen` with
+`OSError: [Errno 7] Argument list too long` before bd started. Notes-based
+heartbeat replacement failed for the same reason; a live heartbeat process
+was not evidence that this issue's notes heartbeat was fresh.
+
+Do not print the notes or discard history. Under the coordinator's notes
+write lock, freshly verify the assignee and preserve the entire original
+notes in a durable private file outside the repo; verify its exact bytes and
+SHA256. Guardedly replace only notes with the archive path/hash, a concise
+current state, recent complete lines, and one fresh canonical heartbeat
+block. Keep the live value comfortably below the platform's per-argument
+limit. Read back exact notes, ownership/status and all canonical requirement
+fields. Then use `--append-notes` for small new entries where appropriate.
+Do not change description/design/acceptance/title to solve an argument limit.
+
+`bd update` v1.0.4 has no notes-file flag (`--body-file` writes description).
+Avoid passing an archive filename as a literal notes value or assuming that
+`--body-file` targets notes. Record the refused command and recovery receipt;
+retry the actual lifecycle allocation only after recovery and fresh guards.
+
+
+### Fresh git worktree `bd show` reports issue-not-found while canonical root succeeds
+
+- Symptom: reviewer `bd show <id>` in a fresh Git worktree returns issue-not-found, while the same explicit `bd -C <canonical-root> ... show <id> --json` reads the owned live issue.
+- Cause: this Butlers worktree lacked its ignored `.beads/metadata.json` shared-server pointer. Verified by copying only the existing canonical pointer and successful same-worktree readback; not a missing issue or dead coordinator.
+- Fix: prefer the explicit canonical `-C` locator. Run the repository worktree setup or copy its existing canonical pointer without displaying contents; refuse to overwrite an existing different pointer. Verify common Git identity and actual canonical assignee/status. Do not init/import, start a local server, doctor a healthy global tracker, create duplicate issues, or change shared directory permissions.
+- Observed: 2026-10-28, bd 1.3.1 (c1c4b642a), isolated PR4751 reviewer worktree.
+
+
+### Bounded coordinator readers can remain alive while observations stop
+
+Observed 2026-11-02, Butlers coordinator: an owned queue watcher asserted that its
+`gh run list --limit 100` result was below the cap. The range grew to 111 runs,
+so the process stayed alive but emitted only UNKNOWN/AssertionError records.
+An old successful PR observation was not current state. A bounded limit of 1000
+returned all 111; after stopping/reaping only the exact owned watcher and
+replacing it under its existing singleton lock, both targets produced fresh
+successful observations. Check the last successful timestamp and error stream,
+not just process liveness. A capped result remains UNKNOWN, never complete.
+
+The same session had a transient shared-Dolt read timeout: `bd show` timed out
+before any admission intent or lifecycle mutation. The prescribed finite
+`bd doctor --fix --yes` also exceeded its 120-second timeout because TERM did
+not finish its child. Verify the exact owned child/parent before stopping it;
+use an outer kill-after bound for future CLI probes. Preserve exit124 and the
+unknown repair result, never attribute later recovery to an unreported fix.
+Fresh canonical ownership/status reads, managed heartbeat, guarded writes and
+registry/ranker success were required before resuming lifecycle work. Shared
+`.beads` permissions stayed0770 despite the advisory0700 warning. The remote
+server cause remained UNKNOWN; no server restart, local fork or foreign-worker
+signal was needed.
+
+## `gh pr create` fails with "GraphQL: Something went wrong while executing your query"
+
+Transient/opaque GitHub GraphQL failure (seen 2026-11-02, repeated on retry). Check `gh pr list --head <branch>` first (no PR was created), then create via REST: `gh api repos/<owner>/<repo>/pulls -f base=main -f head=<branch> -f title=... -F body=@body.md --jq .number`.
