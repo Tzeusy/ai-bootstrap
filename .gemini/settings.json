@@ -156,9 +156,6 @@
     "name": "gemini-3-pro"
   },
   "mcpServers": {
-    "everything": {
-      "httpUrl": "https://mcp.tze.how/everything"
-    },
     "tze-obsidian": {
       "httpUrl": "https://mcp.tze.how/obsidian"
     }
