@@ -47,6 +47,7 @@ shape.
 Minimum accepted reviewer statuses:
 - `merged-pr`
 - `merge-queued`
+- `held-for-owner`
 - `corrections-required`
 - `pushed-review-fixes`
 - `blocked-awaiting-coordinator`
@@ -67,7 +68,12 @@ On a safe test PR:
 4. post a reply with a stable dedupe key
 5. rerun the same reply and verify it is skipped as duplicate
 6. evaluate merge readiness with required checks available
-7. verify a required-check fetch failure fails closed
+7. verify a required-check fetch failure fails closed; in fake-command tests,
+   exercise exact held/near-match/removed labels, complete pagination and bad
+   label evidence. Execute the canonical hold guard/report projection for
+   direct/auto/fallback, queue-direct initial/retry, close after comment, and
+   existing branch PR before base push. Add the label after earlier readiness
+   and prove no later action occurs; report all held PRs with actual/UNKNOWN CI
 8. verify a correction report records the exact reviewed head and leaves the
    implementation lane—not the reviewer—as code owner
 9. simulate two substantive reopenings and verify the two-correction checkpoint
@@ -81,3 +87,8 @@ Do not consider the skill update complete unless:
 - reviewer/coordinator status vocabularies match
 - exact-head and reviewer-independence rules match
 - the merge-readiness helper fails closed when check status is unavailable
+- OPEN held reports keep identity, exact-head/risk, findings and correction
+  independence with Merge-Performed: no and PR-Closed: no; no hold-only blocker
+- owner MERGED/CLOSED reconciliation is permitted even with the label remaining
+- label reads and actions are separate remote requests, with a residual TOCTOU
+  race and no atomic server guarantee

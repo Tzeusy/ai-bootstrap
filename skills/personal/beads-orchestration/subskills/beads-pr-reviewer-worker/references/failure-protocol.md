@@ -9,6 +9,28 @@ the worker report and let the coordinator reconcile it.
 
 ## Failure Classes
 
+### `held-for-owner`
+
+A freshly resolved OPEN PR with the exact `owner-merge` label is reserved for
+its owner. Apply the canonical [Owner merge hold](../../beads-coordinator/references/coordinator-loop.md#owner-merge-hold)
+before every direct/auto merge, GraphQL enqueue fallback, retry or close;
+recheck after an explanatory close comment. This terminal report status takes
+precedence over merge/queue/close intentions: `Merge-Performed: no` and
+`PR-Closed: no`, including an already queued/armed held PR. Never auto-dequeue.
+
+Retain Head-Commit, Reviewed-Head-Commit, Reviewer-Identity, Risk-Tier,
+Review-Actions-JSON, actionable findings and correction handoffs. Preserve
+exceptional pushed-fix evidence and its fresh independent reviewer requirement;
+a hold implies no approval and cannot erase corrections. Bootstrap failures
+remain `invalid-runtime-context`; unavailable/malformed labels remain a
+fail-closed `blocked-awaiting-coordinator`, not a successful hold.
+
+Do not create a blocker solely for the hold. The coordinator preserves one
+canonical original/review relation, releases review-running, records the hold
+and avoids repeatedly reviewing the same head just to merge. Next fresh cycle
+re-evaluates labels; removal resumes normal exact-head/CI/independence rules.
+Owner-performed MERGED/CLOSED state still follows terminal reconciliation.
+
 ### `corrections-required`
 
 Use when review found actionable correctness gaps inside the accepted outcome.
@@ -74,7 +96,7 @@ Retries must be idempotent:
 ### `merged-pr`
 
 Use only when:
-- `gh pr merge --squash` succeeded (without `--delete-branch`), and
+- the fresh hold guard permitted the attempt and `gh pr merge --squash` succeeded (without `--delete-branch`), and
 - a follow-up `gh pr view` confirms the PR is merged
 
 Do not delete the `agent/<id>` branch; the coordinator deletes it after closure
@@ -87,7 +109,7 @@ Use only when:
 - the base branch is behind a merge queue (`merge_queue: true` from the
   readiness helper or `MERGE_QUEUE=yes` from the coordinator), and
 - every merge gate held for the exact reviewed head, and
-- `gh pr merge --squash --auto` succeeded and the GraphQL projection below
+- the fresh hold guard permitted the attempt and `gh pr merge --squash --auto` succeeded and the GraphQL projection below
   reports a non-null `merge_queue_entry`:
 
 ```bash
@@ -109,5 +131,5 @@ absent; never report `merge-queued` from the armed state.
 This is a successful terminal outcome, not a failure. The queue rebuilds the PR
 on the latest base and runs CI once more; the coordinator confirms `MERGED` in
 Step 0 and closes the beads. If queue membership later disappears, the
-coordinator re-dispatches the review bead without inferring a cause or
+coordinator applies the fresh owner-hold overlay before any re-dispatch, without inferring a cause or
 authorizing a rebase from that absence. Never bypass the queue with `--admin`.
