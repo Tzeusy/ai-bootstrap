@@ -2389,3 +2389,9 @@ beads (`bu-atsax`, `bu-m09qm`) whose prior coordinator session's heartbeat was
 ## tze-hud: `gh pr merge --squash --auto` fails "Auto merge is not allowed"
 - **Symptom**: reviewer cannot enter the merge queue; repo has enablePullRequestAutoMerge off.
 - **Workaround**: enqueue directly with GraphQL `mutation{enqueuePullRequest(input:{pullRequestId:$id}){mergeQueueEntry{position}}}` (queue still enforces required checks). Observed: 2026-10-03, tze-hud PR #1247.
+
+## `bd create`: "Creating test issue in production database" warning, then exit 5, but the issue IS created
+
+- **Symptom:** a title that starts with "Test" (for example "Test-timeout tooling follow-ups: …") makes `bd create --json` print `⚠ Creating test issue in production database` / `appears to be test data` to stdout before the JSON. A `| jq` pipeline then fails to parse and the shell reports exit 5. The issue was still created, so a retry creates a duplicate.
+- **Seen:** syzygy, 2026-10-27 (`syzygy-bpyt.35` and its duplicate `.36`).
+- **Fix:** after any failed `bd create`, run `bd list --status open --json | jq '.[] | select(.title|test("<title fragment>"))'` before retrying. Close a duplicate with `--force --reason "Duplicate of …"`. Avoid titles that start with "Test", or parse with `sed -n '/^{/,$p' | jq` instead of `jq` alone.

@@ -50,10 +50,19 @@
   },
   "outputStyle": "tree",
   "effortLevel": "high",
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    },
+    "claude-fable-5-1": {
+      "effortLevel": "high"
+    }
+  },
   "skipDangerousModePermissionPrompt": true,
   "autoCompactEnabled": true,
   "autoContinueAtUsageLimit": true,
   "teammateMode": "in-process",
   "remoteControlAtStartup": true,
+  "agentPushNotifEnabled": true,
   "compactModel": "sonnet"
 }
