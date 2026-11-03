@@ -2299,3 +2299,67 @@ beads (`bu-atsax`, `bu-m09qm`) whose prior coordinator session's heartbeat was
 ## tze-hud: `gh pr merge --squash --auto` fails "Auto merge is not allowed"
 - **Symptom**: reviewer cannot enter the merge queue; repo has enablePullRequestAutoMerge off.
 - **Workaround**: enqueue directly with GraphQL `mutation{enqueuePullRequest(input:{pullRequestId:$id}){mergeQueueEntry{position}}}` (queue still enforces required checks). Observed: 2026-10-03, tze-hud PR #1247.
+
+## `bd worktree create` prints "Fixed .beads permissions to 0700"
+
+bd 1.3.x tightens the new worktree's `.beads/` to 0700 on creation (seen
+2026-10-06, tze-hud). On hosts where the project tree is shared with a
+reviewer by group/ACL, that locks them out. Restore right after creation:
+`chmod 2770 <worktree>/.beads` (match the main checkout's `.beads` mode via
+`stat -c %a`). The ACL entries survive; only the mode bits change.
+
+## Guarded label-only updates require a field update (bd 1.0.4)
+
+Observed 2026-10-06: `bd update ID --if-assignee ACTOR --add-label pr-review` fails with `--if-assignee/--if-status require at least one field update`; label and parent edits are not covered by that guard. Read and verify current ownership, then include the intended current status field (for example `--status blocked`) with the guarded label change, and verify both afterward. Do not drop ownership verification or blindly overwrite a stale status.
+
+
+## bd1.3.1 validated bug creation requires a Steps to Reproduce section
+
+Observed 2026-11-01: `bd create --type bug --validate` rejected a prose-only evidence-watch description with `missing required sections for bug: ## Steps to Reproduce`. The rejection did not create the issue. Search the exact title before retrying, then retain the bug type and supply actual Markdown Problem / Steps to Reproduce / Evidence sections. For a nonreproducible flaky failure, say that the named full gate failed once and bounded reruns passed; do not invent a deterministic reproducer or disable validation. Creation succeeded after that correction.
+
+### Remote Dolt TCP read timeout with `invalid connection`
+- **Symptom**: `[mysql] ... packets.go:58 read tcp ...:3307: i/o timeout`, then `failed to open database: database "hud" not available after CREATE DATABASE: invalid connection` or `failed to check if database "hud" exists ...: invalid connection`.
+- **Cause**: intermittent remote connection/read failure; this text alone does not prove a missing schema or justify creating/restarting/reconfiguring a database. Slow queries preceded the observed failures.
+- **Fix/workaround**: use bounded fresh read retries. If a mutation preceded the failed read, inspect canonical ownership/fields before resuming; the mutation may already have committed. Never replay claim/create/update blindly, and preserve partial receipts. One fresh read succeeded after the first failure; recurrence needs a new bounded read, not server/config/credential changes. Stop canonical writes if reads cannot establish current ownership.
+- Observed: 2026-11-02, bd 1.3.1 (`c1c4b642a`).
+
+### Decision validation requires rationale and alternatives headings
+- **Symptom**: `bd create --type decision --validate` rejects an otherwise complete prose decision with `missing required sections for decision: ## Rationale ... ## Alternatives Considered`.
+- **Cause**: decision-type validation requires those literal Markdown headings even while the choice remains pending.
+- **Fix**: dedupe the exact title first (a validation refusal did not create an issue), retain validation/type, and add `## Rationale` plus `## Alternatives Considered`. For a pending owner decision, explicitly say no option is chosen/rejected, give the recommendation and each consequence, and preserve the unchanged status-quo default. Retry then verify actual returned id; do not turn a recommendation into a fictional owner decision.
+- Observed: 2026-11-02, bd 1.3.1.
+
+### Worker report formatter rejects extra quality-gate keys
+- **Symptom**: the report helper exits 1 after successful gates/push/PR when passed `--quality-gate prepush=pass`; its allowed keys are `lint`, `typecheck`, and `tests`. A surrounding assertion can then fail even though publication already succeeded.
+- **Fix**: preserve the first helper exit/stderr and actual gate/Git/PR receipts. Run a reporting-only correction using the supported keys, describe pre-push evidence in the summary/tests detail, and retain a distinct corrected receipt. If an already-written summary says zero observer failures, add an explicit correction artifact rather than silently overwriting it. Do not replay successful gates, push, or PR creation. Inspect the current helper schema before formatting.
+- Observed: 2026-11-02, portal publication PR1538 (also encountered during earlier deletion publication).
+
+### A successful bd show can omit relationships during remote read instability
+- **Observed**: during the 2026-11-02 remote Dolt TCP timeout phase, `bd show hud-lirh2.8 --json` exited0 and returned current core fields/assignee/notes, but omitted `dependencies` and `parent` and reported both dependency counts0. The preceding complete read had four dependencies/three dependents. Later complete `bd show` and independent `bd dep list` restored the same four relations, including three closed blocking prerequisites. No edge mutation occurred.
+- **Evidence limit**: the successful wrapper did not preserve stderr, so the exact internal reason is unproved. Do not diagnose data loss, missing schema, or a deleted DAG from those default counts.
+- **Workaround**: preserve raw stdout/stderr and require complete relationship evidence before dispatch readiness; use a bounded fresh complete show plus `bd dep list` if needed. A core-only read does not prove zero dependencies. Do not create/replay edges, restart/reconfigure Dolt, or dispatch through an incomplete graph. Guarded field-only updates leave relationships untouched; source allocation waits for actual relationship/readiness recovery.
+
+### Artifact manifest accidentally hashes its own empty output
+- **Symptom**: a prepared packet lists its own manifest with bytes0 and the SHA-256 of empty data, while the final file has content. Opening the output before enumerating inputs included the still-empty file.
+- **Fix**: preserve the invalid packet; write a distinct corrected manifest that explicitly excludes itself and verifies every listed artifact after writing. Keep its own hash in a separate outer receipt. Validate this before execution. A reporting correction does not authorize gate replay or source edits.
+- Observed: 2026-11-02, hud-lirh2.8 focused preparation; caught before Cargo execution, corrected14-artifact packet independently verified.
+
+### Filtered Nextest JSON includes skipped suites
+- **Symptom**: an inventory observer asserts every rust-suite status is listed and rejects a valid filtered `cargo nextest list --message-format json` after childexit0. Nextest0.9.114 returned irrelevant suites with status skipped and empty testcases; the listed suites still selected exactly the expected tests.
+- **Fix**: accept only listed or skipped statuses, require skipped suites to have empty testcases and contribute zero, and retain exact nonignored selected names/count validation. Preserve the first observer failure and actual child0. Correct parsing from the saved log, then resume only remaining unexecuted commands under a new exact grant; do not replay successful listing/version/group commands.
+- Observed: 2026-11-02, hud-lirh2.8 runtime selection:5listed/50skipped,34actualselected; workspace2907 andGPU1369/global1538 already verified.
+
+### Time-only snapshot tags collide after a multi-day coordinator run
+- **Symptom**: a fresh read-only universe helper refuses `mkdir(exist_ok=False)` because universe-HHMM already exists from the previous day. No query or mutation occurred.
+- **Fix**: preserve the old directory and refusal, inspect only its timestamps/provenance, and use a date-qualified new tag. Never overwrite or adopt the previous day's snapshot as current. If the new acquisition independently fails, retain it as incomplete and keep the last completed snapshot authoritative.
+- Observed: 2026-11-02 15:34, old universe-1534 was dated2026-11-01; fresh dated attempt then separately failed due remote Dolt unreachability.
+
+### Python observer tuples differ from serialized JSON arrays
+- **Symptom**: independently recomputed selections compare unequal to stored JSON even when names/counts match; Python selected entries are tuples, while JSON decoding produces lists.
+- **Fix**: preserve the failed observer result, JSON-normalize the recomputed value before comparison, and rerun only read-only verification. No gate/child replay, source change, or grant before verification succeeds.
+- Observed: 2026-11-02, hud-lirh2.8 focused evidence verification; first assertion at workspace-list corrected without executing children.
+
+### Git preflight rejects harness noninteractive credential flags
+- **Symptom**: a publication runner forbids any GIT_CONFIG_COUNT and refuses before starting commands; the harness injects two options to disable interactive and GUI credential prompts. A separate JS observer can also lose a terminal native result by trying to store its absent session_id.
+- **Fix**: preserve the failed attempt and unavailable provider metadata honestly. Classify keys safely without printing credential values or whole environments; permit only exact count2/keyset credential.interactive and credential.guiPrompt with false values, retaining all hook/path/hash and other Git override checks. Prepare a distinct corrected packet and new exact grant; successful commands are never replayed. Save complete native results before optional session handling, and never store undefined.
+- Observed: 2026-11-02, hud-lirh2.8 publication startup; no launcher marker/child command/push/PR occurred, confirmed remote absent and PR[] readbacks0.
