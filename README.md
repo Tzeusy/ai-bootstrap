@@ -107,6 +107,14 @@ To refresh only the skill views without the rest of bootstrap, run
 Do not replace Codex's generated wrappers with direct directory symlinks: that
 would reintroduce nested subskills into Codex's catalog.
 
+### MCP servers
+
+`mcp-servers.tsv` lists `name<TAB>url` remote MCP servers. Run
+`scripts/sync-mcp.sh` to register any missing ones with every installed
+`claude`, `codex`, and `gemini` CLI (idempotent; existing entries are kept).
+Log in manually on first use. To support another agent (e.g. pi), add an
+`add_<tool>` function to the script and list it in its loop.
+
 For a standalone installation, clone this repository recursively, generate its
 skill views, then link the tool homes:
 

@@ -1,0 +1,4 @@
+# name<TAB>url — remote HTTP MCP servers added to every installed agent CLI.
+# Auth is manual: log in on first use (OAuth). Apply with scripts/sync-mcp.sh.
+everything	https://mcp.tze.how/everything
+tze-obsidian	https://mcp.tze.how/obsidian
