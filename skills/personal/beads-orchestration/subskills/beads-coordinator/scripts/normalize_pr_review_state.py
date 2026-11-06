@@ -284,7 +284,7 @@ def view_pr(
 ) -> tuple[dict[str, Any] | None, str | None]:
     if pr_number not in cache:
         payload, error = command_json(
-            ["gh", "pr", "view", str(pr_number), "--json", "number,state,mergedAt,createdAt"],
+            ["gh", "pr", "view", str(pr_number), "--json", "number,state,mergedAt,createdAt,headRefOid"],
             repo_root,
         )
         if error:
@@ -295,6 +295,8 @@ def view_pr(
             cache[pr_number] = (None, "invalid-pr-number")
         elif payload["state"] not in PR_STATES:
             cache[pr_number] = (None, "invalid-pr-state")
+        elif not isinstance(payload.get("headRefOid"), str) or not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", payload["headRefOid"]):
+            cache[pr_number] = (None, "invalid-pr-head")
         else:
             created_at = parse_time(payload.get("createdAt"))
             if created_at is None:
@@ -965,6 +967,10 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                 recommendation=recommendation,
             )
         )
+
+    for finding in findings:
+        pr, _ = pr_cache.get(finding.get("pr_number"), (None, None))
+        finding["head_sha"] = pr.get("headRefOid") if pr else None
 
     # A merged package is landing evidence, not blanket member acceptance.
     # Keep one canonical review task while the lifecycle owner reconciles the

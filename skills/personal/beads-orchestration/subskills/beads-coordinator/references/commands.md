@@ -60,7 +60,7 @@ default coordinator views.
 
 | Action | Command |
 |---|---|
-| Ranked ready work | `uv run scripts/rank_ready_work.py --repo-root "$REPO_ROOT" --coordinator "$COORDINATOR_ID"` (from the package directory; Step 1 explains the envelope) |
+| Ranked ready work | `uv run scripts/rank_ready_work.py --repo-root "$REPO_ROOT" --coordinator "$COORDINATOR_ID" --review-state-file "$REVIEW_STATE_FILE"` (from the package directory; Step 1 explains the envelope) |
 | New coordinator id | `uv run scripts/coordinator_registry.py new-id --runtime claude` |
 | Register / renew | `uv run scripts/coordinator_registry.py register --repo-root "$REPO_ROOT" --id "$COORDINATOR_ID" --wake-minutes <n> [--startup] [--extra-lanes <k>]` |
 | Epic progress | `bd epic status --json \| jq -c '[.[] \| {id: .epic.id, closed: .closed_children, total: .total_children}]'` |

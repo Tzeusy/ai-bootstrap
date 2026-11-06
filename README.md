@@ -91,6 +91,8 @@ The main personal workflow is:
 
 The [canonical delivery model](skills/personal/beads-orchestration/references/delivery-model.md)
 defines branch/session tradeoffs, claims, packets, evidence reuse and recovery.
+A single admission queue prioritizes reviews and existing-owner corrections before
+new packages. Parked owners retain claims and sessions while freeing execution capacity.
 Default to frequent bounded integration to main; milestone integration branches
 require a concrete reason and repository permission. Required review/CI/queue and
 owner authorization remain binding. No live fleets are restarted by updating skills.

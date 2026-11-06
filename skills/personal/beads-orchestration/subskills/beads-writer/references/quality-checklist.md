@@ -5,8 +5,9 @@ execution gate for every task.
 
 - The accepted owner outcome is finite, observable, and preserved through partial
   foundation, dark-source, and activation slices.
-- Titles, types, and numeric priorities describe actual work. Governing intent,
-  source surface, current instructions, and structured acceptance are clear.
+- Titles, types, and numeric priorities describe actual work. The governing
+  contract follows work-allocation’s proportional rule; source surface, current
+  instructions, and structured acceptance are clear.
 - A fresh owner can follow exact references without the creator's conversation
   or inline copies of the historical archive.
 - Search covered open/recently closed work, active PRs, and concrete source
@@ -36,4 +37,4 @@ execution gate for every task.
 | More children than a quota permits | Assess ownership, risk, reviewability, and useful landing points directly. |
 | Foundation closure presented as the accepted feature delivered | Preserve the original outcome as partial with remaining activation/runtime criteria. |
 | Fresh reconciliation generation after each partial result | Update the same finite closeout path and existing owner. |
-| Green lint presented as executable authority | Check adopted contract, actual source assumptions, prerequisites, and sign-off. |
+| Green lint presented as executable authority | Check the applicable governing contract, source assumptions, prerequisites, and required sign-off. |

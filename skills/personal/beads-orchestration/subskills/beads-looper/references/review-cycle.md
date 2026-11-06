@@ -7,6 +7,13 @@ owns substantive review and fail-closed merge readiness.
 
 ## Take a review
 
+Use Step 0 normalization and the shared ranker with `--review-state-file`.
+Select canonical package-anchor review actions from `queue`, not a private review
+queue. Parked implementation owners retain WIP/claims and do not occupy execution;
+a reviewer needs only an execution slot. If this pane cannot execute the highest
+eligible action, notify its capable owner and refresh rather than admitting lower
+new work over it. Native runtime limits still apply.
+
 Look for canonical package-anchor review records. Dedupe by anchor/PR, never create
 one per member. Acquire only the review bead with this actor and mark `review-running`;
 implementation claims remain with their owner. For an unassigned blocked review,
@@ -44,6 +51,16 @@ controller of state changes only; avoid relaying each comment through a coordina
 A reviewer who authored semantic fixes cannot attest those changes independently.
 
 ## Reconcile review state
+
+As holder, persist the independent report in one typed `metadata.review_receipt`
+on this review record: current head plus ready/corrections/queued/held disposition,
+with findings, reviewer identity and content/equivalence evidence retained in notes.
+See the [shared evidence contract](../../../references/delivery-model.md#evidence-and-review).
+Return this record to blocked and remove review-running when execution ends; do
+not retain an active slot for CI/owner/queue waits. The source verdict is reusable
+at the same head; changed content requeues review. Fresh merge permission/checks
+remain separate and Step 0 responds to their events without repeating source review.
+
 
 | Report | Action |
 |---|---|

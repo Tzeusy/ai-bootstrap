@@ -91,13 +91,11 @@ branch/PR/review ceremonies; it does not bypass repository integration policy.
   after verified completion or published handoff. A PR opening or one member
   closing is not permission to delete unfinished or unpublished package work.
 - bd has no `--rig` flag: target another project with `bd -C <path> …`.
-- **Spirit > spec > DAG.** Beads are the implementation DAG derived from the
-  project's specs, which serve its doctrine (`th-projects`). The writer derives
-  beads from approved specs, the coordinator executes the DAG in finish-first
-  order, and an owner delivers one cohesive package. None of them re-plans: a bead that
-  conflicts with its spec or doctrine, or has no governing spec, is routed back
-  through `th-projects` (feature-request amendment or direction), not
-  reinterpreted, re-scoped, or quietly dispatched.
+- **Execute the governing contract.** Use the proportional
+  [work-allocation contract](../th-projects/references/work-allocation.md#governing-contract)
+  to establish scope and acceptance; a formal spec is required only where the
+  work or repository requires one. Respect existing doctrine/specs and route
+  unresolved scope, architecture, trust, or authorization through its real gate.
 - **Finish outcomes before starting new ones.** The coordinator ranks ready
   work so a pool of lanes completes a few epics instead of half-building many
   (`subskills/beads-coordinator/scripts/rank_ready_work.py`). Reports count

@@ -77,7 +77,297 @@ def snapshot(live, epics=(), kv=None, ready=None):
 
 
 def queue_ids(payload):
-    return [item["id"] for item in payload["queue"]]
+    return [item["id"] for item in payload["candidates"]]
+
+
+SHA = "a" * 40
+
+def normalized(*pairs, head=SHA):
+    return {"schema": "beads-pr-review-normalization/v1", "status": "success" if pairs else "empty",
+            "generated_at": registry.format_time(NOW), "errors": [], "self_heal_candidates": [],
+            "findings": [{"kind": "review-task", "review_id": review["id"], "original_id": anchor["id"],
+                          "canonical_review_id": review["id"], "duplicate_of": None, "context_status": "resolved",
+                          "pr_state": "OPEN", "pr_number": 1, "head_sha": head,
+                          "recommendation": "dispatch-canonical-review", "cooldown_until": None}
+                         for anchor, review in pairs]}
+
+
+def live_registry(*actors):
+    return {"beads.coordinator." + actor: {"expires_at": "2026-10-27T05:00:00Z"} for actor in actors}
+
+
+def review_pair(name="a", *, owner="coordinator:a", members=1):
+    anchor = bead("bd-" + name, assignee=owner, status="blocked", labels=["pr-review"], external_ref="gh-pr:1")
+    review = bead("bd-review-" + name, status="blocked", labels=["pr-review", "pr-review-task"])
+    rows = [anchor, review]
+    if members > 1:
+        more = [bead("bd-" + name + "." + str(i), assignee=owner, status="in_progress") for i in range(1, members)]
+        anchor["metadata"] = {"delivery": {"schema": "beads-delivery/v1", "anchor": anchor["id"],
+                              "members": [anchor["id"], *[m["id"] for m in more]], "owner": owner,
+                              "outcome": anchor["id"], "base_branch": "main", "packet": "Current packet"}}
+        for member in more:
+            member["metadata"] = {"delivery_anchor": anchor["id"]}
+        rows.extend(more)
+    return anchor, review, rows
+
+
+class AdmissionPriorityTests(unittest.TestCase):
+    def plan(self, rows, review_state, *, lanes=4, actor="coordinator:a", limit=10, scope=None):
+        actors = {"coordinator:a", "coordinator:b", "coordinator:r", actor}
+        return ranking.rank(snapshot(rows, kv=live_registry(*actors)), now=NOW, lanes=lanes,
+                            coordinator=actor, review_state=review_state, limit=limit, scope_epics=scope)
+
+    def test_saturated_waiting_owners_admit_reviews_without_releasing_any_member(self):
+        a, ar, rows_a = review_pair("a", members=3)
+        b, br, rows_b = review_pair("b", owner="coordinator:b")
+        before = json.dumps(rows_a + rows_b, sort_keys=True)
+        payload = self.plan(rows_a + rows_b, normalized((a, ar), (b, br)), lanes=2)
+        self.assertEqual(payload["capacity"]["occupied"], 0)
+        self.assertEqual(payload["capacity"]["owned"], 2)
+        self.assertEqual([item["kind"] for item in payload["queue"]], ["review", "review"])
+        self.assertEqual(json.dumps(rows_a + rows_b, sort_keys=True), before)
+
+    def test_one_lane_review_correction_and_re_review_keep_the_implementation_owner(self):
+        anchor, review, rows = review_pair(members=2)
+        new = bead("bd-new")
+        first = self.plan(rows + [new], normalized((anchor, review)), lanes=1)
+        self.assertEqual([a["kind"] for a in first["queue"]], ["review"])
+        review["metadata"] = {"review_receipt": {"head": SHA, "disposition": "corrections"}}
+        second = self.plan(rows + [new], normalized((anchor, review)), lanes=1)
+        self.assertEqual([a["kind"] for a in second["queue"]], ["correction"])
+        self.assertEqual(second["queue"][0]["owner"], "coordinator:a")
+        anchor["status"] = "in_progress"
+        running = self.plan(rows + [new], normalized((anchor, review)), lanes=1)
+        self.assertEqual(running["capacity"]["occupied"], 1)
+        self.assertEqual(running["queue"], [])
+        anchor["status"] = "blocked"
+        moved = self.plan(rows + [new], normalized((anchor, review), head="b" * 40), lanes=1)
+        self.assertEqual([a["kind"] for a in moved["queue"]], ["review"])
+        self.assertEqual(anchor["assignee"], "coordinator:a")
+
+    def test_open_parked_package_has_one_execution_phase_even_with_spare_slots(self):
+        anchor, review, rows = review_pair(members=2)
+        anchor["status"] = "open"
+        for disposition in (None, "corrections", "ready", "held", "queued"):
+            with self.subTest(disposition=disposition):
+                review["metadata"] = {} if disposition is None else {
+                    "review_receipt": {"head": SHA, "disposition": disposition}}
+                payload = self.plan(rows, normalized((anchor, review)), lanes=4)
+                expected = ["review"] if disposition is None else ["correction"] if disposition == "corrections" else []
+                self.assertEqual([action["kind"] for action in payload["queue"]], expected)
+                self.assertTrue(all(action["anchor"] == anchor["id"] for action in payload["queue"]))
+                self.assertEqual(anchor["assignee"], "coordinator:a")
+
+    def test_review_is_global_and_precedes_candidate_cutoff_then_spare_slots_accept_new_work(self):
+        anchor, review, rows = review_pair()
+        new = [bead("bd-low-" + str(i), priority=1) for i in range(5)]
+        first = self.plan(rows + new, normalized((anchor, review)), lanes=3, limit=1, scope=["bd-other"])
+        self.assertEqual([item["id"] for item in first["queue"]], [review["id"]])
+        full = self.plan(rows + new, normalized((anchor, review)), lanes=3, limit=10)
+        self.assertEqual([item["kind"] for item in full["queue"]], ["review", "implementation", "implementation"])
+        self.assertEqual(full["capacity"]["free_wip"], 2)
+
+    def test_running_reviewer_does_not_idle_spare_execution_capacity(self):
+        anchor, review, rows = review_pair()
+        review.update(status="in_progress", assignee="coordinator:r")
+        payload = self.plan(rows + [bead("bd-new")], normalized((anchor, review)), lanes=2)
+        self.assertEqual(payload["capacity"]["occupied"], 1)
+        self.assertEqual([item["kind"] for item in payload["queue"]], ["implementation"])
+
+    def test_review_record_hard_gates_block_only_its_review_execution(self):
+        anchor, review, rows = review_pair()
+        # The normal implementation -> review edge is not a review blocker.
+        anchor["dependencies"] = [{"issue_id": anchor["id"], "depends_on_id": review["id"], "type": "blocks"}]
+        gate = bead("bd-review-gate", status="blocked")
+        for labels, dependencies in ((["no-dispatch"], []), ([], [gate["id"]])):
+            with self.subTest(labels=labels, dependencies=dependencies):
+                review["labels"] = ["pr-review", "pr-review-task", *labels]
+                review["dependencies"] = [{"issue_id": review["id"], "depends_on_id": target, "type": "blocks"}
+                                          for target in dependencies]
+                held = self.plan(rows + [gate, bead("bd-independent")], normalized((anchor, review)), lanes=2)
+                self.assertEqual([action["id"] for action in held["queue"]], ["bd-independent"])
+        review["labels"] = ["pr-review", "pr-review-task", "owner-merge"]
+        gate["status"] = "closed"
+        clear = self.plan(rows + [gate], normalized((anchor, review)))
+        self.assertEqual([action["kind"] for action in clear["queue"]], ["review"])
+
+    def test_review_waits_for_same_package_execution_but_spare_slots_remain_useful(self):
+        anchor, review, rows = review_pair(members=2)
+        for anchor_status in ("in_progress", "closed"):
+            with self.subTest(anchor_status=anchor_status):
+                anchor["status"] = anchor_status
+                payload = self.plan(rows + [bead("bd-independent")], normalized((anchor, review)), lanes=3)
+                self.assertEqual([action["id"] for action in payload["queue"]], ["bd-independent"])
+                self.assertIn({"id": anchor["id"], "reason": "implementation-running"}, payload["admission"]["waiting"])
+                self.assertEqual(payload["capacity"]["occupied"], 1)
+
+    def test_one_parked_package_allows_one_emergency_overflow_but_never_a_second(self):
+        anchor, review, rows = review_pair()
+        review["metadata"] = {"review_receipt": {"head": SHA, "disposition": "ready"}}
+        fire, second = bead("bd-fire", priority=0), bead("bd-fire-again", priority=0)
+        first = self.plan(rows + [fire, second], normalized((anchor, review)), lanes=1)
+        self.assertEqual([action["id"] for action in first["queue"]], [fire["id"]])
+        self.assertEqual(first["queue"][0]["wip_exception"], "emergency")
+        fire.update(assignee="coordinator:b", status="blocked")
+        next_cycle = self.plan(rows + [fire, second], normalized((anchor, review)), lanes=1)
+        self.assertEqual(next_cycle["capacity"]["owned"], 2)
+        self.assertEqual(next_cycle["queue"], [])
+        fire["status"] = "in_progress"
+        running = self.plan(rows + [fire, second], normalized((anchor, review)), lanes=1)
+        self.assertEqual(running["queue"], [])
+        self.assertEqual(running["capacity"]["occupied"], 1)
+
+    def test_spare_execution_slots_cannot_create_multiple_wip_exceptions_in_one_plan(self):
+        owners = [bead("bd-owned-" + str(i), assignee="coordinator:a", status="blocked") for i in range(2)]
+        fires = [bead("bd-fire-" + str(i), priority=0) for i in range(3)]
+        payload = self.plan(owners + fires, normalized(), lanes=2)
+        self.assertEqual(payload["capacity"]["free"], 2)
+        self.assertEqual([action["id"] for action in payload["queue"]], [fires[0]["id"]])
+        self.assertEqual(payload["queue"][0]["wip_exception"], "emergency")
+
+    def test_retained_standalone_and_epic_packages_can_admit_one_runnable_prerequisite(self):
+        for packaged in (False, True):
+            with self.subTest(packaged=packaged):
+                substrate = bead("bd-z-substrate", priority=3)
+                intermediate = bead("bd-intermediate", status="blocked", blocks_on=[substrate["id"]])
+                anchor = bead("bd-owned", assignee="coordinator:a", status="blocked", blocks_on=[intermediate["id"]])
+                rows, epics = [anchor, intermediate, substrate, bead("bd-a-unrelated", priority=1)], []
+                if packaged:
+                    outcome = epic("bd-accepted")
+                    anchor["parent"] = outcome["id"]
+                    anchor["metadata"] = {"delivery": {"schema": "beads-delivery/v1", "anchor": anchor["id"],
+                        "members": [anchor["id"]], "owner": "coordinator:a", "outcome": outcome["id"],
+                        "base_branch": "main", "packet": "Accepted feature requires canonical substrate"}}
+                    rows.append(outcome)
+                    epics = [status(outcome, 1, 0)]
+                payload = ranking.rank(snapshot(rows, epics, live_registry("coordinator:a")), now=NOW,
+                                       coordinator="coordinator:a", lanes=1, review_state=normalized())
+                self.assertEqual([action["id"] for action in payload["queue"]], [substrate["id"]])
+                self.assertEqual(payload["queue"][0]["wip_exception"], "prerequisite")
+                self.assertEqual(anchor["assignee"], "coordinator:a")
+                substrate.update(assignee="coordinator:b", status="blocked")
+                saturated = ranking.rank(snapshot(rows, epics, live_registry("coordinator:a", "coordinator:b")), now=NOW,
+                                         coordinator="coordinator:a", lanes=1, review_state=normalized())
+                self.assertEqual(saturated["queue"], [])
+
+    def test_held_or_foreign_prerequisite_chain_cannot_convey_wip_overflow(self):
+        substrate = bead("bd-substrate")
+        intermediate = bead("bd-intermediate", status="blocked", blocks_on=[substrate["id"]])
+        anchor = bead("bd-owned", assignee="coordinator:a", status="blocked", blocks_on=[intermediate["id"]])
+        intermediate["labels"] = ["owner-held"]
+        held = self.plan([anchor, intermediate, substrate], normalized(), lanes=1)
+        self.assertEqual(held["queue"], [])
+        intermediate["labels"] = []
+        anchor["labels"] = ["owner-held"]
+        held_owner = self.plan([anchor, intermediate, substrate], normalized(), lanes=1)
+        self.assertEqual(held_owner["queue"], [])
+        anchor["labels"] = []
+        intermediate.update(labels=[], assignee="coordinator:b")
+        foreign = self.plan([anchor, intermediate, substrate], normalized(), lanes=1)
+        self.assertEqual(foreign["queue"], [])
+
+    def test_canonical_waiting_review_can_convey_its_external_runnable_prerequisite(self):
+        anchor, review, rows = review_pair(members=2)
+        prerequisite = bead("bd-review-prerequisite")
+        anchor["dependencies"] = [{"issue_id": anchor["id"], "depends_on_id": review["id"], "type": "blocks"}]
+        review["dependencies"] = [{"issue_id": review["id"], "depends_on_id": prerequisite["id"], "type": "blocks"}]
+        for reviewer in ("", "coordinator:r"):
+            with self.subTest(reviewer=reviewer):
+                review["assignee"] = reviewer
+                payload = self.plan(rows + [prerequisite], normalized((anchor, review)), lanes=1)
+                self.assertEqual([action["id"] for action in payload["queue"]], [prerequisite["id"]])
+                self.assertEqual(payload["queue"][0]["wip_exception"], "prerequisite")
+                self.assertEqual(review["assignee"], reviewer)
+                review["labels"].append("owner-held")
+                held = self.plan(rows + [prerequisite], normalized((anchor, review)), lanes=1)
+                self.assertEqual(held["queue"], [])
+                review["labels"].remove("owner-held")
+        prerequisite["assignee"] = "coordinator:b"
+        foreign = self.plan(rows + [prerequisite], normalized((anchor, review)), lanes=1)
+        self.assertEqual(foreign["queue"], [])
+
+    def test_queued_peer_reviewer_requires_resumption_before_new_work_without_stealing_claim(self):
+        anchor, review, rows = review_pair()
+        review["assignee"] = "coordinator:r"
+        payload = self.plan(rows + [bead("bd-new")], normalized((anchor, review)), lanes=2)
+        self.assertEqual(payload["queue"], [])
+        self.assertIn({"id": review["id"], "reason": "review-owned-by-peer", "owner": "coordinator:r"},
+                      payload["admission"]["waiting"])
+        self.assertEqual(review["assignee"], "coordinator:r")
+        emergency = self.plan(rows + [bead("bd-fire", priority=0)], normalized((anchor, review)), lanes=2)
+        self.assertEqual([action["id"] for action in emergency["queue"]], ["bd-fire"])
+
+    def test_historical_partial_source_does_not_require_an_active_review_inventory_entry(self):
+        partial = bead("bd-partial", status="blocked", assignee="coordinator:b",
+                       external_ref="gh-pr:53", blocks_on=["bd-owner-gate"])
+        gate = bead("bd-owner-gate", status="blocked", labels=["owner-held"])
+        payload = self.plan([partial, gate, bead("bd-new")], normalized(), lanes=2)
+        self.assertEqual([action["id"] for action in payload["queue"]], ["bd-new"])
+        self.assertEqual(payload["capacity"]["owned"], 1)
+
+    def test_review_only_admission_reports_a_nonempty_top_level_status(self):
+        anchor, review, rows = review_pair()
+        payload = self.plan(rows, normalized((anchor, review)), lanes=1)
+        self.assertEqual(payload["candidates"], [])
+        self.assertEqual(payload["status"], "ok")
+
+    def test_missing_partial_and_stale_review_evidence_never_becomes_an_empty_priority_lane(self):
+        anchor, review, rows = review_pair()
+        bad_states = [None, {**normalized(), "status": "partial", "errors": [{"code": "unavailable"}]}, normalized(),
+                      {**normalized((anchor, review)), "findings": []},
+                      {**normalized(), "findings": [{"kind": "original"}]}]
+        for state in bad_states:
+            with self.subTest(state=state):
+                payload = self.plan(rows + [bead("bd-new")], state)
+                self.assertEqual(payload["queue"], [])
+                self.assertEqual(payload["admission"]["status"], "blocked")
+                self.assertEqual(queue_ids(payload), ["bd-new"])
+
+    def test_unchanged_content_receipt_waits_without_new_review_and_changed_head_invalidates_it(self):
+        anchor, review, rows = review_pair()
+        for disposition in ("ready", "queued", "held"):
+            with self.subTest(disposition=disposition):
+                review["metadata"] = {"review_receipt": {"head": SHA, "disposition": disposition}}
+                same = self.plan(rows + [bead("bd-new")], normalized((anchor, review)), lanes=2)
+                self.assertEqual([a["kind"] for a in same["queue"]], ["implementation"])
+                changed = self.plan(rows + [bead("bd-new")], normalized((anchor, review), head="b" * 40), lanes=2)
+                self.assertEqual([a["kind"] for a in changed["queue"]], ["review", "implementation"])
+
+    def test_hard_gate_blocks_its_package_only_and_wip_bounds_spillover(self):
+        anchor, review, rows = review_pair()
+        anchor["labels"].append("owner-held")
+        payload = self.plan(rows + [bead("bd-independent")], normalized((anchor, review)), lanes=2)
+        self.assertEqual([a["id"] for a in payload["queue"]], ["bd-independent"])
+        full = self.plan(rows + [bead("bd-independent")], normalized((anchor, review)), lanes=1)
+        self.assertEqual(full["queue"], [])
+        self.assertEqual(anchor["assignee"], "coordinator:a")
+
+    def test_foreign_live_correction_returns_to_existing_owner_without_claim_transfer(self):
+        anchor, review, rows = review_pair(owner="coordinator:b")
+        review["metadata"] = {"review_receipt": {"head": SHA, "disposition": "corrections"}}
+        payload = self.plan(rows, normalized((anchor, review)), lanes=1)
+        self.assertEqual(payload["queue"], [])
+        self.assertIn({"id": anchor["id"], "reason": "resume-existing-owner", "owner": "coordinator:b"}, payload["admission"]["waiting"])
+        self.assertEqual(anchor["assignee"], "coordinator:b")
+
+    def test_review_cannot_ignore_an_external_member_dependency_or_malformed_receipt(self):
+        anchor, review, rows = review_pair()
+        anchor["dependencies"] = [{"issue_id": anchor["id"], "depends_on_id": "bd-hard-gate", "type": "blocks"}]
+        held = self.plan(rows + [bead("bd-hard-gate", status="blocked", labels=["owner-held"])], normalized((anchor, review)))
+        self.assertEqual(held["queue"], [])
+        anchor["dependencies"] = []
+        review["metadata"] = {"review_receipt": {"head": SHA, "disposition": "complete"}}
+        invalid = self.plan(rows, normalized((anchor, review)))
+        self.assertEqual(invalid["admission"]["status"], "blocked")
+
+    def test_known_closed_dependency_allows_review_and_p0_still_preempts_new_review(self):
+        anchor, review, rows = review_pair()
+        gate = bead("bd-gate", status="closed")
+        anchor["dependencies"] = [{"issue_id": anchor["id"], "depends_on_id": gate["id"], "type": "blocks"}]
+        snap = snapshot(rows + [bead("bd-fire", priority=0)], kv=live_registry("coordinator:a"))
+        snap["dependency_records"] = [gate]
+        payload = ranking.rank(snap, now=NOW, coordinator="coordinator:a", lanes=2, review_state=normalized((anchor, review)))
+        self.assertEqual([a["id"] for a in payload["queue"]], ["bd-fire", review["id"]])
 
 
 class DeliveryPackageSchedulingTests(unittest.TestCase):
@@ -89,9 +379,9 @@ class DeliveryPackageSchedulingTests(unittest.TestCase):
             "members": [row["id"]], "owner": owner, "outcome": row["id"],
             "base_branch": "main", "packet": "Accepted scope"}}
         manifested = ranking.rank(snapshot([row]), now=NOW)
-        self.assertEqual(single["capacity"]["occupied"], 1)
+        self.assertEqual(single["capacity"]["occupied"], 0)
         self.assertEqual(single["capacity"], manifested["capacity"])
-        self.assertEqual(single["capacity"]["free"], single["capacity"]["budget"] - 1)
+        self.assertEqual(single["capacity"]["free"], single["capacity"]["budget"])
 
     def test_scoped_run_keeps_the_runnable_frontier_of_an_outside_p0_epic(self):
         normal, emergency = epic("bd-normal"), epic("bd-emergency", priority=0)
@@ -103,8 +393,8 @@ class DeliveryPackageSchedulingTests(unittest.TestCase):
         payload = ranking.rank(snapshot(rows, [status(normal, 1, 0), status(emergency, 1, 0)]),
                                now=NOW, scope_epics=[normal["id"]])
         self.assertEqual(queue_ids(payload), [substrate["id"], normal_child["id"]])
-        self.assertEqual(payload["queue"][0]["outcome"], emergency["id"])
-        self.assertIn("prerequisite", payload["queue"][0]["reason"])
+        self.assertEqual(payload["candidates"][0]["outcome"], emergency["id"])
+        self.assertIn("prerequisite", payload["candidates"][0]["reason"])
 
     def test_scoped_run_keeps_p0_child_frontier_under_an_ordinary_epic(self):
         normal, outside = epic("bd-normal"), epic("bd-outside")
@@ -116,8 +406,8 @@ class DeliveryPackageSchedulingTests(unittest.TestCase):
                                [status(normal, 1, 0), status(outside, 1, 0)]),
                                now=NOW, scope_epics=[normal["id"]])
         self.assertEqual(queue_ids(payload), [substrate["id"], normal_child["id"]])
-        self.assertEqual(payload["queue"][0]["outcome"], emergency["id"])
-        self.assertIn("P0 task", payload["queue"][0]["reason"])
+        self.assertEqual(payload["candidates"][0]["outcome"], emergency["id"])
+        self.assertIn("P0 task", payload["candidates"][0]["reason"])
 
     def test_scoped_run_keeps_standalone_p0_frontier_and_deduplicates_shared_substrate(self):
         normal, outside = epic("bd-normal"), epic("bd-outside")
@@ -129,8 +419,8 @@ class DeliveryPackageSchedulingTests(unittest.TestCase):
                                [status(normal, 1, 0), status(outside, 1, 0)]),
                                now=NOW, scope_epics=[normal["id"]])
         self.assertEqual(queue_ids(payload), [substrate["id"], normal_child["id"]])
-        self.assertEqual(payload["queue"][0]["outcome"], emergency["id"])
-        self.assertIn("P0 task", payload["queue"][0]["reason"])
+        self.assertEqual(payload["candidates"][0]["outcome"], emergency["id"])
+        self.assertIn("P0 task", payload["candidates"][0]["reason"])
 
     def test_p0_urgency_does_not_cross_unknown_held_or_foreign_owned_gates(self):
         normal, substrate = epic("bd-normal"), bead("bd-substrate")
@@ -163,7 +453,8 @@ class DeliveryPackageSchedulingTests(unittest.TestCase):
             member["metadata"] = {"delivery_anchor": anchor["id"]}
         unrelated = bead("bd-calendar")
         payload = ranking.rank(snapshot([*members, unrelated]), now=NOW, coordinator=owner)
-        self.assertEqual(payload["capacity"]["occupied"], 1)
+        self.assertEqual(payload["capacity"]["occupied"], 0)
+        self.assertEqual(payload["capacity"]["owned"], 1)
         self.assertEqual(queue_ids(payload), ["bd-calendar"])
 
     def test_independent_packages_keep_separate_capacity_and_ownership(self):
@@ -271,7 +562,7 @@ class FinishFirstOrderingTests(unittest.TestCase):
         payload = ranking.rank(snapshot(live, epics), now=NOW, scope_epics=["bd-busy"])
 
         self.assertEqual(queue_ids(payload), ["bd-fire.1", "bd-busy.2"])
-        self.assertEqual(payload["queue"][0]["reason"], "urgent: under P0 epic bd-fire")
+        self.assertEqual(payload["candidates"][0]["reason"], "urgent: under P0 epic bd-fire")
 
     def test_review_in_flight_counts_as_progress(self) -> None:
         reviewing, fresh = epic("bd-rev"), epic("bd-fresh")
@@ -337,7 +628,7 @@ class FinishFirstOrderingTests(unittest.TestCase):
 
         payload = ranking.rank(snapshot(live, [status(fresh, total=1, closed=0)]), now=NOW)
 
-        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["status"], "blocked")
         self.assertEqual(queue_ids(payload), ["bd-solo", "bd-fresh.1"])
 
     def test_ready_prerequisite_outside_the_epic_inherits_the_epic_rank(self) -> None:
@@ -353,7 +644,7 @@ class FinishFirstOrderingTests(unittest.TestCase):
         payload = ranking.rank(snapshot(live, epics), now=NOW)
 
         self.assertEqual(queue_ids(payload)[0], "bd-other.2")
-        self.assertIn("prerequisite for epic bd-near", payload["queue"][0]["reason"])
+        self.assertIn("prerequisite for epic bd-near", payload["candidates"][0]["reason"])
 
     def test_within_an_epic_unblocking_beads_go_first(self) -> None:
         parent = epic("bd-e")
@@ -377,7 +668,7 @@ class LaneCapTests(unittest.TestCase):
             queue_ids(payload),
             ["bd-wide.1", "bd-wide.2", "bd-second.1", "bd-wide.3", "bd-wide.4"],
         )
-        self.assertTrue(payload["queue"][3]["reason"].endswith("over epic lane cap"))
+        self.assertTrue(payload["candidates"][3]["reason"].endswith("over epic lane cap"))
 
     def test_bead_queued_by_another_outcome_does_not_use_up_the_epic_share(self) -> None:
         first, second = epic("bd-a", priority=1), epic("bd-b", priority=2)
@@ -392,7 +683,7 @@ class LaneCapTests(unittest.TestCase):
         payload = ranking.rank(snapshot(live, epics), now=NOW, max_lanes_per_epic=1)
 
         self.assertEqual(queue_ids(payload), ["bd-b.1", "bd-b.2"])
-        self.assertNotIn("over epic lane cap", payload["queue"][1]["reason"])
+        self.assertNotIn("over epic lane cap", payload["candidates"][1]["reason"])
 
     def test_lanes_already_held_count_against_the_epic_cap(self) -> None:
         wide, second = epic("bd-wide"), epic("bd-second")
@@ -469,7 +760,7 @@ class ParallelCoordinatorTests(unittest.TestCase):
         forward = ranking.rank(snapshot(live, epics), now=NOW, coordinator="coordinator:a")
         backward = ranking.rank(snapshot(list(reversed(live)), epics), now=NOW, coordinator="coordinator:b")
 
-        self.assertEqual(forward["queue"], backward["queue"])
+        self.assertEqual(forward["candidates"], backward["candidates"])
 
     def test_human_claims_do_not_use_agent_lanes(self) -> None:
         live = [bead("bd-h", status="in_progress", assignee="tze"), bead("bd-c", status="in_progress", assignee="coordinator:a")]
@@ -631,7 +922,7 @@ class ExclusionTests(unittest.TestCase):
 
         payload = ranking.rank(snapshot(live, [status(stuck, total=3, closed=2)]), now=NOW)
 
-        self.assertEqual(payload["status"], "empty")
+        self.assertEqual(payload["status"], "blocked")
         self.assertEqual(payload["held_total"], 1)
         self.assertEqual(
             payload["held"][0]["waiting_on"],
@@ -666,7 +957,7 @@ class FailClosedTests(unittest.TestCase):
         payload = ranking.rank(snap, now=NOW)
 
         self.assertEqual(payload["errors"], [{"code": "invalid-record", "scope": "ready"}])
-        self.assertEqual(payload["queue"], [])
+        self.assertEqual(payload["candidates"], [])
 
     def test_wrong_payload_shape_is_fatal(self) -> None:
         snap = snapshot([bead("bd-1")])
@@ -725,7 +1016,7 @@ class RegistryTests(unittest.TestCase):
 
 
 class CommandLineTests(unittest.TestCase):
-    def run_cli(self, fixture: dict[str, object]) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
+    def run_cli(self, fixture: dict[str, object], *, review_state=None) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "repo").mkdir()
@@ -753,8 +1044,14 @@ class CommandLineTests(unittest.TestCase):
             fake.chmod(0o755)
             env = os.environ.copy()
             env.update(PATH=f"{root / 'bin'}:{env['PATH']}", RANK_FIXTURE=str(fixture_path), RANK_CALLS=str(calls_path))
+            argv = [sys.executable, str(SCRIPT), "--repo-root", str(root / "repo"),
+                    "--now", "2026-10-27T04:00:00Z", "--coordinator", "coordinator:a"]
+            if review_state is not None:
+                review_path = root / "review-state.json"
+                review_path.write_text(json.dumps(review_state), encoding="utf-8")
+                argv.extend(["--review-state-file", str(review_path)])
             result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--repo-root", str(root / "repo"), "--now", "2026-10-27T04:00:00Z"],
+                argv,
                 capture_output=True, text=True, env=env,
             )
             calls = [json.loads(line) for line in calls_path.read_text(encoding="utf-8").splitlines()] if calls_path.exists() else []
@@ -778,7 +1075,7 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["capacity"]["occupied"], 1)
-        self.assertEqual(payload["queue"], [])
+        self.assertEqual(payload["candidates"], [])
         self.assertIn(["show", anchor_id, "--json"], calls)
 
     def test_cli_runs_read_only_queries_and_emits_one_envelope(self) -> None:
@@ -786,7 +1083,7 @@ class CommandLineTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["schema"], "beads-work-queue/v1")
+        self.assertEqual(payload["schema"], "beads-work-queue/v2")
         self.assertEqual(queue_ids(payload), ["bd-e.1"])
         self.assertEqual(
             calls,
@@ -797,6 +1094,21 @@ class CommandLineTests(unittest.TestCase):
                 ["kv", "list", "--json"],
             ],
         )
+
+    def test_cli_reuses_step_zero_inventory_and_hydrates_only_missing_owner_dependencies(self):
+        anchor, review, rows = review_pair()
+        gate = bead("bd-old-gate", status="closed")
+        review_gate = bead("bd-review-gate", status="closed")
+        anchor["dependencies"] = [{"issue_id": anchor["id"], "depends_on_id": gate["id"], "type": "blocks"}]
+        review["dependencies"] = [{"issue_id": review["id"], "depends_on_id": review_gate["id"], "type": "blocks"}]
+        fixture = {"list": rows, "ready": [], "epic": [], "kv": live_registry("coordinator:a"),
+                   "show": {gate["id"]: [gate], review_gate["id"]: [review_gate]}}
+        result, calls = self.run_cli(fixture, review_state=normalized((anchor, review)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual([action["kind"] for action in payload["queue"]], ["review"])
+        self.assertEqual(calls[-2:], [["show", gate["id"], "--json"], ["show", review_gate["id"], "--json"]])
+        self.assertEqual(len(calls), 6)
 
     def test_cli_fails_closed_on_a_failed_query(self) -> None:
         fixture = self.fixture()

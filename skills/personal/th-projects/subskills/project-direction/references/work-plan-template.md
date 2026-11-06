@@ -6,22 +6,14 @@ Template for the **Handoff Output** — the direction report the orchestrator as
 
 ## Work Plan Construction
 
-### Linking to spec
+### Governing contract and signoff
 
-Every work item has one of:
-- **Spec reference**: specific section defining expected behavior.
-- **Spec-first flag**: "spec work required before implementation" — first chunk IS writing/updating the spec.
-
-No spec coverage → work plan starts with writing the spec; implementation chunks come after spec signoff.
-
-### Signoff gates
-
-Default: **user signoff required before implementation begins**.
-
-Signoff NOT required for:
-- Pure refactors that don't change behavior (still need reconciliation)
-- Bug fixes where spec already defines correct behavior
-- Spec writing itself (but spec content needs signoff before implementation)
+Apply the shared
+[`Governing Contract`](../../../references/work-allocation.md#governing-contract)
+rule. Routine settled fixes route directly to beads-writer; they do not need
+this direction/specification lifecycle. For work handled here, cite the
+applicable approved spec sections or identify unresolved specification and its
+actual approval gate. A repository's mandated spec/signoff remains binding.
 
 ### Decomposing into chunks
 
@@ -39,7 +31,7 @@ branch/PR/review ceremony.
 ### Chunk {n}: {title}
 
 **Objective**: {one sentence — what this chunk accomplishes}
-**Spec reference**: {spec section} or "Spec work required"
+**Governing contract**: {applicable approved spec sections or unresolved specification and its gate}
 **Dependencies**: {which prior chunks must be complete}
 **Why ordered here**: {brief rationale for sequencing}
 **Scope**: S / M / L / XL

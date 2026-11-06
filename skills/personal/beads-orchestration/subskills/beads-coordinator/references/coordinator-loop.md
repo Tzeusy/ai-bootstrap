@@ -167,10 +167,16 @@ dedupe by anchor/PR, retain the oldest valid parsed creation chronology; invalid
 chronology is partial manual triage. Never copy `external_ref` to members or
 review beads. Review bead has `pr-review-task,pr-review`, structured acceptance
 for independent findings/evidence/current-head readiness, and a link to anchor.
-Only anchor depends on that review bead. Reuse this record and reviewer for
+Only anchor depends on that review bead. Mark an anchor awaiting an open PR with
+`pr-review` so the current lifecycle inventory distinguishes it from historical
+PR associations. After terminal reconciliation, remove that active lifecycle label
+when it is no longer waiting on the PR. A partial outcome can retain its historical
+external_ref while remaining blocked on real unfinished work; it must not look like
+an unreviewed open delivery forever. Reuse this record and reviewer for
 corrections. `review-running` plus guarded acquisition prevents duplicate reviewers.
-Native `--claim` refuses blocked beads: read the review assignee and acquire an
-unassigned blocked review record using both guards, then verify command success:
+After Step 1 admits a review action, acquire its review record. Native `--claim`
+refuses blocked beads: read the assignee and acquire an unassigned blocked review
+using both guards, then verify command success. Step 0 does not start review jobs:
 
 ```bash
 bd --actor "$COORDINATOR_ID" update <review-id> --if-assignee '' \
@@ -206,24 +212,39 @@ using the owner hold procedure before every action.
 | OPEN corrections-required | Send findings directly to existing implementation owner; keep same claims/PR/review. |
 | OPEN review-ready | Resume independent reviewer with changed content and prior findings. |
 
-## Step 1: Rank finite outcomes and prerequisites
+## Step 1: Admit from one review-first queue
 
-Run `scripts/rank_ready_work.py` for `beads-work-queue/v1`; its module docstring
-owns ranking. A fatal result dispatches nothing; diagnose tracker failure rather
-than falling back to an unranked ready queue. Prefer an active owner's next
-package or its runnable prerequisite, with P0 and explicit priority preemption.
-An all-children-closed candidate is not proof the accepted outcome is complete.
-Check the original observable acceptance, including required activation/proof.
+Step 0 produces a compact normalization envelope. Save that existing result to
+`REVIEW_STATE_FILE`, then reuse it with the current tracker snapshot:
 
-Distinguish runnable prerequisite, technical wait and owner hold. A prerequisite
-shared by several outcomes gets one owner. Do not open unrelated outcomes to
-occupy a slot while waiting. Scope an owner to a finite outcome, not exclusive
-custody of a whole programme. Capacity counts packages/owners, not member beads;
-respect `beads.max_lanes` including independent review capacity.
+```bash
+uv run scripts/rank_ready_work.py --repo-root "$REPO_ROOT" \
+  --coordinator "$COORDINATOR_ID" --review-state-file "$REVIEW_STATE_FILE"
+```
+
+The module docstring owns `beads-work-queue/v2`. Dispatch only from `queue` and
+its `admission` decision, never diagnostic `candidates`, raw `bd ready`, or a
+mode-specific side queue. Missing/partial/inconsistent review evidence permits
+no dispatch. Refresh changed state before acting; no extra whole-fleet scan is
+needed just to re-read a verdict. Priority ordering occurs before the output
+limit, so a candidate cutoff cannot hide review work. A failed claim/race refreshes
+admission before choosing another item.
+
+Reviews outrank ordinary new implementation, then corrections/resumes retain their
+owner; P0 keeps emergency precedence. Once higher-class actions are admitted or
+running, spare slots can advance disjoint work. Runtime safety owns active-slot,
+WIP, parked-owner and native-thread rules; claims and sessions survive waits.
+
+A prerequisite shared by several outcomes gets one owner. A hard hold gates its
+dependent work, rather than demanding universal idleness. Allow bounded disjoint
+spillover only when no useful higher-class action waits and both execution and WIP
+capacity allow it; retain concrete resume events and checkpoint priority.
+An all-children-closed candidate is not proof of accepted completion: check original
+observable acceptance, including required activation/proof.
 
 ## Step 2: Form the next cohesive package
 
-Use the current allocation packet, source and governing adopted contract. Several
+Use the current allocation packet, source and applicable governing contract. Several
 existing cohesive beads can share one package without another wrapper issue.
 Independent outcomes keep separate rollback/ownership. Inspect other live claims
 and branches before assigning overlapping interfaces. A different hard dependency,
@@ -270,6 +291,14 @@ reviewer and owner communicate directly; state changes return here for lifecycle
 
 ## Step 5: Review and correct
 
+On a worker handoff, park the anchor as blocked while keeping all member claims.
+Create/reuse its review record, normalize the changed state, then use the shared
+admission queue for its independent review. No implementation-WIP vacancy is needed
+for review/correction, only an execution slot. Set the admitted record in_progress
+immediately before its job starts; return it to blocked when that execution ends.
+Do not park a still-running test/correction process to manufacture free capacity.
+
+
 One independent reviewer per package, normally the same session through rechecks.
 Create its worktree on `review/<review-id>` fetched from the published package
 head. Keep the implementation worktree. Never transfer the author's branch
@@ -285,7 +314,24 @@ restore the same relation after push. Member hard gates remain. The same owner
 amends current acceptance/failure matrix when same-seam corrections reveal a bad
 assumption. A new trust boundary/subsystem/architecture choice follows its real
 spec/authority gate, with a separately owned prerequisite only when needed.
-No new review bead, correction bead or coordinator dispatch cascade.
+No new review bead, correction bead or coordinator dispatch cascade. When findings
+are returned, persist the typed review receipt from the independent report as in
+[delivery evidence](../../../references/delivery-model.md#evidence-and-review),
+then park the review. The queue admits correction to the existing owner; only then
+set the anchor in_progress. After correction push, park it again and let the changed
+head invalidate the old receipt for the same review record. Admission is not
+permission to seize a foreign claim or bypass an actual prerequisite.
+
+A same-head ready/held/queued receipt does not dispatch another source review.
+Step 0 resumes its fresh merge/CI/owner/queue checks on the actual event and may
+perform an already-authorized merge using the independent content evidence. If a
+same-head CI failure needs author repair, record current check evidence and set
+the receipt disposition to corrections; the queue resumes the same owner. For
+fresh reviewer execution after an actual environment/assumption change, preserve
+the prior independent report and clear only the operative review_receipt, then
+readmit that reviewer through the queue. The shared evidence contract owns these
+event transitions; a wake or pending CI alone never invalidates source review.
+Never treat cached source evidence as current merge authorization.
 
 ## Step 6: Land or wait with explicit state
 
@@ -323,6 +369,9 @@ Wake on review/CI/dependency/owner events, with the bounded fallback and no-prog
 frontier in `runtime-and-safety.md`. Renew registry using
 `coordinator_registry.py register`; on exit use `coordinator_registry.py deregister`.
 Do not rescan the fleet or re-run broad verdicts just because a session woke up.
+A nonempty diagnostic candidates list is not runnable admission. If queue is empty
+because execution/WIP capacity or a real gate prevents work, resume on the named
+event with bounded fallback, rather than repeatedly waking to inspect the same list.
 At a frontier, classify your actual blocked work under decision-autonomy; resolve
 engineering choices, preserve owner hard gates, then stop at the bounded no-op limit.
 

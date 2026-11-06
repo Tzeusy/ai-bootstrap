@@ -818,7 +818,7 @@ class CleanupScanTests(unittest.TestCase):
                     "reviewDecision": None,
                     "headRefName": f"agent/{original_id}",
                     "baseRefName": "main",
-                    "headRefOid": "abc123",
+                    "headRefOid": "a" * 40,
                     "createdAt": "2026-08-14T03:00:00Z",
                     "mergedAt": None,
                 }
@@ -1849,7 +1849,7 @@ class CleanupScanTests(unittest.TestCase):
             "headRefName": f"agent/{original_id}",
             "baseRefName": "main",
             "mergedAt": None,
-            "headRefOid": "abc123",
+            "headRefOid": "a" * 40,
             "createdAt": "2026-08-14T03:00:00Z",
         }
         fixture = {
@@ -1913,7 +1913,7 @@ class CleanupScanTests(unittest.TestCase):
                     "number,url,state,isDraft,mergeStateStatus,reviewDecision,headRefName,baseRefName,mergedAt,headRefOid",
                 ],
             },
-            {"tool": "gh", "argv": ["pr", "view", "41", "--json", "number,state,mergedAt,createdAt"]},
+            {"tool": "gh", "argv": ["pr", "view", "41", "--json", "number,state,mergedAt,createdAt,headRefOid"]},
             {"tool": "bd", "argv": ["-C", repo_root, "config", "get", "issue_prefix", "--json"]},
             {"tool": "gh", "argv": ["pr", "list", "--state", "open", "--json", "number,headRefName,createdAt"]},
             {"tool": "bd", "argv": ["-C", repo_root, "list", "--status=in_progress", "--json", "--limit", "0"]},

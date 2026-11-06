@@ -15,7 +15,7 @@ compatibility: Requires a Beads-backed repository with the `bd` CLI available. A
 
 Create high-quality beads issues through repo-grounded research and deliberate field selection. This skill is a routing layer over the Beads operating model described in [`../../../../../README.md`](../../../../../README.md): issue writing should reinforce that workflow, not compete with it.
 
-Write a concise current packet with exact governing references so a fresh owner can act without the creation chat. Tracking and delivery granularity differ: related existing beads may share one package while retaining their own acceptance.
+Write a concise current packet grounded in the proportional governing contract from work-allocation so a fresh owner can act without the creation chat. Tracking and delivery granularity differ: related existing beads may share one package while retaining their own acceptance.
 
 ## Use This Skill When
 
@@ -69,7 +69,7 @@ Write a concise current packet with exact governing references so a fresh owner 
 | File | Read when | Content |
 |------|-----------|---------|
 | [`references/workflow.md`](references/workflow.md) | Every real use of this skill | Research-first workflow, decomposition rules, creation sequence, and verification flow |
-| [`../../../th-projects/references/work-allocation.md`](../../../th-projects/references/work-allocation.md) | Shaping implementation boundaries or dispatch packets | Cohesive delivery boundaries, current packets, semantic readiness, and discovery triage |
+| [`../../../th-projects/references/work-allocation.md`](../../../th-projects/references/work-allocation.md) | Shaping implementation boundaries or dispatch packets | Proportional governing contracts, cohesive delivery boundaries, current packets, and readiness |
 | [`references/fields-and-examples.md`](references/fields-and-examples.md) | Crafting issue text or choosing fields | Field schema, type/priority guidance, and example beads |
 | [`references/reconciliation-beads.md`](references/reconciliation-beads.md) | Writing or checking an epic | Finite outcome closeout, optional closeout-bead contract, and evidence prompt |
 | [`references/quality-checklist.md`](references/quality-checklist.md) | Before finalizing or after creating beads | Final checklist, persistence checks, and anti-patterns |

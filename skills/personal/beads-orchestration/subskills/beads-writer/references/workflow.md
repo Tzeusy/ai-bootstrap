@@ -3,14 +3,16 @@
 ## Understand and Reuse
 
 Inspect the target repository's instructions and the affected source. Take
-scope, priority, and authority from the owner and governing spec; ask only for
+scope, priority, and authority from the owner and applicable governing contract; ask only for
 material information those sources cannot supply. Search open and recently
 closed beads, active PRs, and concrete symbols/files before creating work.
 Attach provenance to existing outcomes instead of duplicating symptom beads.
 
 Apply the shared
 [`work-allocation contract`](../../../../th-projects/references/work-allocation.md)
-for accepted outcomes, cohesion, semantic readiness, and current packet shape.
+for proportional governing contracts, accepted outcomes, cohesion, semantic
+readiness, and current packet shape. Use its Governing Contract section to
+decide whether existing evidence suffices or a formal spec/approval is required.
 The execution representation is defined by the
 [`delivery model`](../../../references/delivery-model.md).
 
@@ -45,12 +47,13 @@ prerequisites, and exact governing references. Fill `acceptance_criteria` with
 observable member acceptance; a description-only checklist is insufficient.
 
 Cold-start self-containment means a fresh owner can resolve the current
-instructions and authority. Link exact spec sections and immutable historical
-artifacts. Do not inline the archive, repeat full contracts in every member,
+instructions and authority. Link the governing request or behavior evidence,
+applicable spec sections, and relevant immutable historical artifacts. Do not inline the archive, repeat full contracts in every member,
 or preserve superseded alternatives as competing current instructions.
 
-Distinguish approved direction from adopted behavior and executable scope.
-For a newly changing shared contract, record the settled interface and a
+For work that changes product or architectural contracts, distinguish approved
+direction from adopted behavior and executable scope. For a newly changing shared
+architectural contract, record the settled interface and a
 focused source feasibility check once before releasing its dependents. Stable
 existing contracts need no new review ritual. `packet-complete` describes
 unambiguous current scope; `runnable-now` also requires real dependencies,

@@ -85,8 +85,10 @@ findings/evidence and waits. Do not treat session launch as continuation by name
 ## Wait and report
 
 Use event-driven continuation for CI/review/dependency/owner events, with the
-bounded fallback/stop rule in runtime safety. Never fill idle slots with unrelated
-outcomes merely to stay busy. P0 can preempt at a safe published checkpoint, with
+bounded fallback/stop rule in runtime safety. Use the same review-first admission queue in either mode; mode filters capability,
+not global priority. Retained claims do not consume parked execution slots. Only
+admit disjoint spillover after runnable higher-class work is admitted and execution
+and WIP capacity permit it; keep resume events and returning-correction priority. P0 can preempt at a safe published checkpoint, with
 explicit claim disposition and resume owner. On drift, publish recovery and retire.
 
 Every state-change report names `LOOPER_ID`, `REPO_ROOT`, outcome, package/members,

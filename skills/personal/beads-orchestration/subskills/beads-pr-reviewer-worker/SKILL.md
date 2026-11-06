@@ -234,7 +234,7 @@ python3 "<loaded beads-pr-reviewer-worker package>/scripts/resolve_review_thread
 ```
 
 5. Review the exact-head diff against the original bead's acceptance criteria
-   and governing spec; threads alone are not the review. Leave a line-level
+   and applicable governing contract; threads alone are not the review. Leave a line-level
    comment (a resolvable thread) for each untracked verdict-changing issue:
    correctness, contract, acceptance, the craft-and-care bar, or a test-growth
    gate. When unsure, thread it; the rest go to `Discovered-Follow-Ups-JSON`:
