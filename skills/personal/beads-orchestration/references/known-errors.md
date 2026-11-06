@@ -2389,3 +2389,81 @@ beads (`bu-atsax`, `bu-m09qm`) whose prior coordinator session's heartbeat was
 ## tze-hud: `gh pr merge --squash --auto` fails "Auto merge is not allowed"
 - **Symptom**: reviewer cannot enter the merge queue; repo has enablePullRequestAutoMerge off.
 - **Workaround**: enqueue directly with GraphQL `mutation{enqueuePullRequest(input:{pullRequestId:$id}){mergeQueueEntry{position}}}` (queue still enforces required checks). Observed: 2026-10-03, tze-hud PR #1247.
+
+
+## `bd update` rejects guarded label-only changes
+
+Observed with `--if-assignee` / `--if-status`: an update containing only
+`--add-label` / `--remove-label` exits 1 with `require at least one field update`
+and says label/parent edits are not covered by the guard. A preceding atomic
+claim may already have succeeded, so do not rerun the whole handoff blindly.
+
+Re-read canonical ownership and status under the coordinator mutation mutex,
+resume only the legitimately owned partial transition, and include an explicit
+scalar field update (for example the verified current `--status in_progress`)
+with the guarded label change. Preserve the original failure receipt. Keep the
+fresh ownership check and mutex: this workaround does not make labels or parent
+edits independently guarded. Verify final canonical state before dispatch.
+
+
+## Review descriptions require exactly one original-bead marker
+
+`resolve_review_context.py` deliberately rejects multiple recognized markers,
+even repeated references to the same ID, as `ambiguous-original-id`. Its tests
+cover identical duplicates. Appending a dispatch paragraph with another
+`Original implementation bead: <id>` can therefore break previously valid
+context. The shorthand `Original: <id>` is not the canonical parsed marker.
+
+Normalize the owned review description under the lifecycle mutex to exactly
+one `Original implementation bead: <id>` marker; preserve unrelated text,
+acceptance, source identity and dependency edges. Retain a failed helper
+receipt and rerun once after the actual metadata correction. Do not rewrite
+context by hand or weaken the parser to turn ambiguity into success.
+
+
+## PR baseRefOid is not the live base branch ref
+
+Observed 2026-11-04: OPEN PR5487 reported baseRefOid=05fc6f14 and PR5490 reported9f723b94 while the actual repository main ref was9e28384a. A ROOT preflight incorrectly equated those fields and refused before mutations. Query `repository { ref(qualifiedName: "refs/heads/main") { target { oid } } }` for the live provider base, or fetch origin/main under the repository custody protocol. Record PR source head and actual merge-group commit/tree separately. Do not silently substitute the PR baseRefOid for current main.
+
+The earlier historical section “With an exact-base merge gate, parallel CI on N PRs wastes N-1 runs” describes a retired exact-base protocol. It does not apply to Butlers’ current non-strict protected merge queue. Follow current repository AGENTS.md: no freshness rebase; independent source review and terminal all-green checks on the exact protected merge_group tree, with rebase only for real conflict or reviewer request.
+
+## `bd worktree remove` refuses only ignored build artifacts
+
+Observed Syzygy 2026-11-04: `cannot prepare worktree removal: worktree contains modified, untracked, or ignored files` despite empty `git status --porcelain`. Inspect `git status --short --ignored=matching`: node_modules and worktree .beads metadata were the only remaining entries. After merge confirmation and bead closure, preserve any receipts, verify no unpublished source, then use `git worktree remove --force <path>` for that exact merged worktree. Preserve unrelated .gitignore changes. Do not force-remove based on normal porcelain alone.
+
+
+## `bd heartbeat` refreshes only an `in_progress` lease
+
+Observed 2026-11-04 during exact-head queue preparation: `bd heartbeat <id>` refuses an owned `blocked` source/review bead. The command help defines it as refreshing a lease held `in_progress`; a blocked review wait has no such active lease. Do not temporarily change lifecycle state just to call it, and do not treat this expected refusal as a Dolt outage. Confirm current assignee/status, then refresh the canonical notes heartbeat under the coordinator notes lock with guarded `bd update --if-assignee <self> --if-status blocked --notes <preserved-notes-with-one-refreshed-block>`. Keep ordinary native lease heartbeat for active `in_progress` work. Notes heartbeat remains stall detection, never mutual exclusion.
+
+## Native worker exec handles may not be visible to the parent
+
+Observed Syzygy 2026-11-04: a native worker reported running `exec_command` session42357; parent `write_stdin` returned `Unknown process id 42357`, while an immediate worker-local poll of that same handle returned still running and retained logs advanced into integration. Do not infer process exit or restart from the parent lookup failure. Ask the existing native worker to poll its original handle, report live/terminal state and retain the exit receipt; use native worker status/messages for parent monitoring. This observation establishes the limitation for that session, not a universal handle-sharing guarantee.
+
+
+## Python isolated mode omits sibling imports for coordinator normalizer
+
+`python3 -I .../normalize_pr_review_state.py` removes the script directory from the import path, so its unchanged `from review_relation_graph import review_relation_error` fails before any scan. Invoke the stock standalone command with `python3 <absolute-script> --repo-root <root>` (or its documented uv script entry point); do not alter repository source or weaken imports. Preserve the failed launcher receipt separately and use new result files for the corrected invocation. Verified 2026-11-04: isolated launch exited1 at import; stock Python launch completed0 in56.432s with the ordinary partial/manual-triage findings. The same caution applies to sibling-importing scripts; `-I` is not a universal wrapper.
+
+
+## PR-number substring dedupe can match Ed25519
+
+Observed 2026-11-04: testing `"5519" in description` falsely selected unrelated broker PR5503 review bu-m1qsbo because `Ed25519` contains that digit substring. Guard stopped without foreign mutation; own source had already been blocked for its verified published PR. Re-read canonical state and resume only owned partial transition; do not rerun creation or claiming blindly. Dedupe by exact original marker and structured PR reference/URL/number with token boundaries (or canonical context resolver), never arbitrary digit substrings. Preserve the failed receipt and foreign custody.
+
+
+## Stock review normalizer reports invalid-record for a review missing pr-review
+
+Observed Syzygy 2026-11-05: stock normalize_pr_review_state.py returned partial with code invalid-record, scope blocked-pr-review-task. Its task inventory requires both pr-review-task and pr-review labels. A read-only full inventory found one of eight nonclosed review tasks (root-owned syzygy-pkym) with only pr-review-task. This is incomplete metadata, not a database outage or permission problem. Preserve the partial envelope and inspect the exact inventory and validator; do not weaken the validator or dispatch from partial output. After freshly confirming root custody, original external_ref and live PR head, repair only the missing required label and (if independently established) the single canonical original-bead marker under guarded status/assignee updates. Preserve the original owner gates, review scope, historical head, source bytes and edges. Rerun the unchanged stock normalizer into new receipts: this case returned success with zero collection errors. Its recommendations still require individual primary-authority/readiness checks; success does not clear known owner holds. Evidence: /home/orca/.tmp/syzygy-next-frontier-20261105T1718/{STEP0.json,PKYM-METADATA-REPAIR-SUCCESS.json,STEP0-AFTER-PKYM-REPAIR.json}.
+
+
+## Atomic claim rejects additional compare-and-set flags
+
+Observed Syzygy 2026-11-05, bd1.3.1 c1c4b642: `bd update ID --if-assignee SELF --if-status open --claim` returns JSON error `cannot combine --if-assignee/--if-status with --claim (--claim is already an atomic compare-and-set)`. It performs no claim. After verifying current status/custody, use `bd update ID --claim` alone and check resulting assignee/status; use guarded updates separately for later notes or lifecycle transitions. If earlier transitions in a coordinator helper already succeeded, preserve its receipts and resume only the failed claim/later steps, never replay the whole mutation sequence.
+
+## --merged-into rejects a literal target HEAD (2026-11-06)
+
+Observed bd1.3.1: clean no-code experiment worktree at current main refused removal with `--merged-into <literal-current-main-oid>`: "is the target HEAD itself; use a ref or descendant commit that independently proves containment". This was a cleanup refusal, not a product gate failure. Re-read current remote main and require a real local remote-tracking ref to equal that independently observed OID, then resume only pending removals with `--merged-into refs/remotes/origin/main`. Preserve initial refusal, closed status/source identity, evidence checks and unrelated ignore bytes; never force removal or replay earlier mutations.
+
+## bd update JSON omits hydrated dependencies (2026-11-06)
+
+Observed bd1.3.1: successful `bd update --json` returned issue fields but omitted dependencies that `bd --readonly show --json` returns. Treat update response as mutation receipt, never a full relation snapshot. Re-read canonical show before checking edge preservation; a missing dependency member in the update response is not a deleted edge. If an analysis assertion used the partial response, preserve it and complete verification with show, never replay the mutation. Seen during a scope-preserving notes append; one original edge remained intact.
