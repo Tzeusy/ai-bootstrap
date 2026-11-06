@@ -1,4 +1,4 @@
 interface:
   display_name: "Beads Coordinator"
-  short_description: "Feed ready Beads issues, finish-first, to cache-warm worker lanes"
-  default_prompt: "Use $beads-coordinator to run an unattended loop that ranks ready Beads issues finish-first, atomically claims them, and feeds them one at a time to long-lived, cache-warm worker lanes in isolated worktrees, alongside any other coordinators on the same tracker."
+  short_description: "Allocate bounded outcomes and recover persistent owners"
+  default_prompt: "Use $beads-coordinator to allocate coherent delivery packages to persistent outcome owners, retain them through corrections, and reconcile individual acceptance and landing."

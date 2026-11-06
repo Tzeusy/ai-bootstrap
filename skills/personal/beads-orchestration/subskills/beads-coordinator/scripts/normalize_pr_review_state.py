@@ -50,6 +50,11 @@ from typing import Any
 
 from review_relation_graph import review_relation_error
 
+PACKAGE_SCRIPTS = Path(__file__).resolve().parents[3] / "scripts"
+if str(PACKAGE_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_SCRIPTS))
+from delivery_package import metadata as bead_metadata, validate_delivery
+
 
 SCHEMA = "beads-pr-review-normalization/v1"
 COOLDOWN = timedelta(minutes=5)
@@ -263,7 +268,13 @@ def resolve_review_task(
         return None, "invalid-original-id"
     if not valid_pr_number(pr_number):
         return None, "invalid-pr-number"
-    return {"original_id": original_id, "pr_number": pr_number}, None
+    context = {"original_id": original_id, "pr_number": pr_number}
+    members = payload.get("delivery_members")
+    if members is not None:
+        if not isinstance(members, list) or not members or any(not isinstance(member, str) or not BEAD_ID_RE.fullmatch(member) for member in members) or original_id not in members or len(set(members)) != len(members):
+            return None, "invalid-delivery-package"
+        context["delivery_members"] = members
+    return context, None
 
 
 def view_pr(
@@ -955,6 +966,31 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             )
         )
 
+    # A merged package is landing evidence, not blanket member acceptance.
+    # Keep one canonical review task while the lifecycle owner reconciles the
+    # package's per-member closure plan.
+    packages_complete = True
+    for finding in findings:
+        original_id = finding.get("original_id")
+        original = original_contexts.get(original_id, (None, None, None))[0]
+        try:
+            metadata = bead_metadata(original) if isinstance(original, dict) else {}
+            delivery = metadata.get("delivery")
+            if delivery is not None:
+                delivery = validate_delivery(delivery)
+        except ValueError:
+            report_error(errors, "invalid-delivery-package", "packages")
+            packages_complete = False
+            continue
+        context = task_contexts.get(finding.get("review_id")) or {}
+        members = delivery.get("members") if isinstance(delivery, dict) else context.get("delivery_members")
+        if isinstance(members, list) and (isinstance(delivery, dict) or len(members) > 1):
+            finding["delivery_members"] = members
+            if finding.get("pr_state") == "MERGED" and finding.get("recommendation") in {
+                "close-original-and-reviews", "close-review-and-original"
+            }:
+                finding["recommendation"] = "reconcile-package-members"
+
     self_heal, open_pr_discovery_complete = self_heal_candidates(
         repo_root=repo_root,
         now=now,
@@ -962,7 +998,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         task_lookup_complete=pre_discovery_collection_complete,
         errors=errors,
     )
-    collection_complete = pre_discovery_collection_complete and open_pr_discovery_complete
+    collection_complete = pre_discovery_collection_complete and open_pr_discovery_complete and packages_complete
     preserve_lone_pr_metadata_skip = (
         provisional_lone_pr_metadata_skip and open_pr_discovery_complete
     )

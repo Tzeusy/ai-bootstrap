@@ -1,6 +1,6 @@
 ---
 name: beads-orchestration
-description: Use for any Beads (`bd`) issue workflow in a Beads-backed repository — coordinating unattended execution of ready issues through long-lived worker lanes (finishing started epics first, alone or with several coordinators on one backlog), running a self-paced coordinator-free lane under `/loop` (one of several tmux panes), implementing a single dispatched issue in a worktree, handling PR-review follow-up tasks, reconciling stale worker/PR/worktree state, or creating and decomposing backlog issues. Route to exactly one subskill per task.
+description: Use for any Beads (`bd`) issue workflow in a Beads-backed repository — coordinating unattended execution of ready issues through long-lived worker lanes (finishing started epics first, alone or with several coordinators on one backlog), running a self-paced coordinator-free lane under `/loop` (one of several tmux panes), implementing a cohesive delivery package in a worktree, handling PR-review follow-up tasks, reconciling stale worker/PR/worktree state, or creating and decomposing backlog issues. Route to exactly one subskill per task.
 metadata:
   owner: tze
   authors:
@@ -9,7 +9,7 @@ metadata:
     - Claude Fable 5.1
     - Claude Opus 5.5
   status: active
-  last_reviewed: "2026-10-27"
+  last_reviewed: "2026-11-06"
 compatibility: Requires bd (beads) CLI v1.3+, git, and a Beads-backed repository. Execution subskills additionally require gh (authenticated), jq, python3, uv, and git worktree support.
 ---
 
@@ -40,9 +40,9 @@ resolves against the wrong tree.
 
 | Task intent | Subskill | Typical trigger |
 |---|---|---|
-| Run the unattended loop: rank ready issues finish-first, claim, dispatch workers, reconcile outcomes; one or several coordinators per tracker. Owns ALL `bd` lifecycle mutations. | [subskills/beads-coordinator/SKILL.md](subskills/beads-coordinator/SKILL.md) | "while true, tackle the next issue", "keep N workers processing the backlog", "run a second coordinator on the same backlog" |
-| Run this session as one self-paced lane with no central coordinator: implement mode claims, works, verifies, and lands or hands off one bead per iteration; review mode reviews, merges, and closes handed-off PRs. Several loopers share one tracker. | [subskills/beads-looper/SKILL.md](subskills/beads-looper/SKILL.md) | "/loop through the ready queue", "run this pane as a beads lane", "be the review lane for the other panes" |
-| Implement exactly one Beads issue; requires ISSUE_ID and WORKTREE_PATH from a coordinator or operator. | [subskills/beads-worker/SKILL.md](subskills/beads-worker/SKILL.md) | Dispatched with a worker contract for one implementation bead |
+| Run the unattended loop: rank ready issues finish-first, claim, dispatch workers, reconcile outcomes; one or several coordinators per tracker. Owns lifecycle writes for its dispatched owners. | [subskills/beads-coordinator/SKILL.md](subskills/beads-coordinator/SKILL.md) | "while true, tackle the next issue", "keep N workers processing the backlog", "run a second coordinator on the same backlog" |
+| Run this session as one self-paced lane with no central coordinator: implement mode claims, works, verifies, and retains a bounded outcome through packages and corrections; review mode independently reviews packages and reports to their owners. Several loopers share one tracker. | [subskills/beads-looper/SKILL.md](subskills/beads-looper/SKILL.md) | "/loop through the ready queue", "run this pane as a beads lane", "be the review lane for the other panes" |
+| Implement one cohesive delivery package (one or several beads); requires anchor ISSUE_ID and WORKTREE_PATH. | [subskills/beads-worker/SKILL.md](subskills/beads-worker/SKILL.md) | Dispatched with a worker contract for one delivery package |
 | Process one `pr-review-task` bead: triage threads, report corrections to the implementation lane, attest exact-head merge readiness. | [subskills/beads-pr-reviewer-worker/SKILL.md](subskills/beads-pr-reviewer-worker/SKILL.md) | Dispatched with a `pr-review-task` bead for an open GitHub PR |
 | Reconcile stale worker state, PR-review bookkeeping, and orphaned worktrees before dispatching new work. | [subskills/beads-cleanup/SKILL.md](subskills/beads-cleanup/SKILL.md) | Coordinator preflight; recovery after a crashed loop; "clean up stale beads state" |
 | Create or decompose backlog issues: features, bugs, epics, grooming, vague ask → actionable beads. | [subskills/beads-writer/SKILL.md](subskills/beads-writer/SKILL.md) | "file beads for X", "break this epic down", backlog grooming |
@@ -65,6 +65,14 @@ resolves against the wrong tree.
   plain `bd` commands or a dedicated skill such as `th-projects`
   (project-direction subskill).
 
+## Delivery model
+
+Execution defaults to persistent bounded-outcome owners using the existing looper;
+coordinated runs use the same model with a small allocation/recovery controller.
+Read [references/delivery-model.md](references/delivery-model.md) for package units,
+branch choice, claims, review, evidence and recovery. This replaces per-bead
+branch/PR/review ceremonies; it does not bypass repository integration policy.
+
 ## Shared invariants (all subskills)
 
 - During an execution run, the coordinator is the **sole mutation authority**
@@ -75,21 +83,18 @@ resolves against the wrong tree.
   may create/update/depend backlog items during explicit authoring before
   dispatch, but hands mutation authority to the coordinator once execution
   starts.
-- Worktrees live at `.worktrees/parallel-agents/<id>` on branch `agent/<id>`.
+- Implementation worktrees use `.worktrees/parallel-agents/<anchor>` on
+  `agent/<anchor>`; independent review snapshots use `review/<review-id>`.
 - `.beads/` is Dolt-backed and gitignored — never commit it to code branches.
-- **Build artifacts die with the bead.** A bead owns at most one build target,
-  tied to its worktree and reused across its commits, never a fresh one per
-  commit. Name any artifact directory outside the worktree `<bead-id>-…`. When
-  the bead's PR merges or closes, the coordinator copies receipts (logs, exit
-  codes, screenshots) to the bead's evidence and deletes the target with the
-  worktree. Full disk is not an operator blocker while targets of merged or
-  closed beads remain. A repo may tighten this, but "keep everything" without
-  a retention rule is not a policy.
+- **Build artifacts follow the package.** Reuse one target across package commits.
+  Retain receipts needed for evidence/recovery, then delete retired build targets
+  after verified completion or published handoff. A PR opening or one member
+  closing is not permission to delete unfinished or unpublished package work.
 - bd has no `--rig` flag: target another project with `bd -C <path> …`.
 - **Spirit > spec > DAG.** Beads are the implementation DAG derived from the
   project's specs, which serve its doctrine (`th-projects`). The writer derives
   beads from approved specs, the coordinator executes the DAG in finish-first
-  order, and a worker implements one node. None of them re-plans: a bead that
+  order, and an owner delivers one cohesive package. None of them re-plans: a bead that
   conflicts with its spec or doctrine, or has no governing spec, is routed back
   through `th-projects` (feature-request amendment or direction), not
   reinterpreted, re-scoped, or quietly dispatched.
@@ -106,8 +111,8 @@ resolves against the wrong tree.
   [`references/token-efficiency.md`](references/token-efficiency.md). Lanes
   over fan-out: one long-lived session works through a chain of beads that
   share context, one at a time, rides autocompaction, and keeps its cache warm,
-  instead of spawning a fresh cold worker per bead. A bead stays the unit of
-  claim, PR, review, and closure. Also: project JSON through `jq`, route gate
+  instead of spawning a fresh cold worker per bead. Tracking beads retain individual claims/acceptance; a package shares branch, PR
+  and independent review. Also: project JSON through `jq`, route gate
   output to files, run targeted tests before the full gate's one run per tree
   (in the tier the repo's test-scope policy assigns it), and keep one
   model per lane. Load it once per session before the first `bd`/`gh` query

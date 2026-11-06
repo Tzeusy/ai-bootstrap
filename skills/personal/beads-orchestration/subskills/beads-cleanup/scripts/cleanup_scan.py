@@ -27,6 +27,11 @@ if str(CANONICAL_COORDINATOR_SCRIPTS) not in sys.path:
 from coordinator_registry import classify_failure, live_coordinator_ids  # noqa: E402
 from review_relation_graph import normalized_finding_relation_error  # noqa: E402
 
+PACKAGE_SCRIPTS = Path(__file__).resolve().parents[3] / "scripts"
+if str(PACKAGE_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_SCRIPTS))
+from delivery_package import metadata as bead_metadata, validate_delivery  # noqa: E402
+
 
 SCHEMA = "beads-cleanup-scan/v1"
 NORMALIZER_SCHEMA = "beads-pr-review-normalization/v1"
@@ -38,6 +43,7 @@ PR_STATES = frozenset({"OPEN", "CLOSED", "MERGED"})
 FINDING_RECOMMENDATIONS = frozenset(
     {
         "close-original-and-reviews",
+        "reconcile-package-members",
         "close-review-and-original",
         "close-review-reopen-original",
         "dedupe-review-task",
@@ -281,6 +287,7 @@ def finding_action_is_consistent(
     if kind == "review-task" and review_id is None:
         return False
     expected = {
+        "reconcile-package-members": (None, "MERGED"),
         "close-original-and-reviews": ("original", "MERGED"),
         "close-review-and-original": ("review-task", "MERGED"),
         "close-review-reopen-original": ("review-task", "CLOSED"),
@@ -573,8 +580,15 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
             else "manual-triage"
         )
         context_status = safe_code(item.get("context_status"), "command-failed")
+        members = item.get("delivery_members")
+        valid_members = (isinstance(members, list) and bool(members)
+                         and all(sanitize_id(member) is not None for member in members)
+                         and len(set(members)) == len(members) and original_id in members
+                         and review_id not in members)
         invalid_evidence = ""
         if not relation_graph_complete:
+            invalid_evidence = "invalid-normalizer-evidence"
+        elif (members is not None or recommendation == "reconcile-package-members") and not valid_members:
             invalid_evidence = "invalid-normalizer-evidence"
         elif number is None:
             invalid_evidence = "invalid-normalizer-evidence"
@@ -629,6 +643,7 @@ def sanitize_normalizer(payload: object) -> dict[str, Any]:
                 "pr_state": state,
                 "recommendation": "manual-triage" if invalid_evidence else recommendation,
                 "review_id": review_id,
+                **({"delivery_members": members} if valid_members else {}),
             }
         )
 
@@ -839,6 +854,21 @@ def resolve_claim_worktree(
     return repo_root / ".worktrees" / "parallel-agents" / path_id, False
 
 
+def delivery_anchor(record: dict[str, Any]) -> str | None:
+    """Identify grouped recovery; malformed metadata must never enable release."""
+    metadata = bead_metadata(record)
+    delivery = metadata.get("delivery")
+    if delivery is not None:
+        delivery = validate_delivery(delivery)
+        if delivery["anchor"] != record_id(record):
+            raise ValueError("delivery-anchor-mismatch")
+        return delivery["anchor"]
+    pointer = metadata.get("delivery_anchor")
+    if pointer is not None and (not isinstance(pointer, str) or not BEAD_ID_RE.fullmatch(pointer)):
+        raise ValueError("invalid-delivery-pointer")
+    return pointer
+
+
 def scan_claims(
     records: list[dict[str, Any]] | None,
     *,
@@ -859,14 +889,15 @@ def scan_claims(
             report_error(errors, "invalid-record", "claims")
             continue
         owner_live = record.get("assignee") in live_owners
+        anchor = delivery_anchor(record)
         worktree, ambiguous = resolve_claim_worktree(
-            issue_id,
+            anchor or issue_id,
             repo_root,
             branch_path_ids=branch_path_ids,
             ambiguous_worktree_ids=ambiguous_worktree_ids,
         )
-        exists = ambiguous or issue_id in worktree_names or (worktree is not None and worktree.is_dir())
-        branch, branch_error = remote_branch_exists(issue_id, repo_root)
+        exists = ambiguous or (anchor or issue_id) in worktree_names or (worktree is not None and worktree.is_dir())
+        branch, branch_error = remote_branch_exists(anchor or issue_id, repo_root)
         if ambiguous:
             unpublished, unpublished_error = None, "ambiguous-worktree"
         else:
@@ -882,6 +913,10 @@ def scan_claims(
             recommendation = "manual-triage"
         elif unpublished is True:
             recommendation = "preserve-unpublished-work"
+        elif anchor:
+            # A dead session may have completed only some members. The package
+            # journal + anchor branch decide recovery; never strand siblings.
+            recommendation = "recover-package"
         elif beat == "stale":
             recommendation = "release-claim-candidate"
         else:
@@ -889,6 +924,7 @@ def scan_claims(
         findings.append(
             {
                 "heartbeat_state": beat,
+                "delivery_anchor": anchor,
                 "id": issue_id,
                 "owner_live": owner_live,
                 "recommendation": recommendation,
@@ -915,6 +951,11 @@ def scan_blockers(
         issue_id = record_id(record)
         if issue_id is None:
             report_error(errors, "invalid-record", "blockers")
+            continue
+        anchor = delivery_anchor(record)
+        if anchor:
+            findings.append({"all_blockers_closed": None, "dependencies": [], "id": issue_id,
+                             "delivery_anchor": anchor, "recommendation": "remain-in-package"})
             continue
         payload, error = command_json(["bd", "dep", "list", issue_id, "--json"], repo_root)
         if error or not isinstance(payload, list):
@@ -1028,7 +1069,10 @@ def scan_worktrees(
         elif unpublished is True:
             recommendation = "preserve-unpublished-work"
         elif status == "closed":
-            recommendation = "cleanup-eligible-after-verification"
+            package = delivery_anchor(record) if isinstance(record, dict) else None
+            # Closing the anchor is not proof that every accepted package
+            # member is complete, nor that recovery commits are published.
+            recommendation = "recover-package" if package else "cleanup-eligible-after-verification"
         elif status == "open":
             recommendation = "preserve-branch-worktree"
         elif status in {"in_progress", "blocked"}:
@@ -1122,6 +1166,8 @@ def scan_build_artifacts(
             closed_pr = pr_closed(record, repo_root, errors) if record and status != "closed" else None
             if record is None or status is None:
                 recommendation = "manual-triage"
+            elif delivery_anchor(record):
+                recommendation = "preserve-active-bead"
             elif status == "closed" or closed_pr:
                 recommendation = "delete-after-receipts"
             else:

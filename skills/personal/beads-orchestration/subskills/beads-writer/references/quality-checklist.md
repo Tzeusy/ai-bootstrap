@@ -1,76 +1,39 @@
 # Quality Checklist
 
-Use this reference before finalizing or after creating beads.
+Use before finalizing an allocation. This is an authoring check, not a new
+execution gate for every task.
 
-## Final Checklist
+- The accepted owner outcome is finite, observable, and preserved through partial
+  foundation, dark-source, and activation slices.
+- Titles, types, and numeric priorities describe actual work. Governing intent,
+  source surface, current instructions, and structured acceptance are clear.
+- A fresh owner can follow exact references without the creator's conversation
+  or inline copies of the historical archive.
+- Search covered open/recently closed work, active PRs, and concrete source
+  symbols. Existing tracking is reused where scope already exists.
+- Cohesive existing beads can share a package; each member retains its own
+  acceptance and closure evidence. Unrelated outcomes keep independent rollback.
+- One owner makes each shared implementation decision. Shared prerequisites are
+  linked once, not independently implemented on competing epic branches.
+- Real dependencies and hard authorization gates are explicit. Approved direction,
+  adopted behavior, packet-complete scope, and runnable-now status are distinct.
+- Verification names the actual behavior seam and nearest suitable existing test.
+  Apply the existing test-growth policy rather than allocating a test bead per
+  requirement or adding duplicate gate species for already-covered behavior.
+- Universal/negative requirements include relevant pre-existing paths, not merely
+  new code. The complete requirement needs an adequate proof surface.
+- A cross-child closeout uses one existing checklist/report or one justified bead.
+  Gaps return to the same owner; no recursive reconciliation generations or
+  arbitrary child-count splits are introduced.
+- Persistence follows the target repository's own instructions. Do not commit
+  Dolt-managed data on code branches or run destructive tracker repair.
 
-- [ ] Title is imperative, specific, and under 72 characters
-- [ ] Type matches the actual work
-- [ ] Priority is calibrated; not everything is P0 or P1
-- [ ] Description answers what, why, and context
-- [ ] A fresh independent session could execute the bead as written
-- [ ] If this is a subbead, it is comprehensive enough to serve as a standalone prompt
-- [ ] Acceptance criteria are testable and enumerated
-- [ ] The bead is not a duplicate of open/recently closed work or an active PR
-- [ ] The cohesion scan found no sibling sharing two or more allocation signals,
-      or the bundle/serialization override is recorded
-- [ ] Structured fields contain a complete dispatch-ready packet: outcome,
-      non-goals, governing intent, surface/trust-boundary map, relevant behavior
-      matrix, documentation impact, and observable verification
-- [ ] Dependencies are linked intentionally
-- [ ] Labels reuse the existing taxonomy
-- [ ] The bead has one testable outcome
-- [ ] Epics include one final reconciliation bead that depends on all siblings
-- [ ] Reconciliation beads carry generation tags and never exceed `gen-3`
-- [ ] Every universal/negative spec invariant ("no X anywhere", "every Y must",
-      "the only path is Z") is owned by a bead that sweeps PRE-EXISTING code
-      into compliance (enumerate current violating paths; fix/route/retire
-      them) — not only by beads making the new code comply
-- [ ] Each invariant or scenario names exactly ONE gate species in acceptance
-      criteria: a behavior-executing test at the real seam, OR one source-scan
-      guard script in CI (criteria quote the spec's mandated scan surface
-      verbatim), OR a type/lint rule. Never two species for one behavior, and
-      never "add tests proving X" when an existing test already pins X
-- [ ] Acceptance criteria name the nearest existing test to extend and the
-      expected net test delta; a bead whose only deliverable is new tests for
-      already-pinned behavior is not dispatch-ready
-- [ ] Epics have 3-7 children. More than 9 requires a recorded override in the
-      epic's `design` field naming why a milestone split is impossible
-
-## Persistence Checks
-
-You must persist Beads changes after creating or modifying beads.
-
-Beads data lives in a Dolt database reached through the repo's configured
-sql-server (external and shared; `bd` never starts it). Writes go straight to
-the DB, so there is no manual file commit for bead content itself.
-
-Recommended checks:
-
-```bash
-bd dolt push
-```
-
-If persistence checks fail, run:
-
-```bash
-bd doctor --fix --yes
-```
-
-## Anti-Patterns
-
-| Anti-pattern | Fix |
-|--------------|-----|
-| Vague title like "Fix stuff" | Write the concrete behavior or capability |
-| Missing description | Explain what changes, why it matters, and the operating context |
-| Everything marked urgent | Use the numeric priority scale proportionally |
-| Mega-issue with unrelated criteria | Split into focused children under an epic |
-| Description prescribes implementation details | Move approach details into `design` or supporting notes |
-| Orphaned issue with no links | Add parent or dependency wiring |
-| Duplicate of existing work | Search first with `bd list` and `bd search` |
-| Tiny subbeads that just restate file names | Expand them until they function as standalone prompts |
-| Epic without reconciliation | Add a final terminal reconciliation bead |
-| Reconciliation beyond `gen-3` | Stop at `gen-3` and document remaining gaps explicitly |
-| Universal invariant concretized only as new-code compliance | Add a sweep bead: enumerate and fix the pre-existing paths the invariant outlaws (observed: "no merge without review" shipped while two legacy merge endpoints kept bypassing it) |
-| One test bead per requirement, or "add tests proving REQ-x" for pinned behavior | Extend the nearest existing test inside the implementation bead; one gate species per behavior (observed: a suite growing 9.4k to 17.4k tests in twelve weeks with CI minutes tracking the count) |
-| Epic with 20+ children | Split into milestone sub-epics of 3-7 children each; every child pays worktree, CI, review, and rebase overhead |
+| Anti-pattern | Correction |
+|---|---|
+| A bead per file, layer, or review finding | Choose a coherent outcome or retain existing related beads in one package. |
+| One branch/PR/review ceremony per small tracking item | Share one delivery cycle where scope and rollback are coherent. |
+| Full spec/history copied into every child | Keep current instructions and link exact authority/history. |
+| More children than a quota permits | Assess ownership, risk, reviewability, and useful landing points directly. |
+| Foundation closure presented as the accepted feature delivered | Preserve the original outcome as partial with remaining activation/runtime criteria. |
+| Fresh reconciliation generation after each partial result | Update the same finite closeout path and existing owner. |
+| Green lint presented as executable authority | Check adopted contract, actual source assumptions, prerequisites, and sign-off. |

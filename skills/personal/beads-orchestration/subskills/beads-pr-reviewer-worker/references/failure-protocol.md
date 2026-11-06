@@ -41,8 +41,8 @@ new review bead and do not author semantic code in the independent review lane.
 Bind every verdict to the **exact head SHA** reviewed. Prefer the same
 independent reviewer for the corrected-head recheck while independence remains
 intact. Require a **fresh independent reviewer** after any reviewer-authored
-semantic change or a high-risk correction involving auth, approvals, migrations,
-cross-schema access, concurrency, or data loss.
+semantic change; an owner-authored correction can return to the same reviewer.
+Refresh the affected risk assessment and evidence when its inputs change.
 
 Apply the **two-correction checkpoint** after two substantive reopenings:
 
@@ -66,13 +66,11 @@ Stop immediately. Do not change code or GitHub state.
 Use when the worker cannot continue safely without outside help. Examples:
 - original bead or PR number cannot be resolved
 - GitHub auth or permissions are missing
-- rebase conflicts require coordinator judgment
-- required checks are failing for reasons you did not fix in this pass
+- required checks are unavailable or fail for external environment reasons;
+  diff-caused failures return to the implementation owner as corrections
 - merge readiness is false because of external blockers
 
 Rules:
-- if a rebase is in progress and you are not finishing it, run
-  `git rebase --abort`
 - preserve useful code changes in the worktree or pushed branch
 - record a concrete blocker with an unblock condition
 - treat ambiguous context resolution, incomplete thread pagination, and
@@ -81,8 +79,8 @@ Rules:
 ### `pushed-review-fixes`
 
 Use when:
-- the coordinator explicitly authorized the exceptional reviewer-as-fixer path
-  and you pushed a mechanical correction
+- exceptional recovery already produced reviewer-authored fixes; this report
+  records the lost independence and requires a fresh reviewer
 
 This is not a hard failure. It means the coordinator should retry review later
 with a fresh independent reviewer or create explicit follow-up work from the
@@ -123,13 +121,13 @@ The projection rejects non-empty top-level GraphQL `errors`, missing response
 fields, and malformed non-null queue entries. If it fails, fail closed. A
 non-null `autoMergeRequest` with no `mergeQueueEntry` means auto-merge is armed,
 not that queue membership is confirmed. A null `autoMergeRequest` does not prove
-queue ejection and never authorizes a rebase; only a textual merge conflict or
-a justified reviewer request does.
+queue ejection and never authorizes a rebase. A textual merge conflict returns
+to the implementation owner; the review snapshot never rewrites that branch.
 Report `blocked-awaiting-coordinator` with the projected state when the entry is
 absent; never report `merge-queued` from the armed state.
 
 This is a successful terminal outcome, not a failure. The queue rebuilds the PR
 on the latest base and runs CI once more; the coordinator confirms `MERGED` in
-Step 0 and closes the beads. If queue membership later disappears, the
+Step 0 and reconciles member acceptance before closing completed beads. If queue membership later disappears, the
 coordinator applies the fresh owner-hold overlay before any re-dispatch, without inferring a cause or
 authorizing a rebase from that absence. Never bypass the queue with `--admin`.

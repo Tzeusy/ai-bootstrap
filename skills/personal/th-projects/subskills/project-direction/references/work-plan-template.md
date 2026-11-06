@@ -27,10 +27,11 @@ Signoff NOT required for:
 
 Load the shared
 [`work-allocation.md`](../../../references/work-allocation.md) contract. Time is
-a sanity check, not the boundary: one chunk becomes one bead/primary-agent
-assignment only when it owns a cohesive independently verifiable outcome.
-Prefer a focused agent session with meaningful implementation over microtasks
-whose context, worktree, CI, and review overhead exceeds their useful work.
+a sanity check, not the boundary. Preserve a finite accepted owner outcome,
+identify its existing member beads, and propose cohesive delivery packages.
+Several related tracking items may share a package and owner; independent
+outcomes keep their own rollback paths. Do not turn every chunk into another
+branch/PR/review ceremony.
 
 #### Chunk template
 
@@ -44,7 +45,11 @@ whose context, worktree, CI, and review overhead exceeds their useful work.
 **Scope**: S / M / L / XL
 **Parallelizable**: Yes / No — {reason}
 **Serialize with**: {chunk IDs that would conflict}
-**Primary owner**: {one bead/agent; specialists advise this owner}
+**Accepted outcome**: {existing outcome ID and mandatory completion criteria}
+**Member tracking**: {existing bead IDs, or justified new tracking}
+**Delivery package**: {cohesive grouping and existing anchor; default main landing}
+**Primary owner**: {one accountable owner through ordinary corrections and landing}
+**Current packet**: {concise current scope and exact authority/source references}
 
 **Acceptance criteria**:
 - [ ] {concrete, testable criterion}
@@ -85,9 +90,11 @@ implementation bead's acceptance criteria:
 
 Reconciliation applies regardless of who/what did the work — person, subagent, or pipeline.
 
-For an epic, add exactly one **epic-level reconciliation/closeout** after all
-implementation children. It owns cross-child and end-to-end behavior rather
-than repeating every child's checks:
+For an accepted outcome that needs cross-child proof, use one finite
+**closeout path**: its existing checklist/report or one justified closeout bead.
+Reuse it for remaining gaps rather than creating reconciliation generations.
+It owns cross-child and end-to-end behavior rather than repeating each member's
+checks; foundation and dark merges leave the outcome partial:
 
 ```markdown
 ### Block Reconciliation: {block title}

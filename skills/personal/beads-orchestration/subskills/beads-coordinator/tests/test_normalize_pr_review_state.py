@@ -1349,6 +1349,26 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                     )
                 )
 
+    def test_merged_package_requires_member_acceptance_reconciliation(self):
+        anchor_id, review_id = "aib-adapters", "aib-review"
+        original = original_bead(anchor_id, 41)
+        members = [anchor_id, "aib-terminal", "aib-stderr"]
+        original["metadata"] = {"delivery": {"schema": "beads-delivery/v1", "anchor": anchor_id,
+            "members": members, "owner": "coordinator:owner", "outcome": "aib-runtime",
+            "base_branch": "main", "packet": "Adapter corrections"}}
+        result, _, _ = self.run_fixture({
+            "blocked_pr_review": [original, review_task(review_id, anchor_id)],
+            "shows": {anchor_id: [original], review_id: review_show(review_id, anchor_id)},
+            "prs": {"41": pr_payload("MERGED")}, "open_prs": [],
+            "resolver_payload": {"ok": True, "original_id": anchor_id, "pr_number": 41,
+                                 "delivery_members": members}})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        findings = json.loads(result.stdout)["findings"]
+        self.assertTrue(findings)
+        self.assertTrue(all(item["recommendation"] == "reconcile-package-members" for item in findings))
+        self.assertTrue(all(item["delivery_members"] == members for item in findings))
+        self.assertEqual({item["review_id"] for item in findings if item["review_id"]}, {review_id})
+
     def test_pr_state_recommendations_cover_merged_closed_open_and_command_failure(self) -> None:
         cases = {
             "MERGED": ("MERGED", "close-review-and-original", None),

@@ -9,6 +9,10 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
+from delivery_package import load_delivery, validate_results
 
 
 def git_worktree_identity(path: str) -> tuple[str, str, str] | None:
@@ -51,18 +55,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--worktree-path", required=True)
     parser.add_argument("--repo-root", required=True)
     parser.add_argument("--issue-id", required=True)
+    parser.add_argument("--delivery-file", help="Current cohesive package JSON; ISSUE_ID is its anchor.")
     parser.add_argument("--current-path", required=True)
+    parser.add_argument("--review-id", help="Independent reviewer worktree branch identity; equals issue-id.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    expected_branch = f"agent/{args.issue_id}"
+    expected_branch = f"review/{args.review_id}" if args.review_id else f"agent/{args.issue_id}"
     current_path = os.path.realpath(args.current_path)
     worktree_path = os.path.realpath(args.worktree_path)
     repo_root = os.path.realpath(args.repo_root)
     process_cwd = os.path.realpath(os.getcwd())
     reasons: list[str] = []
+    delivery = None
+    if args.review_id and args.review_id != args.issue_id:
+        reasons.append("review-id-does-not-match-issue-id")
+    if args.delivery_file:
+        try:
+            delivery = load_delivery(args.delivery_file)
+            if delivery["anchor"] != args.issue_id or delivery.get("state", "active") != "active":
+                reasons.append("delivery-anchor-or-state-mismatch")
+            if args.review_id:
+                reasons.append("review-context-cannot-own-implementation-package")
+        except (OSError, ValueError):
+            reasons.append("invalid-delivery-manifest")
 
     if process_cwd != current_path:
         reasons.append("process-cwd-does-not-match-current-path")
@@ -97,6 +115,7 @@ def main() -> int:
     payload = {
         "status": "ok" if not reasons else "invalid-runtime-context",
         "issue_id": args.issue_id,
+        "members": delivery["members"] if delivery else [args.issue_id],
         "expected_branch": expected_branch,
         "branch": branch,
         "current_path": current_path,

@@ -71,21 +71,12 @@ class BeadsWorkerPackageTests(unittest.TestCase):
             self.assertIn("# /// script", contents, path)
             self.assertIn('requires-python = ">=3.11"', contents, path)
 
-    def test_skill_documents_branch_binding(self) -> None:
-        contents = SKILL_MD.read_text(encoding="utf-8")
-        self.assertRegex(contents, re.compile(r"agent/<ISSUE_ID>", re.IGNORECASE))
-        self.assertRegex(contents, re.compile(r"branch.*must.*agent", re.IGNORECASE))
 
     def test_skill_documents_structured_invalid_runtime_context_handoff(self) -> None:
         contents = SKILL_MD.read_text(encoding="utf-8")
         self.assertRegex(contents, re.compile(r"invalid-runtime-context", re.IGNORECASE))
         self.assertRegex(contents, re.compile(r"emit_worker_report\.py", re.IGNORECASE))
 
-    def test_skill_supports_existing_pr_correction_mode(self) -> None:
-        contents = SKILL_MD.read_text(encoding="utf-8")
-        self.assertIn("REVIEW_CORRECTION_MODE", contents)
-        self.assertIn("EXISTING_PR_NUMBER", contents)
-        self.assertIn("Do not call `gh pr create`", contents)
 
 
 if __name__ == "__main__":

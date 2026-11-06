@@ -84,6 +84,31 @@ class AssertWorkerContextTests(unittest.TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["expected_branch"], "agent/bd-42")
 
+    def test_delivery_bootstrap_uses_anchor_and_independent_review_uses_own_branch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp) / "repo"
+            worktree = Path(tmp) / "worker"
+            self._init_repo(repo_root)
+            subprocess.run(["git", "-C", str(repo_root), "worktree", "add", "-q", "-b", "agent/bd-42", str(worktree)], check=True)
+            manifest = Path(tmp) / "delivery.json"
+            delivery = {"schema": "beads-delivery/v1", "anchor": "bd-42", "members": ["bd-42", "bd-43"], "owner": "coord-test", "outcome": "bd-feature", "base_branch": "main", "packet": "docs/current.md#adapter-corrections"}
+            manifest.write_text(json.dumps(delivery))
+            command = ["python3", str(ASSERT_CONTEXT), "--worktree-path", str(worktree), "--repo-root", str(repo_root), "--issue-id", "bd-42", "--current-path", str(worktree), "--delivery-file", str(manifest)]
+            result = subprocess.run(command, cwd=worktree, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertEqual(json.loads(result.stdout)["members"], ["bd-42", "bd-43"])
+            delivery["anchor"] = "bd-43"
+            manifest.write_text(json.dumps(delivery))
+            result = subprocess.run(command, cwd=worktree, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            subprocess.run(["git", "-C", str(worktree), "switch", "-q", "-c", "review/bd-review"], check=True)
+            review_command = command[:-2]
+            review_command[review_command.index("--issue-id") + 1] = "bd-review"
+            review_command += ["--review-id", "bd-review"]
+            result = subprocess.run(review_command, cwd=worktree, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertEqual(json.loads(result.stdout)["expected_branch"], "review/bd-review")
+
     def test_context_fails_for_wrong_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp) / "repo"
@@ -188,6 +213,37 @@ class AssertWorkerContextTests(unittest.TestCase):
 
 
 class EmitWorkerReportTests(unittest.TestCase):
+    def test_package_report_preserves_partial_acceptance_and_rejects_missing_member(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "delivery.json"
+            manifest.write_text(json.dumps({"schema": "beads-delivery/v1", "anchor": "bd-42", "members": ["bd-42", "bd-43"], "owner": "coord-test", "outcome": "bd-feature", "base_branch": "main", "packet": "docs/current.md#adapter-corrections"}))
+            results = [{"id": "bd-42", "status": "satisfied", "evidence": "Adapter seam tests pass"}, {"id": "bd-43", "status": "partial", "evidence": "Activation remains owner-held"}]
+            command = ["python3", str(EMIT_REPORT), "--status", "completed-pr-opened", "--issue-id", "bd-42", "--worktree-path", "/tmp/worker", "--head-commit", "abc123", "--handoff-path", "pr-required", "--branch-pushed", "yes", "--pr-url", "https://example.invalid/pr/1", "--pr-number", "1", "--summary", "Foundation ready for review; activation remains partial.", "--delivery-file", str(manifest), "--member-results-json", json.dumps(results)]
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('"status":"partial"', result.stdout)
+            self.assertIn('"outcome":"bd-feature"', result.stdout)
+            command[-1] = json.dumps(results[:1])
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("member-results-do-not-cover-package", result.stderr)
+
+    def test_bootstrap_failure_reports_members_unverified_and_handles_unreadable_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "delivery.json"
+            manifest.write_text(json.dumps({"schema": "beads-delivery/v1", "anchor": "bd-42", "members": ["bd-42", "bd-43"], "owner": "coord-test", "outcome": "bd-feature", "base_branch": "main", "packet": "docs/current.md"}))
+            command = ["python3", str(EMIT_REPORT), "--status", "invalid-runtime-context", "--issue-id", "bd-42", "--branch", "unexpected-branch", "--worktree-path", "/tmp/worker", "--head-commit", "n/a", "--handoff-path", "invalid-runtime-context", "--branch-pushed", "no", "--summary", "Bootstrap failed before edits.", "--delivery-file", str(manifest)]
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('"status":"blocked"', result.stdout)
+            self.assertIn('Not evaluated: runtime bootstrap failed', result.stdout)
+            self.assertNotIn('"status":"satisfied"', result.stdout)
+            manifest.write_text("unreadable JSON")
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("Delivery-Validation-Error: delivery-manifest-unverifiable", result.stdout)
+            self.assertNotIn("Member-Results-JSON", result.stdout)
+
     def test_completed_pr_opened_requires_pr_metadata(self) -> None:
         result = subprocess.run(
             [

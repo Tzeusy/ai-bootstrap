@@ -1,76 +1,23 @@
-# Coordinator Loop
+# Coordinator loop
 
-Load this file when you need the exact cycle, PR-review priority lane, claim and
-heartbeat rules, worker bootstrap rules, monitoring details, or adaptive polling.
+Small allocation/recovery controller for persistent outcome owners. The shared
+[delivery model](../../../references/delivery-model.md) owns execution units,
+branch/session choices, packets, evidence and per-member closure. This file owns
+controller actions; a looper applies the same transitions to its own package.
 
 ## Preflight
 
-- Before entering the loop, run `../../beads-cleanup/SKILL.md`. This is mandatory.
-- Run `bd doctor` once at startup and again after any unexpected `bd` error;
-  do not spend worker cycles on a sick tracker. The tracker is sick only when
-  `bd` cannot read or write: `rank_ready_work.py` returns `fatal`, or a `bd`
-  command still fails after the transient-timeout retry in
-  `../../../references/known-errors.md`. Doctor errors and warnings that leave
-  reads and writes working (a repo-fingerprint mismatch, an old schema
-  version, gitignore drift) go in the report and never halt the run. Never
-  apply doctor's destructive remedies (`rm -rf .beads`, `bd init`) to a
-  tracker on a shared server.
-- Mint this run's `COORDINATOR_ID` and register it, then pass
-  `--actor "$COORDINATOR_ID"` on every `bd` command
-  (`runtime-and-safety.md` → "Parallel Coordinators"):
+Read target AGENTS/CLAUDE and relevant craft guidance; inspect dirty state. Run
+cleanup once at startup, consume its findings, and preserve foreign/unpublished
+work. A tracker fault is an actual failed read/write after the known-errors
+retry, not every doctor warning; never reset a shared tracker to repair it.
+Register a unique actor using `scripts/coordinator_registry.py new-id` and
+`register --startup`. Pass `--actor "$COORDINATOR_ID"` on lifecycle writes.
 
-  ```bash
-  COORDINATOR_ID=$(uv run scripts/coordinator_registry.py new-id --runtime claude)
-  uv run scripts/coordinator_registry.py register --repo-root "$REPO_ROOT" \
-    --id "$COORDINATOR_ID" --wake-minutes 30 --startup
-  ```
-
-  Other coordinators may already be running against this tracker; their
-  claims, PRs, and worktrees stay theirs.
-- If running from outside the target rig, pass `bd -C <path>` on **every**
-  command, including ones that take a bead ID — see "Rig Targeting" in
-  `../SKILL.md`; prefix auto-routing does not work.
-- Detect once per run whether the default branch is behind a merge queue, and
-  carry the answer as `MERGE_QUEUE=yes|no` into every reviewer prompt and the
-  direct-merge path:
-
-```bash
-BASE=$(git remote show origin | sed -n 's/.*HEAD branch: //p')
-MERGE_QUEUE=$(gh api "repos/{owner}/{repo}/rules/branches/${BASE}" \
-  --jq '[.[] | select(.type=="merge_queue")] | if length > 0 then "yes" else "no" end' \
-  2>/dev/null || echo no)
-```
-
-  With a queue, integration (rebase onto the latest base plus one full CI run
-  on the merge group) is GitHub's job: reviewers stop at `merge-queued`,
-  nothing rebases a PR to "freshen" it, and Step 0 confirms `MERGED`.
-
-## Constraints
-
-| Constraint | Value |
-|---|---|
-| Worker lanes | 1 by default; open more only under `../../../references/token-efficiency.md` → "Cache-first execution" and only while `capacity.free > 0`; the ceiling is one budget shared by every coordinator on the tracker (`beads.max_lanes` kv key, else 4) |
-| Lane unit | one long-lived worker session running one bead at a time; each bead keeps its own claim, worktree, branch, PR, and report |
-| Slot | an idle lane, or unused global capacity to open one; implementation and reviewer lanes both count, and a reviewer never shares an implementer's lane |
-| Worker isolation | each worker gets its own beads worktree and branch |
-| Worktree creation | `bd worktree create` |
-| Branch naming | `agent/<issue-id>` |
-| Worktree root | `.worktrees/parallel-agents/` |
-| Worker bootstrap | worker must prove `pwd == WORKTREE_PATH` and expected branch |
-| Issue tracker | `bd` CLI only |
-| Metadata persistence | shared external Dolt sql-server (`bd` never starts it; see `runtime-and-safety.md` → "Bead Mutation Safety") |
-| PR review cooldown | 5 minutes after PR `createdAt` |
-
-The stall-heartbeat model (TTL, renewal cadence), the per-runtime stall
-threshold, the orchestrator wake cadence (prompt-cache economics), and the
-model-selection tables live in `runtime-and-safety.md`. Do not restate them
-here.
-
-Repeat this rule during the whole run:
-
-Before any `bd` mutation: confirm you are the bead's `assignee`, renew the stall
-heartbeat if near expiry, then mutate. Never mutate a bead assigned to another
-live actor.
+Detect integration base, required checks and queue policy. Failure to read
+protection policy is unknown, never permission for a direct push. Preserve
+repository-required gates and owner merge holds. Native runtime dispatch only;
+do not launch assistant CLIs from shell.
 
 ## Owner merge hold
 
@@ -205,118 +152,38 @@ title and actual CI state; missing CI is UNKNOWN. Successful emptiness is
 `Held PRs: none`; failed/partial enumeration is unavailable/partial, never
 none or green. Listing a foreign PR grants no ownership or mutation rights.
 
-## Step 0: Normalize PR-Review State
+## Step 0: Reconcile changed delivery state
 
-Step 0 is the **sole PR-state mutator** in the system. Only the coordinator
-closes, reopens, or relabels beads in response to PR state (`MERGED`,
-`CLOSED`-unmerged, etc.). `beads-cleanup` only inspects and reports PR-state
-findings; it never mutates PR-review bead state. With parallel coordinators,
-each one reconciles only the original and review beads it is assignee of, and
-adopts a peer's only under `runtime-and-safety.md` → "Parallel Coordinators".
+This controller is the sole PR-state mutator for its dispatched work. A looper
+is that controller for its own package; the review session owns only its review
+bead. Read `scripts/normalize_pr_review_state.py` (module docstring defines the
+fail-closed contract) and consume its compact `beads-pr-review-normalization/v1`
+output. Cleanup is report-only. A partial/fatal/manual-triage result authorizes
+no mutations. Freshly check assignee and PR state immediately before each actual
+mutation. Cached findings may guide what to inspect, never authorize closure.
 
-When a `beads-cleanup` pass ran immediately before this loop, consume its
-"PR-state findings (for coordinator Step 0)" report section instead of
-re-querying `gh pr view` for those same PRs. Re-verify with `gh` only in the
-moment right before an actual mutation, so a stale finding never drives an
-irreversible close/reopen.
-
-First collect the compact, read-only scan from
-[`scripts/normalize_pr_review_state.py`](../scripts/normalize_pr_review_state.py):
-
-```bash
-# from the beads-coordinator package directory
-uv run scripts/normalize_pr_review_state.py --repo-root "${REPO_ROOT}"
-```
-
-It emits one `beads-pr-review-normalization/v1` envelope with deterministic
-lists of blocked original/review-task contexts, duplicate selections, cooldown
-candidates, and open-branch self-heal candidates. How to read it:
-
-- Its recommendations are **not authorization**. Step 0 remains the sole
-  PR-state mutator and must freshly verify the exact `gh`/Beads state,
-  assignee, and heartbeat immediately before each actual mutation.
-- A `partial` or `fatal` envelope, and every `manual-triage` finding, is a
-  report-only triage result: never guess, mutate, dispatch, or wire from it.
-  The script fails the whole collection closed on any inventory, lookup,
-  relation-graph, chronology, or PR-metadata defect; the exact contract lives in
-  the script's module docstring and is enforced by
-  [`scripts/review_relation_graph.py`](../scripts/review_relation_graph.py) —
-  do not re-derive it here, and do not "repair" a partial result by hand.
-
-Before discovering new work, and whenever a worker frees a slot, check
-(projected — never dump the unfiltered JSON into context; see
-`../../../references/token-efficiency.md`):
+Canonical association is PR → anchor → members. Before creating a review bead,
+dedupe by anchor/PR, retain the oldest valid parsed creation chronology; invalid
+chronology is partial manual triage. Never copy `external_ref` to members or
+review beads. Review bead has `pr-review-task,pr-review`, structured acceptance
+for independent findings/evidence/current-head readiness, and a link to anchor.
+Only anchor depends on that review bead. Reuse this record and reviewer for
+corrections. `review-running` plus guarded acquisition prevents duplicate reviewers.
+Native `--claim` refuses blocked beads: read the review assignee and acquire an
+unassigned blocked review record using both guards, then verify command success:
 
 ```bash
-bd list --status=blocked --label pr-review --json \
-  | jq -c '[.[] | {id, title, labels, assignee, external_ref}]'
+bd --actor "$COORDINATOR_ID" update <review-id> --if-assignee '' \
+  --if-status blocked --assignee "$COORDINATOR_ID" --status in_progress \
+  --add-label review-running --json
 ```
 
-This list may include:
-- blocked original implementation beads waiting on PR outcome
-- blocked dedicated PR-review beads with label `pr-review-task`
+For a review record already held by this controller, keep that assignee and use
+its guarded blocked→in_progress transition. Exit 13 means another actor won;
+dispatch nothing. An independent review looper uses its own actor for this record,
+without acquiring the implementation package.
 
-Canonical PR metadata is stored on the original implementation bead only.
-
-### 0a. Dedupe review beads
-
-Before creating or dispatching any review bead, dedupe by:
-- original implementation bead ID
-- `external_ref` PR number on the original bead
-
-If multiple review beads refer to the same original bead or PR:
-- keep the oldest non-closed review bead by parsed creation chronology as canonical
-- if any candidate creation timestamp is invalid, emit partial manual triage;
-  never choose by raw timestamp text
-- remove stale `review-running` labels from duplicates
-- append notes to duplicates explaining they were superseded
-- close duplicates if safe, or leave them blocked for explicit cleanup if
-  closure would be ambiguous
-
-Never create a new `pr-review-task` bead while a canonical open or blocked one
-already exists for the same original bead / PR.
-
-Run this dedupe check immediately before **any** `bd create` of a review bead,
-not only at the start of a cycle. Step 0c and Step 7 both create review beads;
-each must rerun this check (by original bead ID and `external_ref` PR number)
-right before creating, and skip creation if a canonical review bead exists.
-
-### 0a1. Claim review beads before dispatch
-
-Review-lane dispatch must use the same atomic `--claim` discipline as ready
-work. A blocked `pr-review-task` bead is not dispatchable until the coordinator
-has claimed it successfully.
-
-Required sequence:
-1. Read the review bead and its original, and inspect both `assignee`s.
-2. Dispatch it only while you hold the original: the original, its review
-   bead, and their worktrees are one ownership unit
-   (`runtime-and-safety.md` → "Parallel Coordinators"). If another coordinator
-   holds either bead, skip it; adopt a dead peer's unit only under that
-   section's guarded rules.
-3. Claim atomically with `bd --actor "$COORDINATOR_ID" update <id> --claim --json` (sets `assignee` and
-   `status=in_progress`), then add the `review-running` label and write the
-   stall heartbeat note.
-4. Verify success from the command result (`assignee` is this coordinator).
-5. Only then dispatch the reviewer worker.
-
-If dispatch fails after the claim:
-- return the bead to `blocked`
-- remove `review-running`
-- renew the stall heartbeat note so cleanup can see when the failed attempt
-  went idle
-
-### 0b. Reconcile blocked PR-review beads
-
-For each blocked issue:
-- if it is an original bead, read its own `external_ref` (`gh-pr:<number>`)
-- if it is a dedicated `pr-review-task` bead, resolve its original bead first,
-  then read the original bead's `external_ref`
-
-If no PR number can be resolved, append a note and skip mutation for that bead.
-
-When PR number is available, query queue membership directly and project only
-the reconciliation fields:
+Query actual queue state rather than inferring it from CI or an armed auto-merge:
 
 ```bash
 PR_QUEUE_JSON=$(gh api graphql \
@@ -325,887 +192,145 @@ PR_QUEUE_JSON=$(gh api graphql \
   | jq -e '. | select((has("errors") | not) or .errors == null or ((.errors | type) == "array" and (.errors | length) == 0)) | .data.repository.pullRequest | select(type == "object" and has("state") and (.state | type) == "string" and has("mergedAt") and (.mergedAt == null or (.mergedAt | type) == "string") and has("autoMergeRequest") and (.autoMergeRequest == null or ((.autoMergeRequest | type) == "object" and (.autoMergeRequest | has("enabledAt")) and (.autoMergeRequest.enabledAt == null or (.autoMergeRequest.enabledAt | type) == "string"))) and has("mergeQueueEntry") and (.mergeQueueEntry == null or ((.mergeQueueEntry | type) == "object" and (.mergeQueueEntry | has("position")) and (.mergeQueueEntry.position | type) == "number" and (.mergeQueueEntry | has("enqueuedAt")) and (.mergeQueueEntry.enqueuedAt | type) == "string")) and has("labels") and (.labels | type) == "object" and (.labels.nodes | type) == "array" and all(.labels.nodes[]; type == "object" and (.name | type) == "string")) | {state, mergedAt, auto_merge_armed: (.autoMergeRequest != null), merge_queue_entry: (.mergeQueueEntry | if . == null then null else {position, enqueuedAt} end), labels: [.labels.nodes[].name]}')
 ```
 
-If GraphQL or the projection fails, log a warning and skip every mutation for
-that PR this cycle. A successful projection distinguishes actual queue
-membership from auto-merge merely being armed.
+The `merge_queue_entry` is non-null only for confirmed queue membership.
+Auto-merge armed with no entry is a wait. Queue metadata alone never proves why
+an entry disappeared, nor authorizes rebase or retry. Check complete fresh labels
+using the owner hold procedure before every action.
 
-Handle each case. For OPEN state, apply [Owner merge hold](#owner-merge-hold)
-first using complete fresh labels; `labels(first:20)` above is queue metadata
-only and cannot prove absence of the hold:
-
-| PR State | Action |
+| Observed state | Reconcile |
 |---|---|
-| `MERGED` | renew heartbeat, then close review/original beads as appropriate (a `queue-direct` PR has only an original bead); then run the post-closure branch/worktree cleanup below |
-| `CLOSED` and not merged | renew heartbeat, then reopen original for re-triage; block/close review bead as appropriate |
-| `OPEN` with `owner-merge` | report held-for-owner; preserve review/correction work, perform no enqueue/merge/close; do not redispatch solely to merge |
-| `OPEN` and `merge_queue_entry` non-null | queued: do nothing this cycle, regardless of `auto_merge_armed`; re-check on the next wake |
-| `OPEN`, `merge_queue_entry` null, and `auto_merge_armed` true | auto-merge is armed but the PR is not yet confirmed in the queue: remove any stale `merge-queued` label, then wait and re-check; do not dispatch or rebase |
-| `OPEN`, review bead labelled `merge-queued`, `merge_queue_entry` null, and `auto_merge_armed` false | membership is absent, but absence alone does not prove why: remove `merge-queued` and treat it as an `OPEN` `pr-review-task`; do not authorize `--force-rebase` without a textual merge conflict or a justified reviewer request |
-| `OPEN` with `pr-review-task` | wait for cooldown; once elapsed, atomically claim the review bead with `bd --actor "$COORDINATOR_ID" update <id> --claim`, then dispatch review worker if slot is open |
-| `OPEN` labelled `queue-direct` | no review bead by design; if `merge_queue_entry` is null and `auto_merge_armed` is false, run a fresh hold guard immediately before each attempt to re-run `gh pr merge <n> --squash --auto`; after two failed enrollment attempts drop the label and route through the normal review lane, without authorizing a rebase from queue metadata alone |
-| `OPEN` without `pr-review-task` | ensure exactly one dedicated review bead exists |
-| `gh` failure | log warning, skip; do not mutate on transient errors |
+| MERGED to actual delivery base | Verify landed content and each member acceptance; apply closure-plan, close review as review-complete; keep incomplete members/outcome open. A merge to an intermediate integration branch is accumulation only. |
+| CLOSED unmerged | Preserve branch/worktree and findings; owner re-triages same package, no success closure. |
+| OPEN owner-merge | Review/corrections allowed; no merge/enqueue/close. Preserve `Merge-Performed: no`, `PR-Closed: no`; no hold-only blocker or repeated same-content review solely to merge. |
+| OPEN queued/armed | Retain owner and event wait; refresh queue/CI when its state changes. |
+| OPEN corrections-required | Send findings directly to existing implementation owner; keep same claims/PR/review. |
+| OPEN review-ready | Resume independent reviewer with changed content and prior findings. |
 
-### Post-closure branch and worktree cleanup (merged PRs)
+## Step 1: Rank finite outcomes and prerequisites
 
-The reviewer merges with `gh pr merge --squash` and does **not** delete the
-branch, so the PR branch `agent/${ORIGINAL_ID}` survives until the coordinator
-removes it. This keeps branch-name → bead correlation intact if a crash happens
-between merge and the worker report. Branch deletion is therefore the
-coordinator's responsibility, performed only **after** the relevant bead(s) are
-closed.
+Run `scripts/rank_ready_work.py` for `beads-work-queue/v1`; its module docstring
+owns ranking. A fatal result dispatches nothing; diagnose tracker failure rather
+than falling back to an unranked ready queue. Prefer an active owner's next
+package or its runnable prerequisite, with P0 and explicit priority preemption.
+An all-children-closed candidate is not proof the accepted outcome is complete.
+Check the original observable acceptance, including required activation/proof.
 
-Keep the two-stage review topology explicit during cleanup: `ORIGINAL_ID` owns
-the remote PR branch and its checked-out local branch, while `REVIEW_ID` owns
-the reviewer worktree path and any temporary `agent/${REVIEW_ID}` branch. When
-the reviewer worktree was transferred sequentially to a correction worker,
-the transferred worktree path remains keyed by `REVIEW_ID` even though its
-checked-out branch is `agent/${ORIGINAL_ID}`. Remove that worktree before
-deleting local branches so the checked-out original branch is no longer in use:
+Distinguish runnable prerequisite, technical wait and owner hold. A prerequisite
+shared by several outcomes gets one owner. Do not open unrelated outcomes to
+occupy a slot while waiting. Scope an owner to a finite outcome, not exclusive
+custody of a whole programme. Capacity counts packages/owners, not member beads;
+respect `beads.max_lanes` including independent review capacity.
 
-```bash
-# After bd --actor "$COORDINATOR_ID" close on the review/original beads:
-git push origin --delete "agent/${ORIGINAL_ID}" 2>/dev/null \
-  || gh api -X DELETE "repos/<owner>/<repo>/git/refs/heads/agent/${ORIGINAL_ID}" 2>/dev/null || true
-bd worktree remove ".worktrees/parallel-agents/${REVIEW_ID}" --force 2>/dev/null || true
-git branch -D "agent/${ORIGINAL_ID}" 2>/dev/null || true
-git branch -D "agent/${REVIEW_ID}" 2>/dev/null || true
-```
+## Step 2: Form the next cohesive package
 
-Do not delete the branch before closure; correlation depends on it.
+Use the current allocation packet, source and governing adopted contract. Several
+existing cohesive beads can share one package without another wrapper issue.
+Independent outcomes keep separate rollback/ownership. Inspect other live claims
+and branches before assigning overlapping interfaces. A different hard dependency,
+authority or risk boundary remains explicit; it is never hidden by bundling.
+If the packet is missing a material decision or source assumption, return that
+specific gap to shaping. Do not fan out a fresh research hierarchy for every task.
 
-In the same step, delete the bead's build artifacts. Copy receipts (gate logs,
-exit codes, screenshots, small evidence files) into the bead's evidence
-directory first; then delete every `<bead-id>-*` artifact directory under the
-repo's artifact roots (named in its `AGENTS.md`). Do this on PR merge or close
-even if the bead stays open for an owner check: the target has no further use.
-The cleanup preflight's `build_artifacts` section lists stragglers as
-`delete-after-receipts`.
+Read `references/epic-coordination.md` only for programme allocation or shared
+prerequisites. No Team Lead/subworker mini-coordinator tier is required.
 
-After this pass's merges are reconciled, close finished epics once:
+## Step 3: Claim, publish current packet and isolate
 
-```bash
-bd --actor "$COORDINATOR_ID" epic close-eligible --json
-```
+For one bead, retain the native atomic claim. For several, write a
+`beads-delivery/v1` manifest and use `../../../scripts/delivery_package.py`
+claim with a durable recovery journal. It validates membership, external gates
+and ownership, persists anchor/member association, and rolls back newly acquired
+claims on partial failure. Do not dispatch until the complete claim succeeds.
+Journal paths and the current packet must be recorded on the anchor for recovery.
+The manifest owner is the lifecycle actor; notes also identify implementation
+session and resume locator. Never bulk-claim future outcome descendants.
 
-It closes only epics whose children are all closed, so it is idempotent and
-any coordinator may run it, whoever holds the children. An epic left open
-after its last merge keeps counting as in flight and hides the finish the
-queue was ranked to produce. Report the closed ids under "Epics closed".
-
-Priority rule:
-- if any `pr-review-task` bead is dispatchable and `capacity.free > 0`,
-  dispatch it before selecting from the Step 1 queue
-- do not start new implementation work while a dispatchable `pr-review-task`
-  is waiting for an open slot
-- dispatch review beads oldest PR first (`createdAt`), so the PR that has waited
-  longest lands first and later PRs rebase (if at all) once
-- never run two reviewers concurrently whose PRs touch overlapping files
-  (`gh pr diff <n> --name-only`); serialize the newer one behind the older.
-  Without a merge queue, each merge invalidates the CI of every overlapping
-  open PR; with one, the queue serializes them anyway and the reviewer's job
-  ends at `merge-queued`
-
-### 0c. Self-heal rule
-
-Reconcile open PRs back into Beads even if workers failed to mutate metadata:
+Create one worktree bound to the actual repository:
 
 ```bash
-gh pr list --state open --json number,url,headRefName,createdAt
+(cd "${REPO_ROOT}" && bd worktree create ".worktrees/parallel-agents/${ISSUE_ID}" --branch "agent/${ISSUE_ID}")
 ```
 
-For each PR whose `headRefName` matches `agent/<issue-id>`, skipping PRs that
-carry the `queue-direct` label (coordinator-opened direct-merge candidates that
-the merge queue integrates without a review bead):
-- ensure the original bead is `status=blocked`, has
-  `external_ref=gh-pr:<N>`, and label `pr-review`
-- ensure exactly one dedicated `pr-review-task` bead exists; if missing, create
-  it sequentially and wire the dependency with `bd dep add`
-- if duplicates exist, dedupe before dispatch
-
-Safe PR-review bead creation pattern:
-
-```bash
-REVIEW_JSON=$(bd --actor "$COORDINATOR_ID" create \
-  "Conduct a thorough code review of ${PR_URL}" \
-  --description="Review PR ${PR_URL} thoroughly. Original implementation bead: ${ORIGINAL_ID}. Leave resolvable PR comments on verdict-changing issues, report corrections for the implementation lane, and attest merge readiness for the exact reviewed head." \
-  --design="Independent exact-head review. Classify risk before review; reviewer reports semantic corrections to the implementation lane and never merges an unreviewed moved head." \
-  --acceptance="1. Record reviewer identity and risk tier. 2. Bind findings and merge verdict to the exact PR head SHA. 3. Resolve or explicitly classify every review thread. 4. Run risk-scaled gates and merge only when readiness fails closed to safe." \
-  -t task -p 1 --assignee "${COORDINATOR_ID}" --validate --json)
-REVIEW_ID=$(echo "${REVIEW_JSON}" | jq -r '.id // .[0].id')
-bd --actor "$COORDINATOR_ID" dep add "${ORIGINAL_ID}" "${REVIEW_ID}"
-bd --actor "$COORDINATOR_ID" update "${REVIEW_ID}" \
-  --status blocked \
-  --add-label pr-review \
-  --add-label pr-review-task \
-  --append-notes "Review target bead: ${ORIGINAL_ID}. PR: ${PR_URL}"
-```
-
-## Step 1: Discover Ready Work
-
-Only run this step when Step 0 found no dispatchable `pr-review-task` issues
-for currently available slots.
-
-```bash
-# from the beads-coordinator package directory
-uv run scripts/rank_ready_work.py --repo-root "${REPO_ROOT}" --coordinator "${COORDINATOR_ID}"
-```
-
-[`scripts/rank_ready_work.py`](../scripts/rank_ready_work.py) runs four
-read-only `bd` queries and emits one compact `beads-work-queue/v1` envelope:
-global `capacity`, the finish-first `queue` (each row carries a one-line
-`reason`), and the context to act on it. It is the only selection read this
-step needs; `bd show` only the bead you are about to claim. Act on it this way:
-
-- `self.live` false: register (`coordinator_registry.py register`) before
-  claiming anything.
-- `capacity.free` 0: claim nothing this wake, including a lane's next bead.
-  A lane whose bead just left `in_progress` has already returned its slot, so
-  `free` counts it; a zero means peers or overshoot hold the budget.
-- `status: fatal`: dispatch nothing this wake. Report the error, run
-  `bd doctor`, and retry at the next wake; after three consecutive fatal
-  wakes, stop as a tracker fault (`../../../references/known-errors.md`).
-  Never fall back to unranked `bd ready` order: that is how lanes scatter
-  across epics.
-- `status: empty` with `held` entries: nothing in focus is runnable, and each
-  entry names its blockers. `totals.ready` versus `totals.ready_in_scope`
-  separates "nothing in my scope" from "nothing in the repository".
-- `unowned_claims`, `stranded`, and `orphaned_blocked`: adoption candidates;
-  act on them only under `runtime-and-safety.md` → "Parallel Coordinators" →
-  "Adopt the dead, guarded". An `orphaned_blocked` row of kind `pr` is a PR
-  unit, adopted together with its review bead. Kind `gate` is blocked by
-  status alone and waits on the owner, so report it instead.
-- `excluded.no_dispatch` (tracking beads) and `excluded.local_state`
-  (gitignored-state work no worktree reaches) are never dispatched
-  (`../../beads-writer/SKILL.md`). List `local_state` ids for the owner.
-- `closable_epics`: epics whose children are all closed; Step 0's
-  `close-eligible` run closes them.
-- `focus`, `held`, `coordinators`, `capacity.by_assignee`,
-  `capacity.other_claims`, and `excluded` feed the Progress Report as given;
-  do not recompute them. `childless_epics` feeds Step 2.
-
-Pass `--scope-epic <id>` (repeatable) only when the owner pins this
-coordinator to specific epics; P0 work still reaches every coordinator.
-
-If no row is claimable and nothing else is dispatchable, you are at the
-no-progress frontier (Step 8).
-
-### Dispatch readiness gate
-
-Before claiming a candidate, read its structured fields and require a complete
-dispatch packet: outcome/non-goals, governing spec or explicit maintenance
-authority, surface/trust-boundary map, relevant failure/concurrency/idempotence
-matrix, documentation impact, and behavior-executing verification. A blank
-structured `acceptance_criteria` field is not dispatch-ready. Do not ask a
-worker to reconstruct planning context.
-
-The bar itself is correct and stays as written. The defect this gate had was the
-silent dead end after a rejection, never the requirement — do not "fix" a
-backlog of rejected beads by loosening the packet.
-
-Track readiness precisely: **packet-complete** means the structured content is
-complete; **runnable-now** additionally means dependencies/sign-off are clear,
-ownership does not overlap, and a suitable lane is available. Dispatch only
-runnable-now work.
-
-#### Stamp every rejection
-
-A rejection is a mutation the coordinator owns, so it lands on the bead — never
-only in your own head:
-
-```bash
-bd --actor "$COORDINATOR_ID" update <id> --add-label needs-shaping \
-  --append-notes "dispatch-readiness <YYYY-MM-DD> <COORDINATOR_ID>: missing <field list>"
-```
-
-Name the exact missing packet items (`acceptance_criteria blank`, `design
-blank`, `no governing spec`, `no verification`, …); never a bare "incomplete".
-Idempotence:
-- read existing notes first and skip the note when an identical
-  `dispatch-readiness` note with the same missing set is already present
-- an identical stamp from any coordinator or earlier run counts: a later cycle
-  that re-rejects the same bead for the same missing set reuses it
-- remove `needs-shaping` only when a re-run of this gate passes
-
-Run a **cohesion check** against ready/in-progress beads and active PRs. When a
-candidate shares two or more allocation signals (module/interface,
-tests/fixtures, migration/config/contract, review surface, micro size), bundle
-before work starts or serialize it behind the active owner. Do not dispatch
-overlapping siblings in parallel. Record each deferred candidate's id and the
-bead/PR it overlaps with for the report; a cohesion deferral carries no label.
-
-### Shaping lane (readiness exit path)
-
-Rejected beads are work, not silence. When a ranked epic (a `focus` or `held`
-entry in the Step 1 envelope) lists `needs_shaping` beads and a slot is free,
-claim that epic and dispatch **one** shaping worker for the batch. Shape only
-ranked epics: shaping beads nobody will dispatch soon is the planning sprawl
-the finish-first queue exists to prevent. Holding the epic's claim keeps a
-peer coordinator from shaping the same batch; release it once the fields are
-applied.
-
-- worker skill: `../../beads-writer/SKILL.md`; its workflow Phase 3 "Structured
-  Dispatch Packet" is the shaping target (there is no separate shaping entry
-  point in that skill). Its deliverable is specification text, so dispatch it
-  at `DESIGN_AND_SPECIFICATION_MODEL`.
-- prompt carries the bead ids, each one's missing-field list, the parent epic
-  id, and the evidence the beads already cite (pursuit dossier JSON, spec paths)
-- the worker returns **proposed field text only** — `design` and
-  `acceptance_criteria` per bead — and runs no `bd` mutation; the "workers never
-  mutate Beads lifecycle" invariant is unchanged
-- the coordinator applies it as assignee, then re-runs the readiness gate on
-  each shaped bead in this cycle:
-
-```bash
-bd --actor "$COORDINATOR_ID" update <id> --design="<proposed>" --acceptance="<proposed>" \
-  --remove-label needs-shaping --append-notes "shaping <YYYY-MM-DD> <COORDINATOR_ID>"
-```
-
-A standalone `needs-shaping` bead (no epic; `excluded.needs_shaping_standalone`
-in the envelope) is shaped only when its priority beats every queue row;
-otherwise it waits, like any other unranked planning.
-
-Caps: one shaping attempt per bead, across runs and coordinators: the
-`shaping` note is the durable marker. A bead whose notes already carry one and
-that still fails the gate keeps its `needs-shaping` stamp and is escalated in
-the escalation format of `../../../references/decision-autonomy.md`, naming
-the exact missing contract. Never reshape it, and never open a new planning
-bead for the same unresolved question.
-
-## Step 2: Select Next Issue
-
-Walk the Step 1 `queue` top-down and take the first row that passes the
-dispatch-readiness and cohesion gates. The order is **finish-first**: P0 work,
-then `focus`-pinned epics, then by priority, where an epic already holding a
-lane counts one level more urgent and, within a level, the epics closest to
-done come first. A pool of N lanes thus completes a few epics instead of
-touching many. The ranking contract is canonical in the script's module
-docstring; do not re-sort the queue by hand.
-
-- Skip a row assigned to a running worker or another live actor (the script
-  drops claimed beads; the claim in Step 3 re-checks).
-- Skip a row blocked by a dispatchable review task that should run first.
-- **Lane-epic affinity.** When one of your lanes frees, re-rank, then offer
-  it the top row from the epic it just worked (the row's `outcome`) before
-  any row ranked above it, unless that row is `urgent:`, from a pinned epic,
-  or two or more priority levels more urgent than the lane's epic (P1 over a
-  P3 epic). A finished bead moves to review and releases its lane, so without
-  this rule the epic would drop back to priority order mid-flight. Affinity is
-  also what keeps the lane's cache warm. It never takes a row marked
-  `over epic lane cap`, and the row still passes the cohesion check.
-- Preserve **context affinity** across PRs: prefer the worker/recovery lane
-  that already owns the same active subsystem or PR when it can be resumed
-  safely. Prefer the same independent reviewer for exact-head rechecks.
-  Rotate only for independence, risk-tier, availability, or stale-context
-  reasons; affinity never overrides isolation or conflicting ownership.
-- Rows marked `over epic lane cap` are fill-ins: take one only when no row
-  above it passes the gates.
-- A `childless_epics` entry is decomposition work, never an implementation
-  dispatch. Take it only when its priority beats every queue row or the queue
-  is empty. Claim the epic, write the children yourself with
-  `../../beads-writer/SKILL.md`'s workflow (or have a writer worker return the
-  child text, which you then create), and release the claim when they exist.
-  Commands are in `epic-coordination.md` → "Independent Dispatch".
-
-## Step 3: Claim The Issue
-
-Claim atomically with `bd --actor "$COORDINATOR_ID" update <id> --claim`. This is the real mutual-exclusion
-mechanism, not the notes-based heartbeat.
-
-1. Read the bead and confirm its `assignee` is empty or already this coordinator.
-   If it is assigned to another live actor, skip this bead.
-2. Claim atomically:
-
-```bash
-bd --actor "$COORDINATOR_ID" update <id> --claim --json
-```
-
-   `--claim` sets `assignee` to you and `status=in_progress` in one atomic,
-   idempotent operation (a no-op if you already hold it). This provides
-   cross-actor mutual exclusion: only one actor wins the assignee.
-3. Verify success from the command result (`assignee` is this coordinator,
-   `status=in_progress`). A refused claim means a peer won the bead: return to
-   the queue for the next row.
-4. Write the initial stall heartbeat note (see the durable-heartbeat model in
-   `runtime-and-safety.md`). The heartbeat is stall detection only; it is NOT
-   the claim mechanism.
-5. Only after a verified claim may the coordinator create the worktree or
-   dispatch a worker. If `bd worktree create` then fails because `agent/<id>`
-   already exists, the bead is already in flight: do not dispatch a second
-   worker (the two-layer exclusion model is in `runtime-and-safety.md`).
-
-## Step 4: Prepare Worker Environment
-
-```bash
-(cd "${REPO_ROOT}" && bd worktree create .worktrees/parallel-agents/<id> --branch agent/<id>)
-```
-
-This creates an isolated code worktree for the worker branch. Beads metadata is
-shared across worktrees via a Dolt DB redirect file.
-The subshell is required: `bd -C "${REPO_ROOT}"` selects the owning tracker but
-does not guarantee that Git worktree operations run against that repository.
-
-PR-review worktrees are the exception to the generic `agent/<id>` branch
-invariant. Their path and initial branch are keyed by the review bead. The
-reviewer then switches that worktree to the canonical PR head during its
-preparation phase. Apply the two-stage attestation in Step 6a rather than
-requiring both branch states in one bootstrap check.
-
-## Step 5: Build The Worker Prompt
-
-Choose worker skill by issue type:
-- epic-complexity work: the queue never lists an epic, so Team Lead mode
-  starts from Step 2. When the row you selected belongs to a `focus` epic
-  that scores high on `epic-coordination.md` → "Classification Heuristics"
-  (or already carries `team-coordination`) and `capacity.free` is at least 2,
-  claim that epic instead and dispatch a Team Lead per that file. Its
-  children then leave every coordinator's queue until the lead reports.
-- default implementation issue: `../../beads-worker/SKILL.md`
-- `pr-review-task` issue: `../../beads-pr-reviewer-worker/SKILL.md`
-
-A `reconciliation`-labelled bead still uses `../../beads-worker/SKILL.md`, but its
-model is floored at `EPIC_COMPLEXITY_MODEL` for medium-or-higher epics — apply
-the "Reconciliation Floor" in `runtime-and-safety.md` when picking the model in
-Step 6.
-
-The prompt carries:
-- the worker skill's absolute path (the worker reads it; never paste its body)
-- `ISSUE_ID`, `WORKTREE_PATH`, `REPO_ROOT`
-- a 2-4 line issue summary plus its acceptance criteria
-- when they apply: the `LANE-CONTINUATION` header (Step 6), `MERGE_QUEUE`
-  (reviewer dispatches), the correction-mode variables
-  (`REVIEW_CORRECTION_MODE`, `EXISTING_PR_NUMBER`, `REVIEW_BEAD_ID`,
-  `CORRECTION_THREADS_JSON`), an inlined `[decision]` record, a coordinator
-  authorization the reviewer skill requires (reviewer-as-fixer,
-  `--force-rebase`), and likely edit targets
-
-No other issue content. Do not inline full `bd show <id> --json` output.
-`ISSUE_JSON` is deprecated as a dispatch field: the worker runs
-`bd show <id> --json` itself when it needs more detail. Team Lead and
-shaping-lane prompts are defined in their own sections and are not bound by
-this list.
-
-## Step 6: Dispatch The Worker
-
-**Lane continuation first.** If a lane is idle (its last worker report has
-been reconciled) and the selected bead fits it (shares context and needs the
-same model tier), continue that worker's session with the constructed prompt
-headed `LANE-CONTINUATION` (Claude Code: `SendMessage` to the worker's agent
-id/name; Codex: send input to the same thread). The worker re-runs its Phase 1
-bootstrap against the new `WORKTREE_PATH`, and Step 6a applies unchanged. Keep
-a lane table `{lane_id, agent_ref, model, epic, beads_done, last_bead,
-compactions_seen}` in the coordinator's run state; `epic` drives Step 2's
-lane-epic affinity.
-
-Spawn a **new** worker only to open a lane, or to replace one that must retire
-(`../../../references/token-efficiency.md` → "Retire a lane"). Retire the lane,
-without forcing it past its limits, when any of these holds: its worker reports
-`blocked-awaiting-coordinator` for context reasons, it gets a
-bootstrap/worktree mismatch on continuation, its reports get vaguer, or it
-contradicts its own earlier decisions.
-
-Spawn via the runtime's native subagent mechanism using the constructed prompt.
-Use `fork_context=false` for Codex worker dispatches unless you are explicitly
-dispatching a coordinator-like helper that must inherit thread history.
-
-Reviewer-worker precondition:
-- before dispatching a reviewer worker for PR `agent/<original-id>`, remove the
-  original implementation worktree if it still exists so the reviewer can check
-  out the PR branch in its own worktree safely
-
-## Step 6a: Bootstrap The Worker
-
-A spawned worker is not considered running until it proves it is operating from
-the assigned worktree.
-
-Bootstrap contract:
-- the worker's actual process cwd and `pwd -P` must equal `WORKTREE_PATH`
-- current branch must equal expected worker branch
-- `pwd` must not equal `REPO_ROOT`
-- `WORKTREE_PATH` must share `REPO_ROOT`'s canonical common Git directory,
-  verified without inherited `GIT_*` repository overrides
-
-For a PR-review worker, branch attestation has two explicit stages:
-
-- **Stage 1 — dispatch bootstrap:** the initial branch is
-  `agent/<review-id>`, created by Step 4. This proves isolated dispatch context
-  before the reviewer runs any branch preparation.
-- **Stage 2 — prepared-head attestation:** after
-  `prepare_pr_branch.py` succeeds, require an interim acknowledgement that the
-  expected reviewer branch is `agent/<original-id>`, its reported
-  `head_commit` equals local `HEAD`, and the same SHA is the remote PR head.
-  Substantive review cannot begin until this attestation passes.
-
-Re-review hand-back starts at Stage 2 because Step 7 restores the now-idle
-worktree directly to `agent/<original-id>`. Do not reapply the Stage 1 branch
-expectation to a transferred re-review worktree.
-
-If the runtime supports interim updates, require a short bootstrap
-acknowledgement before continuing. If bootstrap never arrives, or if the worker
-reports repo-root / `main` / `master` context, treat dispatch as failed and
-renew the heartbeat before releasing the bead.
-
-Codex note: a missing completion event is not a bootstrap failure. Bootstrap
-failure requires explicit invalid context or no bootstrap evidence within the
-bootstrap window.
-
-## Step 7: Monitor Workers
-
-- Track each worker's issue ID, branch, worktree path, start time, bootstrap
-  status, and last progress signal.
-- Do not mark a lane running in the lane table until bootstrap succeeds,
-  including a continuation's re-bootstrap. (The global budget already counts
-  the claim from Step 3.)
-- A missing bootstrap acknowledgement is a dispatch failure, not an
-  implementation stall.
-- If `main` or the repo-root checkout advances unexpectedly while a worker is
-  supposedly active, stop and investigate worktree misbinding before
-  dispatching more workers.
-- Renew the coordinator stall heartbeat before every mutation and after long external
-  checks.
-
-Implementation-worker report contract:
-- accepted `Status` values:
-  - `completed-pr-opened`
-  - `completed-direct-merge-candidate`
-  - `blocked-awaiting-coordinator`
-  - `invalid-runtime-context`
-- required fields include `Branch`, `Head-Commit`, `Branch-Pushed`,
-  `Handoff-Path`, `Recovery-State`, and `Resume-Condition`
-- `Discovered-Follow-Ups-JSON` and `Blockers-JSON` must be valid JSON arrays
-- parse those JSON arrays with a real JSON parser such as `jq`; do not infer
-  structure from prose
-- `blocked-awaiting-coordinator` is a valid terminal worker outcome, not a
-  stall
-- implementation workers are single-writer executors; if a worker reports that
-  the issue needs multiple code-writing tracks, route it back through the
-  coordinator or team-lead flow instead of letting the worker fan out locally
-
-When an implementation worker completes, reconcile from the explicit Worker
-Report first, then verify the reported branch / PR state:
-
-1. Parse the report. If `Status` is missing, ambiguous, or contradicts the
-   artifacts, do one recovery probe. If it remains ambiguous, treat it as a
-   reconciliation failure instead of guessing.
-2. Verify any reported side effects:
-   - if a PR was reported, confirm it via `gh pr view <number>` or
-     `gh pr list --state open --head "agent/<id>"`
-   - if `Branch-Pushed=yes`, confirm the remote branch exists
-   - if `Head-Commit` was reported, confirm the branch tip matches or explain
-     the divergence before mutating Beads state
-3. Handle by `Status`:
-   - `completed-pr-opened`:
-     - require a verified open PR
-     - renew heartbeat, then block the original bead and set
-       `external_ref=gh-pr:<N>`
-     - run the Step 0a dedupe check, then ensure exactly one dedicated
-       `pr-review-task` bead exists (create only if the dedupe check finds none)
-     - classify discovered items before creating any bead (see Discovery
-       classification below)
-     - re-run Step 0 immediately so review/merge is prioritized
-   - `completed-direct-merge-candidate`:
-     - require `Branch-Pushed=yes`; apply [Owner merge hold](#owner-merge-hold)
-       branch-PR check before any base push or PR creation; route an existing
-       OPEN PR through its lane rather than creating a duplicate or bypassing it
-     - if `MERGE_QUEUE=yes`: the base rejects direct pushes, so open a PR and
-       hand it to the queue without a review bead:
-       ```bash
-       owner_merge_branch_guard "agent/<id>" &&
-         PR_URL=$(gh pr create --base main --head agent/<id> --label queue-direct \
-           --title "<worker title> [<id>]" --body "<worker summary>") &&
-         PR_NUMBER=${PR_URL##*/} &&
-         owner_merge_guard "$PR_NUMBER" && gh pr merge "${PR_URL}" --squash --auto
-       ```
-       then renew heartbeat, block the original bead with
-       `external_ref=gh-pr:<N>`, and let Step 0b close it on `MERGED`. The
-       merge-group CI run is the gate; the `queue-direct` label tells Step 0c
-       not to create a review bead
-     - otherwise attempt fast-forward merge, but only when the worker
-       report's `Tests` carries a passing `full:` entry and its
-       `Head-Commit` equals `git rev-parse origin/agent/<id>` after
-       `git fetch origin`; nothing
-       hosted gates this path. Missing or stale evidence takes the
-       "on failure" route below:
-       ```bash
-       git fetch origin
-       git checkout main && git pull --ff-only
-       git merge --ff-only origin/agent/<id>
-       owner_merge_branch_guard "agent/<id>" && git push origin main
-       ```
-     - on success: renew heartbeat, then `bd --actor "$COORDINATOR_ID" close <id> --reason "Simple change merged to main"`
-     - on failure: if a branch PR exists, reuse its lane; a failed branch-PR
-       read stops this path. Otherwise open a PR, set `external_ref`, ensure
-       the review bead, and route through the PR-review lane
-   - `blocked-awaiting-coordinator`:
-     - do not treat this as stalled
-     - renew heartbeat
-     - triage each `Blockers-JSON` entry against
-       `../../../references/decision-autonomy.md` first: a decision-shaped
-       entry with no hard gate is decided by the coordinator, recorded as a
-       `[decision]` note on the original bead, and the bead is re-dispatched
-       with the decision inlined — no blocker bead is created for it
-     - convert the remaining (external or hard-gated) `Blockers-JSON` entries
-       into blocker beads and wire the original bead to depend on them;
-       hard-gated decisions must use the escalation format from
-       `../../../references/decision-autonomy.md`
-     - classify `Discovered-Follow-Ups-JSON` entries before creating linked work
-     - set the original bead to `blocked`
-     - preserve recovery state explicitly:
-       - if `Recovery-State=branch-pushed`, keep the remote branch for the next
-         worker and clean the local worktree only after verifying the remote
-         branch exists
-       - if `Recovery-State=local-only`, quarantine the worktree under
-         `.worktrees/recovery/<id>-<timestamp>` and append the recovery path in
-         notes if the schema allows it; never silently delete unrecoverable
-         local progress
-       - if `Recovery-State=no-code-changes`, no quarantine is needed
-   - `invalid-runtime-context`:
-     - renew heartbeat, release the bead with
-       `bd --actor "$COORDINATOR_ID" unclaim <id> --reason "invalid runtime context"`
-       (it clears the assignee and reopens the bead, so any coordinator can
-       take it), and clean the worktree
-     - do not create blocker beads unless the report includes a separate
-       project-level blocker that truly belongs in Beads
-4. Only treat the run as stalled if the worker disappears after bootstrap or
-   the report remains unusable after the recovery probe.
-
-### Discovery classification
-
-Classify every worker or reviewer discovery before any `bd create`:
-
-| Class | Coordinator action |
-|---|---|
-| **current-PR correctness** required for accepted outcome | Keep it in the original bead/PR and return it to the implementation/recovery lane; no follow-up bead. |
-| **prerequisite blocker** with a different subsystem, trust boundary, architecture decision, or risk class | Create one linked blocker, return through the governing spec/design gate, and serialize the original behind it. |
-| **new behavior** or adjacent idea | Create or link spec-first work outside the active outcome; do not expand the PR. |
-| **duplicate** symptom/outcome | Link provenance to the existing bead/PR and close or suppress the duplicate. |
-
-Classification precedence: a new trust boundary, subsystem, architecture
-decision, or risk class wins over "current-PR correctness" even when required
-for the current outcome; it must become a prerequisite blocker.
-
-Search open/recently closed beads, active PRs, and concrete symbols/files before
-materializing the last three classes. Only genuinely new work is converted by
-the coordinator using sequential creation:
-
-```bash
-NEW_JSON=$(bd --actor "$COORDINATOR_ID" create "<title>" --description="<details>" -t <type> -p <priority> --json)
-NEW_ID=$(echo "${NEW_JSON}" | jq -r '.id // .[0].id')
-bd --actor "$COORDINATOR_ID" dep add "<original-id>" "${NEW_ID}"
-```
-
-Recommended extraction pattern:
-
-```bash
-FOLLOWUPS_JSON='<parse fenced JSON block from Worker Report>'
-BLOCKERS_JSON='<parse fenced JSON block from Worker Report>'
-
-echo "${FOLLOWUPS_JSON}" | jq -e 'type == "array"' >/dev/null
-echo "${BLOCKERS_JSON}" | jq -e 'type == "array"' >/dev/null
-```
-
-Reviewer-worker report contract:
-- accepted `Status` values:
-  - `merged-pr`
-  - `merge-queued`
-  - `held-for-owner`
-  - `corrections-required`
-  - `pushed-review-fixes`
-  - `blocked-awaiting-coordinator`
-  - `invalid-runtime-context`
-- `Review-Actions-JSON`, `Discovered-Follow-Ups-JSON`, and `Blockers-JSON`
-  must be valid JSON arrays
-- `Head-Commit` and `Reviewed-Head-Commit` are both required; `merged-pr`
-  requires them to match the confirmed PR head
-- `Reviewer-Identity` and `Risk-Tier` are required so affinity/rotation policy
-  is auditable
-- `merged-pr` means GitHub merge is complete but Beads closure still belongs to
-  the coordinator
-- `merge-queued` means the exact reviewed head passed every gate and was handed
-  to the base branch's merge queue (`Merge-Performed: queued`); the queue
-  integrates and re-tests it, and Step 0b closes on `MERGED`
-- `corrections-required` means the independent reviewer left unresolved,
-  actionable threads for the implementation/recovery lane and did not author
-  semantic code
-- `pushed-review-fixes` means the worker pushed code under the exceptional
-  reviewer-as-fixer path; a fresh independent reviewer must assess the
-  resulting head
-
-When a reviewer worker completes:
-- if it reports `held-for-owner`, freshly verify OPEN + complete held labels,
-  require `Merge-Performed: no` and `PR-Closed: no`, remove `review-running`,
-  preserve the canonical original/review relationship and record the hold.
-  Keep identity, exact-head/risk evidence, findings, correction handoffs and any
-  fresh-independent-review requirement; do not create a hold-only blocker or
-  retry the same head solely to merge. If GitHub is now MERGED/CLOSED, use Step
-  0b terminal reconciliation instead. Recompute next cycle, including removal.
-- if it reports `merged-pr`, confirm the PR is merged, then renew the heartbeat,
-  close the review and original beads, and run the post-closure branch/worktree
-  cleanup in Step 0b (delete the `ORIGINAL_ID` PR branch, remove the
-  `REVIEW_ID` worktree, then delete the original and temporary review local
-  branches) — the reviewer left the PR branch in place on purpose
-- if it reports `merge-queued`, run the Step 0b GraphQL projection and confirm
-  `merge_queue_entry` is non-null, then renew the heartbeat, add label `merge-queued` to the review
-  bead, remove `review-running`, and keep both beads blocked; Step 0b performs
-  closure and cleanup when the PR reports `MERGED`; missing/error metadata fails
-  closed, and an absent entry never authorizes `--force-rebase` by itself
-- if it reports `blocked-awaiting-coordinator`, keep the review bead blocked
-  and create any follow-up merge-blocker bead from the structured report if one
-  does not already exist
-- if it reports `corrections-required`, keep the one canonical review bead
-  blocked, remove `review-running`, and return current-PR correctness to the
-  original author when resumable or a recovery worker on the same PR branch.
-  Do not create another review bead. Use this explicit sequential transition;
-  it temporarily detaches the original from the review gate so correction work
-  is runnable, then restores the same gate:
-
-  ```bash
-  # Reviewer agent has exited; its worktree may be transferred sequentially.
-  bd --actor "$COORDINATOR_ID" dep remove <original-id> <review-id>
-  bd --actor "$COORDINATOR_ID" update <original-id> --status in_progress
-
-  # Dispatch beads-worker in the now-idle PR worktree with:
-  REVIEW_CORRECTION_MODE=yes
-  EXISTING_PR_NUMBER=<pr-number>
-  REVIEW_BEAD_ID=<review-id>
-  CORRECTION_THREADS_JSON='<unresolved-current-correctness-threads>'
-
-  # After completed-pr-opened confirms the existing PR head was pushed:
-  bd --actor "$COORDINATOR_ID" update <original-id> --status blocked
-  bd --actor "$COORDINATOR_ID" dep add <original-id> <review-id>
-
-  # Correction-to-re-review hand-back; the correction agent has exited.
-  git -C <review-worktree> status --porcelain  # must be empty
-  git -C <review-worktree> fetch origin agent/<original-id>
-  git -C <review-worktree> checkout -B agent/<original-id> origin/agent/<original-id>
-  ```
-
-  The correction-mode handler takes precedence over generic
-  `completed-pr-opened` reconciliation: reuse the existing PR/review bead, do
-  not create either again. Never run reviewer and correction agents in the
-  transferred worktree concurrently. Before redispatching the reviewer, require
-  an empty worktree; the expected reviewer branch is `agent/<original-id>`.
-  Let the reviewer preparation helper verify and
-  push the exact prepared head. If the hand-back is dirty or the branch cannot
-  be restored, preserve the recovery state or remove and recreate a fresh
-  review worktree from the remote PR head. On correction failure, preserve
-  recovery state, restore the original→review dependency, and keep both beads
-  blocked before retrying.
-
-  After correction, prefer the same
-  independent reviewer for an exact-head recheck unless the risk tier requires
-  rotation. Track review state in one replace-in-place note on the original
-  bead (never append duplicate blocks):
-
-  ```text
-  [review-cycle]
-  substantive_reopenings=<integer>
-  reviewer_identity=<runtime-id-or-login>
-  risk_tier=<high|standard|low>
-  reviewed_head_sha=<sha>
-  [/review-cycle]
-  ```
-
-  At two
-  substantive reopenings, apply the allocation contract's two-correction
-  checkpoint: the coordinator updates the original bead's structured
-  acceptance criteria/failure matrix and reruns dispatch readiness for the same invariant, or
-  split and spec-gate a new subsystem/trust-boundary/risk-class prerequisite.
-  For a prerequisite split, keep the PR open and mark it draft when supported,
-  remove any partial boundary implementation from its diff, then rebase and
-  re-review only after the prerequisite lands.
-- if it reports `pushed-review-fixes`, keep the review bead blocked and rely on
-  the PR-review lane to dispatch a fresh independent reviewer for the new head
-- if it reports `invalid-runtime-context`, release the review bead back to
-  `blocked`, remove `review-running`, and retry later after environment repair
-
-If a worker fails bootstrap, or stalls after bootstrap:
-- log the failure
-- in Codex, send one interrupt heartbeat/status request before release
-- renew heartbeat
-- release the issue:
-  - `pr-review-task`: `bd --actor "$COORDINATOR_ID" update <id> --status blocked --remove-label review-running --json`
-  - otherwise: `bd --actor "$COORDINATOR_ID" unclaim <id> --reason "<bootstrap failure|stall>"`;
-    `--status open` alone would keep your name on a bead nobody is working
-- clean up the worktree
-
-## Step 8: Adaptive Polling And Loop
-
-Use an **event-driven** primary loop. The full cleanup pass runs at startup;
-afterward prefer targeted state refreshes caused by real events.
-
-Renew this coordinator's registry entry on every wake, before sleeping, and
-deregister when the loop stops (`runtime-and-safety.md` → "Parallel
-Coordinators"):
-
-```bash
-uv run scripts/coordinator_registry.py register --repo-root "$REPO_ROOT" \
-  --id "$COORDINATOR_ID" --wake-minutes <planned delay> [--extra-lanes <TEAM_SIZE>]
-uv run scripts/coordinator_registry.py deregister --repo-root "$REPO_ROOT" --id "$COORDINATOR_ID"  # on stop
-```
-
-Immediate recheck triggers:
-- worker completion
-- worker bootstrap failure
-- slot freed
-- PR discovered, merged, or closed
-- review bead created or deduped
-
-Polling modes (wake cadence and its cost rationale are canonical in
-`runtime-and-safety.md` → "Orchestrator Wake Cadence"; do not restate the
-numbers here):
-- active mode: whenever near-term work exists (an active worker, a dispatchable
-  `pr-review-task`, a PR cooldown counting down). Wait for events when the
-  runtime supports it, but never let a gap between wakes exceed the runtime's
-  cache-TTL fallback.
-  Tighten to 1-2 minutes only when an event is imminent (a cooldown about to
-  expire, a lane just freed). A cache-hit poll is cheap, not free.
-- no-progress frontier: once a sweep finds nothing dispatchable, widen to the
-  60-minute cadence and 3-consecutive-no-op-wake stop condition in
-  `runtime-and-safety.md`. Each wake in this mode still runs the full safety
-  sweep covering ready work, PR state, released dependencies, stalled claims,
-  and tracker health — the sweep's content doesn't shrink, only its cadence
-  widens.
-
-Decision sweep: on every transition into the no-progress frontier — and at
-least once per session even if it's never reached — run the Coordinator
-Decision Sweep from `../../../references/decision-autonomy.md` over blocked
-and human-flagged beads that are yours or unassigned (take an unassigned one
-with a guarded `--if-assignee '' --assignee "$COORDINATOR_ID"` update before
-deciding it, so two coordinators never decide the same bead), as part of that
-wake's safety sweep, **before**
-counting the wake as a no-op. Decision debt is dispatchable work: a
-swept-and-decided bead re-enters the ready pool this cycle, so re-run Step 0
-after a sweep that unblocked anything (this also resets the no-op counter — see
-`runtime-and-safety.md`). A coordinator at the no-progress frontier with
-decision-shaped blocked beads is not actually at the frontier; it is avoiding a
-decision.
-
-Prefer low-cost evidence over narrative heartbeats:
-- worktree exists
-- branch moved
-- new commit
-- PR state changed
-
-Batch each poll into **one** composite command that emits a compact summary,
-instead of separate `bd`/`git`/`gh` invocations whose full output each lands in
-context:
-
-```bash
-{ bd list --status=in_progress --json | jq -c '[.[] | {id, assignee}]'
-  git for-each-ref --format='%(refname:short) %(objectname:short)' 'refs/remotes/origin/agent/*'
-  gh pr list --state open --json number,headRefName,mergeStateStatus \
-    --jq 'map({number, headRefName, mergeStateStatus})'
-} 2>&1
-```
-
-After each cycle, return to Step 0.
-
-## Progress Report
-
-Every cycle must include the [Owner merge hold](#owner-merge-hold) inventory,
-including frontier and final reports, even when the outcome report is skipped.
-
-Render a progress report only when bead status actually changed since the last
-report. Never derive the report from an unfiltered `bd list --json`; use
-filtered queries plus targeted checks of the ids dispatched this cycle.
-
-The report measures finished outcomes. Bead, PR, commit, and note counts never
-stand in for completion, so classify every outcome you mention as exactly one
-of: merged source (the bead's PR reached `main`), verified behavior (also
-checked in the runtime its acceptance names), planning (spec or shaping
-work), partial (a PR or green head that does not yet meet every acceptance
-criterion; name the criteria still open), or waiting (an external blocker; name
-the blocker and its resume condition).
-
-1. Query active work and the ids you dispatched or reconciled this cycle:
-   ```bash
-   bd list --status=in_progress --json | jq -c '[.[] | {id, title, status, assignee}]'
-   ```
-   Then `bd show <id> --json | jq '{id, status, assignee, external_ref}'` for
-   each recently dispatched / reconciled id to confirm closures, merges, or
-   status moves.
-2. If nothing changed, skip the report and proceed to Step 0.
-3. If something changed, print the report once, reusing the latest Step 1
-   envelope for the epic table. For each closed bead, confirm the merge route:
-   ```bash
-   gh pr view <number> --json state,mergedAt   # PR-based merges
-   ```
-   The "Merged to main?" column shows `Yes`, `No`, or `—`.
-
-```
-═══════════════════════════════════════════════════════════════
-  Beads Coordinator — Progress Report (<COORDINATOR_ID>)
-  <TZ=Asia/Singapore date '+%Y-%m-%d %H:%M SGT'>
-═══════════════════════════════════════════════════════════════
-
-Epics in focus
-| Epic      | Title              | Closed / total | In review | Lanes | Next              |
-|-----------|--------------------|----------------|-----------|-------|-------------------|
-| beads-040 | Checkout redesign  | 6 / 9          | 1         | 1     | beads-045 running |
-
-Beads this cycle (outcomes only; running beads show under Next)
-| # | Bead ID   | Title                    | Outcome                    | Merged to main? |
-|---|-----------|--------------------------|----------------------------|-----------------|
-| 1 | beads-042 | Fix login redirect       | merged source              | Yes             |
-| 2 | beads-044 | Cart totals API          | partial (AC 3 open)        | No              |
-| 3 | beads-051 | Shape refund children    | planning                   | —               |
-
-Delivered this session: 1 epic closed (beads-031); 3 merged source; 1 partial
-Held PRs: <owner_merge_inventory output: every number/title/CI, none, or unavailable/partial>
-Lanes: 3 / 5 in use (this coordinator 2, coordinator:codex-YYYYMMDD-xxxxxxxx 1); 1 human claim
-═══════════════════════════════════════════════════════════════
-```
-
-### Not-dispatched disclosure (required)
-
-Every progress report and the final report must list non-dispatched candidates
-**by id**, each under its own heading. An aggregate adjective sentence ("the
-rest are incomplete, overlapping, owner-gated, or unsafe") is not a report; it
-is the silence this contract exists to prevent. Print the heading with `none`
-when a set is empty. "Candidates" means rows this coordinator evaluated this
-cycle and did not dispatch; the backlog below the queue cutoff is one line,
-`<queue_total> ranked, <totals.ready> ready`, not a list.
-
-Readiness-rejected (`needs-shaping`):
-
-| Bead ID | Parent epic | Missing packet items | Shaping this run |
-|---------|-------------|----------------------|------------------|
-| bu-abcd | bu-7exe4 | acceptance_criteria, design | dispatched |
-| bu-efgh | bu-7exe4 | acceptance_criteria | epic cap reached |
-
-Cohesion-deferred:
-
-| Bead ID | Overlaps with | Shared allocation signals |
-|---------|---------------|---------------------------|
-| bu-ijkl | bu-mnop (in_progress) | module/interface, tests/fixtures |
-
-Held epics (from the envelope's `held`):
-
-| Epic | Closed / total | Waiting on | Resume condition |
-|------|----------------|------------|------------------|
-| bu-qrst | 7 / 8 | bu-qrst.8.2 (open, assigned tze) | owner runs the native proof |
-
-Other non-dispatched candidates (owner-gated, foreign-assignee, externally
-dependent) are listed the same way: id, one-phrase reason, and the concrete
-unblock condition.
-
-### Final report (required when the loop stops)
-
-The final report is the only record the owner and the next session get, so
-write it for a reader who has not seen this run. On top of the last progress
-report and the not-dispatched disclosure above, state:
-
-- fresh held PR inventory from `owner_merge_inventory` (also at frontier)
-- why the loop stopped: frontier stop, owner stop, or tracker fault, with the
-  evidence for it
-- delivery by the categories above: epics closed this run, each focus epic's
-  closed / total, and every partial PR with the acceptance criteria still open
-- every `[decision]` recorded this run: bead id plus the one-line record
-- every open hard-gate escalation: bead id, the question, your recommendation,
-  and the default that applies if the owner does not answer
-- recovery state for the next session: quarantined worktrees, unreconciled
-  lanes, and beads left `in_progress`, each by id, and confirmation that this
-  coordinator's registry key was cleared
-
-Print each heading with `none` when it is empty.
+Recover an existing branch/worktree rather than overwriting it. Publish useful
+commits before a wait/preemption. Never edit or move the shared root checkout.
+
+## Step 4: Continue the accountable owner
+
+Dispatch absolute worker SKILL path, anchor `ISSUE_ID`, `WORKTREE_PATH`,
+`REPO_ROOT`, optional `DELIVERY_FILE`, current packet locator and a short current
+instruction. Do not inline full issue JSON or archives. Continue the existing
+Claude session/Codex thread before launching a new owner. Bootstrap verifies
+actual cwd, shared Git identity, branch and manifest anchor. A fresh launch is
+recovery with explicit actor/session handoff; it is not a warm continuation.
+
+The owner can implement, test, diagnose, correct and push within accepted scope
+without narrow coordinator permissions per edit. Trust/architecture/scope changes
+still follow their governing gates. The coordinator does not relay each finding:
+reviewer and owner communicate directly; state changes return here for lifecycle.
+
+## Step 5: Review and correct
+
+One independent reviewer per package, normally the same session through rechecks.
+Create its worktree on `review/<review-id>` fetched from the published package
+head. Keep the implementation worktree. Never transfer the author's branch
+between review and implementation sessions. The reviewer checks substantive
+correctness and acceptance, reports every evidenced finding, and binds the
+current-head receipt to new or explicitly reused content evidence. Repository
+merge/CI/owner authorization is checked separately at the action.
+
+`corrections-required` returns directly to the existing implementation owner with
+`REVIEW_CORRECTION_MODE=yes`, existing PR and review IDs, and findings. For anchor
+correction work only, detach anchor→review dependency while retaining all claims;
+restore the same relation after push. Member hard gates remain. The same owner
+amends current acceptance/failure matrix when same-seam corrections reveal a bad
+assumption. A new trust boundary/subsystem/architecture choice follows its real
+spec/authority gate, with a separately owned prerequisite only when needed.
+No new review bead, correction bead or coordinator dispatch cascade.
+
+## Step 6: Land or wait with explicit state
+
+Use repository-required independent review, checks, queue and current hold guard.
+Direct fast-forward is limited to repository-permitted trivial work with the
+required local gate and independent verdict; branch guard must prove no existing
+PR. Queue-direct never bypasses a required review. An integration-branch merge
+cannot close main-delivery acceptance. An unchanged source verdict can be reused;
+current queue/label/environment facts are refreshed when authorizing an action.
+
+Ordinary CI failure belongs to the implementation owner. External blockers name
+the event and dependent scope. Do not manufacture a new blocker bead for a wait
+already represented in CI, review or an existing prerequisite. Classify discoveries:
+current-PR correctness stays here; prerequisite blocker gets one canonical owner;
+new behavior goes outside accepted scope; duplicate links existing provenance.
+
+## Step 7: Per-member reconciliation and safe cleanup
+
+Require structured member results and evidence. `closure-plan` checks each member
+independently; a merged package never implies all members or the parent outcome
+complete. Close only accepted, verified and actually landed members as holder;
+record unmet acceptance in place for the rest. Close a foundation-only member
+when that is its actual acceptance, leaving the larger feature visibly partial.
+
+Before release or session-loss recovery, use the durable journal and guarded
+assignee checks; never clear foreign or pre-existing claims as compensation.
+A failed bootstrap with useful work gets recovery, not deletion. Keep published
+branches and local-only work. Remove worktrees/branches only after verifying
+clean state, no unpublished commits, no pending correction and completed/handoff
+recovery receipts. Never delete unrelated stashes or worktrees.
+
+## Step 8: Event-driven continuation and report
+
+Wake on review/CI/dependency/owner events, with the bounded fallback and no-progress
+frontier in `runtime-and-safety.md`. Renew registry using
+`coordinator_registry.py register`; on exit use `coordinator_registry.py deregister`.
+Do not rescan the fleet or re-run broad verdicts just because a session woke up.
+At a frontier, classify your actual blocked work under decision-autonomy; resolve
+engineering choices, preserve owner hard gates, then stop at the bounded no-op limit.
+
+Report meaningful state changes: accepted outcome and remaining acceptance,
+package anchor/members/PR, merged source vs verified runtime vs partial/planning,
+wait type and resume event, exact claims/session and recovery paths. Include fresh
+`owner_merge_inventory`, including frontier/final reports. List evaluated but
+undispatched IDs with their concrete reason; do not dump the whole backlog.
+Final report explains stop reason, delivered and partial outcomes, hard gates,
+published/local recovery work and registry/claim disposition. Activity counts
+never substitute for accepted outcome completion.

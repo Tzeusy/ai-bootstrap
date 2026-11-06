@@ -165,16 +165,23 @@ Acceptance: spec intent, implemented spine, gap analysis coherent and actionable
 Call `/beads-orchestration` (beads-writer) to build a full acyclic dependency
 graph from the approved changeset. Load
 [`references/work-allocation.md`](../../references/work-allocation.md) before
-decomposing: one primary agent per cohesive independently verifiable outcome,
-with enough work to amortize dispatch/context/worktree/CI/review overhead.
+decomposing: preserve one finite accepted owner outcome and distinguish tracking
+from coherent delivery packages. Existing related beads may share one owner,
+branch, PR, and review cycle while retaining member acceptance.
 
-1. Generate epics/tasks, explicit dependencies, no cycles or overlapping owners.
+1. Reuse or generate finite accepted outcomes and member tracking, with real
+   dependencies and no cycles or overlapping implementation owners. Identify
+   shared prerequisites once rather than cloning substrate work across epics.
 2. Run the allocation contract's dedupe and cohesion scan across open/recently
-   closed beads, active PRs, and the proposed graph. Merge or serialize shared
-   surfaces before creating more review lanes.
+   closed beads, active PRs, and the proposed graph. Propose cohesive packages
+   among existing beads or serialize shared decisions; keep independent rollback
+   paths separate. Do not split into sub-epics to satisfy child-count targets.
 3. Populate every implementation bead's **Dispatch Readiness Packet** in its
-   structured description/design/acceptance fields; incomplete structured
-   acceptance criteria block dispatch.
+   structured description/design/acceptance fields, using concise current
+   instructions and exact authority/history references. Approved direction,
+   adopted behavior, packet-complete scope, and runnable-now are distinct;
+   settle a changed shared interface and source assumptions before releasing
+   its dependents, once at that contract rather than once per child.
 4. Map every in-scope `v1-mandatory` requirement to an implementation bead and
    verification path; one cohesive bead may cover several adjacent requirements.
 5. Triage gaps, TODOs, unknowns, and expanded ideas through the allocation
@@ -182,15 +189,20 @@ with enough work to amortize dispatch/context/worktree/CI/review overhead.
    back to feature-request, and capture adjacent scope separately.
 6. Sequence tightened cross-cutting contracts as representation → propagation →
    enforcement when that creates independently safe rollout and rollback points.
-7. Include one epic-level reconciliation/report closeout path per beads-writer
-   conventions (report beads use `scripts/epic-report-scaffold.sh`; see
-   `references/epic-report.md`). Do not add reconciliation beads per task.
+7. Preserve the accepted outcome through foundation/dark merges and use one
+   finite cross-child closeout path where needed: its checklist, an existing
+   report, or one justified bead. Reuse it when gaps remain; do not create
+   recursive reconciliation generations. Report beads may use
+   `scripts/epic-report-scaffold.sh` (see `references/epic-report.md`).
 8. Add a milestone-close callback that refreshes VISION mandate coverage and
    re-enters milestone synthesis when uncovered mandates remain.
 9. Run mechanical graph validations (cycle check, complete mandatory-mandate
    coverage, spec-link coverage), then **verify-tier**.
 
-Acceptance: graph acyclic, prioritized, execution-ready, every bead spec-traceable. Delivery/execution NOT handled here — owned by `/beads-orchestration` (beads-coordinator).
+Acceptance: graph acyclic, prioritized, spec-traceable, and honest about runnable
+scope versus real waits. Accepted outcomes, proposed delivery packages, and
+member criteria are explicit. Execution belongs to `/beads-orchestration`
+(outcome-owning looper or coordinator), not this planning phase.
 
 ### Handoff Output (No Delivery Ownership)
 
@@ -200,7 +212,7 @@ Output the direction report per `references/work-plan-template.md`:
 - What to stop pretending it can do?
 - Which beads graph was generated and why it's coherent with doctrine/lore/spec.
 
-Do not execute/deliver the beads plan here — hand off explicitly to the beads coordinator.
+Do not execute/deliver the beads plan here — hand off explicitly to an outcome-owning looper or beads coordinator.
 
 ## Adapting to Focus
 

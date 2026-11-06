@@ -1,178 +1,148 @@
 # Work Allocation Contract
 
 Load when turning an approved spec, confirmed gap set, or milestone into beads
-and agent assignments. The objective is reliable ownership with minimum context,
-worktree, CI, and review overhead.
+and assignments. Allocate finite accepted owner outcomes, then choose coherent
+delivery boundaries. Execution, branch, ownership, recovery, and evidence rules
+live in the shared
+[`Beads delivery model`](../../beads-orchestration/references/delivery-model.md).
+This contract shapes its inputs; it does not add another execution preflight.
 
-**Cache-first.** Context loading is the dominant cost. It is paid at full
-(write) price by every cold session and re-read at 1/20th of that price
-(Opus 5.5) by a session that is still warm. So plan work to be walked in a line
-by a few long-lived **lanes**, not fanned out to many fresh sessions. The
-canonical economics and lane rules live in
-[`beads-orchestration/references/token-efficiency.md`](../../beads-orchestration/references/token-efficiency.md)
-→ "Cache-first execution". This contract applies them to graph shape.
+## Accepted Outcome, Tracking, and Delivery
 
-## Unit of Work
+Record the observable owner outcome, mandatory acceptance, activation or runtime
+proof where required, and explicit exclusions on the existing outcome record.
+Keep that accepted baseline visible until completed or explicitly amended by its
+authority. A backend foundation, adopted specification, or dark implementation
+may satisfy a member's acceptance while the accepted feature remains partial.
+Do not close the feature and replace its remaining acceptance with a new
+reconciliation hierarchy. Deliberate deferral names what was removed, why,
+and who authorized the scope amendment.
 
-Default to **one bead per cohesive, independently verifiable outcome**, with one
-accountable primary agent. A requirement, scenario, file, TODO, or review
-finding is evidence for a bead; it is not automatically a bead boundary.
+Default to one bead per cohesive, independently verifiable outcome. A file,
+scenario, review finding, or layer is not automatically a tracking boundary.
+Tracking and delivery granularity can differ: several existing related beads
+may share one delivery package, accountable implementation owner, branch, PR,
+and independent review. Preserve each member's acceptance and closure state;
+no new umbrella bead is needed just to batch existing work.
 
-A bead is correctly sized when one worker can:
+Use the existing anchor/member representation from the delivery model. Only
+its anchor owns the canonical PR association and review relation. Independent
+outcomes retain separate ownership and rollback paths. Do not combine unrelated
+work merely to fill a package or session.
 
-- understand its spec slice without loading unrelated project context;
-- implement, test, review, and roll back the outcome independently;
-- own a bounded file/interface surface without another bead making the same
-  decisions; and
-- finish as one bead-sized stretch of a lane: substantial enough to be worth
-  a PR and review, usually hours rather than a few mechanical minutes. It does
-  not need a whole fresh session to itself.
+## Cohesion and Boundaries
 
-## Merge or Split
+Compare proposed work with open and recently closed beads, active PRs, and the
+actual source. Bundle related corrections when shared modules/interfaces,
+fixtures, migration/config, or review surface make one delivery cycle coherent.
+Serialize overlapping implementation decisions under one owner. Similar names
+or a common epic alone do not establish cohesion.
 
-**Merge** candidate tasks when they share setup, the same module or interface,
-fixtures, migration, quality gate, or review surface. Merge whenever repeated
-context loading, worktree setup, CI, and review overhead is material compared
-with the implementation. Keep distinct acceptance criteria inside the bead.
+Split a delivery boundary when independent rollback, a different hard gate or
+risk class, unstable shared inputs, or review complexity requires it. Do not
+split only to satisfy child-count or line-count targets. Conversely, a large
+diff is not proof that an entire programme belongs in one PR. Size packages so
+an independent reviewer can judge the complete change and the owner can land
+useful work without waiting for an optional tail.
 
-**Split** only when each outcome can land, test, review, and roll back without
-the other; separate owners reduce cognitive load; or one outcome has a
-different hard dependency, risk class, or sign-off gate. Unlocking parallelism
-counts as a reason only when the owner has asked for throughput. The default
-executor is one lane walking the graph in order, so a split made only for
-parallelism buys nothing and costs an extra PR.
+Prefer additive **representation → propagation → enforcement** when tightening
+stored or wire contracts across producers, retries, deferred paths, and
+consumers. These can be separate packages when intermediate states are safe.
+Keep one package when splitting would create an invalid intermediate protocol.
+The default remains frequent integration to main; bounded integration branches
+are chosen under the delivery model and the target repository's policies.
 
-Never split by file, layer, requirement, scenario, TODO, or subagent specialty
-alone. Never merge unrelated outcomes merely to fill a worker session.
+## Current Operative Packet
 
-Run a **cohesion scan** across proposed, ready, and recently completed work
-before materializing or dispatching the graph. The cohesion threshold is two or more shared signals; treat those candidates as one bundle or serialize them:
+Give the owner one concise current packet. Put the outcome and exclusions in
+`description`, current implementation decisions and references in `design`,
+and member-level observable acceptance in `acceptance_criteria`. The package
+packet identifies its members and the current shared work; members retain their
+own criteria without repeating the whole package or programme archive.
 
-- primary module, interface, or state machine;
-- focused tests, fixtures, or failure-injection harness;
-- migration, checkpoint, config, or persisted contract;
-- expected PR and reviewer decision surface; or
-- individually micro-sized implementation whose setup/CI/review cost rivals
-  the change itself.
+A cold reader needs unambiguous authority and current instructions, including:
 
-Override that threshold only when the outcomes have independent rollback and
-verification paths **and** a different dependency, risk class, or sign-off
-gate. Record the reason. Large diffs are not automatically over-sized: keep a
-single protocol, vertical user outcome, or exhaustive sweep cohesive when
-splitting would create an unstable intermediate contract.
+- the accepted outcome and the exact governing spec sections or decisions;
+- the owned modules/interfaces and any relevant trust, persistence, caller,
+  compatibility, sequencing, and rollback boundaries;
+- relevant happy-path and failure behavior, including concurrency, idempotence,
+  and retry/replay when the change touches them;
+- documentation impact and named verification at the actual behavior seam,
+  extending the nearest suitable tests under the existing test-growth policy;
+- dependencies, required authorization, and the next concrete completion proof.
 
-For tightened required contracts spanning stored data, producers, retries, or
-consumers, prefer the additive sequence **representation → propagation → enforcement**:
+Link authoritative documents and immutable history rather than copying full
+before/after contracts, superseded alternatives, hash inventories, or transcripts.
+Rewrite an active stale packet in place, preserving its references and accepted
+intent. Leave closed history alone. There is no arbitrary packet-size cap.
+An acceptance checklist hidden only in `description` does not replace the
+structured `acceptance_criteria` field.
 
-1. **representation** — add the optional persisted/wire shape and compatibility;
-2. **propagation** — update every producer, replay, deferred, and round-trip
-   path while the field remains optional; then
-3. **enforcement** — activate fail-closed requirements only after propagation
-   coverage is proven.
+## Semantic Readiness
 
-Each phase may be a bead when it has an independent rollback and verification
-story. Do not split merely by frontend/backend or language.
+Distinguish approved direction, adopted behavior, packet-complete scope, and
+runnable-now implementation. Approval of a programme is not adoption of every
+proposed interface and is not proof that every child can execute now.
 
-## Dispatch Readiness Packet
+For a new or changed shared contract, settle its authoritative interface and
+check its source assumptions with a focused feasibility walk before releasing
+its dependents. Record the result once at that contract; do not repeat it for
+every child. Existing stable contracts need no new ceremony. A packet is
+complete when its current scope and acceptance are unambiguous and source-grounded.
+It is runnable-now only when actual prerequisites, ownership, and required
+sign-off permit work. `bd lint` verifies structure, not these semantic facts.
 
-Do not dispatch an implementation bead until its structured fields make these
-items explicit. Use `description`, `design`, and `acceptance_criteria`; prose
-hidden in creator-session context does not count.
+A hard gate blocks only the work that requires it. Other accepted runnable
+scope can proceed when it has an independent safe landing and rollback story.
+Owner-held authority remains owner-held; do not silently reinterpret a dependency
+to manufacture ready work.
 
-- **Outcome and non-goals** — observable result plus explicit exclusions.
-- **Governing intent** — doctrine/VISION mandate, exact spec requirement, and
-  baseline commit when the project uses them.
-- **Surface map** — owned modules/interfaces plus trust boundaries, schemas,
-  runtimes, persistence/deferred paths, and callers affected.
-- **Behavior matrix** — happy path and relevant failure, concurrency,
-  idempotence, retry/replay, compatibility, and rollback semantics. Omit an
-  axis only when demonstrably irrelevant.
-- **Documentation impact** — docs/spec/RFC updates required in this change, or
-  an explicit "none" with reason.
-- **Verification** — named behavior-executing checks at the real seam; for
-  each invariant exactly one gate species (behavior test, source-scan guard,
-  or type/lint rule); the nearest existing test to extend; and the expected
-  net test delta. "Add tests for X" without a named seam is not a packet.
+## Ownership and Scheduling Inputs
 
-An empty structured `acceptance_criteria` field is not dispatch-ready even when
-the description contains an informal checklist.
+One accountable implementation owner retains a bounded accepted outcome through
+implementation, diagnosis, ordinary test/review repairs, and landing or explicit
+handoff. Specialists advise that owner; they do not independently implement the
+same contract. A shared runtime prerequisite has one canonical owner/package
+with downstream dependents, rather than a copy on each epic branch.
 
-Use two distinct states:
+Map mandatory requirements to member acceptance and a verification path. Order
+work by actual prerequisites and context locality, and record the next useful
+landing point. Dependencies represent real gates, not artificial sequencing to
+force a queue order. A second session requires a separate coherent outcome and
+non-overlapping inputs; capacity alone does not justify opening another epic.
+Distinguish runnable prerequisites, technical waits, and genuine owner holds.
 
-- **packet-complete** — the structured packet above is semantically complete;
-- **runnable-now** — packet-complete, dependencies clear, no ownership overlap,
-  required sign-off present, and an appropriate worker/reviewer lane available.
+Keep requirement-level reconciliation in member acceptance. Use one finite
+cross-child/end-to-end closeout path where the outcome needs it: the outcome
+record's checklist, an existing report, or one closeout bead. Reuse that path
+when gaps remain; neither every slice nor every review correction needs a new
+tracking record or generation of reconciliation.
 
-Only runnable-now work dispatches. A blocked bead can be packet-complete without
-being runnable-now.
+## Discovery and Correction Triage
 
-## Ownership and Dependencies
-
-- Give each bead one accountable primary agent. Specialists advise that owner;
-  they do not create overlapping implementation ownership.
-- Map every in-scope `v1-mandatory` requirement to at least one implementation
-  bead and one verification path. One bead may cover several adjacent
-  requirements when the implementation seam is shared.
-- Serialize beads that touch the same contract, migration, fixture, config, or
-  architecture decision. Serial is the default in any case. Plan a second lane
-  only for a disjoint chain with stable inputs, and only when throughput is
-  wanted.
-- **Order for locality.** Wire dependencies so each bead's ready successor
-  shares module, spec area, or fixtures with it, which lets one lane carry the
-  chain on a warm cache. Record the intended lane order in the epic's
-  `design` field when it is not obvious from the dependencies.
-- Put requirement-level reconciliation inside the implementation bead's
-  acceptance criteria. Add one epic-level reconciliation bead only for
-  cross-child and end-to-end behavior; do not create a reconciliation bead per
-  implementation bead.
-
-## Discovery Triage
-
-Classify every gap, TODO, unknown, or expanded idea before assigning work:
-
-| Discovery | Required route |
+| Discovery | Route |
 |---|---|
-| Current-spec correction; no behavior change | Amend the governing spec/task notes, then continue. |
-| Boundary, contract, topology, or user-experience change | Return to the earliest affected feature-request gate; resume only after the delta converges and is signed off. |
-| Evidence unknown | Create a bounded investigation outcome with evidence target, owner, blocking status, and exit criterion. |
-| New behavior or adjacent idea | Capture durably in the ideas ledger or a separate spec-first bead; do not expand the active bead silently. |
-| Local debt required to meet current acceptance | Keep inside the active bead when cohesive; otherwise create a linked blocker using this allocation contract. |
+| Ordinary implementation, test, or review repair within accepted scope | Existing owner fixes it in the same package/PR. |
+| Current-spec correction with no behavior change | Amend the relevant current notes/spec, then continue. |
+| Changed scope, architecture, trust, or authorization | Return to the actual governing boundary; resume affected work after its decision. |
+| Evidence unknown that prevents implementation | Bounded investigation with an evidence target, owner, and exit condition. |
+| New behavior or adjacent idea | Capture separately after deduplication; do not expand accepted scope silently. |
+| Local debt required for current acceptance | Keep it with the current owner when cohesive; otherwise link the real prerequisite. |
 
-Do not leave actionable TODO comments as the only record. Do not create a bead
-for every discovered line item before doctrine, spec, and cohesion triage.
-
-Before creating a discovery bead, search open and recently closed beads, active
-PRs/branches, and concrete symbols/files. Link provenance to an existing item
-or close as duplicate when the outcome already exists.
-
-Apply a **two-correction checkpoint** after two substantive review reopenings:
-
-- Same seam or invariant: retain the active bead/PR, rewrite its behavior
-  matrix and acceptance criteria, then continue with the current owner.
-- New subsystem, trust boundary, security decision, architecture prerequisite,
-  or risk class: split a linked prerequisite blocker and return to the earliest
-  affected spec/design gate before resuming.
-- Reviewer-authored semantic correction: require a fresh independent reviewer
-  on the resulting exact head. Otherwise prefer the same independent reviewer
-  for recheck so context is reused.
+Search existing work and concrete symbols before materializing a discovery.
+Do not make every TODO or finding a bead. Repeated substantive corrections on
+the same invariant are a reason to refresh its behavior matrix in place with
+the same owner and independent reviewer. A new trust/subsystem/risk boundary
+follows its governing gate. Reviewer-authored semantic fixes require fresh
+independent review; ordinary author corrections normally retain the reviewer.
 
 ## Handoff Check
 
-Before materializing the graph, verify:
-
-1. Every bead cites VISION/doctrine, exact spec requirements, and observable
-   acceptance criteria.
-2. No two beads own the same implementation decision or review surface.
-3. No bead is mostly setup, context loading, or duplicated verification.
-4. Mandatory requirement coverage is complete; deferred/new ideas are explicit
-   and cannot masquerade as completion.
-5. The graph ends with one cross-child reconciliation/closeout path and a next-
-   milestone callback when doctrine mandates remain uncovered.
-6. Every implementation bead has a complete Dispatch Readiness Packet, and the
-   cohesion scan found no duplicate or overhead-dominated boundary.
-7. No requirement is pinned by two gate species, no bead exists only to add
-   tests for behavior an existing test executes, and no epic exceeds 7
-   children without a recorded override.
-8. The graph walks as a line: ready order follows context locality; every
-   planned lane's chain shares one model tier or isolates the harder bead; and
-   any extra lane is justified by disjoint surfaces plus a throughput need.
+Before handing off the allocation, confirm that accepted scope remains finite,
+mandatory coverage and source/spec references are explicit, and no two owners
+make the same implementation decision. Identify coherent packages among existing
+beads without duplicating tracking. Confirm current packets distinguish planning,
+partial source delivery, activation, and runtime acceptance. Name genuine waits
+and the next useful landing or completion proof. Reuse current evidence according
+to what it proves; worker replacement or a coordinator wake alone changes none
+of these facts.

@@ -2,7 +2,7 @@
 
 Portable AI assistant configs and shared skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://github.com/openai/codex), [Gemini CLI](https://github.com/google-gemini/gemini-cli), and [OpenCode](https://github.com/opencode-ai/opencode).
 
-The current operating model is **skills-first**, not `agents/`-first. Shared workflows live in `skills/` and are mirrored into each tool's native skills directory. For day-to-day execution, the primary path is the Beads workflow under `skills/personal/`, especially `beads-coordinator`, `beads-worker`, and `beads-pr-reviewer-worker`.
+The current operating model is **skills-first**, not `agents/`-first. Shared workflows live in `skills/` and are mirrored into each tool's native skills directory. For day-to-day execution, the primary path is the Beads workflow under `skills/personal/`, especially `beads-looper`, `beads-worker`, and `beads-pr-reviewer-worker`, with a small coordinator when allocation/recovery needs one.
 
 ## What This Repo Optimizes For
 
@@ -78,13 +78,22 @@ The generated namespace is flattened by root directory basename. Provenance and 
 
 The main personal workflow is:
 
-1. Use `beads-writer` or normal `bd` commands to create and shape issues.
-2. Start `beads-coordinator` to pull ready work from `bd ready`.
-3. `beads-coordinator` runs `beads-cleanup`, claims work, creates isolated worktrees, and dispatches workers.
-4. `beads-worker` executes one implementation issue in its own worktree.
-5. `beads-pr-reviewer-worker` handles PR review follow-up, review threads, and merge-or-retry decisions, then reports the outcome back to the coordinator for Beads closure.
+1. Use `beads-writer` or normal `bd` commands to shape finite accepted outcomes.
+2. A persistent `beads-looper` owns a bounded outcome through implementation,
+   tests, independent review corrections and landing or explicit handoff.
+3. Deliver coherent packages: several existing tracking beads can share one
+   isolated worktree, branch, PR and independent review record. Preserve each
+   member's acceptance and closure; partial foundations leave the outcome open.
+4. `beads-pr-reviewer-worker` reviews in its own worktree and sends findings
+   directly to the same implementation owner. Ordinary corrections keep ownership.
+5. Use `beads-coordinator` when a small allocation/recovery controller is useful;
+   dispatched workers use the same package model and report lifecycle changes to it.
 
-This is the preferred model for sustained throughput. The coordinator coordinates; workers implement or review.
+The [canonical delivery model](skills/personal/beads-orchestration/references/delivery-model.md)
+defines branch/session tradeoffs, claims, packets, evidence reuse and recovery.
+Default to frequent bounded integration to main; milestone integration branches
+require a concrete reason and repository permission. Required review/CI/queue and
+owner authorization remain binding. No live fleets are restarted by updating skills.
 
 ### 3. Planning lives in skills too
 
@@ -133,9 +142,9 @@ This repo is intended to work standalone. Do not assume an enclosing parent repo
 
 ## Recommended Entry Points
 
-- Want continuous issue execution: start with `beads-coordinator`
-- Want independent self-paced lanes (`/loop`, one tmux pane each) with no central coordinator: run `beads-looper`, implement mode per pane plus one review-mode pane
-- Want to implement one already-assigned issue in a worktree: use `beads-worker`
+- Want sustained accepted-outcome delivery: start with `beads-looper`
+- Want several owners with allocation/recovery managed centrally: use `beads-coordinator`; independent review may use a pane or native reviewer session
+- Want to implement an assigned package (one or several beads) in a worktree: use `beads-worker`
 - Want PR review follow-up and merge handling: use `beads-pr-reviewer-worker`
 - Want to create or decompose backlog work: use `beads-writer`
 

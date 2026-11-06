@@ -7,7 +7,7 @@ metadata:
     - tze
     - OpenAI Codex
   status: active
-  last_reviewed: "2026-10-04"
+  last_reviewed: "2026-11-06"
 compatibility: Requires a Beads-backed repository with the `bd` CLI available. Assumes the agent can inspect the target project workspace before creating issues.
 ---
 
@@ -15,7 +15,7 @@ compatibility: Requires a Beads-backed repository with the `bd` CLI available. A
 
 Create high-quality beads issues through repo-grounded research and deliberate field selection. This skill is a routing layer over the Beads operating model described in [`../../../../../README.md`](../../../../../README.md): issue writing should reinforce that workflow, not compete with it.
 
-Every bead must be a self-contained handoff for a future independent session. Subbeads are not reminders; they must read like full standalone prompts, with enough context that a fresh session can execute them without the bead-creation chat.
+Write a concise current packet with exact governing references so a fresh owner can act without the creation chat. Tracking and delivery granularity differ: related existing beads may share one package while retaining their own acceptance.
 
 ## Use This Skill When
 
@@ -37,8 +37,8 @@ Every bead must be a self-contained handoff for a future independent session. Su
 - Apply the shared
   [`th-projects` work-allocation contract](../../../th-projects/references/work-allocation.md)
   before creating or decomposing implementation work.
-- Keep epics focused: 3-7 children is usually the right range once overhead is counted.
-- End every epic with a terminal reconciliation bead that depends on all implementation children.
+- Keep accepted outcomes finite and visibly partial until mandatory acceptance is met.
+- Use one cross-child closeout path when needed; an existing outcome checklist or report may suffice. Do not create recursive reconciliation generations or split to meet a child-count quota.
 - Use `bd create`, not `bd q`, when you need a real description.
 - Do not pass dependency flags to `bd create`; create first, then wire with `bd dep add`.
 - Reconcile against the existing backlog before creating: `bd search` the
@@ -69,9 +69,9 @@ Every bead must be a self-contained handoff for a future independent session. Su
 | File | Read when | Content |
 |------|-----------|---------|
 | [`references/workflow.md`](references/workflow.md) | Every real use of this skill | Research-first workflow, decomposition rules, creation sequence, and verification flow |
-| [`../../../th-projects/references/work-allocation.md`](../../../th-projects/references/work-allocation.md) | Shaping implementation boundaries or dispatch packets | Cohesion threshold, additive rollout, structured dispatch readiness, and discovery triage |
+| [`../../../th-projects/references/work-allocation.md`](../../../th-projects/references/work-allocation.md) | Shaping implementation boundaries or dispatch packets | Cohesive delivery boundaries, current packets, semantic readiness, and discovery triage |
 | [`references/fields-and-examples.md`](references/fields-and-examples.md) | Crafting issue text or choosing fields | Field schema, type/priority guidance, and example beads |
-| [`references/reconciliation-beads.md`](references/reconciliation-beads.md) | Writing or checking an epic | Required reconciliation-bead contract, generation rules, and template |
+| [`references/reconciliation-beads.md`](references/reconciliation-beads.md) | Writing or checking an epic | Finite outcome closeout, optional closeout-bead contract, and evidence prompt |
 | [`references/quality-checklist.md`](references/quality-checklist.md) | Before finalizing or after creating beads | Final checklist, persistence checks, and anti-patterns |
 
 ## Trigger Sanity Check
@@ -84,5 +84,5 @@ Every bead must be a self-contained handoff for a future independent session. Su
 ### references/
 - `workflow.md` — Primary execution flow for research, decomposition, creation, and verification.
 - `fields-and-examples.md` — Field schema, type selection guide, priority calibration table, and exemplary beads.
-- `reconciliation-beads.md` — Required reconciliation-bead template and generation rules for epics.
+- `reconciliation-beads.md` — Finite outcome closeout and an optional verification prompt.
 - `quality-checklist.md` — Final review checklist, persistence checks, and anti-patterns to remove.
