@@ -2410,3 +2410,13 @@ beads (`bu-atsax`, `bu-m09qm`) whose prior coordinator session's heartbeat was
 - **Related:** `bd show <id> --json` returns a singleton array. Project `.[0]`
   after validating cardinality and requested identity; projecting `{id,...}`
   directly fails with `Cannot index array with string "id"`.
+
+## bd 1.3.1: guarded updates reject label-only edits
+
+- **Observed:** 2026-11-06, bd 1.3.1; an unassigned shaping record.
+- **Symptom:** `bd update <id> --if-assignee '' --remove-label needs-shaping`
+  fails with `--if-assignee/--if-status require at least one field update`;
+  label and parent edits alone are not covered by the guard.
+- **Fix:** include the intended field transition in the same guarded update,
+  such as `--status open` after verifying that is the correct state. Do not drop
+  the assignee guard merely to make a label mutation succeed.

@@ -26,8 +26,12 @@ Do not use when:
 
 ## Core Rules
 
-1. **Specs are source of truth** — every work item links to a spec section. No spec coverage → recommend spec work first.
-2. **No coding before signoff** — spec written/updated and approved before implementation.
+1. **Ground work in its governing contract** — use the proportional
+   [work-allocation contract](../../references/work-allocation.md#governing-contract).
+   Routine settled fixes go directly to beads-writer; this project-direction
+   lifecycle governs work that actually needs direction or specification.
+2. **Honor actual signoff gates** — new or unresolved behavior follows its
+   applicable spec/approval path; repository-mandated requirements remain binding.
 3. **Evidence over assumption** — cite files, functions, spec sections. Label claims [Observed] / [Inferred] / [Unknown].
 4. **Push back** — flag misaligned, premature, unrealistic, infeasible work directly.
 5. **Minimize churn** — remove dead paths over back-compat shims (`/th-engineering` cruft-cleanup is the bar); serialize conflicting work.

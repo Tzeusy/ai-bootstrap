@@ -5,10 +5,13 @@
 # ///
 """Rank ready Beads work in finish-first order for one or more coordinators.
 
-Report-only: emits one compact `beads-work-queue/v1` JSON envelope and never
-mutates Beads. The coordinator still applies the dispatch-readiness and
-cohesion gates and claims atomically; losing a claim race means taking the
-next row. Every coordinator reading the same tracker gets the same order, so
+Report-only: emits one compact `beads-work-queue/v2` JSON envelope and never
+mutates Beads. `queue` is the capacity-bounded admission plan: P0 emergency,
+review, retained-owner correction/resume, then new implementation. Complete
+Step-0 normalization via `--review-state-file` is required for admissions;
+without it only diagnostic `candidates` are available. The coordinator still applies the dispatch-readiness and
+cohesion gates and claims atomically; losing a claim race requires refreshing
+the queue. Every coordinator reading the same tracker gets the same order, so
 parallel coordinators converge on the same epics instead of each opening its
 own.
 
@@ -47,20 +50,27 @@ Ranking contract (canonical; `coordinator-loop.md` Step 2 only points here):
    outcome's primary share, so no lane idles while ready work exists.
 
 Capacity: the lane budget is global across coordinators: `--lanes`, else the
-`beads.max_lanes` kv key, else 4. Each active delivery package (or unpackaged bead in progress or retaining
-an assigned blocked PR) whose assignee is a
-coordinator (`coordinator:` prefix) occupies one lane, plus each live
-registration's explicitly reserved `extra_lanes`.
+`beads.max_lanes` kv key, else 4. An in-progress package anchor or unpackaged
+bead, including a reviewer, occupies one execution slot. Blocked/open owners
+retain claims and outcome WIP but park execution; member in-progress flags
+never override a parked anchor. A closed anchor conservatively falls back to
+its pending members. Live registrations' `extra_lanes` reserve execution.
+New outcomes also require free owned-WIP capacity under the same budget;
+reviews and corrections reuse existing WIP. Running higher-priority work
+consumes slots without idling the rest; unadmitted peer-owned higher work
+requires owner resumption before unrelated admissions.
+One emergency or runnable prerequisite of retained parked work may overflow
+owned WIP by one when execution is free. At budget+1 no further overflow is
+admitted, even if that extra package parks. Execution never exceeds budget.
 Other `in_progress` assignees (humans) are counted under `other_claims` only.
-Coordinator claims whose assignee has no live registration are listed under
-`unowned_claims` and still occupy a lane until recovered.
+In-progress claims whose assignee has no live registration are listed under
+`unowned_claims`; their execution remains conservatively reserved until recovery.
 
-Excluded from the queue, with counts or ids in `excluded`:
+Excluded from diagnostic candidates, with counts or ids in `excluded`:
 - epics themselves; claiming a programme does not hide its runnable
   prerequisites or authorize parallel implementation of the same substrate;
-- `pr-review` and `pr-review-task` beads (Step 0 owns them), and
-  `review-correction` beads (an implement looper takes them by label, in
-  correction mode on the existing PR);
+- `pr-review`, `pr-review-task`, and legacy `review-correction` beads (their
+  review/correction phase comes from normalized PR state and the receipt);
 - `needs-shaping` beads (listed per epic, standalone ones by priority);
 - `no-dispatch` beads (tracking or meta beads no lane works; counted) and
   `scope:local-state` beads (work on a checkout's gitignored state, which no
@@ -88,6 +98,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -101,8 +112,9 @@ from delivery_package import ID as DELIVERY_ID, metadata as bead_metadata, packa
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from coordinator_registry import lane_budget, parse_time, registrations  # noqa: E402
+from review_relation_graph import normalized_finding_relation_error
 
-SCHEMA = "beads-work-queue/v1"
+SCHEMA = "beads-work-queue/v2"
 COORDINATOR_PREFIX = "coordinator:"
 FOCUS_LABEL = "focus"
 SHAPING_LABEL = "needs-shaping"
@@ -132,6 +144,7 @@ def fatal(now: str | None, code: str, scope: str) -> dict[str, Any]:
         "errors": [{"code": code, "scope": scope}],
         "generated_at": now,
         "queue": [],
+        "candidates": [],
         "schema": SCHEMA,
         "status": "fatal",
     }
@@ -156,7 +169,7 @@ def bd_json(argv: list[str], repo_root: Path) -> tuple[object | None, str | None
         return None, "invalid-json"
 
 
-def collect(repo_root: Path) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
+def collect(repo_root: Path, *, with_dependencies: bool = False) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
     """Run the four read-only `bd` queries the ranking needs."""
     queries = {
         "live": ["list", "--status=open,blocked,in_progress", "--json", "--limit", "0"],
@@ -196,6 +209,19 @@ def collect(repo_root: Path) -> tuple[dict[str, Any] | None, dict[str, str] | No
             if error or not isinstance(records, list) or len(records) != 1 or not isinstance(records[0], dict) or records[0].get("id") != member_id:
                 return None, {"code": error or "invalid-package-record", "scope": "packages"}
             snapshot["package_records"].extend(records)
+    if with_dependencies and isinstance(snapshot.get("live"), list):
+        known = {row["id"] for row in [*snapshot["live"], *snapshot.get("package_records", [])] if isinstance(row, dict) and isinstance(row.get("id"), str)}
+        needed = {target for row in snapshot["live"] if isinstance(row, dict)
+                  and (text(row.get("assignee")) or "pr-review-task" in labels_of(row))
+                  for target in blockers_of(row) if target not in known}
+        snapshot["dependency_records"] = []
+        for target in sorted(needed):
+            if not DELIVERY_ID.fullmatch(target):
+                return None, {"code": "invalid-dependency", "scope": "admission"}
+            records, error = bd_json(["show", target, "--json"], repo_root)
+            if error or not isinstance(records, list) or len(records) != 1 or not isinstance(records[0], dict) or records[0].get("id") != target:
+                return None, {"code": error or "invalid-dependency", "scope": "admission"}
+            snapshot["dependency_records"].extend(records)
     return snapshot, None
 
 
@@ -240,6 +266,300 @@ def validate(snapshot: dict[str, Any]) -> dict[str, str] | None:
     return None
 
 
+
+HOLD_LABELS = frozenset({"no-dispatch", "needs-shaping", "scope:local-state", "owner-held", "human-gate", "held-for-owner"})
+SHA_RE = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
+
+
+def package_running(anchor, rows, delivery_anchors):
+    """The anchor controls execution; pending members backstop a closed anchor."""
+    principal = rows[anchor]
+    if principal.get("status") == "closed":
+        return any(row.get("status") == "in_progress" for member, row in rows.items()
+                   if delivery_anchors.get(member) == anchor and row.get("status") != "closed")
+    return principal.get("status") == "in_progress"
+
+
+def execution_capacity(rows, delivery_anchors, regs, budget):
+    """Claims survive waits; only running anchors/reviewers consume execution."""
+    groups = {}
+    for row in rows.values():
+        if row.get("status") == "closed" or not text(row.get("assignee")):
+            continue
+        anchor = delivery_anchors.get(row["id"], row["id"])
+        groups.setdefault((text(row.get("assignee")), anchor), []).append(row)
+    active, owned, other, unowned = {}, set(), 0, []
+    for (owner, anchor), members in groups.items():
+        principal = rows.get(anchor, members[0])
+        review = "pr-review-task" in labels_of(principal)
+        running = package_running(anchor, rows, delivery_anchors)
+        if not owner.startswith(COORDINATOR_PREFIX):
+            other += 1
+            continue
+        if not review and principal.get("issue_type") != "epic":
+            owned.add((owner, anchor))
+        if running:
+            active[owner] = active.get(owner, 0) + 1
+        if not regs.get(owner, {}).get("live") and any(m.get("status") == "in_progress" for m in members):
+            unowned.append(anchor)
+    for owner, entry in regs.items():
+        if entry["live"] and entry["extra_lanes"]:
+            active[owner] = active.get(owner, 0) + entry["extra_lanes"]
+    occupied = sum(active.values())
+    return {"by_assignee": dict(sorted(active.items())), "occupied": occupied,
+            "free": max(budget - occupied, 0), "owned": len(owned),
+            "free_wip": max(budget - len(owned), 0), "other_claims": other}, unowned
+
+
+def admission_queue(candidates, rows, delivery_anchors, regs, capacity, review_state, *, coordinator, now, limit, ready_ids, budget):
+    """Project one global priority queue; nothing here authorizes a mutation."""
+    def blocked(reason):
+        return {"status": "blocked", "reason": reason, "waiting": [], "queue": []}
+    if not isinstance(review_state, dict) or review_state.get("schema") != "beads-pr-review-normalization/v1":
+        return blocked("review-state-required")
+    if review_state.get("status") not in {"success", "empty"} or review_state.get("errors") != []:
+        return blocked("review-state-incomplete")
+    findings, healing = review_state.get("findings"), review_state.get("self_heal_candidates")
+    if not isinstance(findings, list) or not isinstance(healing, list) or any(not isinstance(f, dict) for f in findings + healing):
+        return blocked("invalid-review-state")
+    for finding in findings:
+        if (finding.get("kind") not in {"original", "review-task"}
+                or not isinstance(finding.get("original_id"), str)
+                or not DELIVERY_ID.fullmatch(finding["original_id"])
+                or finding.get("context_status") != "resolved"
+                or finding.get("pr_state") not in {"OPEN", "MERGED", "CLOSED"}
+                or not isinstance(finding.get("pr_number"), int)
+                or isinstance(finding["pr_number"], bool) or finding["pr_number"] <= 0):
+            return blocked("invalid-review-state")
+    generated = parse_time(review_state.get("generated_at"))
+    if generated is None or generated > now:
+        return blocked("invalid-review-state-time")
+    if normalized_finding_relation_error(findings):
+        return blocked("invalid-review-relations")
+    visible_reviews = {r["id"] for r in rows.values()
+                       if r.get("status") != "closed" and "pr-review-task" in labels_of(r)}
+    seen_reviews = {f.get("review_id") for f in findings if f.get("kind") == "review-task"}
+    visible_originals = {r["id"] for r in rows.values() if r.get("status") == "blocked"
+                         and "pr-review" in labels_of(r) and "pr-review-task" not in labels_of(r)
+                         and text(r.get("external_ref")).startswith("gh-pr:")}
+    seen_originals = {f.get("original_id") for f in findings}
+    if not visible_reviews.issubset(seen_reviews) or not visible_originals.issubset(seen_originals):
+        return blocked("review-inventory-changed")
+    waiting, actions, pending_higher = [], [], False
+    active_finishing = any(r.get("status") == "in_progress" and
+                           ("pr-review-task" in labels_of(r) or "review-correction" in labels_of(r))
+                           for r in rows.values())
+    seen = set()
+
+    # Only runnable blockers of retained parked work earn the WIP escape hatch.
+    # Unknown, held, and already owned implementation nodes never convey it.
+    # Only this anchor's validated canonical waiting review may convey its own
+    # external blockers; reading that edge never transfers a reviewer claim.
+    canonical_reviews = {finding["original_id"]: finding["review_id"] for finding in findings
+                         if finding.get("kind") == "review-task" and not finding.get("duplicate_of")
+                         and finding.get("canonical_review_id") == finding.get("review_id")
+                         and finding.get("review_id") in visible_reviews and finding.get("pr_state") == "OPEN"
+                         and isinstance(finding.get("head_sha"), str) and SHA_RE.fullmatch(finding["head_sha"])
+                         and text(rows.get(finding["original_id"], {}).get("external_ref")) == f"gh-pr:{finding['pr_number']}"}
+    parked = {delivery_anchors.get(row["id"], row["id"]) for row in rows.values()
+              if row.get("status") != "closed" and row.get("issue_type") != "epic"
+              and text(row.get("assignee")).startswith(COORDINATOR_PREFIX)
+              and "pr-review-task" not in labels_of(row)
+              and regs.get(row.get("assignee"), {}).get("live")
+              and not package_running(delivery_anchors.get(row["id"], row["id"]), rows, delivery_anchors)}
+    owned_frontier = {}
+    for anchor in sorted(parked):
+        members = {member for member, package in delivery_anchors.items() if package == anchor} or {anchor}
+        if any(labels_of(rows[member]) & HOLD_LABELS for member in members if rows[member].get("status") != "closed"):
+            continue
+        pending = [target for member in members if not labels_of(rows[member]) & HOLD_LABELS
+                   for target in blockers_of(rows[member]) if target not in members]
+        visited = set()
+        while pending:
+            target = pending.pop()
+            if target in visited:
+                continue
+            visited.add(target)
+            row = rows.get(target)
+            if row is None or row.get("status") == "closed" or labels_of(row) & HOLD_LABELS:
+                continue
+            if target == canonical_reviews.get(anchor) and row.get("status") in {"blocked", "open"}:
+                pending.extend(blockers_of(row))
+                continue
+            if text(row.get("assignee")) or labels_of(row) & REVIEW_LABELS:
+                continue
+            if target in ready_ids:
+                owned_frontier.setdefault(target, anchor)
+            else:
+                pending.extend(blockers_of(row))
+
+    def hard_gate(anchor, review_id=None):
+        members = [member for member, package in delivery_anchors.items() if package == anchor] or [anchor]
+        owner = text(rows.get(anchor, {}).get("assignee"))
+        for member in members:
+            record = rows.get(member)
+            if record is None:
+                return "missing-member"
+            if record.get("status") == "closed":
+                continue
+            if labels_of(record) & HOLD_LABELS:
+                return "member-held"
+            if text(record.get("assignee")) != owner:
+                return "member-owner-mismatch"
+            for target in blockers_of(record):
+                if target in members or target == review_id:
+                    continue
+                if target not in rows and member in ready_ids:
+                    continue
+                if target not in rows or rows[target].get("status") != "closed":
+                    return "external-blocker"
+        return None
+
+    def append_action(kind, anchor, review_id=None, candidate=None):
+        nonlocal pending_higher
+        record = rows.get(anchor)
+        if record is None:
+            waiting.append({"id": anchor, "reason": "anchor-unavailable"})
+            pending_higher = True
+            return
+        owner = text(record.get("assignee"))
+        if kind == "review" and package_running(anchor, rows, delivery_anchors):
+            waiting.append({"id": anchor, "reason": "implementation-running"})
+            return
+        gate = hard_gate(anchor, review_id)
+        if gate:
+            waiting.append({"id": anchor, "reason": gate})
+            return
+        if kind in {"correction", "resume"} and package_running(anchor, rows, delivery_anchors):
+            return
+        if kind in {"correction", "resume"} and (not owner or owner != coordinator):
+            waiting.append({"id": anchor, "reason": "resume-existing-owner", "owner": owner})
+            pending_higher = True
+            return
+        if owner.startswith(COORDINATOR_PREFIX) and not regs.get(owner, {}).get("live"):
+            waiting.append({"id": anchor, "reason": "owner-recovery-required", "owner": owner})
+            return
+        review = rows.get(review_id, {}) if review_id else {}
+        if kind == "review":
+            if labels_of(review) & HOLD_LABELS:
+                waiting.append({"id": review_id, "reason": "review-held"})
+                return
+            if any(target not in rows or rows[target].get("status") != "closed" for target in blockers_of(review)):
+                waiting.append({"id": review_id, "reason": "review-external-blocker"})
+                return
+        if kind == "review" and text(review.get("assignee")) not in {"", coordinator}:
+            waiting.append({"id": review_id, "reason": "review-owned-by-peer", "owner": review.get("assignee")})
+            pending_higher = True
+            return
+        if kind == "review" and review.get("status") == "in_progress":
+            return
+        if anchor in seen:
+            return
+        seen.add(anchor)
+        action = {"id": review_id if kind == "review" else anchor, "kind": kind,
+                  "anchor": anchor, "owner": owner, "review_id": review_id,
+                  "review_owner": text(review.get("assignee")) if review_id else None,
+                  "priority": priority_of(record), "outcome": candidate.get("outcome") if candidate else None,
+                  "reason": candidate.get("reason") if candidate else kind + " retained delivery",
+                  "session_policy": "independent-reviewer" if kind == "review" else "resume-existing" if kind in {"correction", "resume"} else "allocate-owner"}
+        action["_tier"] = 0 if action["priority"] == 0 or (candidate and candidate["reason"].startswith("urgent:")) else {"review": 1, "correction": 2, "resume": 3, "implementation": 5}[kind]
+        if kind == "implementation" and anchor in owned_frontier and action["_tier"] != 0:
+            action["_tier"] = 4
+        action["_order"] = len(actions)
+        actions.append(action)
+
+    review_anchors = {finding.get("original_id") for finding in findings}
+    for finding in findings:
+        if finding.get("kind") != "review-task" or finding.get("duplicate_of"):
+            continue
+        review_id, anchor = finding.get("review_id"), finding.get("original_id")
+        if review_id not in visible_reviews:
+            # A terminal record already reconciled out of the live inventory.
+            if finding.get("pr_state") in {"MERGED", "CLOSED"}:
+                continue
+            return blocked("review-inventory-changed")
+        if finding.get("canonical_review_id") != review_id or finding.get("context_status") != "resolved":
+            return blocked("unresolved-review-state")
+        if not isinstance(anchor, str) or anchor not in rows:
+            return blocked("review-anchor-unavailable")
+        if finding.get("pr_state") != "OPEN":
+            waiting.append({"id": review_id, "reason": "reconcile-terminal-pr"})
+            pending_higher = True
+            continue
+        if rows[review_id].get("status") == "in_progress":
+            active_finishing = True
+            continue
+        if text(rows[anchor].get("external_ref")) != f"gh-pr:{finding.get('pr_number')}":
+            return blocked("review-association-changed")
+        head = finding.get("head_sha")
+        if not isinstance(head, str) or not SHA_RE.fullmatch(head):
+            return blocked("review-head-unavailable")
+        try:
+            receipt = bead_metadata(rows[review_id]).get("review_receipt")
+        except ValueError:
+            return blocked("invalid-review-receipt")
+        if receipt is not None and (not isinstance(receipt, dict) or
+                not isinstance(receipt.get("head"), str) or not SHA_RE.fullmatch(receipt["head"]) or
+                receipt.get("disposition") not in {"ready", "corrections", "queued", "held"}):
+            return blocked("invalid-review-receipt")
+        if receipt and receipt["head"] == head:
+            if receipt["disposition"] == "corrections":
+                append_action("correction", anchor, review_id)
+            else:
+                waiting.append({"id": review_id, "reason": "same-head-" + receipt["disposition"]})
+            continue
+        if finding.get("recommendation") == "wait-for-cooldown":
+            waiting.append({"id": review_id, "reason": "review-cooldown"})
+            continue
+        if finding.get("recommendation") != "dispatch-canonical-review":
+            return blocked("review-reconciliation-required")
+        append_action("review", anchor, review_id)
+    for finding in findings:
+        if finding.get("kind") == "original" and finding.get("original_id") in rows and not finding.get("canonical_review_id"):
+            waiting.append({"id": finding["original_id"], "reason": "review-wiring-required"})
+            pending_higher = True
+    if any(f.get("recommendation") not in {"review-wiring-current"} for f in healing):
+        waiting.append({"id": None, "reason": "review-wiring-required"})
+        pending_higher = True
+    for candidate in candidates:
+        record = rows[candidate["id"]]
+        if record["id"] in review_anchors:
+            continue
+        owner = text(record.get("assignee"))
+        if owner:
+            append_action("resume", record["id"], candidate=candidate)
+        else:
+            append_action("implementation", record["id"], candidate=candidate)
+    # Active packages are excluded from diagnostic ready candidates. A parked,
+    # open anchor with clear gates may resume without another WIP admission.
+    resume_anchors = set(delivery_anchors.values()) | {
+        row["id"] for row in rows.values() if text(row.get("assignee"))
+        and row["id"] in ready_ids and not labels_of(row) & REVIEW_LABELS}
+    for anchor in sorted(resume_anchors):
+        if anchor not in review_anchors and rows[anchor].get("status") == "open":
+            append_action("resume", anchor)
+    if pending_higher:
+        actions = [action for action in actions if action["kind"] != "implementation" or action["_tier"] == 0]
+    actions.sort(key=lambda a: (a["_tier"], a["_order"], a["id"]))
+    free, wip, owned = capacity["free"], capacity["free_wip"], capacity["owned"]
+    selected = []
+    for action in actions:
+        if len(selected) >= min(free, max(limit, 0)):
+            break
+        if action["kind"] == "implementation":
+            if wip <= 0:
+                exception = "emergency" if action["_tier"] == 0 else "prerequisite" if action["id"] in owned_frontier else None
+                if not exception or not parked or owned >= budget + 1:
+                    waiting.append({"id": action["id"], "reason": "owned-wip-budget-full"})
+                    continue
+                action["wip_exception"] = exception
+            else:
+                wip -= 1
+            owned += 1
+        selected.append({key: value for key, value in action.items() if not key.startswith("_")})
+    return {"status": "ready" if selected else "busy" if actions or active_finishing else "waiting" if waiting else "empty",
+            "reason": None, "waiting": waiting, "queue": selected}
+
 def rank(
     snapshot: dict[str, Any],
     *,
@@ -249,13 +569,14 @@ def rank(
     max_lanes_per_epic: int = DEFAULT_MAX_LANES_PER_EPIC,
     scope_epics: list[str] | None = None,
     limit: int = DEFAULT_LIMIT,
+    review_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     generated_at = format_time(now)
     problem = validate(snapshot)
     if problem:
         return fatal(generated_at, problem["code"], problem["scope"])
 
-    rows = {row["id"]: row for row in [*snapshot["live"], *snapshot.get("package_records", [])]}
+    rows = {row["id"]: row for row in [*snapshot["live"], *snapshot.get("package_records", []), *snapshot.get("dependency_records", [])]}
     try:
         delivery_anchors = package_index(list(rows.values()))
     except ValueError:
@@ -320,45 +641,25 @@ def rank(
     def is_live_coordinator(assignee: str) -> bool:
         return bool(regs.get(assignee, {}).get("live"))
 
-    # Capacity and epic activity come from the live rows.
+    # Owned work remains visible while blocked/open anchors lend their execution
+    # slot to independent review. Never infer session retirement from parking.
     budget, budget_source = lane_budget(snapshot["kv"], lanes)
-    by_assignee: dict[str, int] = {}
-    other_claims = 0
-    unowned: list[str] = []
-    orphaned: list[dict[str, str]] = []
-    counted_lanes: set[tuple[str, str]] = set()
+    capacity, unowned = execution_capacity(rows, delivery_anchors, regs, budget)
+    by_assignee = capacity["by_assignee"]
+    orphaned = []
+    counted_epics = set()
     for row in snapshot["live"]:
         bead_id, assignee = row["id"], text(row.get("assignee"))
-        anchor_id = delivery_anchors.get(bead_id, bead_id)
         epic_id = outcome_of(bead_id)
-        if (
-            row.get("status") == "blocked"
-            and assignee.startswith(COORDINATOR_PREFIX)
-            and not is_live_coordinator(assignee)
-        ):
+        anchor = delivery_anchors.get(bead_id, bead_id)
+        if row.get("status") == "blocked" and assignee.startswith(COORDINATOR_PREFIX) and not is_live_coordinator(assignee):
             on_pr = text(row.get("external_ref")).startswith("gh-pr:") or bool(labels_of(row) & REVIEW_LABELS)
             orphaned.append({"assignee": assignee, "id": bead_id, "kind": "pr" if on_pr else "gate"})
-        retains_pr = row.get("status") == "blocked" and text(row.get("external_ref")).startswith("gh-pr:")
-        holds_lane = row.get("status") == "in_progress" or retains_pr or (
-            bead_id in delivery_anchors and row.get("status") in {"open", "blocked"}
-        )
-        lane_key = (assignee, anchor_id)
-        if holds_lane and assignee and lane_key not in counted_lanes:
-            counted_lanes.add(lane_key)
-            if assignee.startswith(COORDINATOR_PREFIX):
-                by_assignee[assignee] = by_assignee.get(assignee, 0) + 1
-                if not is_live_coordinator(assignee):
-                    unowned.append(bead_id)
-            else:
-                other_claims += 1
-            if epic_id and row.get("issue_type") != "epic":
-                epics[epic_id]["lanes"] += 1
+        if epic_id and assignee and row.get("issue_type") != "epic" and (assignee, anchor) not in counted_epics:
+            counted_epics.add((assignee, anchor))
+            epics[epic_id]["lanes"] += 1
         if row.get("status") == "blocked" and text(row.get("external_ref")).startswith("gh-pr:") and epic_id:
             epics[epic_id]["in_review"] += 1
-    for cid, entry in regs.items():
-        if entry["live"] and entry["extra_lanes"]:
-            by_assignee[cid] = by_assignee.get(cid, 0) + entry["extra_lanes"]
-    occupied = sum(by_assignee.values())
 
     # Sort ready beads into urgent, epic-owned, and standalone outcomes.
     ready_ids = {row["id"] for row in ready_rows}
@@ -577,6 +878,8 @@ def rank(
         push(row, outcome["id"], reason_for(outcome, row) + "; over epic lane cap")
 
     emitted = queue[: max(limit, 0)]
+    admission = admission_queue(queue, rows, delivery_anchors, regs, capacity, review_state,
+                                coordinator=coordinator, now=now, limit=limit, ready_ids=ready_ids, budget=budget)
     focus_ids: list[str] = []
     for item in emitted:
         if item["outcome"] in epics and item["outcome"] not in focus_ids:
@@ -654,14 +957,10 @@ def rank(
         in_scope_ready.update(row["id"] for row in outcome["beads"])
 
     return {
-        "capacity": {
-            "budget": budget,
-            "budget_source": budget_source,
-            "by_assignee": dict(sorted(by_assignee.items())),
-            "free": max(budget - occupied, 0),
-            "occupied": occupied,
-            "other_claims": other_claims,
-        },
+        "capacity": {"budget": budget, "budget_source": budget_source, **capacity},
+        "admission": {key: value for key, value in admission.items() if key != "queue"},
+        "candidates": emitted,
+        "candidate_total": len(queue),
         "childless_epics": [entry[-1] for entry in childless[:LIST_LIMIT]],
         "closable_epics": closable[:LIST_LIMIT],
         "coordinators": [
@@ -682,12 +981,12 @@ def rank(
         "held": held[:LIST_LIMIT],
         "held_total": len(held),
         "orphaned_blocked": sorted(orphaned, key=lambda entry: entry["id"])[:LIST_LIMIT],
-        "queue": emitted,
-        "queue_total": len(queue),
+        "queue": admission["queue"],
+        "queue_total": len(admission["queue"]),
         "schema": SCHEMA,
         "scope": sorted(scope),
         "self": self_entry,
-        "status": "ok" if queue else "empty",
+        "status": "ok" if admission["queue"] else admission["status"],
         "stranded": sorted(stranded)[:LIST_LIMIT],
         "totals": {
             "epics_open": len(epics),
@@ -711,6 +1010,7 @@ def main() -> int:
     )
     parser.add_argument("--scope-epic", action="append", default=[], help="Restrict non-urgent work to this epic's subtree; repeatable.")
     parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT, help="Queue rows to emit (default 10).")
+    parser.add_argument("--review-state-file", type=Path, help="Complete Step-0 normalization; required for admission, otherwise diagnostics only.")
     parser.add_argument("--now", help="RFC 3339 UTC timestamp; supply it for byte-stable reports.")
     args = parser.parse_args()
 
@@ -722,11 +1022,12 @@ def main() -> int:
     if not repo_root.is_dir():
         emit(fatal(format_time(now), "invalid-repo-root", "bootstrap"))
         return 1
-    snapshot, error = collect(repo_root)
+    snapshot, error = collect(repo_root, with_dependencies=args.review_state_file is not None)
     if error:
         emit(fatal(format_time(now), error["code"], error["scope"]))
         return 1
     try:
+        review_state = json.loads(args.review_state_file.read_text()) if args.review_state_file else None
         payload = rank(
             snapshot,
             now=now,
@@ -735,6 +1036,7 @@ def main() -> int:
             max_lanes_per_epic=max(args.max_lanes_per_epic, 1),
             scope_epics=args.scope_epic,
             limit=args.limit,
+            review_state=review_state,
         )
     except Exception:
         payload = fatal(format_time(now), "unexpected-error", "rank")

@@ -1,11 +1,36 @@
 # Work Allocation Contract
 
-Load when turning an approved spec, confirmed gap set, or milestone into beads
-and assignments. Allocate finite accepted owner outcomes, then choose coherent
-delivery boundaries. Execution, branch, ownership, recovery, and evidence rules
+Load when turning an owner request, reproduced defect, approved spec, confirmed
+gap set, or milestone into beads and assignments. Allocate finite accepted owner
+outcomes, then choose coherent delivery boundaries. Execution, branch, ownership, recovery, and evidence rules
 live in the shared
 [`Beads delivery model`](../../beads-orchestration/references/delivery-model.md).
 This contract shapes its inputs; it does not add another execution preflight.
+
+## Governing Contract
+
+Use the smallest clear contract that establishes the authorized outcome. Within
+an authorized fix or maintenance request, a precise owner instruction, a
+reproduced regression, or settled existing behavior can govern a routine bug,
+configuration, documentation, or maintenance change. Record the intended
+observable result, owned surface, relevant constraints, and verification
+proportional to the change. A broken alias or documentation typo does not need
+a newly authored formal specification merely because none already exists.
+
+Inspect the actual source and repository instructions before calling the
+behavior settled; an old test or current implementation can itself be wrong.
+Where an existing governing spec applies, follow it or resolve its contradiction
+rather than silently substituting the observed behavior. A bug report describes
+a problem; it does not grant authority for new product behavior, a shared
+architecture decision, a trust change, deployment, or a broader scope amendment.
+
+New or unresolved product behavior, shared architectural contracts, trust
+boundaries, and authorization decisions follow their applicable shaping and
+approval gates. A repository-mandated formal spec or sign-off remains required.
+Route only that unresolved or gated work through its real boundary; absence of
+a formal spec alone does not send a clear routine fix through the full planning
+lifecycle. This is how the current packet is grounded, not another per-task
+preflight or an alternative execution mode.
 
 ## Accepted Outcome, Tracking, and Delivery
 
@@ -62,7 +87,8 @@ own criteria without repeating the whole package or programme archive.
 
 A cold reader needs unambiguous authority and current instructions, including:
 
-- the accepted outcome and the exact governing spec sections or decisions;
+- the accepted outcome and its governing request, reproduction/existing-behavior
+  evidence, or exact formal spec sections/decisions as applicable;
 - the owned modules/interfaces and any relevant trust, persistence, caller,
   compatibility, sequencing, and rollback boundaries;
 - relevant happy-path and failure behavior, including concurrency, idempotence,
@@ -84,8 +110,8 @@ Distinguish approved direction, adopted behavior, packet-complete scope, and
 runnable-now implementation. Approval of a programme is not adoption of every
 proposed interface and is not proof that every child can execute now.
 
-For a new or changed shared contract, settle its authoritative interface and
-check its source assumptions with a focused feasibility walk before releasing
+For a new or changed shared architectural contract, settle its authoritative
+interface and check its source assumptions with a focused feasibility walk before releasing
 its dependents. Record the result once at that contract; do not repeat it for
 every child. Existing stable contracts need no new ceremony. A packet is
 complete when its current scope and acceptance are unambiguous and source-grounded.
@@ -139,8 +165,8 @@ independent review; ordinary author corrections normally retain the reviewer.
 ## Handoff Check
 
 Before handing off the allocation, confirm that accepted scope remains finite,
-mandatory coverage and source/spec references are explicit, and no two owners
-make the same implementation decision. Identify coherent packages among existing
+mandatory coverage and governing/source references are explicit, and no two
+owners make the same implementation decision. Identify coherent packages among existing
 beads without duplicating tracking. Confirm current packets distinguish planning,
 partial source delivery, activation, and runtime acceptance. Name genuine waits
 and the next useful landing or completion proof. Reuse current evidence according

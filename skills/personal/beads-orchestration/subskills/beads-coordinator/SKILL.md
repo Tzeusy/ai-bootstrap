@@ -48,7 +48,9 @@ locators. Require worker bootstrap proof before editing. Never commit Dolt-manag
 ## Executable consumers
 
 - [rank_ready_work.py](scripts/rank_ready_work.py) ranks finite outcomes and
-  prerequisites, reports package-aware capacity; ranking failure dispatches nothing.
+  prerequisites and review-first admission. Pass the Step 0 normalization file;
+  `queue` is executable order, `candidates` diagnostic only. Missing review evidence
+  dispatches nothing; parked owners keep claims without consuming execution slots.
 - [coordinator_registry.py](scripts/coordinator_registry.py) is the registry writer
   and shared liveness reader; do not hand-write registry expiries.
 - [normalize_pr_review_state.py](scripts/normalize_pr_review_state.py) reports

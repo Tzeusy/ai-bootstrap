@@ -48,6 +48,24 @@ uses its own `review/<review-id>` branch/worktree, so no worktree transfer or
 original-bead release/reclaim is needed. A dispatched worker still reports lifecycle
 changes to its controller; a looper performs them itself as holder.
 
+## Review-first admission
+
+Ownership survives a wait; an executing job does not. Mark the package anchor
+blocked when it waits, retaining member claims/session/worktree. Resume it as
+in_progress only when its existing owner has an admitted execution slot. A
+reviewer holds only its review record and independently reports its result.
+
+Use the existing ranker's single admission queue in coordinator and looper paths.
+The [runtime contract](../subskills/beads-coordinator/references/runtime-and-safety.md#parallel-coordinators)
+owns capacity, WIP and priority: reviews drain before ordinary new admissions,
+corrections return to existing owners, genuine emergencies preserve preemption.
+Its bounded WIP escape admits a needed prerequisite or emergency when parked
+ownership would otherwise prevent progress; ordinary spillover gets no exemption.
+Same-head reviewed work awaiting CI/owner/merge queue is a wait, not another
+review. Spare capacity can advance a disjoint bounded outcome when runnable
+higher-class actions are admitted and the WIP bound permits it. Real hard gates
+still block only the work that depends on them.
+
 ## Branch choice is independent of session choice
 
 Default: `agent/<anchor>` based on the repository's integration base; accumulate
@@ -89,7 +107,7 @@ implicit reinterpretation of a foundation merge as feature completion.
 ## Current operative packet
 
 One concise current packet per package: accepted outcome and exclusions, member IDs
-and individual acceptance, owned interfaces, governing adopted contract locators,
+and individual acceptance, owned interfaces, applicable governing contract locators,
 current source anchors, relevant behavior/failure seams and checks, open authority
 or prerequisite gates, base and recovery/resume locator. Link immutable specs/history;
 do not inline archives, superseded alternatives, whole before/after contracts,
@@ -174,12 +192,45 @@ head, with reused content evidence and its equivalence proof explicitly identifi
 Reuse the same independent reviewer while independence holds; retain substantive
 findings and recheck deltas in the existing review record.
 
+The lifecycle holder persists the independent report on that review record using
+typed `metadata.review_receipt`, never on each member or via `--set-metadata`:
+
+```json
+{"review_receipt":{"head":"<current PR head SHA>","disposition":"ready"}}
+```
+
+Disposition is `ready`, `corrections`, `queued` or `held`. Establish the content
+verdict only from the independent report after checking the current head; retain
+findings, reviewer identity and content/equivalence evidence in the same record's
+notes/report.
+Return the review to blocked and remove review-running at that checkpoint.
+`corrections` routes to the existing implementation owner; a corrected head
+invalidates that receipt and requeues the same independent reviewer. A same-head
+`ready` receipt reuses source review while Step 0 refreshes CI/merge authority;
+`queued` awaits actual queue outcome; `held` preserves the owner gate until its
+fresh removal. None is an immutable merge permission or an acceptance closure.
+
+Step 0 also handles concrete same-head events. A failed current-head check needing
+author repair can change disposition to `corrections`, recording the failed check
+and affected scope while retaining the independent source verdict and findings.
+The queue then admits the existing owner. If a changed environment or assumption
+requires fresh reviewer execution, preserve the prior report and clear only the
+operative `review_receipt`; the queue readmits the same independent reviewer, who
+reuses unchanged source evidence and verifies the affected assumption. Do not clear
+receipts merely for a wake, pending CI, or hold removal. Scheduling transitions
+never fabricate a new independent content verdict.
+A malformed receipt or unknown head needs triage, not optimistic admission.
+
+
 ## Waits, preemption and recovery
 
 - Runnable prerequisite: finish it under one owner; multiple outcomes may wait on it.
 - Technical wait (CI/review/external dependency): retain outcome affinity and resume
-  on its event, using a bounded fallback. Do useful in-outcome work when available;
-  do not continuously poll or open unrelated outcomes just to fill slots.
+  on its event, using a bounded fallback. Prefer useful in-outcome work and runnable
+  prerequisites. When those cannot advance, the admission queue may permit disjoint
+  work within execution and WIP capacity after higher-class actions drain. Record
+  the resume event and give returning reviews/corrections priority at the next safe
+  checkpoint; do not keep opening new outcomes to manufacture activity.
 - Owner hold: publish precise dependent scope, authority and unblock event. Continue
   unaffected work; never infer consent from a prior answer or elapsed time.
 

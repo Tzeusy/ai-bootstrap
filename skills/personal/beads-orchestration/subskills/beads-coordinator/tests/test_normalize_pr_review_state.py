@@ -242,7 +242,7 @@ def pr_payload(state: str, *, created_at: str = "2026-08-14T03:00:00Z", merged_a
         "reviewDecision": None,
         "headRefName": "agent/aib-swr.1",
         "baseRefName": "main",
-        "headRefOid": "abc123",
+        "headRefOid": "a" * 40,
         "createdAt": created_at,
         "mergedAt": merged_at,
     }
@@ -393,7 +393,7 @@ class NormalizePrReviewStateTests(unittest.TestCase):
             },
             "gh": {
                 ("pr", "list", "--state", "open", "--json", "number,headRefName,createdAt"),
-                ("pr", "view", "41", "--json", "number,state,mergedAt,createdAt"),
+                ("pr", "view", "41", "--json", "number,state,mergedAt,createdAt,headRefOid"),
             },
             "git": set(),
         }
@@ -1065,6 +1065,28 @@ class NormalizePrReviewStateTests(unittest.TestCase):
         self.assertIsNone(finding["pr_number"])
         self.assertEqual(finding["recommendation"], "manual-triage")
         self.assertIn({"code": "invalid-pr-number", "scope": "review-context"}, payload["errors"])
+
+    def test_review_findings_bind_the_observed_head_and_invalid_heads_fail_closed(self) -> None:
+        original_id, review_id = "aib-swr.1", "aib-review.1"
+        fixture = {
+            "blocked_pr_review": [original_bead(original_id, 41), review_task(review_id, original_id)],
+            "shows": {original_id: [original_bead(original_id, 41)],
+                      review_id: review_show(review_id, original_id)},
+            "prs": {"41": pr_payload("OPEN")}, "open_prs": [],
+        }
+        result, _, _ = self.run_fixture(fixture)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "success")
+        self.assertTrue(payload["findings"])
+        self.assertTrue(all(finding["head_sha"] == "a" * 40 for finding in payload["findings"]))
+        for invalid in (None, "", "abc123", True, "z" * 40, "a" * 41):
+            with self.subTest(head=invalid):
+                fixture["prs"]["41"]["headRefOid"] = invalid
+                result, _, _ = self.run_fixture(fixture)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], "partial")
+                self.assertIn({"code": "invalid-pr-head", "scope": "pr-state"}, payload["errors"])
+                self.assertTrue(all(finding["head_sha"] is None for finding in payload["findings"]))
 
     def test_invalid_pr_created_at_is_partial_manual_triage_for_every_state(self) -> None:
         original_id = "aib-swr.1"

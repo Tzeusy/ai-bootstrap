@@ -23,7 +23,8 @@ rather than creating another reconciliation generation.
 ## Verification Prompt
 
 ```text
-Verify the accepted outcome at <outcome-id> against <exact spec sections>.
+Verify the accepted outcome at <outcome-id> against its governing contract
+(request/behavior evidence or applicable exact spec sections).
 Read the current acceptance and source. Reuse existing tests/review evidence
 for unchanged relevant content, then check the cross-child/runtime seam the
 outcome actually requires. Do not equate merged foundations with activation.

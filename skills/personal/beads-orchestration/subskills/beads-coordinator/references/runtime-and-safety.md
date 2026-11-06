@@ -108,15 +108,43 @@ below stops one coordinator from duplicating or undoing another's work.
   bead heartbeats lapse, and a bead blocked on review carries no fresh
   heartbeat at all. The same script's readers back `rank_ready_work.py` and
   `beads-cleanup`.
-- **One lane budget.** Global `beads.max_lanes`, else 4; only the owner changes
-  it. Capacity counts a delivery package once across its member claims, plus
-  independent review and registered `extra_lanes`. A package held in review/CI
-  still represents owned work; it is not permission to open unrelated outcomes.
-  Do not reserve every descendant of a programme. The ranker reports free capacity;
-  races can overshoot temporarily, so let the next freed lane absorb it.
-- **One queue.** Every coordinator walks the same `rank_ready_work.py` queue.
-  A failed `--claim` means a peer won that bead: take the next row, never
-  retry or contest it.
+- **Execution capacity and retained WIP differ.** Global `beads.max_lanes`, else
+  4; only the owner changes it. `capacity.occupied/free` counts currently executing
+  implementation/review work and explicit active `extra_lanes`. A package anchor
+  `in_progress` counts once, regardless of member count. A blocked/open anchor
+  parks execution while retaining every member claim, worktree and owner session.
+  Unpackaged one-bead work follows the same rule. A closed anchor cannot hide a
+  still-running member; the ranker conservatively counts pending active work.
+  Review records count execution while `in_progress`; finish the report and return
+  them to `blocked` when waiting. Never mark work parked while its job still runs.
+  Retained implementation packages count separately in `capacity.owned/free_wip`.
+  The same budget bounds new-outcome WIP; reviewers and corrections of an existing
+  package need an execution slot, not a second implementation-WIP slot. This admits
+  independent review even when every implementation owner is parked, including
+  a one-lane budget. If retained parked work fills WIP, the queue may admit one
+  overflow package for a genuine P0 emergency or the runnable prerequisite frontier
+  of an owned outcome. Execution still fits the existing budget; retained WIP can
+  exceed it by only this one package, never repeated spillover. The queue marks
+  `wip_exception`; complete it or publish a concrete handoff before another such
+  admission. A parked overflow is not permission for indefinite exclusive custody.
+  Native agent/thread limits are separate: an idle retained thread may still occupy
+  a runtime slot. Resume the existing session, check native
+  availability, and publish an explicit recovery handoff if a real runtime ceiling
+  requires retirement. Do not solve thread exhaustion by stealing claims or raising
+  the Beads budget. Concurrent claim races can briefly overshoot; the next freed
+  slot absorbs it rather than admitting more work.
+- **One priority queue.** Every coordinator and looper uses `rank_ready_work.py`
+  `beads-work-queue/v2`. After genuine P0 emergency work, drain runnable reviews,
+  then existing-owner corrections/resumes, before admitting new implementation.
+  Priority applies to queued work: once higher-class actions are admitted/running,
+  spare execution and WIP capacity can admit disjoint work. One running review is
+  not a fleet-wide idle barrier. Active jobs finish or reach a safe checkpoint;
+  a newly queued review gets the next freed slot. Do not reserve an idle review
+  lane or start another coordinator layer. The report's `queue` is admission order;
+  `candidates` is diagnostic finish-first implementation order and never authorizes
+  dispatch. Its `admission` result blocks dispatch on missing/partial/inconsistent
+  review evidence. A lost atomic claim refreshes this queue; do not skip a failed
+  high-class action and fill its slot with lower-class work from an old snapshot.
 - **Mutate only what you own.** Step 0 PR reconciliation, decision sweeps,
   shaping, review-bead creation, and closure act only on beads whose
   `assignee` is you. A bead held by a live registered coordinator is never
