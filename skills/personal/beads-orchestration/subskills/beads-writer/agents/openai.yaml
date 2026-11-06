@@ -1,4 +1,4 @@
 interface:
   display_name: "Beads Writer"
-  short_description: "Create and decompose Beads issues with full-context handoffs"
-  default_prompt: "Use $beads-writer to create or decompose Beads issues that are grounded in the repo, scoped well, and comprehensive enough for fresh sessions."
+  short_description: "Allocate finite outcomes with concise current packets"
+  default_prompt: "Use $beads-writer to create or decompose Beads issues that are grounded in the repo, scoped well, and clear for fresh owners through exact references and current acceptance."

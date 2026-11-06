@@ -1,6 +1,6 @@
 # Epic Report Bead
 
-Execution guide for the **epic report bead** — a child bead `project-direction` creates during work-plan materialization to generate a human-readable report of what was built, for human review.
+Execution guide for a separately justified **epic report bead**, when the accepted outcome needs a durable human-readable report beyond its current checklist. Reuse an existing closeout/report rather than adding another ceremony.
 
 Referenced in the report bead's description. The executor (human, `/beads-orchestration` beads-worker, or agent) follows this guide.
 
@@ -10,14 +10,15 @@ Referenced in the report bead's description. The executor (human, `/beads-orches
 
 ## Bead Template
 
-When `project-direction` calls `/beads-orchestration` (beads-writer) to create the epic, include a report bead:
+When a separately assignable report is useful, `project-direction` may ask
+`/beads-orchestration` (beads-writer) to create one:
 
 ```
 Title: "Generate epic report for: {epic title}"
 Type: task
 Priority: same as epic
 Parent: {epic-id}
-Dependencies: ALL implementation children + reconciliation bead (this runs last)
+Dependencies: the mandatory implementation needed for this report; reuse the outcome closeout rather than requiring a separate reconciliation bead
 Description: |
   Generate a human-readable epic report following the guide in
   <skill_dir>/references/epic-report.md.
@@ -36,7 +37,7 @@ Acceptance criteria:
   - Diagram decision recorded; useful diagrams rendered and embedded
   - Spec compliance matrix complete
   - Discoveries classified and durably routed; no TODO auto-filed without triage
-  - Every in-scope v1-mandatory requirement implemented or changed by an approved spec amendment
+  - Every in-scope v1-mandatory requirement has truthful complete/partial/missing evidence; the accepted outcome remains open for unmet criteria unless its authority explicitly amends scope
   - Report linked to epic via bd update --append-notes
 ```
 
@@ -44,12 +45,10 @@ Acceptance criteria:
 
 ## When to Include
 
-Include a report bead for epics that are:
-- Non-trivial (>=3 children or >100 lines expected)
-- Multi-module or architectural
-- A user-facing milestone
-
-Skip: single-bead fixes, config changes, doc-only epics.
+Use a report when cross-child or end-to-end evidence needs a maintained artifact
+for the owner. An outcome checklist or existing report is sufficient when it
+already communicates acceptance, remaining criteria, and evidence. Child count
+and diff size alone do not require another tracking/review cycle.
 
 ---
 

@@ -1,4 +1,4 @@
 interface:
   display_name: "Beads Looper"
-  short_description: "Self-paced single-lane Beads loop: implement or review, no central coordinator"
-  default_prompt: "Use $beads-looper to run this session as one self-paced Beads lane: in implement mode take the next finish-first bead, finish it in its own worktree, pass the adversarial verifier, and land it or hand its PR to the review lane; in review mode review, merge, and close handed-off PRs."
+  short_description: "Own a bounded outcome through delivery and corrections"
+  default_prompt: "Use $beads-looper to own this accepted outcome through cohesive packages, testing, independent review corrections and landing or explicit recovery handoff; review mode serves those existing owners independently."

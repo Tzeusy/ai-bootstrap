@@ -477,6 +477,46 @@ class CleanupScanTests(unittest.TestCase):
         self.assertNotIn({"code": "worktree-unavailable", "scope": "claims"}, payload["errors"])
         self.assertEqual(payload["status"], "success")
 
+    def test_serialized_member_metadata_uses_anchor_and_malformed_metadata_fails_closed(self):
+        member = bead("aib-terminal", "in_progress", notes=heartbeat("2026-08-14T03:00:00Z"))
+        member["metadata"] = json.dumps({"delivery_anchor": "aib-adapters"})
+        result, calls, _ = self.run_fixture({"in_progress": [member], "open_prs": []})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        claim = json.loads(result.stdout)["claims"][0]
+        self.assertEqual(claim["delivery_anchor"], "aib-adapters")
+        self.assertEqual(claim["recommendation"], "recover-package")
+        member["metadata"] = {"delivery_anchor": ["aib-adapters"]}
+        result, _, _ = self.run_fixture({"in_progress": [member], "open_prs": []})
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "fatal")
+        self.assertEqual(payload["claims"], [])
+
+    def test_dead_member_recovers_anchor_package_and_keeps_partial_artifacts(self):
+        anchor, member = "aib-adapters", "aib-terminal"
+        original = bead(anchor, "closed")
+        original["metadata"] = {"delivery": {"schema": "beads-delivery/v1", "anchor": anchor,
+            "members": [anchor, member], "owner": "coordinator:dead", "outcome": "aib-runtime",
+            "base_branch": "main", "packet": "Adapter corrections"}}
+        pending = bead(member, "in_progress", notes=heartbeat("2026-08-14T03:00:00Z"))
+        pending["metadata"] = {"delivery_anchor": anchor}
+        result, calls, _ = self.run_fixture({
+            "in_progress": [pending], "blocked": [{**pending, "status": "blocked"}],
+            "worktree_entries": [worktree_entry(path_id=anchor, branch_id=anchor)],
+            "worktree_dirs": [anchor], "remote_branches": [anchor],
+            "shows": {anchor: [original]}, "artifact_dirs": [f"{anchor}-build"],
+            "open_prs": [], "blocked_pr_review": [], "blocked_pr_review_tasks": []})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["claims"][0]["recommendation"], "recover-package")
+        self.assertEqual(payload["claims"][0]["delivery_anchor"], anchor)
+        self.assertTrue(payload["claims"][0]["worktree_exists"])
+        self.assertEqual(payload["blockers"][0]["recommendation"], "remain-in-package")
+        self.assertEqual(payload["worktrees"][0]["recommendation"], "recover-package")
+        self.assertEqual(payload["build_artifacts"][0]["recommendation"], "preserve-active-bead")
+        remote_probes = [item["argv"][-1] for item in calls if item["tool"] == "git" and "ls-remote" in item["argv"]]
+        self.assertNotIn(f"agent/{member}", remote_probes)
+
     def test_claims_ordinary_same_name_worktree_topology_still_resolves(self) -> None:
         fixture = {
             "in_progress": [bead("aib-plain", "in_progress", notes=heartbeat("2026-08-14T03:00:00Z"))],
@@ -1033,6 +1073,25 @@ class CleanupScanTests(unittest.TestCase):
                 self.assertEqual(payload["pr_review"]["findings"], [])
                 self.assertEqual(payload["pr_review"]["self_heal_candidates"], [])
                 self.assertIn({"code": "normalizer-failed", "scope": "pr-review"}, payload["errors"])
+
+    def test_package_reconciliation_preserves_members_and_rejects_missing_members(self):
+        finding = {"canonical_review_id": None, "context_status": "resolved", "cooldown_until": None,
+                   "duplicate_of": None, "kind": "original", "original_id": "aib-adapters",
+                   "pr_number": 41, "pr_state": "MERGED", "recommendation": "reconcile-package-members",
+                   "review_id": None}
+        for members in (["aib-adapters", "aib-terminal"], None, ["aib-adapters", "aib-adapters"]):
+            with self.subTest(members=members):
+                source = {**finding, **({"delivery_members": members} if members is not None else {})}
+                result, _, _ = self.run_fixture({"normalizer_stdout": json.dumps({
+                    "schema": "beads-pr-review-normalization/v1", "status": "success", "errors": [],
+                    "findings": [source], "self_heal_candidates": []})})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                preserved = json.loads(result.stdout)["pr_review"]["findings"][0]
+                if members == ["aib-adapters", "aib-terminal"]:
+                    self.assertEqual(preserved["recommendation"], "reconcile-package-members")
+                    self.assertEqual(preserved["delivery_members"], members)
+                else:
+                    self.assertEqual(preserved["recommendation"], "manual-triage")
 
     def test_invalid_required_finding_evidence_is_partial_manual_triage(self) -> None:
         valid_finding = {

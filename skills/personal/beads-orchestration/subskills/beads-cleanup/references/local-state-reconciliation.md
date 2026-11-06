@@ -33,6 +33,7 @@ back to heartbeats alone.
 | Fresh heartbeat, or `owner_live` | `preserve-live-claim` |
 | Git probe failed or worktree evidence is unavailable | `manual-triage` |
 | Unpublished work exists | `preserve-unpublished-work` |
+| Package metadata with dead owner | `recover-package`; inspect journal, anchor branch and every member together |
 | Stale heartbeat with complete negative evidence | `release-claim-candidate` for coordinator verification |
 | Missing or malformed heartbeat | `manual-triage` |
 
@@ -42,10 +43,19 @@ has a fresh heartbeat, report manual triage and leave ownership unchanged. A
 only the claims that `../../beads-coordinator/references/runtime-and-safety.md`
 → "Adopt the dead, guarded" allows, with its guarded command.
 
+Package members use the anchor's branch/worktree evidence. Never release an
+individual member from a package because it has no same-named branch. Recovery
+uses [delivery policy](../../../references/delivery-model.md) and the existing
+claim journal. Unknown publication state preserves all work. A closed anchor's
+worktree remains `recover-package` until every member's disposition and local
+commits are verified; partial delivery cannot authorize cleanup.
+
 ## Pass 4: Blocked Beads Whose Blockers Are Closed
 
 Use `blockers` findings to distinguish complete dependency evidence from
-unknown or malformed dependency state:
+unknown or malformed dependency state. Package members report
+`remain-in-package`; their current owner controls continuation and genuine
+hard gates remain binding:
 
 | Dependency result | Report recommendation |
 |---|---|

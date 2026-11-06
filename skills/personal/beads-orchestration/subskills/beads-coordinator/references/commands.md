@@ -19,8 +19,12 @@ Coordinator responsibilities:
 - renew the stall heartbeat at the checkpoints in `runtime-and-safety.md`
   (TTL, cadence, and the skip-if-recently-renewed rule are canonical there)
 - replace the canonical heartbeat block in notes; never append a second one
-- keep every wake inside the prompt-cache window (`runtime-and-safety.md` →
-  "Orchestrator Wake Cadence")
+- wake on useful events; renew registry for the bounded fallback wait
+
+For multi-bead claims/recovery/closure plans use
+[delivery_package.py](../../../scripts/delivery_package.py), not a bulk native
+claim. [Delivery model](../../../references/delivery-model.md) owns canonical
+manifest association, guarded journal recovery and individual acceptance closure.
 
 ## Session Completion Checklist
 
@@ -71,7 +75,7 @@ default coordinator views.
 | Claim issue | `bd --actor "$COORDINATOR_ID" update <id> --claim --json` (atomic; sets `assignee` + `in_progress`), then write the stall heartbeat note |
 | Release issue | `bd --actor "$COORDINATOR_ID" unclaim <id> --reason "<why>"` (clears the assignee and reopens it) |
 | Adopt a dead peer's bead | guarded `bd --actor "$COORDINATOR_ID" update <id> --if-assignee '<old>' --if-status <status> …`; exit 13 means a peer won (`runtime-and-safety.md` → "Adopt the dead, guarded") |
-| Close finished epics | `bd --actor "$COORDINATOR_ID" epic close-eligible --json` (after Step 0 merges) |
+| Evaluate outcome closure | Compare original accepted outcome and runtime/activation proof; child counts alone never authorize closure |
 | Stamp readiness rejection | `bd --actor "$COORDINATOR_ID" update <id> --add-label needs-shaping --append-notes "dispatch-readiness <date> <COORDINATOR_ID>: missing <fields>"` (see the readiness gate in `coordinator-loop.md`) |
 | Shaped beads awaiting re-check | `bd list --label needs-shaping --json \| jq -c '[.[] \| {id, title, labels}]'` |
 | Block review issue | `bd --actor "$COORDINATOR_ID" update <id> --status blocked --json` |

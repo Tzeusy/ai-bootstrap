@@ -1,133 +1,64 @@
-# Reconciliation Beads
+# Finite Outcome Closeout
 
-Every epic must end with one final child bead that performs spec-to-code reconciliation.
+Use when an accepted outcome needs cross-child or end-to-end verification.
+Keep one closeout path on the existing outcome: its checklist, an existing
+report, or one closeout bead when separately assignable work is warranted.
+There is no mandatory reconciliation bead per epic/package and no recursive
+reconciliation-generation hierarchy.
 
 ## Contract
 
-- Create the reconciliation bead last, after all implementation children exist.
-- Make it depend on every other child so it runs last.
-- Use the same priority as the epic.
-- Tag the title with generation: `gen-1`, `gen-2`, or `gen-3`.
-- `gen-3` is the hard limit. Do not create `gen-4`.
-- Add the `reconciliation` label (`--label reconciliation`). The coordinator
-  keys model selection off this label: for a medium-or-higher epic the
-  reconciliation bead is dispatched at `EPIC_COMPLEXITY_MODEL` (Opus on
-  Claude), not the default coding tier. See "Reconciliation Floor" in the
-  coordinator's `runtime-and-safety.md`.
+The accepted outcome remains open while mandatory acceptance is partial.
+A closeout verifies code and required runtime behavior against that baseline,
+including activation when accepted scope requires it. Specification adoption,
+foundation delivery, and dark source merges are reported separately.
 
-Purpose: verify that every requirement from the original epic or spec has a
-corresponding implementation bead and code change. If gaps exist, report gap
-candidates and next-generation reconciliation needs to the coordinator; the
-dispatched reconciliation worker never mutates Beads lifecycle.
+If a closeout bead is useful, give it the outcome's priority, exact governing
+references, and the `reconciliation` label for the existing model-selection
+floor. Make it depend only on the implementation needed for its proof. Do not
+block a useful mandatory release on an optional tail. Reuse this same record
+when evidence is incomplete; report gaps to the existing implementation owner
+rather than creating another reconciliation generation.
 
-## Template
-
-- Title: `Reconcile spec-to-code (gen-1) for <epic summary>`
-- Type: `task`
-- Priority: same as the epic
-- Label: `reconciliation`
-- Description:
+## Verification Prompt
 
 ```text
-Deep-dive review: compare the original spec/requirements (see epic description)
-against the implementation delivered by sibling beads under this epic.
+Verify the accepted outcome at <outcome-id> against <exact spec sections>.
+Read the current acceptance and source. Reuse existing tests/review evidence
+for unchanged relevant content, then check the cross-child/runtime seam the
+outcome actually requires. Do not equate merged foundations with activation.
 
-Mindset: audit the CODEBASE against the spec, not the sibling diffs against
-their bead descriptions. Your job is to FALSIFY the coverage claim, not to
-collect confirming evidence. A requirement counts as implemented only after
-you have read the implementing code — a test existing, or the suite being
-green, is never sufficient evidence by itself.
+For each accepted requirement, record implemented/partial/missing/deviates,
+with source evidence and the required behavior proof. For universal or negative
+claims, enumerate the applicable paths, including pre-existing paths; one
+compliant example is insufficient. Check that any scan/guard covers its
+mandated surface and compare multiple producers/consumers of the same contract.
+A green test proves only the behavior and environment it exercised.
 
-Workflow:
-1. Re-read the epic description and all sibling bead descriptions/acceptance criteria.
-2. Audit the code. Start from the sibling diffs, but treat the whole codebase
-   as in scope — spec invariants bind pre-existing code too.
-3. For every universal or negative requirement ("no X anywhere", "every Y
-   must", "the only path is Z"): enumerate ALL code paths performing that
-   operation (search the repo), and verify each one. One compliant path
-   proves nothing.
-4. Audit the instruments. For every guardrail/scan test, read its regex,
-   glob, and scan roots and check they cover the surface the spec mandates —
-   a green-but-blind guardrail is itself a gap; the fix is widening that
-   guard's scope, not adding a parallel test. For every spec scenario,
-   confirm ONE gate pins it: a test that EXECUTES the behavior (DB/integration
-   level) or, for structural invariants, the designated scan guard. A test
-   that merely greps source for a feature does not count as a behavior gate,
-   and a scenario already pinned by one species does not need a second.
-5. When several surfaces implement the same contract (N readers of one
-   store, N writers of one table), diff them against each other for
-   consistency: filters, defaults, ordering, authz.
-6. Produce a checklist mapping every spec requirement to its implementing
-   bead and code evidence (file:line), classified
-   implemented/partial/missing/deviates. For large epics, fan out
-   independent read-only per-spec-area skeptic subagents and merge their
-   findings (the read-only helper allowance in `beads-worker/SKILL.md`; they
-   never write code).
-7. For every partial or missing requirement, report a cold-start-ready gap
-   candidate in `Discovered-Follow-Ups-JSON`, including priority, proposed
-   parent/dependencies, exact spec link, acceptance evidence, the gate
-   species that will pin it, and the expected net test delta. The deliverable
-   of reconciliation is the report plus spec amendments; new tests are
-   proposed only for scenarios with NO gate, never as "prove X" additions for
-   behavior an existing test already executes.
-8. When gaps remain, report the need for the next-generation reconciliation
-   candidate (up to gen-3) and return `blocked-awaiting-coordinator` with
-   "coverage gaps remain" as the unblock condition.
-9. The coordinator dedupes/materializes the reported gaps, wires dependencies,
-   and keeps this reconciliation bead blocked until the gap children and next
-   reconciliation generation close.
-10. A later reconciliation pass re-runs the checklist. Only the coordinator
-    closes lifecycle state after full coverage is reported and verified.
-11. If coverage is complete and the epic is managed via an OpenSpec change,
-    run /opsx:sync to synchronize deltas into the authoritative application spec.
+Return ordinary correctness gaps to the accountable implementation owner in
+the same package/PR where possible. Report gap candidates only when a distinct
+prerequisite, scope, or governing boundary really requires separate work; dedupe
+against existing tracking. Preserve every incomplete acceptance item on the
+original outcome. Do not create recursive closeout records or silently defer
+mandatory criteria. Any scope amendment needs its actual authority.
+
+Report complete acceptance only with evidence for all mandatory criteria,
+including authorization/activation/runtime proof where required. A dispatched
+worker reports; the holding coordinator or looper performs lifecycle closure
+after independently confirming the required evidence and landing state.
 ```
 
-- Acceptance criteria:
+## Evidence and Follow-through
 
-```text
-1. Every requirement in the epic spec has a corresponding implementation bead.
-2. Universal/negative invariants are verified by enumerating every code path
-   that performs the operation, not by citing a single compliant example.
-3. Guardrail/scan tests were audited for blind spots (scan scope vs the
-   spec-mandated surface), and every spec scenario is pinned by exactly one
-   gate species (a behavior-executing test, or the designated scan guard for
-   structural invariants); no gap candidate proposes tests for a scenario
-   that already has one.
-4. Any gaps found are reported as dedupe-ready child-bead candidates under the same epic.
-5. If gaps were found, the handoff reports a next-generation reconciliation candidate.
-6. The close reason records the reconciliation summary.
-```
+Do not add tests for behavior already pinned by a suitable gate merely to
+produce a reconciliation artifact. Extend the nearest behavior-executing test
+when a real gap exists under the shared test-growth policy. Preserve substantive
+findings and refresh only evidence invalidated by relevant content or environment
+changes. An unchanged review/test verdict is not repeated because the next
+session resumed.
 
-## Known Failure Modes (why the template insists on falsification)
-
-Observed in practice (butlers entity-v3 gen-1 recon, 2026-06: reported 26/26
-"full coverage"; an adversarial re-audit the next day found two P1 violations
-and four P2 gaps). The four holes, all generalizable:
-
-1. **Instrument trust.** "Guardrail test exists + suite green" was accepted as
-   proof of an invariant; the guardrail's regex was blind to the one real
-   violating form in the codebase (`ON CONFLICT ... DO UPDATE` vs a
-   `UPDATE ... SET` pattern). The instrument is an audit target, not evidence.
-2. **Positive-example verification of universal claims.** "No merge without
-   review" was checked by confirming the new endpoint complies; two
-   pre-existing endpoints that bypass it were never searched for.
-3. **Diff scoping.** Auditing only "changes delivered by sibling beads"
-   structurally excludes pre-existing code that violates the new spec.
-4. **No cross-surface diffing.** Four readers of the same store each looked
-   fine in isolation; only comparing them side by side exposed an
-   inconsistent filter.
-
-A matching exercise ("find evidence each requirement is implemented") will
-report full coverage on an epic with live spec violations. Only counterexample
-search finds the gaps.
-
-## Dependency Wiring
-
-Create the bead first, then add dependencies from the reconciliation bead to every implementation child:
-
-```bash
-bd dep add <recon-id> <child-id>
-```
-
-When the coordinator creates new gap beads later, it wires the next-generation
-reconciliation bead to those gaps as well.
+The owner updates the same outcome's checklist with remaining criteria and the
+next proof. A separately approved deferral names the acceptance removed and
+its authority. Useful landed work remains published if an optional tail is
+held. The larger outcome is reported as partial until its accepted mandatory
+scope is actually met.

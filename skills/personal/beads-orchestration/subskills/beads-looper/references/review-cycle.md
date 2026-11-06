@@ -1,194 +1,66 @@
-# Review Cycle
+# Independent review cycle
 
-One iteration of the review lane. This lane is the sticky reviewer lane of
-`../../beads-coordinator/references/runtime-and-safety.md` → "Review Risk
-Tiers": one session reviews PR after PR, which keeps the repo context cached.
-It owns PR state for every unit that implement lanes hand off. It never
-authors fixes, so this mode has no reviewer-as-fixer path. `CO` is the
-absolute path of the `beads-coordinator` package, and `RV` the absolute path
-of the `beads-pr-reviewer-worker` package. Resolve `REPO_ROOT` with the
-command in `../SKILL.md` → "Launch". Renew the stall heartbeat and the
-registration through long reviews and CI waits, exactly as the implement
-cycle's "Work" step says.
+Serve persistent outcome owners; do not take their implementation claims. Shared
+[delivery policy](../../../references/delivery-model.md) owns content evidence and
+per-member acceptance; [reviewer worker](../../beads-pr-reviewer-worker/SKILL.md)
+owns substantive review and fail-closed merge readiness.
 
-## 1. Sweep Every Unit You Hold
+## Take a review
 
-Run the canonical [Owner merge hold](../../beads-coordinator/references/coordinator-loop.md#owner-merge-hold)
-inventory on every cycle, including frontier/final reports: all OPEN held PRs,
-number/title/actual CI or UNKNOWN; none only after a successful empty read.
-Foreign PRs are listed without adoption. Partial/error inventory is unavailable.
-Apply its fresh guard immediately before every enqueue/merge/close, including
-queue-direct re-enrollment and each retry; cached normalizer advice is never
-authorization. Owner-performed terminal MERGED/CLOSED state still reconciles
-normally even with the label remaining.
-
-Start each wake with every original assigned to `LOOPER_ID`. Reconcile each
-one against its PR using the `$CO/references/coordinator-loop.md` → "0b.
-Reconcile blocked PR-review beads" table:
-
-- **`MERGED`**: close the review bead (if any) and the original. Run that
-  file's "Post-closure branch and worktree cleanup", copy receipts and delete
-  the original's `<id>-*` artifacts, then run
-  `bd --actor "$LOOPER_ID" epic close-eligible --json`.
-- **`CLOSED` unmerged**: close the review bead as superseded, then release
-  the original for re-triage. Remove `pr-review` while releasing, because the
-  ranker never queues a bead that carries it:
-
-  ```bash
-  bd --actor "$LOOPER_ID" update <original-id> --if-assignee "$LOOPER_ID" --status open \
-    --assignee '' --remove-label pr-review --append-notes "[pr-closed] <why>" --json
-  ```
-
-- **`OPEN` + `owner-merge`**: keep the canonical unit, report held-for-owner,
-  and perform no enrollment/merge/close action, including queued/armed PRs.
-  Preserve authorized correction/review work; no auto-dequeue, hold-only blocker
-  or repeated review of the same head solely to merge. Check again next cycle;
-  label removal resumes normal rules without another reset.
-- **`OPEN`**: apply the table's queue rows after the fresh hold overlay. If
-  the PR is queued, wait; it counts as near-term work for the wake cadence. If auto-merge is armed but
-  the PR is not queued, clear the stale label and wait. A `queue-direct` PR
-  that is not enrolled gets enrolled again. Any other held unit goes to step
-  3 as a retry once its review bead has no open blockers.
-
-## 2. Adopt Orphans
-
-Some originals sit `blocked` with `gh-pr:<N>` and no live holder. Take them
-over, then reconcile them as in step 1 within the same wake:
-
-- **Unassigned, and the PR is `MERGED`, `CLOSED`, or labelled `queue-direct`:**
-
-  ```bash
-  bd --actor "$LOOPER_ID" update <original-id> --if-assignee '' --if-status blocked \
-    --assignee "$LOOPER_ID" --json    # exit 13: a peer took it; skip
-  ```
-
-  An unassigned original whose `OPEN` PR has a review bead is not an orphan.
-  It is a unit waiting for review, and step 3 handles it.
-- **Held by a dead coordinator** under "Parallel Coordinators", whatever the
-  PR state. The ranker lists these as `orphaned_blocked` rows of kind `pr`
-  (`$CO/scripts/rank_ready_work.py`). Adopt each with
-  `--if-assignee '<dead-id>'`. Adopt its review bead in the same way,
-  original first and review bead second.
-
-## 3. Select The Next Review
+Look for canonical package-anchor review records. Dedupe by anchor/PR, never create
+one per member. Acquire only the review bead with this actor and mark `review-running`;
+implementation claims remain with their owner. For an unassigned blocked review,
+use guarded acquisition (native `--claim` refuses blocked records):
 
 ```bash
-uv run "$CO/scripts/normalize_pr_review_state.py" --repo-root "$REPO_ROOT"
+bd --actor "$LOOPER_ID" update <review-id> --if-assignee '' \
+  --if-status blocked --assignee "$LOOPER_ID" --status in_progress \
+  --add-label review-running --json
 ```
 
-The scan is the inventory and the fail-closed gate. On `partial` or `fatal`,
-review nothing this wake. Its recommendations do not authorize anything;
-re-read the live `bd`/`gh` state before each mutation. A unit is reviewable
-only when all of these hold. The fresh owner-hold overlay outranks dispatch
-recommendations: a held PR may receive authorized review/corrections, but skip
-same-head redispatch whose sole purpose is a merge attempt:
+Exit 13 loses the race and dispatches nothing. For your existing blocked review,
+use your own assignee in the guard and continue the same reviewer. A live peer's
+review claim cannot be taken. Register/count this review capacity using the existing
+registry; recover dead review sessions under existing guarded liveness rules.
 
-- Its PR is `OPEN`, not in a merge queue, and past the cooldown
-  (`$CO/references/coordinator-loop.md` → "Constraints").
-- It is handed off, or already yours:
-  - **Handed off**: the original is `blocked`, labelled `pr-review`, and
-    unassigned. The review bead is unassigned, or yours and labelled
-    `corrections-requested`, which means the corrected head is back.
-  - **Yours, as a retry**: the original and the `blocked` review bead are
-    both yours, and the review bead has no open blockers.
-- `capacity.free > 0`, as reported by `$CO/scripts/rank_ready_work.py`.
+Resolve anchor manifest and PR; create a separate `review/<review-id>` worktree at
+the published head. Never remove the implementation owner's worktree or check out
+its branch here. Native reviewer bootstrap verifies repository identity and branch.
+The preparation helper fetches a snapshot; actual conflicts go to the owner.
 
-Take the oldest PR first. A high-tier PR (risk tiers above) needs a fresh
-independent reviewer. Spawn a new `beads-pr-reviewer-worker` subagent for it
-instead of reviewing in this session, and reconcile its report as your own.
+## Review and communicate
 
-## 4. Take The Unit
+Use the worker's review phases. Check member acceptance, runtime claims, contracts,
+callers and failure seams, not just diff formatting. Report every evidenced finding.
+Reuse previous independent content verdicts when unchanged relevant content and
+assumptions are proved; recheck affected deltas after corrections. Current merge
+checks/labels/permissions remain time-sensitive. The receipt binds current head to
+its fresh/reused content evidence; broad required final-tree CI still runs where
+repository policy places it.
 
-`--claim` refuses `blocked` beads (`../../../references/known-errors.md`).
-Every take is therefore a guarded update:
+Send actionable findings directly to the existing implementation session in the
+anchor packet. Keep same review record and session for rechecks. Notify its lifecycle
+controller of state changes only; avoid relaying each comment through a coordinator.
+A reviewer who authored semantic fixes cannot attest those changes independently.
 
-```bash
-# original: skip this line when it is already yours
-bd --actor "$LOOPER_ID" update <original-id> --if-assignee '' --if-status blocked \
-  --assignee "$LOOPER_ID" --json     # exit 13: skip the unit
-# review bead: use --if-assignee "$LOOPER_ID" when it is already yours
-bd --actor "$LOOPER_ID" update <review-id> --if-assignee '' --if-status blocked \
-  --assignee "$LOOPER_ID" --status in_progress --json
-bd --actor "$LOOPER_ID" update <review-id> --add-label review-running \
-  --remove-label corrections-requested --json
-```
+## Reconcile review state
 
-If the review bead's update exits 13 after you took the original, release the
-original again (`--if-assignee "$LOOPER_ID" --assignee ''`) and skip the
-unit. Then write the stall heartbeat on the review bead.
+| Report | Action |
+|---|---|
+| corrections-required | Keep canonical review blocked, remove review-running, send findings to existing owner. Do not reopen/unassign original or remove its worktree. |
+| merge-queued | Verify actual queue entry; mark review waiting, notify owner, resume on queue event. |
+| held-for-owner | Preserve findings/content evidence, remove review-running; no merge/close/enqueue or hold-only blocker; notify dependent scope. |
+| merged-pr | Notify owner with fresh MERGED/base/content evidence. Owner applies per-member closure; reviewer never closes all members from merge state alone. |
+| pushed-review-fixes | Preserve recovery evidence; request another independent reviewer for authored content. |
+| blocked-awaiting-coordinator | Send concrete external/hard gate to owner/controller; ordinary CI/conflict corrections go to implementer. |
+| invalid-runtime-context | Preserve work, release only guarded own review claim to blocked; stop repeated invalid bootstrap. |
 
-## 5. Review
+Every merge/queue/close action uses the current
+[owner hold guard](../../beads-coordinator/references/coordinator-loop.md#owner-merge-hold),
+required checks and independent current-head receipt. Failed/partial reads block
+the action. No main-policy bypass for integration branches or grouped tracking.
 
-Create the review worktree, keyed by the review bead:
-
-```bash
-(cd "$REPO_ROOT" && bd worktree create ".worktrees/parallel-agents/<review-id>" --branch "agent/<review-id>")
-```
-
-Read `$RV/SKILL.md` once per session and run its Phases 1-5 there, passing
-`MERGE_QUEUE` from the preflight. Apply the two-stage branch attestation
-(`$CO/references/coordinator-loop.md` → "Step 6a: Bootstrap The Worker").
-
-Skip Phase 2 step 1 of that skill, which unconditionally removes the
-original's worktree. An implement lane tears its worktree down before it
-releases, so normally no worktree holds `agent/<original-id>` here. If one
-does, it belongs to whoever holds the original, which is you now. Clear it
-with the implement cycle's "Clear leftovers" procedure, which quarantines
-unpublished work rather than deleting it. The skill's report is the input to
-step 6.
-
-## 6. Reconcile By Reviewer Status
-
-Follow `$CO/references/coordinator-loop.md` → "When a reviewer worker
-completes", with these looper-specific differences:
-
-- **`held-for-owner`**: freshly verify OPEN + held labels; require
-  `Merge-Performed: no` and `PR-Closed: no`. Remove `review-running`, keep the
-  canonical original/review relationship, and record the hold without a
-  hold-only blocker. Retain Head-Commit, Reviewed-Head-Commit, Reviewer-Identity,
-  Risk-Tier, Review-Actions-JSON and findings; actionable corrections still go
-  to the implement lane, and exceptional pushed fixes still require a fresh
-  independent reviewer. Do not repeat same-head review solely to merge.
-  Recompute next cycle; if the owner already MERGED/CLOSED, use step 1 instead.
-- **`merged-pr`**: confirm `MERGED`, then reconcile as in step 1.
-- **`merge-queued`**: confirm the queue entry. Label the review bead
-  `merge-queued`, remove `review-running`, and set it back to `blocked`. Keep
-  holding both beads, and let step 1 close them on `MERGED`.
-- **`corrections-required`**: return the work to the implement lanes.
-  1. Tear down the review worktree **first**, so `agent/<original-id>` is
-     free.
-  2. While you still hold the original, update its `[review-cycle]` note in
-     place. If the count reaches that note's two-correction checkpoint, apply
-     the checkpoint now.
-  3. Hand the original back, and keep the review bead so the same reviewer
-     re-checks the corrected head:
-
-  ```bash
-  bd --actor "$LOOPER_ID" dep remove <original-id> <review-id>
-  bd --actor "$LOOPER_ID" update <review-id> --status blocked \
-    --remove-label review-running --add-label corrections-requested --json
-  bd --actor "$LOOPER_ID" update <original-id> --if-assignee "$LOOPER_ID" --status open \
-    --assignee '' --remove-label pr-review --add-label review-correction \
-    --append-notes "[review-correction] pr=<N> review=<review-id> reviewed_head=<sha>" --json
-  ```
-
-- **`blocked-awaiting-coordinator`**:
-  - If the author can fix the cause (a `rebase-conflict`, or a CI failure
-    caused by the diff), hand it back as `corrections-required` and name the
-    conflict or failure in the correction note.
-  - Decide anything else that the decision-autonomy rules let you decide.
-  - File external blockers as beads and run
-    `bd --actor "$LOOPER_ID" dep add <review-id> <blocker-id>`. Keep the unit
-    with the review bead `blocked`. Step 1 retries it once those blockers
-    close.
-- **`invalid-runtime-context`**: set the review bead back to `blocked` and
-  remove `review-running`. Tear down, then release both beads with
-  `--assignee ''`, and report. Stop the loop if it repeats.
-
-## 7. Tear Down
-
-Check that the review worktree is clean, then run
-`bd worktree remove ".worktrees/parallel-agents/<review-id>" --force`. Delete
-its local branches, `agent/<review-id>` and the local `agent/<original-id>`.
-The reviewer pushes only prepared heads, so nothing in the worktree is
-unpublished. Only the post-closure cleanup deletes the remote branch.
+Delete only the review snapshot after proving clean/no unpublished work; retain
+review record, findings and affinity through corrections. Retire on independence
+loss or demonstrated drift, with an explicit published handoff. Wait on events,
+not repeated same-head reviews solely to attempt a held merge.

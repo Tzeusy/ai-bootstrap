@@ -143,10 +143,6 @@ class BreadsPrReviewerWorkerPackageTests(unittest.TestCase):
         contents = SKILL_MD.read_text(encoding="utf-8").lower()
         self.assertIn("semantic regardless of line count", contents)
 
-    def test_beads_cleanup_is_classified_as_pre_review_hygiene(self) -> None:
-        contents = SKILL_MD.read_text(encoding="utf-8").lower()
-        self.assertIn(".beads branch-hygiene cleanup is non-semantic", contents)
-
     def test_all_scripts_compile(self) -> None:
         for script in SCRIPTS_DIR.glob("*.py"):
             result = subprocess.run(

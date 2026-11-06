@@ -44,8 +44,7 @@ Heartbeat and stall parameters (canonical; do not restate elsewhere):
 - Heartbeat TTL: 20 minutes.
 - Renewal target: every 5 minutes while active, and before every mutation.
 - Worker stall threshold: at least 30 minutes without a progress signal before
-  force-release, unless a runtime-specific note below states otherwise. Team
-  Leads get 3x this threshold (see `epic-coordination.md`).
+  force-release, unless a runtime-specific note below states otherwise. A technical wait with a recorded resume event is not a stalled implementer.
 
 Repeat this rule during long runs:
 
@@ -98,28 +97,23 @@ below stops one coordinator from duplicating or undoing another's work.
   $REG deregister --repo-root "$REPO_ROOT" --id "$COORDINATOR_ID"  # on stop
   ```
 
-  `--startup` exits 3 when the id is already live: mint a new id. `register`
+  `--startup` exits 3 when the id is already live: a new launch mints a new id.
+  A genuine continuation resumes the existing session/actor, without startup. `register`
   skips the write while the stored expiry still covers the next wake, so
   routine wakes add no tracker history. Pass `--extra-lanes K` while you run
-  lanes the tracker cannot see (Team Lead subworkers, `epic-coordination.md`)
+  lanes the tracker cannot see (for example a separately running review session)
   so peers count them. A coordinator is live while its `expires_at` is in the
   future (and no more than 3 hours ahead). Liveness is per coordinator, not
-  per bead, because a coordinator sleeping between cache-bounded wakes lets
+  per bead, because a coordinator sleeping between event-driven wakes lets
   bead heartbeats lapse, and a bead blocked on review carries no fresh
   heartbeat at all. The same script's readers back `rank_ready_work.py` and
   `beads-cleanup`.
-- **One lane budget.** The lane limit is global: the `beads.max_lanes` kv key,
-  else 4. A lane is an `in_progress` bead held by a `coordinator:` assignee,
-  plus each live coordinator's `extra_lanes`; `rank_ready_work.py` reports
-  `capacity.free`. Claims by humans or other tools are listed as
-  `capacity.other_claims` and do not spend the budget. Every claim needs
-  `free > 0`, including a lane continuing with its next bead (the lane's
-  previous bead already returned its slot when it left `in_progress`). Two
-  coordinators racing for the last lane can overshoot by one each; the next
-  freed lane absorbs it rather than being refilled. Only the owner sets the
-  key (`bd --actor "$COORDINATOR_ID" kv set beads.max_lanes <n>`); a
-  coordinator writes it only to relay an explicit owner instruction about the
-  total.
+- **One lane budget.** Global `beads.max_lanes`, else 4; only the owner changes
+  it. Capacity counts a delivery package once across its member claims, plus
+  independent review and registered `extra_lanes`. A package held in review/CI
+  still represents owned work; it is not permission to open unrelated outcomes.
+  Do not reserve every descendant of a programme. The ranker reports free capacity;
+  races can overshoot temporarily, so let the next freed lane absorb it.
 - **One queue.** Every coordinator walks the same `rank_ready_work.py` queue.
   A failed `--claim` means a peer won that bead: take the next row, never
   retry or contest it.
@@ -129,12 +123,12 @@ below stops one coordinator from duplicating or undoing another's work.
   touched, whatever its bead heartbeat says. Hold an epic's claim while
   creating its children: child ids come from a per-parent counter that two
   creators can race.
-- **A PR is one ownership unit.** The original bead, its `pr-review-task`
-  bead, and their worktrees belong to the coordinator holding the original.
-  Create the review bead with `--assignee "$COORDINATOR_ID"`, dispatch a
-  review bead only while you hold its original, and adopt the two together.
-  A peer never picks up your review bead, because `rank_ready_work.py` keeps
-  `pr-review` work out of the shared queue.
+- **One implementation owner, separate reviewer.** Package members remain with
+  the implementation lifecycle actor through review/corrections. The reviewer
+  claims only its canonical review bead and uses an independent worktree. It
+  never takes the package's implementation claims. Controller runs hold those
+  claims for their named worker; loopers hold their own. Direct owner/reviewer
+  communication needs no coordinator relay per finding.
 - **Adopt the dead, guarded.** Only a `coordinator:` assignee with no live
   registration is adoptable; a human's or another tool's claim never is. A
   claim left by a coordinator from before this section (an assignee without
@@ -164,80 +158,33 @@ below stops one coordinator from duplicating or undoing another's work.
     --if-status blocked --assignee "$COORDINATOR_ID" --json
   ```
 
-  Adopt a PR's original bead first and its review bead after; if the original
-  exits 13, leave the review bead to whoever won. A review bead stays
-  `blocked`; never release it to `open`.
-- **Loopers.** A `beads-looper` session registers here as a coordinator with
-  one lane, so it counts against the budget and its dead claims are
-  adoptable. Its PR units are the one exception to "A PR is one ownership
-  unit": an implement looper releases a wired unit (original `blocked`, review
-  bead created without `--assignee`), and a review looper takes it with
-  `--if-assignee ''` (`../../beads-looper/references/review-cycle.md`). A
-  coordinator never takes an unassigned PR unit; it leaves those to the review
-  looper.
-- **Rollout.** Coordinators started before this section existed neither
-  register nor pass `--actor`. Restart every running coordinator onto this
-  revision at a bead boundary; a mixed fleet can adopt a live old
-  coordinator's blocked beads.
+  Recover the package using its manifest and claim journal, not one arbitrary
+  member at a time. Inspect its published/local work before changing claims.
+  If any member is held by a live peer, stop and reconcile the partial recovery;
+  do not dispatch split ownership. Reviewer claims recover separately after its
+  liveness check. Preserve independent reviewer findings and implementation owner
+  resume locator. Never restart a live fleet as a side effect of a harness update.
 
-## Orchestrator Wake Cadence (Prompt-Cache Economics)
+## Orchestrator Wake Cadence
 
-This is a distinct mechanism from the Beads stall heartbeat above — it governs
-the **token cost of resuming this session**, not bead mutual exclusion or
-stall detection. Do not conflate the two.
+Wake on actual implementation, review, CI, dependency or owner events. Cache
+reuse is useful but does not justify repeated tracker scans or wakes solely to
+keep a cache warm. Keep registry liveness renewed for the planned wait using
+`coordinator_registry.py`; explicit waits carry a concrete resume event.
 
-- The coordinator session's prompt cache lives for the runtime's **TTL**,
-  measured start-to-start between requests. Claude Code sessions default to a
-  **1-hour** TTL (it falls back to 5 minutes in usage overage). Treat any
-  runtime whose TTL you cannot confirm as **5 minutes**. A wake that lands
-  after the TTL re-reads the whole context at write price: 12.5x-40x a cache
-  hit, depending on model and TTL (see `../../../references/token-efficiency.md`).
-- While there is near-term work to track (an active lane, a dispatchable
-  `pr-review-task`, a PR cooldown about to expire), wake on events first.
-  Behind them, set a fallback heartbeat that always lands inside the TTL:
-  **20-30 minutes** on a 1-hour TTL, **4m50s** on a 5-minute TTL. On a 1-hour
-  TTL, polling faster than every 20 minutes just to keep the cache warm is
-  waste, because there is no cache cliff to beat. This is what "active mode"
-  in `coordinator-loop.md` Step 8 means in practice.
-- The miss cost scales with context size, so the projection and file-routing
-  rules in `../../../references/token-efficiency.md` compound with this one: a
-  lean context makes every wake cheaper in both modes.
-- Never block the coordinator's own turn on a long call either: no in-line
-  test suites, and no wait-on-agent call whose timeout exceeds the ceiling.
-
-Runtime binding (use whichever wake primitive the session exposes):
-
-| Runtime | Active-mode wake | Frontier wake |
-|---|---|---|
-| Claude Code | subagent completion wakes you; fallback `ScheduleWakeup` (`/loop` dynamic mode) with `delaySeconds: 1200`-`1800` on the default 1-hour TTL (`290` only if the session is on the 5-minute TTL), or a `Monitor` until-loop | `delaySeconds: 3600`, `noop: true` on a no-op wake, `stop: true` after the third |
-| Codex | `wait_agent` with timeout ≤ 290s (a timeout means "still running", never a stall) | `wait_agent`/sleep capped at 60 min per wake |
+Use native runtime completion notifications/continuation (Claude agent/session,
+Codex thread) when available. A bounded fallback checks only pending events and
+liveness, not a full fleet audit. Choose it for expected CI/event latency within
+registry expiry limits. Never interpret a wait timeout as implementation failure.
 
 ### No-progress frontier
 
-Once a poll finds genuinely nothing to do — no claimable row (the queue is
-empty, or every row fails the readiness gate, the model tier, the scope, or an
-owner exclusion), no dispatchable `pr-review-task`, no active workers, no
-near-term PR cooldown, no decision-sweep work — the cache-preserving fallback
-cadence stops paying for itself: there is no real work to keep warm a cache
-*for*. At that frontier, switch modes instead of continuing to burn cache-hit
-polls on nothing:
-
-- Widen the wake interval to **60 minutes** and run the safety sweep on each
-  wake.
-- Track consecutive no-op wakes (a wake where the sweep still finds nothing
-  dispatchable). After **3 consecutive no-op wakes** (3 hours of confirmed
-  silence), stop the loop entirely — report the terminal state and hand back —
-  rather than polling forever. Any wake that finds real work (even one
-  dispatchable bead) resets the no-op counter to zero and returns to the
-  near-term-work cadence above.
-- This still respects the mandatory heartbeat-renewal checkpoints above: renew
-  the stall heartbeat on any wake that performs a `bd` mutation.
-
-Net shape: fast, cache-cheap polling while there is work to track; slow,
-infrequent polling with a hard stop while there is confirmed nothing to do.
-Neither mode is license to skip a mandatory heartbeat-renewal checkpoint or
-override the stall-heartbeat/claim rules above — this section is cost-only and
-never trades correctness for it.
+At a genuine frontier, resolve engineering decisions under decision-autonomy,
+name technical waits and owner gates, and wait for their event. If polling is
+needed, use 60 minutes and stop after 3 consecutive no-op wakes. Renew registry
+before waiting; apply the existing guarded adoption rules, not cache timing.
+On stop, publish current packet/claims/recovery state and deregister. Do not keep
+an outcome indefinitely exclusive without a runnable next step or agreed handoff.
 
 ## Model Selection Strategy
 
@@ -364,56 +311,36 @@ setting for TRIVIAL work. Right-size when a lane is **formed**, from the highest
 tier in its planned chain. Never switch a live lane's model: that is a cold
 start, so retire the lane instead.
 
-### Reconciliation Floor (mandatory)
+### Reconciliation Floor
 
-A reconciliation bead (label `reconciliation`, title `Reconcile spec-to-code
-(gen-N) …`) is a deep spec-to-code audit, not ordinary coding. Its `task` type
-would otherwise route it to `MEDIUM_COMPLEXITY_MODEL` (Sonnet), which is too weak to
-catch coverage gaps across a large epic.
-
-Rule: before dispatching a reconciliation bead, resolve its parent epic's
-complexity tier (see `epic-coordination.md` → "Epic Complexity Tiers"). If the
-epic is **medium or higher** (1+ positive classification signal, or it carries
-the `team-coordination` label), dispatch the reconciliation bead at
-`EPIC_COMPLEXITY_MODEL` — i.e. Opus on Claude. This is a floor, not a
-target: never drop below it for a qualifying epic, regardless of the bead's
-`task` type. Only a low/trivial epic (0 signals) may reconcile at
-`MEDIUM_COMPLEXITY_MODEL`.
-
-To find the parent epic and its tier:
-
-```bash
-EPIC_ID=$(bd show <recon-id> --json | jq -r '.parent // .epic // empty')
-bd show "${EPIC_ID}" --json   # inspect scope + labels for the tier signals
-```
+Cross-package acceptance and shared runtime/trust-contract closeout requires the
+model tier appropriate to those decisions, generally `EPIC_COMPLEXITY_MODEL`.
+Mechanical evidence aggregation can use the ordinary complexity tier. Do not
+create a new reconciliation generation or mini-coordinator to obtain this tier.
 
 ## Review Risk Tiers
 
-Every review verdict is bound to the **exact head SHA** inspected. If the head
-moves, merge readiness expires until that SHA is reviewed.
+The final readiness receipt names the **exact head SHA** to merge. Its substantive
+review evidence may be reused when relevant content and base/contract assumptions
+are proven unchanged; a changed SHA alone need not force another broad review.
+New relevant content invalidates affected evidence. Current CI/queue/labels and
+runtime permissions are separate time-sensitive facts.
 
 | Tier | Examples | Review policy |
 |---|---|---|
-| High | auth/authorization, approvals, secrets, cross-schema boundaries, migrations/persisted contracts, concurrency/distributed state, replay/idempotence, data loss | Dedicated independent exact-head review. Any reviewer-authored semantic fix or material risk-changing correction requires a fresh independent reviewer. |
-| Standard | Cohesive product/backend/UI behavior with bounded failure surface | Independent exact-head review; retain the same reviewer for correction rechecks when independence is intact. |
-| Low | Tiny docs, tests, formatting, chore, or mechanical refactor with no observable contract/risk change | Schedule a sequential convoy of 3-4 same-domain review beads to one sticky reviewer identity. Process one PR/SHA and emit one verdict at a time; escalate on any semantic finding. |
+| High | auth/authorization, secrets, cross-schema boundaries, migration, concurrency, replay, data loss | Independent review of the cohesive package; new semantic content or reviewer-authored fixes requires fresh independent judgment as warranted by risk. |
+| Standard | Bounded product/backend/UI behavior | Keep the same independent reviewer through corrections; inspect the changed content and affected assumptions. |
+| Low | Docs, formatting, mechanical changes | Reuse one independent reviewer session across sequential packages; each has its own content evidence and current-head receipt. |
 
-**Reviewer lanes.** Standard- and low-tier reviews run on a sticky reviewer
-lane: one reviewer session takes sequential reviews (and their correction
-rechecks) so the repo context it loaded stays cached. A reviewer lane never
-reviews a PR produced by an implementation lane it shares a session with.
-High-tier reviews, and any review that needs a fresh reviewer, retire or
-bypass the reviewer lane and start cold. Independence beats cache.
-
-Risk tiers reduce repeated context loading, never the evidence required for the
-actual change. Do not batch high-risk work or merge an unreviewed moved head.
-"Sequential convoy" never means one multi-PR reviewer worker: the one-bead,
-one-PR report contract remains intact, and the coordinator dispatches the next
-low-risk bead only after the prior verdict returns.
+A reviewer never reviews content it authored. High-risk content can be cohesive
+within one package; risk is a reason for appropriate review, not a mandatory
+separate PR per tracking item. The shared delivery model owns the evidence contract.
 
 ## Central Mutation Authority
 
-The coordinator owns canonical Beads lifecycle mutations. Worker agents do not.
+The controller owns lifecycle writes for dispatched workers. A looper is its own
+controller for its held package; an independent review looper owns only its review
+record. Dispatched implementation/reviewer workers report lifecycle changes.
 
 Coordinator-only operations:
 - `bd create`
@@ -501,35 +428,24 @@ Rules:
 
 ## Bead Closure Rule
 
-Apply the canonical [Owner merge hold](coordinator-loop.md#owner-merge-hold)
-before every enqueue/merge/close-PR attempt and before a direct base push.
-An OPEN held PR cannot be closed by the fleet. This does not freeze Beads
-bookkeeping: freshly verified owner-performed MERGED/CLOSED state follows the
-normal terminal closure/re-triage rules even if `owner-merge` remains.
+Apply [Owner merge hold](coordinator-loop.md#owner-merge-hold) before every remote
+merge/enqueue/close-PR/base-push action. Unknown hold/policy/check status fails
+closed. A verified owner-performed MERGED/CLOSED state still reconciles truthfully.
 
-A bead may only be closed by the coordinator when one of these conditions is
-met:
+The lifecycle holder closes a member only when its accepted criteria are proven
+and its relevant source landed on the actual delivery base, normally main.
+A package merge alone closes neither every member nor the original outcome.
+Use the delivery helper's per-member closure plan, then freshly verify the
+landing/evidence and guarded ownership before mutation. Runtime/activation criteria
+remain open until proved; approved deferral/supersession is explicitly recorded
+and never reported as delivered behavior.
 
-1. Direct merge for trivial/simple changes:
-   - worker pushes `agent/<id>`
-   - worker reports `direct-merge-candidate`
-   - coordinator fast-forward merges to `main`
-   - coordinator closes the bead
-2. GitHub PR merged:
-   - worker pushes branch and opens PR, or coordinator opens it during
-     reconciliation
-   - coordinator blocks the original bead and stores `external_ref=gh-pr:<N>`
-   - coordinator creates or reuses exactly one dedicated PR-review bead
-   - reviewer worker may merge the PR (or enqueue it to the base branch's
-     merge queue and report `merge-queued`), but coordinator confirms `MERGED`
-     and then closes the review and original beads
-3. Queued direct merge (base branch behind a merge queue):
-   - worker pushes `agent/<id>` and reports `direct-merge-candidate`
-   - coordinator opens a `queue-direct` PR and enqueues it with
-     `gh pr merge --squash --auto`; no review bead is created
-   - coordinator closes the bead only after `gh pr view` reports `MERGED`
-
-Implementation workers and reviewer workers must never call `bd close`.
+PR routes retain exactly one anchor `external_ref` and one independent review
+record. A queue receipt is waiting, not closure. A merge to a temporary integration
+branch is accumulated source. Direct pushes require repository permission and an
+independent verdict plus the repository-assigned full gate; queue-direct is no
+review exemption. Dispatched workers do not close Beads; the controller or owning
+looper reconciles members and outcome. Preserve unfinished recovery work.
 
 ## Quality Gates
 

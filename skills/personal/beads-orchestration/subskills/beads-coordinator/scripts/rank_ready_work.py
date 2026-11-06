@@ -37,7 +37,7 @@ Ranking contract (canonical; `coordinator-loop.md` Step 2 only points here):
       own epic);
    e. oldest creation, then id.
 3. Within an outcome: prerequisites first (ready beads outside the epic that
-   block one of its open beads, one hop; they count as in scope when the epic
+   form the runnable frontier of its transitive blocker chain; they count as in scope when the epic
    is), then priority, then most dependents, then oldest.
 4. Each epic puts at most `--max-lanes-per-epic` beads, minus the lanes it
    already holds, in the primary queue; a bead another outcome already queued
@@ -45,17 +45,16 @@ Ranking contract (canonical; `coordinator-loop.md` Step 2 only points here):
    outcome's primary share, so no lane idles while ready work exists.
 
 Capacity: the lane budget is global across coordinators: `--lanes`, else the
-`beads.max_lanes` kv key, else 4. Every `in_progress` bead whose assignee is a
+`beads.max_lanes` kv key, else 4. Each active delivery package (or unpackaged `in_progress` bead) whose assignee is a
 coordinator (`coordinator:` prefix) occupies one lane, plus each live
-registration's `extra_lanes` (Team Lead subworkers the tracker cannot see).
+registration's explicitly reserved `extra_lanes`.
 Other `in_progress` assignees (humans) are counted under `other_claims` only.
 Coordinator claims whose assignee has no live registration are listed under
 `unowned_claims` and still occupy a lane until recovered.
 
 Excluded from the queue, with counts or ids in `excluded`:
-- epics themselves, and every descendant of an `in_progress` epic labelled
-  `team-coordination` (a Team Lead holds it; a plain epic claim held for
-  shaping or decomposition hides nothing);
+- epics themselves; claiming a programme does not hide its runnable
+  prerequisites or authorize parallel implementation of the same substrate;
 - `pr-review` and `pr-review-task` beads (Step 0 owns them), and
   `review-correction` beads (an implement looper takes them by label, in
   correction mode on the existing PR);
@@ -75,7 +74,7 @@ label, so the review lane adopts it) or `gate` (blocked by status alone).
 
 Also reported: `held` epics (progress or a pin, no runnable work, with what
 they wait on), `childless_epics` for decomposition, and `closable_epics`
-(every child closed).
+(every child closed; a candidate hint, never acceptance or activation proof).
 
 Fail-closed: a failed `bd` command or unexpected output yields `status: fatal`
 and no queue. bd older than 1.3 rejects `--brief` and fails this way. The
@@ -92,6 +91,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+PACKAGE_SCRIPTS = Path(__file__).resolve().parents[3] / "scripts"
+if str(PACKAGE_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_SCRIPTS))
+from delivery_package import ID as DELIVERY_ID, metadata as bead_metadata, package_index
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from coordinator_registry import lane_budget, parse_time, registrations  # noqa: E402
 
@@ -99,7 +103,6 @@ SCHEMA = "beads-work-queue/v1"
 COORDINATOR_PREFIX = "coordinator:"
 FOCUS_LABEL = "focus"
 SHAPING_LABEL = "needs-shaping"
-TEAM_LEAD_LABEL = "team-coordination"
 # `review-correction` marks a looper PR original returned for corrections: only an
 # implement looper may take it, in correction mode on the existing PR.
 REVIEW_LABELS = frozenset({"pr-review", "pr-review-task", "review-correction"})
@@ -153,7 +156,7 @@ def bd_json(argv: list[str], repo_root: Path) -> tuple[object | None, str | None
 def collect(repo_root: Path) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
     """Run the four read-only `bd` queries the ranking needs."""
     queries = {
-        "live": ["list", "--status=open,blocked,in_progress", "--json", "--brief", "--limit", "0"],
+        "live": ["list", "--status=open,blocked,in_progress", "--json", "--limit", "0"],
         "ready": ["ready", "--json", "--brief", "--limit", "0", "--exclude-type", "epic"],
         "epics": ["epic", "status", "--json"],
         "kv": ["kv", "list", "--json"],
@@ -164,6 +167,32 @@ def collect(repo_root: Path) -> tuple[dict[str, Any] | None, dict[str, str] | No
         if error:
             return None, {"code": error, "scope": name}
         snapshot[name] = payload
+    # Closed members and anchors remain traceability evidence for a partially
+    # delivered package. Fetch only missing identities, never the closed archive.
+    if isinstance(snapshot.get("live"), list):
+        known = {row.get("id") for row in snapshot["live"] if isinstance(row, dict)}
+        needed = set()
+        for row in snapshot["live"]:
+            if not isinstance(row, dict):
+                continue
+            try:
+                metadata = bead_metadata(row)
+            except ValueError:
+                return None, {"code": "invalid-package-metadata", "scope": "packages"}
+            anchor = metadata.get("delivery_anchor")
+            if isinstance(anchor, str):
+                needed.add(anchor)
+            delivery = metadata.get("delivery")
+            if isinstance(delivery, dict) and isinstance(delivery.get("members"), list):
+                needed.update(item for item in delivery["members"] if isinstance(item, str))
+        snapshot["package_records"] = []
+        for member_id in sorted(needed - known):
+            if not DELIVERY_ID.fullmatch(member_id):
+                return None, {"code": "invalid-package-record", "scope": "packages"}
+            records, error = bd_json(["show", member_id, "--json"], repo_root)
+            if error or not isinstance(records, list) or len(records) != 1 or not isinstance(records[0], dict) or records[0].get("id") != member_id:
+                return None, {"code": error or "invalid-package-record", "scope": "packages"}
+            snapshot["package_records"].extend(records)
     return snapshot, None
 
 
@@ -223,7 +252,11 @@ def rank(
     if problem:
         return fatal(generated_at, problem["code"], problem["scope"])
 
-    rows = {row["id"]: row for row in snapshot["live"]}
+    rows = {row["id"]: row for row in [*snapshot["live"], *snapshot.get("package_records", [])]}
+    try:
+        delivery_anchors = package_index(list(rows.values()))
+    except ValueError:
+        return fatal(generated_at, "invalid-delivery-package", "packages")
     ready_rows = [row for row in snapshot["ready"] if row.get("issue_type") != "epic"]
     regs = registrations(snapshot["kv"], now)
     epics: dict[str, dict[str, Any]] = {}
@@ -254,6 +287,11 @@ def rank(
         return chain
 
     def outcome_of(bead_id: str) -> str | None:
+        anchor_id = delivery_anchors.get(bead_id)
+        if anchor_id:
+            outcome = bead_metadata(rows[anchor_id])["delivery"]["outcome"]
+            if outcome in epics:
+                return outcome
         return next((ancestor for ancestor in ancestors(bead_id) if ancestor in epics), None)
 
     def pinned(epic_id: str) -> bool:
@@ -269,23 +307,16 @@ def rank(
     def is_live_coordinator(assignee: str) -> bool:
         return bool(regs.get(assignee, {}).get("live"))
 
-    team_led = {
-        row["id"]
-        for row in snapshot["live"]
-        if row.get("issue_type") == "epic"
-        and row.get("status") == "in_progress"
-        and text(row.get("assignee"))
-        and TEAM_LEAD_LABEL in labels_of(row)
-    }
-
     # Capacity and epic activity come from the live rows.
     budget, budget_source = lane_budget(snapshot["kv"], lanes)
     by_assignee: dict[str, int] = {}
     other_claims = 0
     unowned: list[str] = []
     orphaned: list[dict[str, str]] = []
+    counted_lanes: set[tuple[str, str]] = set()
     for row in snapshot["live"]:
         bead_id, assignee = row["id"], text(row.get("assignee"))
+        anchor_id = delivery_anchors.get(bead_id, bead_id)
         epic_id = outcome_of(bead_id)
         if (
             row.get("status") == "blocked"
@@ -294,7 +325,12 @@ def rank(
         ):
             on_pr = text(row.get("external_ref")).startswith("gh-pr:") or bool(labels_of(row) & REVIEW_LABELS)
             orphaned.append({"assignee": assignee, "id": bead_id, "kind": "pr" if on_pr else "gate"})
-        if row.get("status") == "in_progress" and assignee:
+        holds_lane = row.get("status") == "in_progress" or (
+            bead_id in delivery_anchors and row.get("status") in {"open", "blocked"}
+        )
+        lane_key = (assignee, anchor_id)
+        if holds_lane and assignee and lane_key not in counted_lanes:
+            counted_lanes.add(lane_key)
             if assignee.startswith(COORDINATOR_PREFIX):
                 by_assignee[assignee] = by_assignee.get(assignee, 0) + 1
                 if not is_live_coordinator(assignee):
@@ -317,10 +353,15 @@ def rank(
     shaping_standalone: list[dict[str, Any]] = []
     stranded: list[str] = []
     local_state: list[dict[str, Any]] = []
-    excluded = {"claimed": 0, "no_dispatch": 0, "review": 0, "team_lead": 0}
+    excluded = {"claimed": 0, "no_dispatch": 0, "review": 0}
     runnable: list[dict[str, Any]] = []
     for row in ready_rows:
         assignee = text(row.get("assignee"))
+        if row["id"] in delivery_anchors:
+            # An active owner resumes the package; member readiness is not a
+            # second implementation allocation, even for its current actor.
+            excluded["claimed"] += 1
+            continue
         if assignee and not (coordinator and assignee == coordinator):
             if assignee.startswith(COORDINATOR_PREFIX) and not is_live_coordinator(assignee):
                 stranded.append(row["id"])
@@ -335,9 +376,6 @@ def rank(
             continue
         if LOCAL_STATE_LABEL in labels_of(row):
             local_state.append(row)
-            continue
-        if set(ancestors(row["id"])) & team_led:
-            excluded["team_lead"] += 1
             continue
         runnable.append(row)
     runnable_ids = {row["id"] for row in runnable}
@@ -359,10 +397,26 @@ def rank(
         else:
             standalone.append(row)
 
-    # One-hop prerequisite inheritance: a ready bead outside an epic that
-    # blocks one of the epic's open beads is ranked with that epic.
+    # Follow prerequisite chains to their runnable frontier. A shared runtime
+    # substrate keeps one queue identity even when it unlocks several epics.
     runnable_by_id = {row["id"]: row for row in runnable}
     urgent_ids = {row["id"] for row in urgent}
+    def runnable_prerequisites(bead_id: str, seen: set[str]) -> list[dict[str, Any]]:
+        if bead_id in seen:
+            return []
+        seen.add(bead_id)
+        dependency = rows.get(bead_id)
+        if dependency is None or dependency.get("status") == "closed":
+            return []
+        if bead_id in runnable_by_id:
+            return [runnable_by_id[bead_id]]
+        # A claimed or owner-held prerequisite belongs to that owner; never
+        # dispatch through it or turn its hold into permission for dependents.
+        if text(dependency.get("assignee")) or NO_DISPATCH_LABEL in labels_of(dependency):
+            return []
+        return [candidate for parent in blockers_of(dependency)
+                for candidate in runnable_prerequisites(parent, seen)]
+
     for row in snapshot["live"]:
         epic_id = outcome_of(row["id"])
         if not epic_id or row["id"] in ready_ids or row.get("status") not in {"open", "blocked"}:
@@ -371,13 +425,13 @@ def rank(
             continue
         epics[epic_id]["blocked_open"].append(row["id"])
         for blocker_id in blockers_of(row):
-            blocker = runnable_by_id.get(blocker_id)
-            if blocker is None or blocker_id in urgent_ids or outcome_of(blocker_id) == epic_id:
-                continue
-            if SHAPING_LABEL in labels_of(blocker):
-                continue
-            if blocker not in epics[epic_id]["prereqs"]:
-                epics[epic_id]["prereqs"].append(blocker)
+            for blocker in runnable_prerequisites(blocker_id, {row["id"]}):
+                if blocker["id"] in urgent_ids or outcome_of(blocker["id"]) == epic_id:
+                    continue
+                if SHAPING_LABEL in labels_of(blocker):
+                    continue
+                if blocker not in epics[epic_id]["prereqs"]:
+                    epics[epic_id]["prereqs"].append(blocker)
 
     def bead_key(row: dict[str, Any]) -> tuple[Any, ...]:
         dependents = row.get("dependent_count") if isinstance(row.get("dependent_count"), int) else 0
@@ -525,7 +579,7 @@ def rank(
             continue
         if epic_state(info) == "new" and not pinned(epic_id):
             continue
-        if not in_scope(epic_id) or epic_id in team_led:
+        if not in_scope(epic_id):
             continue
         waiting_on: list[dict[str, Any]] = []
         candidates = list(blockers_of(info["row"]))
@@ -547,7 +601,7 @@ def rank(
     childless = sorted(
         (0 if pinned(epic_id) else 1, priority_of(info["row"]), text(info["row"].get("created_at")), epic_id)
         for epic_id, info in epics.items()
-        if info["total"] == 0 and in_scope(epic_id) and epic_id not in team_led
+        if info["total"] == 0 and in_scope(epic_id)
     )
     closable = sorted(epic_id for epic_id, info in epics.items() if info["total"] and info["closed"] >= info["total"])
 

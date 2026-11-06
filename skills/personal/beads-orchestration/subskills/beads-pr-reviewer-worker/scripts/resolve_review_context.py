@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.9"
+# requires-python = ">=3.11"
 # dependencies = []
 # ///
 import argparse
@@ -8,6 +8,12 @@ import json
 import re
 import subprocess
 import sys
+from pathlib import Path
+
+PACKAGE_SCRIPTS = Path(__file__).resolve().parents[3] / "scripts"
+if str(PACKAGE_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_SCRIPTS))
+from delivery_package import metadata as bead_metadata, package_index, validate_delivery
 
 
 BEAD_ID_PATTERN = r"[a-z][a-z0-9]*(?:-[a-z0-9]+)+(?:\.[0-9]+)*"
@@ -201,6 +207,30 @@ def main():
 
         original_payload = run_json(["bd", "show", original_id, "--json"])
         original = requested_record(original_payload, original_id)
+        try:
+            metadata = bead_metadata(original)
+        except ValueError:
+            fail("invalid-delivery-package", "original metadata must be a record")
+        if metadata.get("delivery_anchor") not in (None, original_id):
+            fail("noncanonical-delivery-original", "review must target the package anchor")
+        delivery = metadata.get("delivery")
+        delivery_members = [original_id]
+        if delivery is not None:
+            try:
+                delivery = validate_delivery(delivery)
+            except ValueError:
+                fail("invalid-delivery-package", "invalid package membership")
+            records = [original]
+            for member_id in delivery["members"]:
+                if member_id != original_id:
+                    records.append(requested_record(run_json(["bd", "show", member_id, "--json"]), member_id))
+            try:
+                membership = package_index(records)
+            except ValueError:
+                fail("invalid-delivery-package", "package membership or ownership is inconsistent")
+            if any(membership.get(member) != original_id for member in delivery["members"]):
+                fail("invalid-delivery-package", "review requires an active canonical package")
+            delivery_members = delivery["members"]
         external_ref = original.get("external_ref") or ""
         pr_number = ""
         match = re.fullmatch(r"gh-pr:([0-9]+)", external_ref)
@@ -224,10 +254,15 @@ def main():
             "number,url,state,isDraft,mergeStateStatus,reviewDecision,headRefName,baseRefName,mergedAt,headRefOid",
         ])
 
+        if delivery and (pr.get("headRefName") != f"agent/{original_id}" or pr.get("baseRefName") != delivery["base_branch"]):
+            fail("invalid-delivery-branch", "PR branch or base differs from the accepted package")
         output = {
             "ok": True,
             "issue_id": args.issue_id,
             "original_id": original_id,
+            "delivery_members": delivery_members,
+            "delivery_packet": delivery.get("packet") if delivery else None,
+            "implementation_owner": delivery.get("owner") if delivery else original.get("assignee"),
             "pr_number": int(pr_number),
             "pr_url": pr.get("url"),
             "owner": owner,

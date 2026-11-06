@@ -8,7 +8,7 @@ metadata:
     - OpenAI Codex
     - Claude Fable 5.1
   status: active
-  last_reviewed: "2026-10-04"
+  last_reviewed: "2026-11-06"
 compatibility: Requires a Beads-backed git repository with git worktrees, git, bd, jq, gh, and python3 available, plus authenticated GitHub access and network access for review, push, and merge operations.
 ---
 
@@ -79,10 +79,9 @@ and comment mutate GitHub or push), each by the loaded package's absolute path:
   matches the requested ID; empty, multiple, non-record, or foreign responses
   fail closed rather than selecting a first record.
 - [`scripts/prepare_pr_branch.py`](scripts/prepare_pr_branch.py)
-  Fetches base/head, checks out the PR head branch, rebases onto the base
-  **only when a dry merge conflicts** (or `--force-rebase` is passed), strips
-  `.beads/` divergence, and reports `rebased`, `rebase_reason`, and whether
-  the prepared head was pushed.
+  Checks out `review/<review-id>` at the published package head and probes
+  merge compatibility. Never rewrites the implementation branch; conflicts
+  return to its existing owner.
 - [`scripts/list_review_threads.py`](scripts/list_review_threads.py)
   Lists review threads with full pagination and returns unresolved-thread
   details in JSON.
@@ -130,16 +129,16 @@ python3 "${ASSERT_WORKER_CONTEXT}" \
   --worktree-path "${WORKTREE_PATH}" \
   --repo-root "${REPO_ROOT}" \
   --issue-id "${ISSUE_ID}" \
+  --review-id "${ISSUE_ID}" \
   --current-path "$(pwd -P)"
 ```
 
 Resolve the helper from the loaded `beads-worker/SKILL.md` path. It derives the
 branch and repository identity without inherited `GIT_*` overrides. Run it and
 later Git/worktree commands with actual cwd set to `WORKTREE_PATH`; `bd -C`
-does not set Git's cwd. On a re-review hand-back the worktree is already on
-`agent/<original-id>` (the ID is in the review bead's notes): pass that ID as
-`--issue-id`.
-
+does not set Git's cwd. The worktree branch is `review/<ISSUE_ID>` on
+both the initial review and later rechecks. Keep the implementation owner's
+worktree and `agent/<anchor>` branch intact.
 4. Confirm GitHub access before doing anything expensive:
 
 ```bash
@@ -169,41 +168,29 @@ Concrete invocation:
 CONTEXT_JSON=$(python3 "<loaded beads-pr-reviewer-worker package>/scripts/resolve_review_context.py" --issue-id "${ISSUE_ID}")
 ```
 
-### Phase 2: Prepare The PR Branch
+### Phase 2: Prepare The Review Snapshot
 
-1. If the original implementation worktree still exists, remove it using an
-   absolute path so this worker can safely check out the PR head branch:
-
-```bash
-bd worktree remove "${REPO_ROOT}/.worktrees/parallel-agents/${ORIGINAL_ID}" 2>/dev/null || true
-```
-
-2. Prepare the PR branch with the bundled helper:
+Run the helper in the isolated review worktree:
 
 ```bash
 PREP_JSON=$(python3 "<loaded beads-pr-reviewer-worker package>/scripts/prepare_pr_branch.py" \
   --base-branch "${PR_BASE_BRANCH}" \
-  --head-branch "${PR_HEAD_BRANCH}")
+  --head-branch "${PR_HEAD_BRANCH}" \
+  --review-id "${ISSUE_ID}")
 ```
 
-3. If branch preparation reports `status=rebase-conflict` or
-   `status=blocked`, stop and report `blocked-awaiting-coordinator`.
-4. The helper rebases only when `git merge-tree` shows the head conflicts with
-   the base; a cleanly merging head is reviewed as-is so the author's CI run
-   stays valid and the squash merge (or merge queue) integrates it. Pass
-   `--force-rebase` only for a textual merge conflict or a coordinator-relayed, justified reviewer request; queue metadata alone never authorizes it.
-5. The helper pushes any rebased or `.beads`-cleaned prepared head with
-   `--force-with-lease`. Before review, verify its reported `head_commit`
-   equals both local `HEAD` and the GitHub PR head; otherwise stop as
-   `blocked-awaiting-coordinator`.
+The helper checks out `review/<review-id>` at the fetched PR head and probes
+`git merge-tree --write-tree`. Clean base drift does not rewrite the author's
+head. `corrections-required` (conflict or `.beads/` divergence) returns to the
+existing implementation owner on the same PR; `blocked` requires diagnosis.
+An unsupported merge probe fails closed. Never remove the implementation
+worktree, stash its state, rebase its branch, or force-push it as preparation.
 
-The helper's deterministic .beads branch-hygiene cleanup is non-semantic
-pre-review preparation authorized by this workflow, as is its conflict-only
-rebase; neither counts as reviewer-authored fixes. Review starts on the
-resulting exact head. Any change outside `.beads/` is semantic and takes the
-exceptional fixer path with a fresh independent reviewer.
-
-Never stash, check out `main`, or push `main` from the worktree.
+Before reviewing, verify local HEAD and GitHub PR head equal the reported
+`head_commit`. Load the current packet and member acceptance criteria from
+`delivery_members` / `delivery_packet` in the resolved context. The package
+has one canonical review bead targeting its anchor. Do not create a review
+per member or assign the anchor's `gh-pr:N` to members.
 
 ### Phase 3: Review And Classify Findings
 
@@ -269,45 +256,29 @@ python3 "<loaded beads-pr-reviewer-worker package>/scripts/create_inline_review_
    contract. A violation is a `correction-required` thread like any other.
 
 7. Default to **no code changes**. Return current-outcome corrections to the
-   original author when resumable or a recovery worker on the same PR branch.
-   This keeps one implementation owner and one independent reviewer.
+   existing implementation owner directly, with substantive findings and the
+   reviewed content identity. Resume that session for corrections and this
+   reviewer for recheck. A coordinator relays only when the runtime requires
+   it; ordinary repairs need no new task, allocation, or permission. Recovery
+   replaces the owner only after its lease is dead or an explicit handoff.
 
    Fail-closed behavior, auth/authorization, approvals, persistence, migrations,
    cross-schema access, concurrency, replay/idempotence, and data-loss handling
    are semantic regardless of line count.
 
-8. Exceptional reviewer-as-fixer path: only use when the coordinator explicitly
-   authorizes an urgent mechanical correction and no implementation lane can be
-   resumed. Keep the commit focused, verify it, and report
-   `pushed-review-fixes`; the resulting head requires a fresh independent
-   reviewer before merge.
+8. If a reviewer has already authored semantic fixes in an exceptional
+   recovery, report `pushed-review-fixes`: a fresh independent reviewer is
+   required. This is a recovery report, not the ordinary correction route.
+   Keep session URLs and attribution links out of commits and PR bodies.
 
-```bash
-git add <files>
-git commit -m "fix: <summary> [${ISSUE_ID}]"
-```
-
-Session-attribution hygiene (mandatory): never put runtime session URLs or
-attribution trailers (`Claude-Session: https://...`) in commits or PR bodies.
-If the PR carries one and the repo has a session-link CI gate, strip the URL
-(keep plain `Co-Authored-By:`), force-push with lease, and remember a body-only
-edit needs a fresh `synchronize` event (empty retrigger commit) to re-run the gate.
-
-9. Push exceptional fixes with lease after verification:
-
-```bash
-git push --force-with-lease origin "${PR_HEAD_BRANCH}"
-```
-
-10. When this pass creates the second substantive reopening, call out the
-   two-correction checkpoint in `Summary`: same invariant rewrites the active
-   acceptance/failure matrix; a new trust boundary, subsystem, or risk class
-   becomes a spec-gated prerequisite.
+9. Repeated same-seam corrections update the current behavior matrix in place
+   with the same owner/reviewer. A new trust boundary, subsystem, or risk
+   class returns to its governing scope/authorization gate.
 
 ### Phase 4: Verify
 
 Run all required project quality gates needed to substantiate the review, and
-all gates affected by any exceptional code change. Typical gates:
+the repository's required landing checks. Typical gates:
 - lint
 - typecheck
 - tests
@@ -337,7 +308,13 @@ MERGE_JSON=$(python3 "<loaded beads-pr-reviewer-worker package>/scripts/evaluate
   --pr-number "${PR_NUMBER}")
 ```
 
-2. Record `Reviewed-Head-Commit` immediately before the final review verdict.
+2. Reuse substantive review and test evidence according to
+   [delivery policy](../../references/delivery-model.md): record source/tree
+   scope, diff and relevant base assumptions. Reuse unchanged content after
+   a session wake or identity-only head change; assess the changed content
+   and interactions when its inputs change. Runtime/environment evidence has
+   its own freshness requirement. Bind the resulting verdict to the current
+   `Reviewed-Head-Commit` immediately before merge assessment.
    Merge is allowed only when `git rev-parse HEAD` and the GitHub PR head both
    still equal that exact head SHA and all are true:
    - PR state is `OPEN`

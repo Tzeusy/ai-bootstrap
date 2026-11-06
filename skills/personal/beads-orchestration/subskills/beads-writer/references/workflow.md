@@ -1,165 +1,90 @@
 # Beads Writer Workflow
 
-Use this reference for the actual step-by-step issue-writing flow.
+## Understand and Reuse
 
-## Phase 1: Understand The Ask
+Inspect the target repository's instructions and the affected source. Take
+scope, priority, and authority from the owner and governing spec; ask only for
+material information those sources cannot supply. Search open and recently
+closed beads, active PRs, and concrete symbols/files before creating work.
+Attach provenance to existing outcomes instead of duplicating symptom beads.
 
-Before writing any bead, gather enough context to write it well:
+Apply the shared
+[`work-allocation contract`](../../../../th-projects/references/work-allocation.md)
+for accepted outcomes, cohesion, semantic readiness, and current packet shape.
+The execution representation is defined by the
+[`delivery model`](../../../references/delivery-model.md).
 
-1. Clarify scope. A vague ask like "improve auth" produces vague beads. Take the desired outcome, affected users, constraints, and why it matters from the governing spec and the repo first; ask the requester only what they alone can answer (intent, priority, a preference the project's doctrine does not settle).
-2. Survey the codebase. Read the relevant files so the bead uses the repo's real terms, modules, and current behavior.
-3. Check existing and recently completed delivery. Search open and recently closed beads, open PRs/branches, and the concrete symbols and files involved;
-   keyword-only title matching is insufficient. Link or supersede an existing
-   outcome rather than creating a parallel symptom bead.
-4. Identify dependencies. Determine what blocks the work, what it blocks, and whether the work belongs under an existing epic.
-5. Work from the target project workspace. Run Beads commands from the repository whose backlog you are editing.
-6. Write for a cold start. Do not stop at "enough context for me right now." Capture enough background that a future independent session can execute the bead without the creator session's hidden context.
+## Choose Tracking and Delivery Boundaries
 
-## Phase 2: Decompose
+| Situation | Action |
+|---|---|
+| One cohesive outcome with no existing tracking | Write one bead. |
+| Several related corrections already have beads | Retain their criteria and propose one delivery package under an existing anchor. |
+| Independent outcomes or different hard gates/rollback paths | Keep separate packages and clear ownership. |
+| Shared prerequisite used by competing features | Link one canonical prerequisite and owner; do not clone implementation scope. |
+| A foundation or dark slice can land before activation | Track the slice truthfully and retain the larger accepted outcome as partial. |
 
-Load and apply the shared
-[`th-projects` work-allocation contract](../../../../th-projects/references/work-allocation.md),
-then choose the right granularity:
+A file, layer, scenario, or review specialty is not automatically a boundary.
+Compare module/interface, fixtures, migration/config, and review surface for
+cohesion. Split when doing so reduces actual implementation/review risk or
+provides independent safe landing, not to hit a child-count quota. There is
+no required milestone hierarchy. Existing related beads can share a delivery
+cycle without being rewritten or replaced by a new umbrella bead.
 
-| Signal | Action |
-|--------|--------|
-| Work fits a single focused session | Write one bead |
-| Work has distinct independently reversible outcomes | Write separate beads, optionally under an epic |
-| Work spans risk classes or requires an additive contract rollout | Sequence children under an epic |
-| Related open issues already exist | Link or extend those issues instead of duplicating scope |
+Use dependencies for real prerequisites. Record preferred package order and
+context locality as guidance; do not manufacture blockers solely to steer a
+queue. For cross-cutting persisted contracts, consider representation →
+propagation → enforcement when each state is safe to land and roll back.
 
-Single-responsibility rule: each bead should produce one cohesive independently
-verifiable outcome. A layer, file, scenario, or review specialty is not itself
-a boundary.
+## Write the Current Packet
 
-Before splitting, run the contract's **cohesion scan**. Sharing two or more of
-module/interface, tests/fixtures, migration/config/persisted contract, review
-surface, or micro-sized implementation means bundle or serialize unless
-independent rollback plus a different risk/dependency/sign-off gate justifies
-the split. Record any override.
+Use [`fields-and-examples.md`](fields-and-examples.md) for field selection.
+Keep one operative packet with the current outcome, exclusions, source surface,
+relevant failure behavior, documentation impact, named seam checks, actual
+prerequisites, and exact governing references. Fill `acceptance_criteria` with
+observable member acceptance; a description-only checklist is insufficient.
 
-### Overhead Budget
+Cold-start self-containment means a fresh owner can resolve the current
+instructions and authority. Link exact spec sections and immutable historical
+artifacts. Do not inline the archive, repeat full contracts in every member,
+or preserve superseded alternatives as competing current instructions.
 
-Every subbead adds real cost:
+Distinguish approved direction from adopted behavior and executable scope.
+For a newly changing shared contract, record the settled interface and a
+focused source feasibility check once before releasing its dependents. Stable
+existing contracts need no new review ritual. `packet-complete` describes
+unambiguous current scope; `runnable-now` also requires real dependencies,
+ownership, and sign-off to permit execution. Mechanical lint alone proves
+neither semantic readiness nor authority.
 
-- Worktree creation and teardown
-- CI and test runs per branch or PR
-- Review and merge coordination
-- Context loading for the next worker. Lanes make this cheap for a child that
-  shares context with the previous one, because the lane already holds it
-  cached. It stays full price for a child that sends the lane somewhere new.
+## Preserve the Accepted Outcome
 
-That is why 10 tiny subbeads can be worse than 3 focused ones. The rule is
-3-7 children per epic; more than 9 needs a recorded override in the epic's
-`design` field, and the usual fix is milestone sub-epics. Each child also pays
-one CI run per push plus a full re-run whenever it rebases, so N children
-merging in sequence cost O(N^2) CI without a merge queue.
+Keep the original outcome and mandatory acceptance visible until completion or
+an authorized scope amendment. Foundation merges and dark implementations can
+close their own member acceptance; they do not prove user-facing activation or
+runtime acceptance. Record remaining criteria on the same outcome rather than
+creating a new residual programme after each slice.
 
-Each child should usually:
+When cross-child/end-to-end proof is needed, use one finite closeout path under
+[`reconciliation-beads.md`](reconciliation-beads.md). An outcome checklist or
+existing report may serve; do not add a new bead when the existing path suffices.
+Routine correctness repairs stay with the active owner/package/PR. Route only
+actual new scope or governing-boundary changes out through their real gate.
 
-- Fill a focused session with implementation and verification rather than a
-  few mechanical minutes
-- Touch a bounded, coherent ownership surface
-- Produce a diff a reviewer can evaluate in one pass
-- Carry enough task framing and context to act as a standalone prompt for a fresh session
+## Create and Verify
 
-When tempted to split further, ask whether the split reduces review complexity or just creates more reviews.
+Use `bd` in the target repository. Preserve existing foreign claims. Create
+parents and genuinely new prerequisites first, capture returned IDs, then
+wire dependencies explicitly with `bd dep add`. Use `bd create` with real
+descriptions instead of title-only quick capture for executable work.
 
-### Lane-Ordered Graphs
+Read back the created or amended records, check graph acyclicity and actual
+ready state, and run `bd lint` where supported. Verify accepted requirement
+coverage, no duplicate ownership, and current packet references against the
+source. Tracker failure stops writes; diagnose it through known-error guidance
+without destructive tracker repair. Follow the target repository's own Beads
+persistence/session-close process.
 
-Execution runs on long-lived lanes (`../../../references/token-efficiency.md`
-→ "Cache-first execution"), so shape the graph to be walked in a line:
-
-- Wire `bd dep add` edges so the ready order within an epic follows context
-  locality. Consecutive children should share module, spec area, or fixtures,
-  so one lane can carry them without re-loading the repo.
-- Don't split *to enable parallelism* unless the owner has asked for
-  throughput. A split still has to pay for itself through independent review,
-  rollback, or a different risk or sign-off gate.
-- Keep every child cold-start self-contained anyway. Lanes compact and retire,
-  and a child may be the first bead a new lane sees.
-- Give all children of a chain the same `complexity:` tier when you honestly
-  can. A lane runs at its highest tier, so a single `high` child upgrades the
-  whole chain. Isolate a genuinely harder child at the chain's end, or give it
-  its own lane, instead of mixing tiers mid-chain.
-
-When tempted to merge, ask whether a reviewer can still hold the full change in their head.
-
-For a tightened required contract crossing stored representation, producers,
-deferred/retry paths, and enforcement, prefer representation → propagation →
-enforcement. Keep one cohesive bead instead when the protocol or vertical user
-outcome cannot produce a safe intermediate state.
-
-### OpenSpec-Anchored Epics
-
-When an epic is driven by an OpenSpec change:
-
-1. List the specific OpenSpec section paths each child bead covers.
-2. Add an acceptance item telling the worker to verify behavior against those section paths.
-3. Avoid vague phrases like "per the spec." Cite the exact section path.
-
-## Phase 3: Craft Each Issue
-
-Use [`fields-and-examples.md`](./fields-and-examples.md) for the field-by-field bar. The minimum writing standard is:
-
-- Title: imperative, specific, under 72 characters
-- Description: explains what, why, and context
-- Acceptance: testable, enumerated, and outcome-based
-- Dependencies: explicit and wired intentionally
-
-### Structured Dispatch Packet
-
-Populate structured fields so the bead is dispatch-ready:
-
-- **Description**: outcome, non-goals, governing spec/doctrine, and why now.
-- **Design**: owned surface map, trust boundaries, schemas/runtimes, callers,
-  persistence/deferred paths, and rollback or sequencing decisions.
-- **Acceptance criteria**: happy path plus relevant failure, concurrency,
-  idempotence, retry/replay, compatibility, documentation impact, and named
-  behavior-executing verification. State "not applicable" only with a reason.
-
-An acceptance checklist embedded only in `description` does not replace the
-structured `acceptance_criteria` field.
-
-Mark the handoff **packet-complete** only after those fields pass review.
-**Runnable-now** additionally means dependencies/sign-off are clear and no
-active owner or PR overlaps the surface. Only runnable-now work is dispatch-ready.
-Record cohesion exceptions in `design` as `Cohesion override: <reason>` and
-dedupe outcomes as `Supersedes: <bead/PR>`.
-
-Hard rule: the description must be comprehensive enough for an independent future session to execute the bead without relying on unstated creator-session context. For subbeads, that means the bead should read like a full standalone prompt.
-
-Avoid references like "as discussed", "same as before", or "use the usual approach" unless the referenced artifact is linked and unambiguous.
-
-## Phase 4: Pre-Flight
-
-Before creating beads in bulk:
-
-1. Run `bd doctor`.
-2. Check `bd vc status` for unresolved Dolt conflicts.
-3. Confirm `.beads/` is not leaking into code diffs.
-
-## Phase 5: Create
-
-Creation rules:
-
-- Create in dependency order: parents and blockers first.
-- Use `bd create --json` and capture the returned `id`.
-- Use `bd create`, not `bd q`, whenever a real description is required.
-- Do not use `--deps` flags in `bd create`; create the bead first, then run `bd dep add`.
-- Re-run `bd doctor` after large create/update batches.
-
-## Phase 6: Verify
-
-After creation:
-
-1. Run `bd show <id>` for each new bead.
-2. Run `bd dep tree <epic-id>` for epics.
-3. Run `bd ready` to make sure the intended work is unblocked.
-4. Run `bd lint`; use `bd create --validate` during creation where supported so
-   empty structured fields fail before dispatch.
-5. For each epic, confirm there is exactly one terminal reconciliation child, carrying the `reconciliation` label, depending on every other child.
-6. Re-run the dedupe and cohesion checks against the IDs just created and any
-   open PRs that appeared during authoring.
-
-Present created beads with at least ID, title, type, and priority.
+Report IDs, titles, priorities, proposed package boundaries, real waits, and
+the next completion proof. Authoring hands allocation to an outcome owner
+(looper) or coordinator; it does not launch execution.

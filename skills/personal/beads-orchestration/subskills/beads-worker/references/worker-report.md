@@ -34,8 +34,9 @@ python3 "<loaded beads-worker package>/scripts/emit_worker_report.py" \
 first in `--tests`: `full: <command>: pass` when the full defined gate ran
 locally, or `scoped: <paths>: pass; broad: hosted` when the repo's required
 hosted run is the broad gate (PR handoff only). Emit the report after the
-gate: a commit after the gate invalidates its `full:` entry, because
-`--head-commit` is the head that entry vouches for. The coordinator
+gate: a relevant content/input change invalidates its `full:` entry. A commit
+with unchanged relevant content can retain evidence with an explicit equivalence
+proof; `--head-commit` still identifies the current handoff head. The coordinator
 fast-forwards a direct-merge candidate only on a `full:` entry.
 
 For PR handoff add:
@@ -63,6 +64,31 @@ For blockers add:
   --unpushed-commits yes|no|unknown \
   --blockers-json '[{"title":"Concrete blocker title","type":"task","priority":1,"depends_on":"bd-42","rationale":"What is blocked and why","unblock_condition":"What must happen before work can resume"}]'
 ```
+
+## Cohesive Package Results
+
+For a multi-bead delivery, `ISSUE_ID` is the canonical anchor. Add
+`--delivery-file "$DELIVERY_FILE"` and `--member-results-json` to the same
+report invocation. Every member needs exactly one result; missing, duplicate,
+or foreign members are rejected:
+
+```json
+[
+  {"id":"bd-a","status":"satisfied","evidence":"Adapter regression cases pass on the reported head"},
+  {"id":"bd-b","status":"partial","evidence":"Representation landed; activation still requires owner authority"}
+]
+```
+
+Result states are `satisfied`, `partial`, and `blocked`. A PR-opened status
+describes the delivery cycle, not acceptance of every member. The emitted
+`Delivery-JSON` and `Member-Results-JSON` let the controller reconcile each
+member separately after confirming landing on main. Neither a foundation
+merge nor a merge into a milestone branch completes the accepted feature.
+The manifest owner retains ordinary corrections on the same branch, PR and
+review record. A report never closes beads or releases their claims.
+For `invalid-runtime-context`, omit member results: a readable manifest yields
+blocked results explicitly marked not evaluated. An unreadable/mismatched
+manifest emits `Delivery-Validation-Error` without claiming member acceptance.
 
 ## JSON Arrays
 

@@ -80,6 +80,57 @@ def queue_ids(payload):
     return [item["id"] for item in payload["queue"]]
 
 
+class DeliveryPackageSchedulingTests(unittest.TestCase):
+    def test_three_members_use_one_lane_and_cannot_be_redispatched(self):
+        owner = "coordinator:owner"
+        anchor = bead("bd-adapter", status="blocked", assignee=owner)
+        members = [anchor, bead("bd-terminal", status="in_progress", assignee=owner),
+                   bead("bd-stderr", status="open", assignee=owner)]
+        manifest = {"schema": "beads-delivery/v1", "anchor": anchor["id"],
+                    "members": [item["id"] for item in members], "owner": owner,
+                    "outcome": "bd-runtime", "base_branch": "main", "packet": "Current adapter corrections"}
+        anchor["metadata"] = {"delivery": manifest}
+        for member in members[1:]:
+            member["metadata"] = {"delivery_anchor": anchor["id"]}
+        unrelated = bead("bd-calendar")
+        payload = ranking.rank(snapshot([*members, unrelated]), now=NOW, coordinator=owner)
+        self.assertEqual(payload["capacity"]["occupied"], 1)
+        self.assertEqual(queue_ids(payload), ["bd-calendar"])
+
+    def test_independent_packages_keep_separate_capacity_and_ownership(self):
+        rows = []
+        for name, owner in (("runtime", "coordinator:a"), ("calendar", "coordinator:b")):
+            row = bead(f"bd-{name}", status="in_progress", assignee=owner)
+            row["metadata"] = {"delivery": {"schema": "beads-delivery/v1", "anchor": row["id"],
+                "members": [row["id"]], "owner": owner, "outcome": row["id"],
+                "base_branch": "main", "packet": "Accepted outcome"}}
+            rows.append(row)
+        payload = ranking.rank(snapshot(rows), now=NOW)
+        self.assertEqual(payload["capacity"]["occupied"], 2)
+        self.assertEqual(payload["capacity"]["by_assignee"], {"coordinator:a": 1, "coordinator:b": 1})
+
+    def test_runnable_shared_substrate_advances_two_blocked_outcomes_once(self):
+        one, two = epic("bd-one", labels=["focus"]), epic("bd-two")
+        runtime = bead("bd-runner", status="blocked", blocks_on=["bd-session"])
+        session = bead("bd-session")
+        rows = [one, two, runtime, session,
+                bead("bd-one.1", parent=one["id"], status="blocked", blocks_on=[runtime["id"]]),
+                bead("bd-two.1", parent=two["id"], status="blocked", blocks_on=[runtime["id"]]),
+                bead("bd-easy")]
+        payload = ranking.rank(snapshot(rows, [status(one, 2, 1), status(two, 2, 1)]), now=NOW)
+        self.assertEqual(queue_ids(payload)[0], session["id"])
+        self.assertEqual(queue_ids(payload).count(session["id"]), 1)
+
+    def test_held_prerequisite_does_not_authorize_dependent_dispatch(self):
+        top = epic("bd-feature", labels=["focus"])
+        hold = bead("bd-perception", status="blocked", labels=["no-dispatch"], blocks_on=["bd-probe"])
+        rows = [top, hold, bead("bd-probe"),
+                bead("bd-feature.1", parent=top["id"], status="blocked", blocks_on=[hold["id"]])]
+        payload = ranking.rank(snapshot(rows, [status(top, 2, 1)]), now=NOW, scope_epics=[top["id"]])
+        self.assertEqual(queue_ids(payload), [])
+        self.assertEqual(payload["held"][0]["id"], top["id"])
+
+
 class FinishFirstOrderingTests(unittest.TestCase):
     def test_nearly_done_epic_outranks_untouched_epic_of_same_priority(self) -> None:
         near, fresh = epic("bd-near"), epic("bd-fresh", created="2026-08-01T00:00:00Z")
@@ -435,7 +486,7 @@ class ExclusionTests(unittest.TestCase):
         self.assertEqual(payload["excluded"]["claimed"], 1)
         self.assertEqual(payload["childless_epics"], ["bd-empty"])
 
-    def test_review_beads_and_team_led_epic_descendants_stay_out_of_the_queue(self) -> None:
+    def test_review_beads_stay_separate_without_hiding_a_claimed_epics_children(self) -> None:
         led = epic("bd-led", labels=["team-coordination"])
         led["status"], led["assignee"] = "in_progress", "coordinator:a"
         live = [
@@ -448,9 +499,9 @@ class ExclusionTests(unittest.TestCase):
 
         payload = ranking.rank(snapshot(live, [status(led, total=1, closed=0)]), now=NOW)
 
-        self.assertEqual(queue_ids(payload), ["bd-solo"])
+        self.assertEqual(queue_ids(payload), ["bd-led.1", "bd-solo"])
         self.assertEqual(payload["excluded"]["review"], 2)
-        self.assertEqual(payload["excluded"]["team_lead"], 1)
+        self.assertNotIn("team_lead", payload["excluded"])
 
     def test_no_dispatch_and_local_state_beads_stay_out_of_the_queue(self) -> None:
         live = [
@@ -473,7 +524,7 @@ class ExclusionTests(unittest.TestCase):
         payload = ranking.rank(snapshot(live, [status(held, total=1, closed=0)]), now=NOW)
 
         self.assertEqual(queue_ids(payload), ["bd-shape.1"])
-        self.assertEqual(payload["excluded"]["team_lead"], 0)
+        self.assertNotIn("team_lead", payload["excluded"])
 
     def test_epic_with_every_child_closed_is_closable_not_held(self) -> None:
         done = epic("bd-done")
@@ -625,7 +676,7 @@ class CommandLineTests(unittest.TestCase):
                     key = argv[0]
                     if key in fixture.get("fail", []):
                         raise SystemExit(1)
-                    print(json.dumps(fixture[key]))
+                    print(json.dumps(fixture[key][argv[1]] if key == "show" else fixture[key]))
                     """
                 ),
                 encoding="utf-8",
@@ -645,6 +696,22 @@ class CommandLineTests(unittest.TestCase):
         child = bead("bd-e.1", parent="bd-e")
         return {"list": [parent, child], "ready": [child], "epic": [status(parent, 2, 1)], "kv": {}}
 
+    def test_cli_recovers_closed_anchor_for_an_incomplete_package(self):
+        owner, anchor_id, member_id = "coordinator:owner", "bd-adapter", "bd-tail"
+        anchor = bead(anchor_id, status="closed", assignee=owner)
+        anchor["metadata"] = {"delivery": {"schema": "beads-delivery/v1", "anchor": anchor_id,
+            "members": [anchor_id, member_id], "owner": owner, "outcome": "bd-runtime",
+            "base_branch": "main", "packet": "Accepted corrections"}}
+        pending = bead(member_id, status="in_progress", assignee=owner)
+        pending["metadata"] = {"delivery_anchor": anchor_id}
+        result, calls = self.run_cli({"list": [pending], "ready": [], "epic": [], "kv": {},
+                                      "show": {anchor_id: [anchor]}})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["capacity"]["occupied"], 1)
+        self.assertEqual(payload["queue"], [])
+        self.assertIn(["show", anchor_id, "--json"], calls)
+
     def test_cli_runs_read_only_queries_and_emits_one_envelope(self) -> None:
         result, calls = self.run_cli(self.fixture())
 
@@ -655,7 +722,7 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(
             calls,
             [
-                ["list", "--status=open,blocked,in_progress", "--json", "--brief", "--limit", "0"],
+                ["list", "--status=open,blocked,in_progress", "--json", "--limit", "0"],
                 ["ready", "--json", "--brief", "--limit", "0", "--exclude-type", "epic"],
                 ["epic", "status", "--json"],
                 ["kv", "list", "--json"],

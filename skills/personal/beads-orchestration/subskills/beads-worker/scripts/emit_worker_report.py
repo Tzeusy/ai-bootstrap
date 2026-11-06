@@ -7,6 +7,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
+from delivery_package import load_delivery, validate_results
 
 
 VALID_STATUSES = {
@@ -33,7 +37,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--status", required=True, choices=sorted(VALID_STATUSES))
     parser.add_argument("--issue-id", required=True)
+    parser.add_argument("--delivery-file", help="Current cohesive package JSON; ISSUE_ID is its anchor.")
     parser.add_argument("--branch")
+    parser.add_argument("--member-results-json", help="One {id,status:satisfied|partial|blocked,evidence} result per package member.")
     parser.add_argument("--worktree-path", required=True)
     parser.add_argument("--head-commit", required=True)
     parser.add_argument("--branch-pushed", required=True, choices=sorted(VALID_BRANCH_PUSHED))
@@ -100,6 +106,30 @@ def validate_args(args: argparse.Namespace, blockers: list[object]) -> None:
     expected_branch = f"agent/{args.issue_id}"
     if args.branch is None:
         args.branch = expected_branch
+    if args.branch != expected_branch and args.status != "invalid-runtime-context":
+        raise ValueError("Branch must match the delivery anchor")
+    args.delivery = None
+    args.member_results = None
+    args.delivery_error = None
+    if args.delivery_file:
+        try:
+            args.delivery = load_delivery(args.delivery_file)
+            if args.delivery["anchor"] != args.issue_id or args.delivery.get("state", "active") != "active":
+                raise ValueError("Delivery anchor or state mismatch")
+        except (OSError, ValueError):
+            if args.status != "invalid-runtime-context":
+                raise
+            args.delivery = None
+            args.delivery_error = "delivery-manifest-unverifiable"
+        if args.delivery is not None:
+            if args.member_results_json is None:
+                if args.status != "invalid-runtime-context":
+                    raise ValueError("Delivery report requires member-results-json")
+                args.member_results = [{"id": member, "status": "blocked", "evidence": "Not evaluated: runtime bootstrap failed before implementation."} for member in args.delivery["members"]]
+            else:
+                args.member_results = validate_results(args.delivery, json.loads(args.member_results_json))
+    elif args.member_results_json is not None:
+        raise ValueError("member-results-json requires delivery-file")
 
     if args.recovery_state not in VALID_RECOVERY_STATES:
         raise ValueError(
@@ -150,7 +180,7 @@ def main() -> int:
         follow_ups = parse_json_array(args.discovered_follow_ups_json, "Discovered-Follow-Ups-JSON")
         blockers = parse_json_array(args.blockers_json, "Blockers-JSON")
         validate_args(args, blockers)
-    except ValueError as exc:
+    except (OSError, ValueError) as exc:
         return fail(str(exc))
 
     changes = args.changes or ["- none recorded"]
@@ -204,6 +234,11 @@ def main() -> int:
         ]
     )
 
+    if args.delivery_error:
+        report += "\n\nDelivery-Validation-Error: " + args.delivery_error
+    if args.delivery is not None:
+        report += "\n\nDelivery-JSON:\n```json\n" + json.dumps(args.delivery, separators=(",", ":")) + "\n```"
+        report += "\n\nMember-Results-JSON:\n```json\n" + json.dumps(args.member_results, separators=(",", ":")) + "\n```"
     print(report)
     return 0
 

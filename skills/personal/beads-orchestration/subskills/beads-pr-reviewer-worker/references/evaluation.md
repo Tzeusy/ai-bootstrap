@@ -60,10 +60,10 @@ names, fix the contract drift before shipping the skill update.
 
 On a safe test PR:
 1. resolve context
-2. prepare branch; verify a cleanly merging head is NOT rebased
-   (`rebased: false`, `rebase_reason: not-needed`); if a conflict forces a
-   rebase or cleanup moves the head, verify the helper pushes it with lease and
-   reports the exact prepared head
+2. prepare an independent `review/<review-id>` snapshot while the author's
+   branch remains checked out in its own worktree. A clean base drift leaves
+   that branch and head unchanged; conflicts and `.beads/` divergence return
+   to the author, unavailable merge probes block without rebasing
 3. list threads
 4. post a reply with a stable dedupe key
 5. rerun the same reply and verify it is skipped as duplicate

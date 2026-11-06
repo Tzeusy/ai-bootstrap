@@ -52,6 +52,14 @@ review-task-to-original cycles are invalid normalizer evidence and become
 partial manual triage. Distinct canonical-plus-duplicate review tasks remain
 valid when their distinct review IDs point to the same original.
 
+A delivery package has one anchor and one canonical review record. Members
+carry `metadata.delivery_anchor` and never duplicate the anchor's `gh-pr:N`.
+A merged package emits `reconcile-package-members`: the lifecycle owner uses
+its per-member acceptance and landing evidence to close only completed
+members. It must preserve unmet/blocked members and the larger accepted
+outcome. A branch landing on an integration branch is accumulation, not main
+closure. This recommendation never authorizes blanket closure.
+
 ## Pass 2: Blocked Original Beads With `pr-review`
 
 Use the normalizer findings for blocked original beads. The original owns the

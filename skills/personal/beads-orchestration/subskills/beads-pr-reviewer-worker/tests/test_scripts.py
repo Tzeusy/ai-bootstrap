@@ -620,6 +620,31 @@ sys.exit(1)
         self.assertEqual(payload["error_code"], "malformed-original-id")
         self.assertEqual(payload["candidates"], ["aib"])
 
+    def test_package_resolves_one_pr_and_all_member_acceptance_targets(self):
+        owner = "coordinator:owner"
+        manifest = {"schema": "beads-delivery/v1", "anchor": "aib-abc",
+            "members": ["aib-abc", "aib-terminal"], "owner": owner,
+            "outcome": "aib-runtime", "base_branch": "main", "packet": "Current adapter corrections"}
+        anchor = {"id": "aib-abc", "assignee": owner, "status": "blocked",
+                  "external_ref": "gh-pr:99", "metadata": {"delivery": manifest}}
+        member = {"id": "aib-terminal", "assignee": owner, "status": "in_progress",
+                  "metadata": {"delivery_anchor": "aib-abc"}}
+        with FakeBinDir() as fbd:
+            self._make_bins(fbd, show_payloads={"aib-abc": [anchor], "aib-terminal": [member]})
+            result = run_script("resolve_review_context.py", ["--issue-id", "aib-xyz"], env=fbd.env())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["delivery_members"], manifest["members"])
+        self.assertEqual(payload["implementation_owner"], owner)
+        self.assertEqual(payload["pr_number"], 99)
+        # A member belongs to the anchor PR; it cannot start its own review.
+        with FakeBinDir() as fbd:
+            self._make_bins(fbd, description="Original implementation bead: aib-terminal",
+                            show_payloads={"aib-terminal": [member]})
+            result = run_script("resolve_review_context.py", ["--issue-id", "aib-xyz"], env=fbd.env())
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(json.loads(result.stderr)["error_code"], "noncanonical-delivery-original")
+
     def test_repeated_original_marker_candidates_fail_as_ambiguous(self) -> None:
         description = (
             "Original implementation bead: aib-swr.1\n"
@@ -847,40 +872,31 @@ sys.exit(1)
 # ---------------------------------------------------------------------------
 
 class PreparePrBranchTests(unittest.TestCase):
-    """prepare_pr_branch.py rebases only when the head conflicts with the base.
-
-    Fake git convention: ``merge-tree`` exit 0 = clean, 1 = conflict, anything
-    else = unsupported. ``rebase`` (without --abort) is the mutation under test.
-    """
+    """Review preparation never mutates the implementation branch."""
 
     @staticmethod
-    def _fake_git(*, merge_tree_exit=0, rebase_exit=0, push_exit=0,
-                  remote_head="same-head", local_head="same-head",
-                  beads_diff="", status=""):
+    def _fake_git(*, merge_tree_exit=0, beads_diff="", dirty=""):
         return f"""
 import sys
-
 argv = sys.argv[1:]
+if argv[:1] in (['rebase'], ['push'], ['commit'], ['add']):
+    print('forbidden implementation mutation', file=sys.stderr)
+    sys.exit(97)
+if argv[:1] == ['checkout'] and argv[1:3] != ['-B', 'review/bd-review']:
+    print('author branch checkout attempted', file=sys.stderr)
+    sys.exit(98)
 if argv[:2] == ['merge-tree', '--write-tree']:
-    if {merge_tree_exit} not in (0, 1):
-        print("error: unknown option `write-tree'", file=sys.stderr)
     sys.exit({merge_tree_exit})
-if argv[:1] == ['rebase'] and '--abort' not in argv:
-    if {rebase_exit} != 0:
-        print('CONFLICT (content): Merge conflict in foo.py', file=sys.stderr)
-    sys.exit({rebase_exit})
-if argv[:2] == ['rev-parse', 'origin/agent/test-1']:
-    print({remote_head!r})
-elif argv[:2] == ['rev-parse', 'HEAD']:
-    print({local_head!r})
+if argv[:1] == ['branch']:
+    print('origin/main')
+elif argv[:1] == ['symbolic-ref']:
+    print('review/bd-review')
+elif argv[:1] == ['rev-parse']:
+    print('same-head')
 elif argv[:1] == ['diff']:
     print({beads_diff!r})
 elif argv[:1] == ['status']:
-    print({status!r})
-elif argv[:1] == ['push']:
-    if {push_exit} != 0:
-        print('push failed: remote rejected', file=sys.stderr)
-    sys.exit({push_exit})
+    print({dirty!r})
 sys.exit(0)
 """
 
@@ -889,92 +905,115 @@ sys.exit(0)
             fbd.add("git", fake_git)
             return run_script(
                 "prepare_pr_branch.py",
-                ["--base-branch", "main", "--head-branch", "agent/test-1", *extra_args],
-                env=fbd.env(),
+                ["--base-branch", "main", "--head-branch", "agent/test-1",
+                 "--review-id", "bd-review", *extra_args], env=fbd.env(),
             )
 
-    def test_success_returns_ready(self) -> None:
+    def test_clean_merge_uses_independent_snapshot_without_mutating_author(self):
         result = self._run(self._fake_git())
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "ready")
-        self.assertTrue(payload["ok"])
-
-    def test_clean_merge_skips_rebase_and_push(self) -> None:
-        # A rebase call would fail the fake, proving the head was left alone.
-        result = self._run(self._fake_git(rebase_exit=97))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
+        self.assertEqual(payload["review_branch"], "review/bd-review")
         self.assertFalse(payload["rebased"])
-        self.assertEqual(payload["rebase_reason"], "not-needed")
         self.assertFalse(payload["pushed_prepared_head"])
         self.assertEqual(payload["head_commit"], "same-head")
 
-    def test_conflict_triggers_rebase_and_pushes_prepared_head(self) -> None:
-        result = self._run(self._fake_git(
-            merge_tree_exit=1, remote_head="old-head", local_head="rebased-head"))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        self.assertTrue(payload["rebased"])
-        self.assertEqual(payload["rebase_reason"], "conflict-with-base")
-        self.assertTrue(payload["pushed_prepared_head"])
-        self.assertEqual(payload["head_commit"], "rebased-head")
-
-    def test_force_rebase_flag_rebases_a_clean_head(self) -> None:
-        result = self._run(self._fake_git(
-            remote_head="old-head", local_head="rebased-head"), ["--force-rebase"])
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        self.assertTrue(payload["rebased"])
-        self.assertEqual(payload["rebase_reason"], "forced")
-        self.assertTrue(payload["pushed_prepared_head"])
-
-    def test_unsupported_merge_tree_falls_back_to_rebase(self) -> None:
-        result = self._run(self._fake_git(
-            merge_tree_exit=129, remote_head="old-head", local_head="rebased-head"))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        self.assertTrue(payload["rebased"])
-        self.assertEqual(payload["rebase_reason"], "merge-tree-unsupported")
-
-    def test_rebase_conflict_returns_error(self) -> None:
-        result = self._run(self._fake_git(merge_tree_exit=1, rebase_exit=1))
+    def test_conflict_returns_correction_without_rewriting_author(self):
+        result = self._run(self._fake_git(merge_tree_exit=1))
         self.assertNotEqual(result.returncode, 0)
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["status"], "rebase-conflict")
-        self.assertFalse(payload["ok"])
-        self.assertEqual(payload["rebase_reason"], "conflict-with-base")
+        self.assertEqual(payload["status"], "corrections-required")
+        self.assertEqual(payload["error"], "conflict-with-base")
 
-    def test_push_failure_after_beads_cleanup_returns_blocked(self) -> None:
-        result = self._run(self._fake_git(
-            beads_diff="some beads diff content", status="M .beads/issues.jsonl",
-            push_exit=1))
+    def test_unavailable_probe_fails_closed_without_rebase(self):
+        result = self._run(self._fake_git(merge_tree_exit=129))
         self.assertNotEqual(result.returncode, 0)
-        payload = json.loads(result.stdout)
-        self.assertEqual(payload["status"], "blocked")
-        self.assertFalse(payload["rebased"])
+        self.assertEqual(json.loads(result.stdout)["error"], "merge-tree-unavailable")
 
-    def test_push_failure_after_rebase_returns_blocked(self) -> None:
-        result = self._run(self._fake_git(
-            merge_tree_exit=1, remote_head="old-head", local_head="rebased-head",
-            push_exit=1))
+    def test_tracker_divergence_returns_to_owner(self):
+        result = self._run(self._fake_git(beads_diff="tracker changes"))
         self.assertNotEqual(result.returncode, 0)
-        payload = json.loads(result.stdout)
-        self.assertEqual(payload["status"], "blocked")
-        self.assertIn("prepared head", payload["error"])
-        self.assertTrue(payload["rebased"])
+        self.assertEqual(json.loads(result.stdout)["status"], "corrections-required")
 
-    def test_dry_run_skips_all_git_mutations(self) -> None:
-        """In --dry-run mode the script must not invoke git at all."""
-        result = self._run("""
-import sys
-print('git called in dry-run!', file=sys.stderr)
-sys.exit(99)
-""", ["--dry-run"])
+    def test_dirty_review_worktree_is_preserved(self):
+        result = self._run(self._fake_git(dirty=" M file.py"))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(json.loads(result.stdout)["error"], "review-worktree-is-dirty")
+
+    def test_real_base_drift_preserves_author_worktree_and_unpublished_tail(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            remote, repo, author, reviewer = [root / name for name in ("remote", "repo", "author", "reviewer")]
+            def git(*args, cwd=None):
+                result = subprocess.run(["git", *map(str, args)], cwd=cwd, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                return result.stdout.strip()
+            git("init", "--bare", remote)
+            git("init", "-b", "main", repo)
+            git("config", "user.name", "Test", cwd=repo)
+            git("config", "user.email", "test@example.invalid", cwd=repo)
+            (repo / "base").write_text("baseline")
+            git("add", ".", cwd=repo); git("commit", "-m", "base", cwd=repo)
+            git("remote", "add", "origin", remote, cwd=repo)
+            git("push", "-u", "origin", "main", cwd=repo)
+            git("worktree", "add", "-b", "agent/bd-package", author, cwd=repo)
+            (author / "adapter").write_text("accepted correction")
+            git("add", ".", cwd=author); git("commit", "-m", "correction", cwd=author)
+            git("push", "-u", "origin", "agent/bd-package", cwd=author)
+            published_head = git("rev-parse", "HEAD", cwd=author)
+            # This optional unpublished tail cannot be made hostage to review.
+            (author / "adapter").write_text("optional unfinished correction")
+            (repo / "unrelated").write_text("concurrent main change")
+            git("add", ".", cwd=repo); git("commit", "-m", "main advances", cwd=repo)
+            git("push", "origin", "main", cwd=repo)
+            git("worktree", "add", "-b", "review/bd-review", reviewer, cwd=repo)
+            result = subprocess.run([sys.executable, str(SCRIPTS / "prepare_pr_branch.py"),
+                "--base-branch", "main", "--head-branch", "agent/bd-package", "--review-id", "bd-review"],
+                cwd=reviewer, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["head_commit"], published_head)
+            self.assertEqual(git("rev-parse", "HEAD", cwd=author), published_head)
+            self.assertEqual(git("branch", "--show-current", cwd=author), "agent/bd-package")
+            self.assertEqual((author / "adapter").read_text(), "optional unfinished correction")
+            self.assertEqual((reviewer / "adapter").read_text(), "accepted correction")
+            self.assertEqual(git("rev-parse", "origin/agent/bd-package", cwd=repo), published_head)
+
+    def test_clean_local_only_review_commit_is_preserved_before_fetch_or_reset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            remote, repo = root / "remote", root / "repo"
+            def git(*args):
+                result = subprocess.run(["git", *map(str, args)], cwd=repo if repo.exists() else root,
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                return result.stdout.strip()
+            git("init", "--bare", remote)
+            git("init", "-b", "review/bd-review", repo)
+            git("config", "user.name", "Test"); git("config", "user.email", "test@example.invalid")
+            (repo / "published").write_text("base")
+            git("add", "."); git("commit", "-m", "published")
+            git("remote", "add", "origin", remote)
+            git("push", "origin", "HEAD:main")
+            (repo / "recovery").write_text("valuable local-only committed work")
+            git("add", "."); git("commit", "-m", "unpublished recovery")
+            recovery_head = git("rev-parse", "HEAD")
+            # A fetch would fail because the requested PR branch does not
+            # exist. The provenance error proves refusal happened first.
+            result = subprocess.run([sys.executable, str(SCRIPTS / "prepare_pr_branch.py"),
+                "--base-branch", "main", "--head-branch", "agent/bd-package", "--review-id", "bd-review"],
+                cwd=repo, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(json.loads(result.stdout)["error"], "review-head-has-no-published-provenance")
+            self.assertEqual(git("rev-parse", "HEAD"), recovery_head)
+            self.assertEqual(git("branch", "--show-current"), "review/bd-review")
+            self.assertEqual((repo / "recovery").read_text(), "valuable local-only committed work")
+
+    def test_dry_run_invokes_no_git(self):
+        result = self._run("import sys; sys.exit(99)", ["--dry-run"])
         self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        self.assertEqual(payload["status"], "dry-run")
-        self.assertTrue(payload["ok"])
+        self.assertEqual(json.loads(result.stdout)["status"], "dry-run")
 
 
 # ---------------------------------------------------------------------------

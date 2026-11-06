@@ -41,6 +41,18 @@ command diagnostics.
 
 If validation fails, stop immediately and report `invalid-runtime-context`.
 
+For a cohesive multi-bead assignment, pass `--delivery-file "$DELIVERY_FILE"`
+to the assertion. The file is the current `beads-delivery/v1` manifest from
+the canonical anchor metadata, not a list inferred from branch names.
+`ISSUE_ID` is its anchor; the branch stays `agent/<anchor>` and all member
+claims belong to its recorded owner. Bootstrap rejects a mismatched anchor
+or inactive manifest. Claim and recovery semantics live in
+[`delivery_package.py`](../../../scripts/delivery_package.py).
+
+For independent review, `--review-id "$ISSUE_ID"` selects the separate
+`review/<review-id>` branch. This mode cannot take an implementation manifest;
+reviewing never transfers the implementation branch or worktree.
+
 ## Guidance Discovery Order
 
 Read project guidance in this order:
@@ -97,7 +109,7 @@ Before pushing to `origin agent/${ISSUE_ID}`, run these project-specific cheap
 checks if your change touches the indicated areas. These are deterministic,
 fast (seconds to ~10s), and catch issues before CI preflight:
 
-- **New test files**: run `make check-ci-test-shards` to register the file in
+- **New test files**: if the project defines it, run `make check-ci-test-shards` to register the file in
   CI shard manifests (`.github/ci-test-shards/{unit,integration}-N.txt`).
 - **New frontend copy/strings**: run the project's copy/inventory-validation
   command if it has one — check the actual target name in the project's
