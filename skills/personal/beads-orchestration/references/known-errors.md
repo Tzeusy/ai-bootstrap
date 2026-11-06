@@ -2395,3 +2395,18 @@ beads (`bu-atsax`, `bu-m09qm`) whose prior coordinator session's heartbeat was
 - **Symptom:** a title that starts with "Test" (for example "Test-timeout tooling follow-ups: …") makes `bd create --json` print `⚠ Creating test issue in production database` / `appears to be test data` to stdout before the JSON. A `| jq` pipeline then fails to parse and the shell reports exit 5. The issue was still created, so a retry creates a duplicate.
 - **Seen:** syzygy, 2026-10-27 (`syzygy-bpyt.35` and its duplicate `.36`).
 - **Fix:** after any failed `bd create`, run `bd list --status open --json | jq '.[] | select(.title|test("<title fragment>"))'` before retrying. Close a duplicate with `--force --reason "Duplicate of …"`. Avoid titles that start with "Test", or parse with `sed -n '/^{/,$p' | jq` instead of `jq` alone.
+
+## bd 1.3.1: `--set-metadata` stores JSON-looking values as strings
+
+- **Observed:** 2026-11-06, bd 1.3.1, isolated embedded database; no external server.
+- **Symptom:** `bd update <id> --set-metadata 'delivery={"schema":"beads-delivery/v1"}'`
+  succeeds, but `bd show <id> --json` contains a string at `metadata.delivery`.
+  Object-consuming package helpers then fail with `invalid-delivery-schema`.
+- **Fix:** pass typed values through `--metadata '{"delivery":{...}}'`; this merges
+  supplied keys and preserves unrelated metadata. Use `--unset-metadata` for key
+  deletion in a separate guarded call: bd rejects combining `--metadata` with
+  `--set-metadata` or `--unset-metadata`. Retain the claim until metadata writes
+  finish. Verify by reading the native CLI result, not only a fake store.
+- **Related:** `bd show <id> --json` returns a singleton array. Project `.[0]`
+  after validating cardinality and requested identity; projecting `{id,...}`
+  directly fails with `Cannot index array with string "id"`.

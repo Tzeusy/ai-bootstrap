@@ -32,11 +32,11 @@ and registry rules in
   ```bash
   bd ready --json | jq -c '[.[] | {id, title, priority, type, labels, assignee}]'
   bd list --status=blocked --label pr-review --json | jq -c '[.[] | {id, title, labels, assignee, external_ref}]'
-  bd show <id> --json | jq '{id, title, status, assignee, labels, external_ref}'   # coordinator view
+  bd show <id> --json | jq '.[0] | {id, title, status, assignee, labels, external_ref}'   # coordinator view
   ```
 
   Workers implementing a bead additionally need `description`,
-  `acceptance_criteria`, and `notes` — project to those, not the full record.
+  `acceptance_criteria`, `design`, and `notes` — project to those, not the full record.
 - For `gh`, always pass an explicit `--json <fields>` list; never fetch default
   field sets.
 - Route long stdout (test runs, builds, installs) to a file; read back only the

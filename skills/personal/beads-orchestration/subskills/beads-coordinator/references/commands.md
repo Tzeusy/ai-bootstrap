@@ -68,7 +68,7 @@ default coordinator views.
 | All open | `bd list --status=open --json \| jq -c '[.[] \| {id, title, priority, type, labels, assignee}]'` (prefix with `bd -C /path/to/rig` if outside target rig) |
 | PR-review issues | `bd list --status=blocked --label pr-review --json \| jq -c '[.[] \| {id, title, labels, assignee, external_ref}]'` |
 | PR-review-task issues | `bd list --status=blocked --label pr-review-task --json \| jq -c '[.[] \| {id, title, labels, assignee, external_ref}]'` |
-| Issue detail | `bd show <id> --json \| jq '{id, title, status, assignee, labels, external_ref}'` (workers add `description`, `acceptance_criteria`, `notes`, `design`) |
+| Issue detail | `bd show <id> --json \| jq '.[0] \| {id, title, status, assignee, labels, external_ref}'` (workers add `description`, `acceptance_criteria`, `notes`, `design`) |
 | Check PR state | `gh pr view <number> --json state,mergedAt,createdAt` |
 | Find PR by worker branch | `gh pr list --state open --head "agent/<id>" --json number,url,createdAt` |
 | Create issue | `bd --actor "$COORDINATOR_ID" create "<title>" --description "<desc>" -t <type> -p <priority> [--parent <epic-id>] --json` |

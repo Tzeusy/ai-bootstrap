@@ -492,6 +492,27 @@ class CleanupScanTests(unittest.TestCase):
         self.assertEqual(payload["status"], "fatal")
         self.assertEqual(payload["claims"], [])
 
+    def test_released_receipt_stops_active_package_recovery_without_hiding_unpublished_work(self):
+        anchor = "aib-released"
+        for state, unpublished in (("active", False), ("released", False), ("released", True)):
+            with self.subTest(state=state, unpublished=unpublished):
+                original = bead(anchor, "closed")
+                original["metadata"] = {"delivery": {"schema": "beads-delivery/v1", "anchor": anchor,
+                    "members": [anchor], "owner": "coordinator:owner", "outcome": "aib-runtime",
+                    "base_branch": "main", "packet": "Accepted correction", "state": state}}
+                result, _, _ = self.run_fixture({
+                    "worktree_entries": [worktree_entry(path_id=anchor, branch_id=anchor)],
+                    "worktree_dirs": [anchor], "remote_branches": [anchor],
+                    "unpublished_worktrees": [anchor] if unpublished else [],
+                    "shows": {anchor: [original]}, "artifact_dirs": [f"{anchor}-build"], "open_prs": []})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                expected_worktree = ("preserve-unpublished-work" if unpublished else
+                                     "recover-package" if state == "active" else "cleanup-eligible-after-verification")
+                self.assertEqual(payload["worktrees"][0]["recommendation"], expected_worktree)
+                self.assertEqual(payload["build_artifacts"][0]["recommendation"],
+                                 "preserve-active-bead" if state == "active" else "delete-after-receipts")
+
     def test_dead_member_recovers_anchor_package_and_keeps_partial_artifacts(self):
         anchor, member = "aib-adapters", "aib-terminal"
         original = bead(anchor, "closed")

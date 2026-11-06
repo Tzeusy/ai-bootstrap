@@ -1410,5 +1410,22 @@ sys.exit(99)
         self.assertEqual(payload["status"], "dry-run")
 
 
+class DocumentedBootstrapProjectionTests(unittest.TestCase):
+    def test_native_show_array_projects_requested_record_and_rejects_bad_identity(self):
+        text = (SKILL_ROOT / "SKILL.md").read_text()
+        program = text.split('| jq -e --arg id "$ISSUE_ID" ', 1)[1].split("')", 1)[0][1:]
+        record = {"id": "probe-a", "title": "Review", "notes": "current", "unneeded": "omit"}
+        for payload in ([record], [], [record, record], [{"id": "probe-b"}], record):
+            with self.subTest(payload=payload):
+                result = subprocess.run(["jq", "-e", "--arg", "id", "probe-a", program],
+                                        input=json.dumps(payload), capture_output=True, text=True)
+                if payload == [record]:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(json.loads(result.stdout)["id"], "probe-a")
+                    self.assertNotIn("unneeded", json.loads(result.stdout))
+                else:
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
