@@ -332,6 +332,23 @@ troubleshooting steps instead. Use `bd dolt status`, `bd version`, and
   restore comment-only churn unless the ignore entries themselves changed.
 - Observed: 2026-06-18, bd 1.0.4.
 
+### `bd worktree remove` refuses ignored coordination files in a clean checkout
+- **Symptom**: tracked/untracked porcelain is empty, but removal fails with
+  `worktree contains modified, untracked, or ignored files`.
+- **Cause**: the current helper deliberately includes ignored files in its
+  clean-check requirement. `.beads.gate.lock`, local Beads metadata, and ignored
+  execution receipts can trigger it even after an owned source PR has merged.
+- **Resolution**: inspect the full ignored-file inventory as well as porcelain.
+  Retain and hash-check all execution receipts outside the worktree; verify the
+  exact released worker/PR ownership and landed source. Only then remove that
+  specific owned worktree with `--force`, which still checks registered identity
+  and concurrent changes. Preserve unrelated or unknown files instead of
+  forcing their removal. Inspect `.gitignore` afterward as above. Never tighten
+  shared checkout permissions to silence the unrelated 0770 warning.
+- Observed: 2026-11-04, tze-hud PR1553; 107 historical receipts matched an
+  existing immutable copy and ten other metadata/output files were retained
+  before the two released worktrees were removed.
+
 ## resolve_review_context.py: `missing-original-id` on freeform review-bead descriptions
 
 The pr-reviewer-worker helper `resolve_review_context.py` only recognizes the
@@ -2389,3 +2406,28 @@ beads (`bu-atsax`, `bu-m09qm`) whose prior coordinator session's heartbeat was
 ## tze-hud: `gh pr merge --squash --auto` fails "Auto merge is not allowed"
 - **Symptom**: reviewer cannot enter the merge queue; repo has enablePullRequestAutoMerge off.
 - **Workaround**: enqueue directly with GraphQL `mutation{enqueuePullRequest(input:{pullRequestId:$id}){mergeQueueEntry{position}}}` (queue still enforces required checks). Observed: 2026-10-03, tze-hud PR #1247.
+
+
+## cargo_source_guard rejects a duplicate cargo executable
+
+In tze-hud, `python3 scripts/cargo_source_guard.py -- cargo nextest ...` returns exit86 `unsupported-frozen-command` before spawning Cargo: the guard owns the executable. Pass only Cargo subcommands: `python3 scripts/cargo_source_guard.py -- nextest ...` (or canonical `just` gates). Check the current justfile/guard parser rather than copying a stale plan. Preserve the refusal receipt; it is not a test failure or source red.
+
+
+### bd worktree remove flags are mutually exclusive
+
+`bd worktree remove PATH --force --merged-into SHA` refuses before removal: `--force and --merged-into cannot be used together`. For an exact released owned checkout whose tracked/nonignored status is clean, inventory and retain/hash its ignored coordination/receipt files first. Independently verify its source, ownership, release and merge state; then use `bd ... worktree remove PATH --force` alone. Keep the refusal receipt and resume cleanup only, never repeat completed canonical closures or target deletion. Do not change shared .beads permissions or remove another live worker checkout.
+
+
+## bd worktree create can reuse an old branch tip
+
+Observed 2026-11-04 in tze-hud: `bd worktree create <new-path> --branch agent/hud-bhs4r` exited 0 but checked out an existing unoccupied branch at its old c073 tip, rather than current main b8e. Successful creation does not establish the expected base, and this version did not refuse the existing branch. Inspect actual HEAD/tree and bootstrap before substantive work. For a clean, coordinator-owned checkout, verify the old tip is an ancestor of the intended base, then use `git merge --ff-only <exact-base>` and repeat actual bootstrap. Do not reset or overwrite a diverged/foreign branch.
+
+
+## Guarded label-only bd update is refused before mutation
+
+Observed 2026-11-04: `bd update ID --if-assignee ACTOR --if-status in_progress --add-label review-running --json` exits 1 because the guards require an actual field update; labels and parent edits alone are not covered. The useful JSON error is in stdout, while stderr may contain only the advisory shared-directory permission warning. Retain both streams and do not mistake this for a Dolt timeout. Fresh-read ownership/status/labels, then include the normal heartbeat `--notes` field update alongside the label edit and verify the returned notes/label. Do not remove guards, tighten shared permissions, or repeat earlier already-committed claims/status changes.
+
+
+## bd create --validate rejects bug descriptions without Steps to Reproduce
+
+Observed 2026-11-06 in tze-hud, bd1.3.1. A bug with structured design and acceptance but no literal `## Steps to Reproduce` in its description is refused with `missing required sections for bug`. Preserve that refusal; independently query the exact title before a revised create to establish no prior issue was written. Add concrete reproduction steps to the description and submit the corrected create once. Do not drop validation or replay an ambiguous mutation. Task-type review beads did not require this bug section.
