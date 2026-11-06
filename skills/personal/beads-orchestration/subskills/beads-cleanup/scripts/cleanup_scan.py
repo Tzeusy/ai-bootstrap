@@ -862,7 +862,8 @@ def delivery_anchor(record: dict[str, Any]) -> str | None:
         delivery = validate_delivery(delivery)
         if delivery["anchor"] != record_id(record):
             raise ValueError("delivery-anchor-mismatch")
-        return delivery["anchor"]
+        if delivery.get("state", "active") != "released":
+            return delivery["anchor"]
     pointer = metadata.get("delivery_anchor")
     if pointer is not None and (not isinstance(pointer, str) or not BEAD_ID_RE.fullmatch(pointer)):
         raise ValueError("invalid-delivery-pointer")

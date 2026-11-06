@@ -81,6 +81,75 @@ def queue_ids(payload):
 
 
 class DeliveryPackageSchedulingTests(unittest.TestCase):
+    def test_retained_one_bead_pr_owner_uses_the_same_capacity_with_or_without_manifest(self):
+        owner = "coordinator:a"
+        row = bead("bd-one", status="blocked", assignee=owner, external_ref="gh-pr:1")
+        single = ranking.rank(snapshot([row]), now=NOW)
+        row["metadata"] = {"delivery": {"schema": "beads-delivery/v1", "anchor": row["id"],
+            "members": [row["id"]], "owner": owner, "outcome": row["id"],
+            "base_branch": "main", "packet": "Accepted scope"}}
+        manifested = ranking.rank(snapshot([row]), now=NOW)
+        self.assertEqual(single["capacity"]["occupied"], 1)
+        self.assertEqual(single["capacity"], manifested["capacity"])
+        self.assertEqual(single["capacity"]["free"], single["capacity"]["budget"] - 1)
+
+    def test_scoped_run_keeps_the_runnable_frontier_of_an_outside_p0_epic(self):
+        normal, emergency = epic("bd-normal"), epic("bd-emergency", priority=0)
+        substrate = bead("bd-substrate", priority=2)
+        host = bead("bd-host", status="blocked", blocks_on=[substrate["id"]])
+        normal_child = bead("bd-normal.1", parent=normal["id"])
+        emergency_child = bead("bd-emergency.1", parent=emergency["id"], status="blocked", blocks_on=[host["id"]])
+        rows = [normal, emergency, normal_child, emergency_child, host, substrate]
+        payload = ranking.rank(snapshot(rows, [status(normal, 1, 0), status(emergency, 1, 0)]),
+                               now=NOW, scope_epics=[normal["id"]])
+        self.assertEqual(queue_ids(payload), [substrate["id"], normal_child["id"]])
+        self.assertEqual(payload["queue"][0]["outcome"], emergency["id"])
+        self.assertIn("prerequisite", payload["queue"][0]["reason"])
+
+    def test_scoped_run_keeps_p0_child_frontier_under_an_ordinary_epic(self):
+        normal, outside = epic("bd-normal"), epic("bd-outside")
+        normal_child = bead("bd-normal.1", parent=normal["id"])
+        substrate = bead("bd-substrate")
+        emergency = bead("bd-outside.1", parent=outside["id"], priority=0,
+                         status="blocked", blocks_on=[substrate["id"]])
+        payload = ranking.rank(snapshot([normal, outside, normal_child, substrate, emergency],
+                               [status(normal, 1, 0), status(outside, 1, 0)]),
+                               now=NOW, scope_epics=[normal["id"]])
+        self.assertEqual(queue_ids(payload), [substrate["id"], normal_child["id"]])
+        self.assertEqual(payload["queue"][0]["outcome"], emergency["id"])
+        self.assertIn("P0 task", payload["queue"][0]["reason"])
+
+    def test_scoped_run_keeps_standalone_p0_frontier_and_deduplicates_shared_substrate(self):
+        normal, outside = epic("bd-normal"), epic("bd-outside")
+        normal_child, substrate = bead("bd-normal.1", parent=normal["id"]), bead("bd-substrate")
+        emergency = bead("bd-emergency", priority=0, status="blocked", blocks_on=[substrate["id"]])
+        other_emergency = bead("bd-outside.1", parent=outside["id"], priority=0,
+                               status="blocked", blocks_on=[substrate["id"]])
+        payload = ranking.rank(snapshot([normal, outside, normal_child, substrate, emergency, other_emergency],
+                               [status(normal, 1, 0), status(outside, 1, 0)]),
+                               now=NOW, scope_epics=[normal["id"]])
+        self.assertEqual(queue_ids(payload), [substrate["id"], normal_child["id"]])
+        self.assertEqual(payload["queue"][0]["outcome"], emergency["id"])
+        self.assertIn("P0 task", payload["queue"][0]["reason"])
+
+    def test_p0_urgency_does_not_cross_unknown_held_or_foreign_owned_gates(self):
+        normal, substrate = epic("bd-normal"), bead("bd-substrate")
+        normal_child = bead("bd-normal.1", parent=normal["id"])
+        for gate in (None,
+                     bead("bd-gate", status="blocked", labels=["no-dispatch"], blocks_on=[substrate["id"]]),
+                     bead("bd-gate", status="blocked", assignee="coordinator:foreign", blocks_on=[substrate["id"]])):
+            with self.subTest(gate=gate):
+                emergency = bead("bd-emergency", priority=0, status="blocked", blocks_on=["bd-gate"])
+                rows = [normal, normal_child, substrate, emergency, *([gate] if gate else [])]
+                payload = ranking.rank(snapshot(rows, [status(normal, 1, 0)]), now=NOW, scope_epics=[normal["id"]])
+                self.assertEqual(queue_ids(payload), [normal_child["id"]])
+        # A P0 record which is itself a hard-held gate cannot lend urgency.
+        emergency = bead("bd-emergency", priority=0, status="blocked", labels=["no-dispatch"],
+                         blocks_on=[substrate["id"]])
+        payload = ranking.rank(snapshot([normal, normal_child, substrate, emergency], [status(normal, 1, 0)]),
+                               now=NOW, scope_epics=[normal["id"]])
+        self.assertEqual(queue_ids(payload), [normal_child["id"]])
+
     def test_three_members_use_one_lane_and_cannot_be_redispatched(self):
         owner = "coordinator:owner"
         anchor = bead("bd-adapter", status="blocked", assignee=owner)

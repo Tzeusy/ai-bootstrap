@@ -19,8 +19,10 @@ Usage (from the beads-coordinator package directory):
 
 Ranking contract (canonical; `coordinator-loop.md` Step 2 only points here):
 
-1. Urgent first: a priority-0 bead, or any ready bead under a priority-0 epic.
-   Urgent rows ignore `--scope-epic`.
+1. Urgent first: a runnable priority-0 bead, a ready bead under a priority-0
+   ancestor, or the runnable blocker frontier of any live priority-0 task or
+   outcome. Urgency ignores `--scope-epic`; held, unknown, or foreign-owned
+   prerequisites never become runnable merely by inheritance.
 2. Then work grouped by outcome. An outcome is a bead's nearest open ancestor
    epic, or the bead itself when it has none (a standalone bead is a one-bead
    outcome). Outcomes sort by:
@@ -45,7 +47,8 @@ Ranking contract (canonical; `coordinator-loop.md` Step 2 only points here):
    outcome's primary share, so no lane idles while ready work exists.
 
 Capacity: the lane budget is global across coordinators: `--lanes`, else the
-`beads.max_lanes` kv key, else 4. Each active delivery package (or unpackaged `in_progress` bead) whose assignee is a
+`beads.max_lanes` kv key, else 4. Each active delivery package (or unpackaged bead in progress or retaining
+an assigned blocked PR) whose assignee is a
 coordinator (`coordinator:` prefix) occupies one lane, plus each live
 registration's explicitly reserved `extra_lanes`.
 Other `in_progress` assignees (humans) are counted under `other_claims` only.
@@ -294,6 +297,16 @@ def rank(
                 return outcome
         return next((ancestor for ancestor in ancestors(bead_id) if ancestor in epics), None)
 
+    def urgent_sponsor(row: dict[str, Any]) -> str | None:
+        # A P0 task or ancestor owns the emergency even when its nearest epic
+        # has ordinary priority or the task has no epic at all.
+        candidates = [row["id"], *ancestors(row["id"])]
+        outcome = outcome_of(row["id"])
+        if outcome:
+            candidates.append(outcome)
+        return next((candidate for candidate in candidates
+                     if candidate in rows and priority_of(rows[candidate]) == 0), None)
+
     def pinned(epic_id: str) -> bool:
         return any(
             FOCUS_LABEL in labels_of(epics[eid]["row"]) for eid in [epic_id, *ancestors(epic_id)] if eid in epics
@@ -325,7 +338,8 @@ def rank(
         ):
             on_pr = text(row.get("external_ref")).startswith("gh-pr:") or bool(labels_of(row) & REVIEW_LABELS)
             orphaned.append({"assignee": assignee, "id": bead_id, "kind": "pr" if on_pr else "gate"})
-        holds_lane = row.get("status") == "in_progress" or (
+        retains_pr = row.get("status") == "blocked" and text(row.get("external_ref")).startswith("gh-pr:")
+        holds_lane = row.get("status") == "in_progress" or retains_pr or (
             bead_id in delivery_anchors and row.get("status") in {"open", "blocked"}
         )
         lane_key = (assignee, anchor_id)
@@ -388,7 +402,7 @@ def rank(
             elif in_scope(row["id"]):
                 shaping_standalone.append(row)
             continue
-        if priority_of(row) == 0 or (epic_id and priority_of(epics[epic_id]["row"]) == 0):
+        if urgent_sponsor(row):
             urgent.append(row)
         elif not in_scope(row["id"]):
             continue
@@ -401,6 +415,7 @@ def rank(
     # substrate keeps one queue identity even when it unlocks several epics.
     runnable_by_id = {row["id"]: row for row in runnable}
     urgent_ids = {row["id"] for row in urgent}
+    urgent_prerequisites: dict[str, str] = {}
     def runnable_prerequisites(bead_id: str, seen: set[str]) -> list[dict[str, Any]]:
         if bead_id in seen:
             return []
@@ -419,16 +434,30 @@ def rank(
 
     for row in snapshot["live"]:
         epic_id = outcome_of(row["id"])
-        if not epic_id or row["id"] in ready_ids or row.get("status") not in {"open", "blocked"}:
+        sponsor = urgent_sponsor(row)
+        eligible_states = {"open", "blocked", "in_progress"} if sponsor else {"open", "blocked"}
+        if (not epic_id and not sponsor) or row["id"] in ready_ids or row.get("status") not in eligible_states:
             continue
         if row.get("issue_type") == "epic" or text(row.get("external_ref")).startswith("gh-pr:"):
             continue
-        epics[epic_id]["blocked_open"].append(row["id"])
+        if epic_id:
+            epics[epic_id]["blocked_open"].append(row["id"])
+        if NO_DISPATCH_LABEL in labels_of(row):
+            continue
         for blocker_id in blockers_of(row):
             for blocker in runnable_prerequisites(blocker_id, {row["id"]}):
-                if blocker["id"] in urgent_ids or outcome_of(blocker["id"]) == epic_id:
-                    continue
                 if SHAPING_LABEL in labels_of(blocker):
+                    continue
+                # Emergency scope exemption follows every P0 task/outcome's
+                # runnable blocker frontier; ownership and hard gates above
+                # still prohibit traversal through held prerequisites.
+                if sponsor:
+                    cause = urgent_prerequisites.get(blocker["id"], sponsor)
+                    urgent_prerequisites[blocker["id"]] = min(cause, sponsor)
+                    if blocker["id"] not in urgent_ids:
+                        urgent.append(blocker)
+                        urgent_ids.add(blocker["id"])
+                if not epic_id or blocker["id"] in urgent_ids or outcome_of(blocker["id"]) == epic_id:
                     continue
                 if blocker not in epics[epic_id]["prereqs"]:
                     epics[epic_id]["prereqs"].append(blocker)
@@ -517,8 +546,13 @@ def rank(
         return True
 
     for row in sorted(urgent, key=bead_key):
-        epic_id = outcome_of(row["id"])
-        cause = f"P{priority_of(row)} {text(row.get('issue_type'))}" if priority_of(row) == 0 else f"under P0 epic {epic_id}"
+        prerequisite_sponsor = urgent_prerequisites.get(row["id"])
+        sponsor = prerequisite_sponsor or urgent_sponsor(row)
+        epic_id = sponsor if prerequisite_sponsor else outcome_of(row["id"])
+        sponsor_type = text(rows.get(sponsor, {}).get("issue_type")) or "task"
+        cause = (f"P{priority_of(row)} {text(row.get('issue_type'))}" if priority_of(row) == 0
+                 else f"prerequisite for P0 {sponsor_type} {sponsor}" if prerequisite_sponsor
+                 else f"under P0 {sponsor_type} {sponsor}")
         push(row, epic_id, f"urgent: {cause}")
 
     def reason_for(outcome: dict[str, Any], row: dict[str, Any]) -> str:

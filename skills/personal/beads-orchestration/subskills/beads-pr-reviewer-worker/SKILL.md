@@ -115,7 +115,10 @@ review-thread operations or the failure protocol:
 
 ```bash
 ISSUE_JSON=$(bd show "${ISSUE_ID}" --json \
-  | jq '{id, title, status, labels, external_ref, description, acceptance_criteria, design, notes}')
+  | jq -e --arg id "$ISSUE_ID" '
+      if type == "array" and length == 1 and .[0].id == $id then
+        .[0] | {id, title, status, labels, external_ref, description, acceptance_criteria, design, notes}
+      else error("expected exactly the requested bead") end')
 ```
 
 Project to those fields only (`../../references/token-efficiency.md`); the

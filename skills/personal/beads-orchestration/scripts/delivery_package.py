@@ -22,7 +22,7 @@ from typing import Any
 
 SCHEMA = "beads-delivery/v1"
 ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
-HOLD_LABELS = {"no-dispatch", "needs-shaping", "owner-held", "human-gate", "held-for-owner"}
+HOLD_LABELS = {"no-dispatch", "needs-shaping", "owner-held", "human-gate", "held-for-owner", "scope:local-state"}
 
 
 def validate_delivery(value: object) -> dict[str, Any]:
@@ -240,15 +240,23 @@ def release_claims(client: Beads, journal: dict[str, Any], path: Path, *, recove
                 update += ["--status", prior["status"]]
             elif current.get("status") == "in_progress":
                 update += ["--if-status", "in_progress", "--status", "open"]
+            restore_metadata: dict[str, Any] = {}
+            unset_metadata: list[str] = []
             for key in ("delivery_anchor", "delivery"):
                 old = metadata(prior).get(key) if recovery else None
                 if not recovery and member == delivery["anchor"] and key == "delivery":
                     old = {**delivery, "state": "released"}
                 if old is None:
-                    update += ["--unset-metadata", key]
+                    unset_metadata += ["--unset-metadata", key]
                 else:
-                    value = json.dumps(old, separators=(",", ":")) if isinstance(old, dict) else str(old)
-                    update += ["--set-metadata", f"{key}={value}"]
+                    restore_metadata[key] = old
+            # Native bd rejects combining typed --metadata with key deletions.
+            # Keep the claim through both metadata operations; relinquish it last.
+            metadata_update = ["update", member, "--if-assignee", delivery["owner"], "--json"]
+            if unset_metadata:
+                client.call(*metadata_update, *unset_metadata)
+            if restore_metadata:
+                client.call(*metadata_update, "--metadata", json.dumps(restore_metadata, separators=(",", ":")))
             client.call(*update)
             released.append(member)
         except (RuntimeError, ValueError, subprocess.TimeoutExpired):
@@ -275,10 +283,10 @@ def claim_delivery(client: Beads, delivery: dict[str, Any], path: Path) -> dict[
             # Recheck status and blockers after the atomic ownership operation.
             check_ready(delivery, {member: client.show(member)}, client)
         for member in delivery["members"]:
-            update = ["update", member, "--if-assignee", delivery["owner"], "--set-metadata", f"delivery_anchor={delivery['anchor']}", "--json"]
+            package_metadata: dict[str, Any] = {"delivery_anchor": delivery["anchor"]}
             if member == delivery["anchor"]:
-                update += ["--set-metadata", "delivery=" + json.dumps(delivery, separators=(",", ":"))]
-            client.call(*update)
+                package_metadata["delivery"] = delivery
+            client.call("update", member, "--if-assignee", delivery["owner"], "--metadata", json.dumps(package_metadata, separators=(",", ":")), "--json")
         package_index([client.show(member) for member in delivery["members"]])
     except (RuntimeError, ValueError, subprocess.TimeoutExpired):
         release_claims(client, journal, path, recovery=True, rollback=True)

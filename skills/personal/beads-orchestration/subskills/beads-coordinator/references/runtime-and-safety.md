@@ -388,8 +388,9 @@ These rules are mandatory when the coordinator runtime is Codex:
    not itself a stall.
 5. Send one interrupt heartbeat requesting a 2-line status before classifying a
    worker as stalled.
-6. Close completed probe/worker agents promptly so thread limits do not block
-   new dispatches.
+6. Close completed one-shot probes and retired sessions promptly. A PR-opened
+   handoff does not retire its implementation owner: retain that session for
+   review/CI corrections and related packages until explicit handoff or completion.
 
 ### Gemini CLI Note
 

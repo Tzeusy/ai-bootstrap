@@ -7,6 +7,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -28,6 +29,7 @@ with path.open('r+') as stream:
  fcntl.flock(stream, fcntl.LOCK_EX)
  state = json.load(stream)
  command, member = args[:2]
+ if '--metadata' in args and ('--set-metadata' in args or '--unset-metadata' in args): sys.exit(1)
  row = state['rows'][member]
  if command == 'show':
   print(json.dumps([row])); sys.exit(0)
@@ -53,9 +55,8 @@ with path.open('r+') as stream:
    elif flag == '--unset-metadata': row.setdefault('metadata', {}).pop(value, None)
    elif flag == '--set-metadata':
     key, value = value.split('=', 1)
-    try: value = json.loads(value)
-    except ValueError: pass
     row.setdefault('metadata', {})[key] = value
+   elif flag == '--metadata': row.setdefault('metadata', {}).update(json.loads(value))
   persist()
  print(json.dumps([row]))
 '''
@@ -93,18 +94,25 @@ class DeliveryLifecycleTests(unittest.TestCase):
         return subprocess.run(["python3", str(SCRIPT), command, "--delivery-file", str(self.manifest), "--repo-root", str(self.root), "--journal", str(self.journal), *extra], capture_output=True, text=True, env=self.env)
 
     def test_related_corrections_claim_and_release_one_package_without_touching_independent_work(self):
+        state = self.read()
+        for member in ("bd-a", "bd-b"):
+            state["rows"][member]["metadata"]["unrelated"] = {"enabled": True}
+        self.write(state)
         result = self.run_package("claim")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         rows = self.read()["rows"]
         self.assertEqual(package.package_index(list(rows.values())), {"bd-a": "bd-a", "bd-b": "bd-a"})
         self.assertEqual(rows["bd-c"]["status"], "open")
         self.assertEqual(rows["bd-a"]["metadata"]["delivery"], delivery())
+        self.assertEqual(rows["bd-a"]["metadata"]["unrelated"], {"enabled": True})
         released = self.run_package("release")
         self.assertEqual(released.returncode, 0, released.stdout)
         rows = self.read()["rows"]
         self.assertTrue(all(not rows[m]["assignee"] for m in ("bd-a", "bd-b")))
         self.assertEqual(rows["bd-a"]["status"], "open")  # Unfinished work returns to runnable discovery.
         self.assertEqual(package.package_index(list(rows.values())), {})
+        self.assertEqual(rows["bd-a"]["metadata"]["unrelated"], {"enabled": True})
+        self.assertEqual(rows["bd-b"]["metadata"]["unrelated"], {"enabled": True})
 
     def test_journal_cannot_release_matching_ids_in_a_different_repository(self):
         self.assertEqual(self.run_package("claim").returncode, 0)
@@ -218,6 +226,9 @@ class DeliveryLifecycleTests(unittest.TestCase):
         self.journal.unlink()
         state = self.read(); state["rows"]["bd-c"]["labels"] = ["owner-held"]; self.write(state)
         self.assertIn("member-held", self.run_package("claim").stdout)
+        state = self.read(); state["rows"]["bd-c"]["labels"] = ["scope:local-state"]; self.write(state)
+        self.assertIn("member-held", self.run_package("claim").stdout)
+
 
     def test_existing_package_member_cannot_join_another_session_package(self):
         self.assertEqual(self.run_package("claim").returncode, 0)
@@ -267,6 +278,100 @@ class DeliveryAcceptanceTests(unittest.TestCase):
         self.assertTrue(package.content_verdict_reusable(record, dict(inputs)))
         self.assertFalse(package.content_verdict_reusable(record, {**inputs, "src/runtime.py": "changed"}))
         self.assertFalse(package.content_verdict_reusable({**record, "kind": "runtime"}, inputs))
+
+
+@unittest.skipUnless(shutil.which("bd"), "native bd CLI is unavailable")
+class NativeDeliveryIntegrationTests(unittest.TestCase):
+    """Use a fresh embedded database, never the developer's shared server."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="beads-delivery-native-")
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.repo = self.root / "repo"
+        self.repo.mkdir()
+        self.native_bd = shutil.which("bd")
+        self.env = {key: value for key, value in os.environ.items() if key in {"PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "TMPDIR"}}
+        self.run_native(["git", "init", "-q", str(self.repo)])
+        self.run_native(["git", "-C", str(self.repo), "config", "user.name", "Delivery fixture"])
+        self.run_native(["git", "-C", str(self.repo), "config", "user.email", "fixture@example.invalid"])
+        self.run_native([self.native_bd, "init", "--prefix", "pkg", "--non-interactive", "--skip-hooks", "--skip-agents", "--quiet"])
+        config = json.loads((self.repo / ".beads/metadata.json").read_text())
+        self.assertEqual(config.get("dolt_mode"), "embedded", "Native integration requires an isolated embedded DB")
+        self.members = [self.bd("create", "--title", title, "--type", "task", "--description", "Isolated delivery fixture", "--silent").stdout.strip() for title in ("Related adapter correction A", "Related adapter correction B")]
+        self.delivery = delivery(self.members[0], self.members)
+        self.manifest = self.root / "delivery.json"
+        self.manifest.write_text(json.dumps(self.delivery))
+        self.journal = self.root / "journal.json"
+
+    def run_native(self, command, *, env=None, check=True):
+        return subprocess.run(command, cwd=self.repo, env=env or self.env, capture_output=True, text=True, check=check, timeout=60)
+
+    def bd(self, *args):
+        return self.run_native([self.native_bd, "-C", str(self.repo), "--actor", self.delivery["owner"] if hasattr(self, "delivery") else "coord-owner", *args])
+
+    def show(self, member):
+        value = json.loads(self.bd("show", member, "--json").stdout)
+        return value[0] if isinstance(value, list) else value
+
+    def run_package(self, command, *, env=None):
+        return self.run_native(["python3", str(SCRIPT), command, "--delivery-file", str(self.manifest), "--repo-root", str(self.repo), "--journal", str(self.journal)], env=env, check=False)
+
+    def test_native_claim_release_preserve_typed_manifest_and_unrelated_metadata(self):
+        for member in self.members:
+            self.bd("update", member, "--metadata", json.dumps({"unrelated": {"enabled": True, "revision": 7}}))
+            self.bd("update", member, "--set-metadata", 'literal={"enabled":true}')
+            self.assertEqual(package.metadata(self.show(member))["literal"], '{"enabled":true}')
+        claimed = self.run_package("claim")
+        self.assertEqual(claimed.returncode, 0, claimed.stdout + claimed.stderr)
+        rows = [self.show(member) for member in self.members]
+        self.assertEqual(package.metadata(rows[0])["delivery"], self.delivery)
+        self.assertIsInstance(package.metadata(rows[0])["delivery"], dict)
+        self.assertEqual(package.package_index(rows), dict.fromkeys(self.members, self.members[0]))
+        released = self.run_package("release")
+        self.assertEqual(released.returncode, 0, released.stdout + released.stderr)
+        for member in self.members:
+            current = self.show(member)
+            self.assertEqual(current["status"], "open")
+            self.assertFalse(current.get("assignee"))
+            self.assertNotIn("delivery_anchor", package.metadata(current))
+            self.assertEqual(package.metadata(current)["unrelated"], {"enabled": True, "revision": 7})
+            self.assertEqual(package.metadata(current)["literal"], '{"enabled":true}')
+        self.assertEqual(package.metadata(self.show(self.members[0]))["delivery"], {**self.delivery, "state": "released"})
+
+    def test_native_interrupted_metadata_publication_recovers_typed_prior_receipt(self):
+        anchor = self.members[0]
+        previous = {**self.delivery, "packet": "docs/previous.md", "state": "released"}
+        self.bd("update", anchor, "--claim", "--metadata", json.dumps({"delivery": previous, "unrelated": {"keep": True}}))
+        shim_dir = self.root / "shim"
+        shim_dir.mkdir()
+        shim = shim_dir / "bd"
+        shim.write_text("""#!/usr/bin/env python3
+import os, signal, subprocess, sys
+result = subprocess.run([os.environ['NATIVE_BD'], *sys.argv[1:]], capture_output=True, text=True)
+sys.stdout.write(result.stdout)
+sys.stderr.write(result.stderr)
+if result.returncode == 0 and '--metadata' in sys.argv and os.environ.get('NATIVE_CRASH_AFTER_METADATA') == 'yes':
+    os.kill(os.getppid(), signal.SIGKILL)
+sys.exit(result.returncode)
+""")
+        shim.chmod(0o755)
+        crash_env = {**self.env, "PATH": str(shim_dir) + os.pathsep + self.env["PATH"], "NATIVE_BD": self.native_bd, "NATIVE_CRASH_AFTER_METADATA": "yes"}
+        interrupted = self.run_package("claim", env=crash_env)
+        self.assertLess(interrupted.returncode, 0)
+        self.assertEqual(package.metadata(self.show(anchor))["delivery"], self.delivery)
+        recovery = self.run_package("recover")
+        self.assertEqual(recovery.returncode, 0, recovery.stdout + recovery.stderr)
+        restored = self.show(anchor)
+        self.assertEqual(package.metadata(restored)["delivery"], previous)
+        self.assertIsInstance(package.metadata(restored)["delivery"], dict)
+        self.assertEqual(package.metadata(restored)["unrelated"], {"keep": True})
+        self.assertEqual(restored["assignee"], self.delivery["owner"])
+        self.assertEqual(restored["status"], "in_progress")
+        untouched = self.show(self.members[1])
+        self.assertEqual(untouched["status"], "open")
+        self.assertFalse(untouched.get("assignee"))
+        self.assertNotIn("delivery_anchor", package.metadata(untouched))
 
 
 if __name__ == "__main__":
