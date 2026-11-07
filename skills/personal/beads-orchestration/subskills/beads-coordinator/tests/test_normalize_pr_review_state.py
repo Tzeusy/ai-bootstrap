@@ -643,6 +643,16 @@ class NormalizePrReviewStateTests(unittest.TestCase):
         review_id = "aib-review.1"
         original = original_bead(original_id, 41)
         task = review_task(review_id, original_id)
+        # Closed legacy and deliberately deferred reviews are not active work.
+        for status in ("closed", "deferred"):
+            with self.subTest(inactive_status=status):
+                legacy = {"id": "aib-legacy", "status": status, "labels": ["pr-review-task"]}
+                result, _, _ = self.run_fixture({"pr_review_tasks_all": [legacy], "open_prs": []})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                terminal_payload = json.loads(result.stdout)
+                self.assertEqual(terminal_payload["status"], "empty")
+                self.assertEqual(terminal_payload["errors"], [])
+                self.assertEqual(terminal_payload["findings"], [])
         cases = {
             "missing-original-label": (
                 [{**original, "labels": []}],
@@ -671,6 +681,18 @@ class NormalizePrReviewStateTests(unittest.TestCase):
             "missing-task-status": (
                 [original],
                 [{**task, "status": None}],
+                "invalid-record",
+                "blocked-pr-review-task",
+            ),
+            "list-task-status": (
+                [original],
+                [{**task, "status": []}],
+                "invalid-record",
+                "blocked-pr-review-task",
+            ),
+            "dict-task-status": (
+                [original],
+                [{**task, "status": {}}],
                 "invalid-record",
                 "blocked-pr-review-task",
             ),
