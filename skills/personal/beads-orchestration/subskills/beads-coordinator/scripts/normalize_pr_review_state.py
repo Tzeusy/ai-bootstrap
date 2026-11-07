@@ -12,7 +12,7 @@ self-heal candidate is held at `manual-triage` — suppressing dispatch, wiring,
 dedupe, and self-heal for the *whole* active collection — when any of these
 fails:
 
-- inventory: a list-shaped but malformed `pr-review-task` inventory, or a record
+- inventory: a list-shaped but malformed active `pr-review-task` inventory, or a record
   missing a required label, status, or uniqueness guarantee
 - resolver: resolver `issue_id` not matching the discovered review-task ID; a
   `bd show` record not echoing the requested original ID; a review task whose
@@ -597,6 +597,14 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         scope="blocked-pr-review",
         errors=errors,
     )
+    # Closed/deferred review history is not part of active admission. Older parked
+    # records may lack today's paired labels; retain validation of every
+    # non-terminal or malformed record instead of retrofitting closed history.
+    if task_records is not None:
+        task_records = [
+            record for record in task_records
+            if not isinstance(record, dict) or record.get("status") not in ("closed", "deferred")
+        ]
     validated_task_records, task_inventory_complete = validate_inventory_records(
         task_records,
         required_labels=frozenset({"pr-review", "pr-review-task"}),
