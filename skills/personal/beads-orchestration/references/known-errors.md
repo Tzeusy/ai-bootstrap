@@ -2469,3 +2469,21 @@ beads (`bu-atsax`, `bu-m09qm`) whose prior coordinator session's heartbeat was
   owner gates and independent source-label reconciliation.
 - Observed: 2026-11-07, `aib-7fs` / PR5600 review frontier; collector-input defect,
   not a `bd` CLI version change.
+
+
+## Needed retained prerequisites suppressed by unrelated known waits
+
+A complete review-first queue can have free execution/WIP and a qualified
+retained prerequisite while returning no admission. Inspect the normalized
+terminal, resume and wiring waits rather than claiming from diagnostic
+`candidates`: a terminal review behind a known owner gate, human-owned personal
+backlog, and positively bound already-running live-coordinator review wiring
+are dependent waits. Keep those gates, claims and waiting reasons intact.
+The ranker preserves the ordinary spillover barrier and separately admits only
+qualified retained prerequisites through these proven waits. A gate-clear
+terminal reconciliation, queued peer review/correction/resume, unknown or
+incomplete binding/dependency state still blocks lower-class admission; the
+existing capacity and one-package WIP overflow bounds also remain in force.
+Never exempt all prerequisite-tier actions or edit a snapshot to obtain real
+admission. After canonical delivery and reviewed installation, refresh complete
+Step 0 and use the unmodified stock queue plus atomic claims.

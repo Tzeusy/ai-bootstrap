@@ -366,6 +366,8 @@ def admission_queue(candidates, rows, delivery_anchors, regs, capacity, review_s
     if not visible_reviews.issubset(seen_reviews) or not visible_originals.issubset(seen_originals):
         return blocked("review-inventory-changed")
     waiting, actions, pending_higher = [], [], False
+    # Keep ordinary spillover policy separate from proven dependent waits.
+    pending_prerequisite = False
     active_finishing = any(r.get("status") == "in_progress" and
                            ("pr-review-task" in labels_of(r) or "review-correction" in labels_of(r))
                            for r in rows.values())
@@ -435,12 +437,52 @@ def admission_queue(candidates, rows, delivery_anchors, regs, capacity, review_s
                     return "external-blocker"
         return None
 
+    def known_terminal_gate(anchor, review_id):
+        """A proven dependent hold is not a runnable global reconciliation job."""
+        members = [member for member, package in delivery_anchors.items() if package == anchor] or [anchor]
+        owner = text(rows[anchor].get("assignee"))
+        for member in members:
+            record = rows.get(member)
+            if record is None or (record.get("status") != "closed" and text(record.get("assignee")) != owner):
+                return False
+        for identity in [*members, review_id]:
+            record = rows.get(identity)
+            if record is None or record.get("status") not in {"open", "blocked", "in_progress", "closed"}:
+                return False
+            if record.get("status") == "closed":
+                continue
+            dependencies = record.get("dependencies")
+            if not isinstance(dependencies, list) or any(not isinstance(dep, dict) for dep in dependencies):
+                return False
+            if any(dep.get("type") == "blocks" and (dep.get("issue_id") != identity
+                   or not isinstance(dep.get("depends_on_id"), str)
+                   or not DELIVERY_ID.fullmatch(dep["depends_on_id"])) for dep in dependencies):
+                return False
+            if any(target not in rows or rows[target].get("status") not in {"open", "blocked", "in_progress", "closed"}
+                   for target in blockers_of(record)):
+                return False
+        review = rows[review_id]
+        return bool(hard_gate(anchor, review_id) or labels_of(review) & HOLD_LABELS
+                    or any(rows[target].get("status") != "closed" for target in blockers_of(review)))
+
+    def running_review_binding(finding):
+        review = rows.get(finding.get("review_id"), {})
+        owner = text(review.get("assignee"))
+        return (finding.get("kind") == "review-task" and not finding.get("duplicate_of")
+                and finding.get("canonical_review_id") == finding.get("review_id")
+                and finding.get("review_id") in visible_reviews and finding.get("pr_state") == "OPEN"
+                and finding.get("context_status") == "resolved"
+                and isinstance(finding.get("head_sha"), str) and SHA_RE.fullmatch(finding["head_sha"])
+                and text(rows.get(finding.get("original_id"), {}).get("external_ref")) == f"gh-pr:{finding.get('pr_number')}"
+                and review.get("status") == "in_progress" and owner.startswith(COORDINATOR_PREFIX)
+                and regs.get(owner, {}).get("live"))
+
     def append_action(kind, anchor, review_id=None, candidate=None):
-        nonlocal pending_higher
+        nonlocal pending_higher, pending_prerequisite
         record = rows.get(anchor)
         if record is None:
             waiting.append({"id": anchor, "reason": "anchor-unavailable"})
-            pending_higher = True
+            pending_higher = pending_prerequisite = True
             return
         owner = text(record.get("assignee"))
         if kind == "review" and package_running(anchor, rows, delivery_anchors):
@@ -455,6 +497,15 @@ def admission_queue(candidates, rows, delivery_anchors, regs, capacity, review_s
         if kind in {"correction", "resume"} and (not owner or owner != coordinator):
             waiting.append({"id": anchor, "reason": "resume-existing-owner", "owner": owner})
             pending_higher = True
+            # Only ordinary human OPEN backlog lacks a coordinator delivery
+            # action. A canonical correction or PR/package resume keeps priority
+            # regardless of how its existing owner's identity is spelled.
+            personal_backlog = (kind == "resume" and record.get("status") == "open" and owner
+                                and not owner.startswith(COORDINATOR_PREFIX)
+                                and anchor not in delivery_anchors and not labels_of(record) & REVIEW_LABELS
+                                and not text(record.get("external_ref")).startswith("gh-pr:"))
+            if not personal_backlog:
+                pending_prerequisite = True
             return
         if owner.startswith(COORDINATOR_PREFIX) and not regs.get(owner, {}).get("live"):
             waiting.append({"id": anchor, "reason": "owner-recovery-required", "owner": owner})
@@ -469,7 +520,7 @@ def admission_queue(candidates, rows, delivery_anchors, regs, capacity, review_s
                 return
         if kind == "review" and text(review.get("assignee")) not in {"", coordinator}:
             waiting.append({"id": review_id, "reason": "review-owned-by-peer", "owner": review.get("assignee")})
-            pending_higher = True
+            pending_higher = pending_prerequisite = True
             return
         if kind == "review" and review.get("status") == "in_progress":
             return
@@ -505,6 +556,10 @@ def admission_queue(candidates, rows, delivery_anchors, regs, capacity, review_s
         if finding.get("pr_state") != "OPEN":
             waiting.append({"id": review_id, "reason": "reconcile-terminal-pr"})
             pending_higher = True
+            if not (text(rows[anchor].get("external_ref")) == f"gh-pr:{finding['pr_number']}"
+                    and isinstance(finding.get("head_sha"), str) and SHA_RE.fullmatch(finding["head_sha"])
+                    and known_terminal_gate(anchor, review_id)):
+                pending_prerequisite = True
             continue
         if rows[review_id].get("status") == "in_progress":
             active_finishing = True
@@ -537,10 +592,21 @@ def admission_queue(candidates, rows, delivery_anchors, regs, capacity, review_s
     for finding in findings:
         if finding.get("kind") == "original" and finding.get("original_id") in rows and not finding.get("canonical_review_id"):
             waiting.append({"id": finding["original_id"], "reason": "review-wiring-required"})
-            pending_higher = True
-    if any(f.get("recommendation") not in {"review-wiring-current"} for f in healing):
+            pending_higher = pending_prerequisite = True
+    running_bindings = {(f["original_id"], f["review_id"], f["pr_number"])
+                        for f in findings if running_review_binding(f)}
+    pending_wiring = [event for event in healing if event.get("recommendation") != "review-wiring-current"]
+    if pending_wiring:
         waiting.append({"id": None, "reason": "review-wiring-required"})
         pending_higher = True
+        if any(not (event.get("recommendation") == "self-heal-original-wiring"
+                    and event.get("context_status") == "resolved"
+                    and isinstance(event.get("original_id"), str)
+                    and isinstance(event.get("canonical_review_id"), str)
+                    and type(event.get("pr_number")) is int
+                    and (event.get("original_id"), event.get("canonical_review_id"), event.get("pr_number")) in running_bindings)
+               for event in pending_wiring):
+            pending_prerequisite = True
     for candidate in candidates:
         record = rows[candidate["id"]]
         if record["id"] in review_anchors:
@@ -559,7 +625,8 @@ def admission_queue(candidates, rows, delivery_anchors, regs, capacity, review_s
         if anchor not in review_anchors and rows[anchor].get("status") == "open":
             append_action("resume", anchor)
     if pending_higher:
-        actions = [action for action in actions if action["kind"] != "implementation" or action["_tier"] == 0]
+        actions = [action for action in actions if action["kind"] != "implementation" or action["_tier"] == 0
+                   or (action["_tier"] == 4 and not pending_prerequisite)]
     actions.sort(key=lambda a: (a["_tier"], a["_order"], a["id"]))
     free, wip, owned = capacity["free"], capacity["free_wip"], capacity["owned"]
     selected = []
