@@ -1727,7 +1727,7 @@ class NormalizePrReviewStateTests(unittest.TestCase):
         for spelling, case in ([("dated", case) for case in dated_cases]
                                + [("attached", case) for case in attached_cases]):
             with self.subTest(spelling=spelling, case=case):
-                original_id = "bu-abc" if case == "plain-anchor" else "bu-abc.1"
+                original_id = "bu-abc" if case in {"plain-anchor", "plain-anchor-suffix"} else "bu-abc.1"
                 if case == "nested-child":
                     original_id += ".2"
                 review_id = "bu-review"
