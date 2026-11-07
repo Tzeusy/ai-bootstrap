@@ -29,10 +29,14 @@ fails:
   any `gh pr list` / in-prefix candidate-source lookup failure (open-PR
   discovery is collection evidence, not a post-selection best effort);
   only `agent/<issue_prefix>-...` branches infer issues. A legacy
-  `agent/<original>-YYYYMMDD` or `agent/<original>-<package>` branch can reuse
-  an unambiguous canonical review/PR association after checking the original's
-  current PR reference; unknown, conflicting or malformed in-prefix identities
-  remain failures
+  `agent/<original>-YYYYMMDD`, `agent/<original>-<package>` or an attached
+  lowercase alphanumeric suffix on a dotted-decimal child (e.g. `.2b`) can
+  reuse one unambiguous canonical review/PR association after checking the
+  original's current PR reference. Association is checked before branch
+  inference: descriptive-hyphen branches with neither a known PR binding nor
+  a related known anchor infer no issue. Known conflicting bindings, ordinary
+  canonical lookup failures and other malformed in-prefix identities remain
+  failures
 - relations: `review_relation_graph.review_relation_error` rejects malformed
   entries, self-links, duplicate review-ID left sides, a review ID reused in the
   original role, and reciprocal/longer cycles (`cyclic-review-relation`);
@@ -427,6 +431,11 @@ def legacy_branch_original(
         for other_id, (_, pr, error) in original_contexts.items()
     ):
         return None
+    # Attached suffixes belong only to an explicitly bound dotted child.
+    if re.search(r"\.[0-9]+\Z", original_id) and re.fullmatch(
+        re.escape(original_id) + r"[a-z][a-z0-9]*", branch_id,
+    ):
+        return original_id
     prefix = f"{original_id}-"
     if not branch_id.startswith(prefix):
         return None
@@ -498,6 +507,20 @@ def self_heal_candidates(
         )
         if legacy_original is not None:
             original_id = legacy_original
+        else:
+            # Unassociated descriptive names are supporting branches, not IDs.
+            # Never let that non-inference hide a known PR/anchor conflict.
+            known_originals = set(original_contexts) | {key[0] for key in canonical_by_key}
+            known_pr = valid_pr_number(number) and (
+                any(pr == number for _, pr in canonical_by_key)
+                or any(pr == number for _, pr, _ in original_contexts.values())
+            )
+            related_anchor = any(
+                original_id == anchor or original_id.startswith(f"{anchor}-")
+                for anchor in known_originals
+            )
+            if not known_pr and not related_anchor and "-" in original_id[len(prefix) + 1:]:
+                continue
         if not BEAD_ID_RE.fullmatch(original_id):
             report_error(errors, "invalid-record", "open-prs")
             discovery_complete = False
