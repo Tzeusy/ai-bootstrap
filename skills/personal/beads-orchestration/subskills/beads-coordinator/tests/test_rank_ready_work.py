@@ -17,6 +17,7 @@ import textwrap
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -359,6 +360,130 @@ class AdmissionPriorityTests(unittest.TestCase):
         review["metadata"] = {"review_receipt": {"head": SHA, "disposition": "complete"}}
         invalid = self.plan(rows, normalized((anchor, review)))
         self.assertEqual(invalid["admission"]["status"], "blocked")
+
+    def test_collector_supplies_review_prerequisites_without_weakening_gates(self):
+        cases = (
+            "closed", "shared-target", "shown-open", "shown-blocked", "unknown", "failed", "malformed",
+            "multiple", "wrong-id", "invalid-target", "without-dependencies",
+            "member", "known-closed-member", "member-live-blocker", "member-held",
+            "member-owner-mismatch", "source-held", "inactive-source-owner",
+            "peer-source-owner", "review-held", "review-owned-by-peer", "terminal-owner-gate",
+        )
+        for case in cases:
+            with self.subTest(case=case):
+                packaged = case in {"member", "known-closed-member", "member-live-blocker",
+                                    "member-held", "member-owner-mismatch"}
+                owner = "coordinator:a" if packaged else ""
+                if case in {"inactive-source-owner", "peer-source-owner"}:
+                    owner = "coordinator:b"
+                anchor, review, rows = review_pair(owner=owner, members=2 if packaged else 1)
+                gate = bead("bd-prerequisite", status="closed")
+                anchor["dependencies"] = [
+                    {"issue_id": anchor["id"], "depends_on_id": target, "type": "blocks"}
+                    for target in (gate["id"], review["id"])
+                ]
+                # The primary regression must not be fetched via the review.
+                review["dependencies"] = []
+                if case == "shared-target":
+                    review["dependencies"] = [
+                        {"issue_id": review["id"], "depends_on_id": gate["id"], "type": "blocks"}
+                    ]
+                shows = {gate["id"]: [gate]}
+                if packaged:
+                    member = rows.pop()
+                    member["dependencies"] = [
+                        {"issue_id": member["id"], "depends_on_id": gate["id"], "type": "blocks"}
+                    ]
+                    anchor["dependencies"] = [
+                        {"issue_id": anchor["id"], "depends_on_id": review["id"], "type": "blocks"}
+                    ]
+                    review["dependencies"] = []
+                    shows[member["id"]] = [member]
+                    if case == "known-closed-member":
+                        member["status"] = "closed"
+                        anchor["dependencies"].append(
+                            {"issue_id": anchor["id"], "depends_on_id": member["id"], "type": "blocks"}
+                        )
+                    elif case == "member-held":
+                        member["labels"].append("owner-held")
+                    elif case == "member-owner-mismatch":
+                        member["assignee"] = "coordinator:b"
+                if case in {"shown-open", "shown-blocked", "member-live-blocker"}:
+                    gate["status"] = "open" if case == "shown-open" else "blocked"
+                elif case == "source-held":
+                    anchor["labels"].append("owner-held")
+                elif case == "review-held":
+                    review["labels"].append("owner-held")
+                elif case == "review-owned-by-peer":
+                    review["assignee"] = "coordinator:r"
+                elif case == "invalid-target":
+                    anchor["dependencies"][0]["depends_on_id"] = "invalid target"
+                state = normalized((anchor, review))
+                if case == "terminal-owner-gate":
+                    gate.update(status="blocked", assignee="human", labels=["owner-gated"])
+                    rows.append(gate)
+                    state["findings"][0].update(pr_state="CLOSED", recommendation="close-review-reopen-original")
+                if case == "unknown":
+                    shows[gate["id"]] = []
+                elif case == "malformed":
+                    shows[gate["id"]] = {}
+                elif case == "multiple":
+                    shows[gate["id"]] = [gate, gate]
+                elif case == "wrong-id":
+                    shows[gate["id"]] = [bead("bd-other", status="closed")]
+                # An unrelated unassigned non-PR blocker must not cause archive reads.
+                rows.append(bead("bd-unrelated", status="blocked", blocks_on=["bd-unread"]))
+                actors = ("coordinator:a", "coordinator:r")
+                if case != "inactive-source-owner":
+                    actors += ("coordinator:b",)
+                source = snapshot(rows, kv=live_registry(*actors), ready=[])
+                original = json.dumps((source, shows, state), sort_keys=True)
+                reads = []
+
+                def read(argv, repo_root):
+                    queries = {
+                        ("list", "--status=open,blocked,in_progress", "--json", "--limit", "0"): source["live"],
+                        ("ready", "--json", "--brief", "--limit", "0", "--exclude-type", "epic"): source["ready"],
+                        ("epic", "status", "--json"): source["epics"],
+                        ("kv", "list", "--json"): source["kv"],
+                    }
+                    if tuple(argv) in queries:
+                        return queries[tuple(argv)], None
+                    self.assertEqual(argv[0], "show")
+                    self.assertEqual(argv[2:], ["--json"])
+                    reads.append(argv[1])
+                    if case == "failed" and argv[1] == gate["id"]:
+                        return None, "command-failed"
+                    self.assertIn(argv[1], shows, "collector must read only missing direct identities")
+                    return shows[argv[1]], None
+
+                with patch.object(ranking, "bd_json", side_effect=read):
+                    collected, error = ranking.collect(Path("/closed-fixture"), with_dependencies=case != "without-dependencies")
+                expected_error = {
+                    "unknown": "invalid-dependency", "failed": "command-failed",
+                    "malformed": "invalid-dependency", "multiple": "invalid-dependency",
+                    "wrong-id": "invalid-dependency", "invalid-target": "invalid-dependency",
+                    "member-owner-mismatch": "invalid-delivery-package",
+                }.get(case)
+                if expected_error:
+                    self.assertIsNone(collected)
+                    self.assertEqual(error, {"code": expected_error,
+                                             "scope": "packages" if case == "member-owner-mismatch" else "admission"})
+                else:
+                    self.assertIsNone(error)
+                    payload = ranking.rank(collected, now=NOW, coordinator="coordinator:a", lanes=4, review_state=state)
+                    allowed = case in {"closed", "shared-target", "member", "known-closed-member", "peer-source-owner"}
+                    self.assertEqual([action["id"] for action in payload["queue"]], [review["id"]] if allowed else [])
+                    if allowed:
+                        self.assertEqual(payload["queue"][0]["owner"], owner)
+                    if case == "terminal-owner-gate":
+                        self.assertIn({"id": review["id"], "reason": "reconcile-terminal-pr"}, payload["admission"]["waiting"])
+                    if case in {"without-dependencies", "known-closed-member", "terminal-owner-gate"}:
+                        self.assertNotIn(gate["id"], reads)
+                    else:
+                        self.assertEqual(reads.count(gate["id"]), 1)
+                self.assertEqual(len(reads), len(set(reads)), "duplicate dependency reads")
+                self.assertEqual(json.dumps((source, shows, state), sort_keys=True), original)
 
     def test_known_closed_dependency_allows_review_and_p0_still_preempts_new_review(self):
         anchor, review, rows = review_pair()

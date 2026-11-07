@@ -170,7 +170,13 @@ def bd_json(argv: list[str], repo_root: Path) -> tuple[object | None, str | None
 
 
 def collect(repo_root: Path, *, with_dependencies: bool = False) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
-    """Run the four read-only `bd` queries the ranking needs."""
+    """Collect live inputs plus exact missing direct prerequisites for admission.
+
+    Recovered explicit-PR sources can be unassigned. Their canonical review
+    still evaluates source/member blockers, so collect those rows regardless
+    of claim presence. Validated packages extend that scope to their members;
+    held/live/unknown targets remain subject to the unchanged hard gate.
+    """
     queries = {
         "live": ["list", "--status=open,blocked,in_progress", "--json", "--limit", "0"],
         "ready": ["ready", "--json", "--brief", "--limit", "0", "--exclude-type", "epic"],
@@ -210,10 +216,24 @@ def collect(repo_root: Path, *, with_dependencies: bool = False) -> tuple[dict[s
                 return None, {"code": error or "invalid-package-record", "scope": "packages"}
             snapshot["package_records"].extend(records)
     if with_dependencies and isinstance(snapshot.get("live"), list):
-        known = {row["id"] for row in [*snapshot["live"], *snapshot.get("package_records", [])] if isinstance(row, dict) and isinstance(row.get("id"), str)}
-        needed = {target for row in snapshot["live"] if isinstance(row, dict)
-                  and (text(row.get("assignee")) or "pr-review-task" in labels_of(row))
-                  for target in blockers_of(row) if target not in known}
+        records = [*snapshot["live"], *snapshot.get("package_records", [])]
+        try:
+            delivery_anchors = package_index(records)
+        except ValueError:
+            return None, {"code": "invalid-delivery-package", "scope": "packages"}
+        known = {row["id"] for row in records}
+        dependency_anchors = {
+            delivery_anchors.get(row["id"], row["id"])
+            for row in records
+            if text(row.get("assignee")) or "pr-review-task" in labels_of(row)
+            or re.fullmatch(r"gh-pr:[1-9][0-9]*", text(row.get("external_ref")))
+        }
+        needed = {
+            target for row in records
+            if row.get("status") != "closed"
+            and delivery_anchors.get(row["id"], row["id"]) in dependency_anchors
+            for target in blockers_of(row) if target not in known
+        }
         snapshot["dependency_records"] = []
         for target in sorted(needed):
             if not DELIVERY_ID.fullmatch(target):
