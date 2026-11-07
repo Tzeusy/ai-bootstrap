@@ -2447,3 +2447,25 @@ beads (`bu-atsax`, `bu-m09qm`) whose prior coordinator session's heartbeat was
   publication, reviewed installation and a fresh real scan remain separate.
 - Observed: 2026-11-07, `aib-r07`; scanner grammar/association issue, not a new
   `bd` CLI version defect.
+
+
+## Review queue: CLOSED source prerequisites appear as external blockers
+
+- **Symptom**: a recovered unassigned source with an explicit `gh-pr:<N>` has
+  a canonical OPEN-PR review, but ranking reports `external-blocker` for its
+  already CLOSED direct prerequisites. Repairing the separate `pr-review`
+  lifecycle label does not restore those records.
+- **Cause**: `collect(with_dependencies=True)` fetched missing dependencies only
+  for assigned live rows or review tasks; the unchanged hard gate also evaluates
+  source anchors and validated package members without a current claim.
+- **Fix**: collect exact missing direct targets for explicit-PR anchors and the
+  nonclosed members of validated relevant packages as well. Deduplicate against
+  live/package rows, require the requested single identity, and keep unknown,
+  failed, malformed and genuinely live blockers fail-closed. No closed-archive
+  scan, inferred closure, gate relaxation or ownership transfer is needed.
+- **Evidence limits**: closed software collect-to-rank controls establish the
+  helper behavior, not actual admission. Public delivery, reviewed installation
+  and fresh real normalization/ranking remain separate; retain all terminal-PR
+  owner gates and independent source-label reconciliation.
+- Observed: 2026-11-07, `aib-7fs` / PR5600 review frontier; collector-input defect,
+  not a `bd` CLI version change.
