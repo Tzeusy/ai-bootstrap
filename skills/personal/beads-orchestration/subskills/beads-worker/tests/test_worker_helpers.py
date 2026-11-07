@@ -202,7 +202,11 @@ class AssertWorkerContextTests(unittest.TestCase):
                 self.assertNotRegex(block, BARE_HELPER_PATH, f"{doc.name} invokes a helper by a cwd-relative path")
                 if not block.rstrip().endswith("..."):  # elided usage stubs are not runnable
                     blocks.append((doc.name, block.replace(PACKAGE_PLACEHOLDER, str(SKILL_ROOT))))
-        self.assertGreaterEqual({name for name, _ in blocks}, {"SKILL.md", "runtime-contract.md", "worker-report.md"})
+        references = {"runtime-contract.md", "worker-report.md"}
+        self.assertGreaterEqual({name for name, _ in blocks}, references)
+        entrypoint = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        for name in references:
+            self.assertIn(f"references/{name}", entrypoint)
 
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp) / "consumer"
