@@ -28,8 +28,11 @@ fails:
 - discovery: missing or invalid authoritative `bd config get issue_prefix`, or
   any `gh pr list` / in-prefix candidate-source lookup failure (open-PR
   discovery is collection evidence, not a post-selection best effort);
-  only `agent/<issue_prefix>-...` branches infer issues, and malformed
-  in-prefix identities remain collection failures
+  only `agent/<issue_prefix>-...` branches infer issues. A legacy
+  `agent/<original>-YYYYMMDD` or `agent/<original>-<package>` branch can reuse
+  an unambiguous canonical review/PR association after checking the original's
+  current PR reference; unknown, conflicting or malformed in-prefix identities
+  remain failures
 - relations: `review_relation_graph.review_relation_error` rejects malformed
   entries, self-links, duplicate review-ID left sides, a review ID reused in the
   original role, and reciprocal/longer cycles (`cyclic-review-relation`);
@@ -403,11 +406,47 @@ def finding_sort_key(finding: dict[str, Any]) -> tuple[str, str, int, str]:
     )
 
 
+def legacy_branch_original(
+    branch_id: str,
+    number: object,
+    canonical_by_key: dict[tuple[str, int], str],
+    original_contexts: dict[str, tuple[dict[str, Any] | None, int | None, str | None]],
+) -> str | None:
+    """Recognize a legacy suffix only around an already established anchor."""
+    if not valid_pr_number(number):
+        return None
+    anchors = {original_id for original_id, pr in canonical_by_key if pr == number}
+    if len(anchors) != 1:
+        return None
+    original_id = next(iter(anchors))
+    if any(
+        error is None and (
+            (other_id == original_id and pr != number)
+            or (other_id != original_id and pr == number)
+        )
+        for other_id, (_, pr, error) in original_contexts.items()
+    ):
+        return None
+    prefix = f"{original_id}-"
+    if not branch_id.startswith(prefix):
+        return None
+    suffix = branch_id[len(prefix):]
+    if re.fullmatch(r"[0-9]{8}", suffix):
+        try:
+            datetime.strptime(suffix, "%Y%m%d")
+        except ValueError:
+            return None
+    elif not re.fullmatch(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*", suffix):
+        return None
+    return original_id
+
+
 def self_heal_candidates(
     *,
     repo_root: Path,
     now: datetime,
     canonical_by_key: dict[tuple[str, int], str],
+    original_contexts: dict[str, tuple[dict[str, Any] | None, int | None, str | None]],
     task_lookup_complete: bool,
     errors: list[dict[str, str]],
 ) -> tuple[list[dict[str, Any]], bool]:
@@ -454,6 +493,11 @@ def self_heal_candidates(
         original_id = branch.removeprefix("agent/")
         if not original_id.startswith(f"{prefix}-"):
             continue
+        legacy_original = legacy_branch_original(
+            original_id, number, canonical_by_key, original_contexts,
+        )
+        if legacy_original is not None:
+            original_id = legacy_original
         if not BEAD_ID_RE.fullmatch(original_id):
             report_error(errors, "invalid-record", "open-prs")
             discovery_complete = False
@@ -492,6 +536,12 @@ def self_heal_candidates(
             original, identity_error = requested_record(original_payload, original_id)
         else:
             original, identity_error = None, original_error
+        if (
+            original is not None
+            and legacy_original is not None
+            and original.get("external_ref") != f"gh-pr:{number}"
+        ):
+            original, identity_error = None, "conflicting-original-pr"
         if original is None:
             report_error(errors, identity_error or "invalid-json", "self-heal")
             discovery_complete = False
@@ -1009,6 +1059,7 @@ def normalize(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         repo_root=repo_root,
         now=now,
         canonical_by_key=canonical_by_key,
+        original_contexts=original_contexts,
         task_lookup_complete=pre_discovery_collection_complete,
         errors=errors,
     )

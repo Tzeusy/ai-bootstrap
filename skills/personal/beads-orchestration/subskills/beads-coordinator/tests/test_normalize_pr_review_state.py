@@ -1689,6 +1689,90 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                 ]
                 self.assertEqual(looked_up, [original_id])
 
+    def test_legacy_branch_requires_unambiguous_canonical_pr_association(self) -> None:
+        for case in (
+            "dotted-anchor", "plain-anchor", "named-package", "named-hyphen-package",
+            "canonical-control", "no-review",
+            "second-review-anchor", "second-original-ref", "changed-pr-ref",
+            "same-anchor-other-pr-open", "same-anchor-other-pr-merged",
+            "foreign-record", "lookup-failure", "wrong-pr", "unrelated-head",
+            "invalid-date", "unknown-suffix",
+        ):
+            with self.subTest(case=case):
+                original_id = "bu-abc" if case == "plain-anchor" else "bu-abc.1"
+                review_id = "bu-review"
+                original = original_bead(original_id, 41)
+                fixture = {
+                    "prefix_payload": {"key": "issue_prefix", "value": "bu"},
+                    "blocked_pr_review": [original, review_task(review_id, original_id)],
+                    "resolver_payloads": {
+                        review_id: {"ok": True, "original_id": original_id, "pr_number": 41},
+                    },
+                    "shows": {original_id: [dict(original)]},
+                    "prs": {"41": pr_payload("OPEN")},
+                    "open_prs": [{
+                        "number": 41,
+                        "headRefName": f"agent/{original_id}-20261105",
+                        "createdAt": "2026-08-14T03:00:00Z",
+                    }],
+                }
+                if case == "canonical-control":
+                    fixture["open_prs"][0]["headRefName"] = f"agent/{original_id}"
+                elif case in {"named-package", "named-hyphen-package"}:
+                    suffix = "chronicler" if case == "named-package" else "chronicler-public-2"
+                    fixture["open_prs"][0]["headRefName"] = f"agent/{original_id}-{suffix}"
+                elif case == "no-review":
+                    fixture["blocked_pr_review"] = [original]
+                elif case in {"same-anchor-other-pr-open", "same-anchor-other-pr-merged"}:
+                    fixture["blocked_pr_review"][0] = original_bead(original_id, 42)
+                    state = "MERGED" if case.endswith("merged") else "OPEN"
+                    other_pr = pr_payload(state, merged_at="2026-08-14T03:30:00Z")
+                    other_pr["number"] = 42
+                    fixture["prs"]["42"] = other_pr
+                elif case in {"second-review-anchor", "second-original-ref"}:
+                    other_id = "bu-other.2"
+                    fixture["blocked_pr_review"].append(original_bead(other_id, 41))
+                    if case == "second-review-anchor":
+                        other_review = "bu-other-review"
+                        fixture["blocked_pr_review"].append(review_task(other_review, other_id))
+                        fixture["resolver_payloads"][other_review] = {
+                            "ok": True, "original_id": other_id, "pr_number": 41,
+                        }
+                elif case == "changed-pr-ref":
+                    fixture["shows"][original_id][0]["external_ref"] = "gh-pr:42"
+                elif case == "foreign-record":
+                    fixture["shows"][original_id][0]["id"] = "bu-foreign"
+                elif case == "lookup-failure":
+                    fixture["failures"] = {f"bd-show:{original_id}": "lookup failed"}
+                elif case == "wrong-pr":
+                    fixture["open_prs"][0]["number"] = 42
+                elif case == "unrelated-head":
+                    fixture["open_prs"][0]["headRefName"] = "agent/bu-unrelated.9-20261105"
+                elif case == "invalid-date":
+                    fixture["open_prs"][0]["headRefName"] = f"agent/{original_id}-20261340"
+                elif case == "unknown-suffix":
+                    fixture["open_prs"][0]["headRefName"] += "-extra"
+
+                result, calls, _ = self.run_fixture(fixture)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                if case in {"dotted-anchor", "plain-anchor", "named-package",
+                            "named-hyphen-package", "canonical-control"}:
+                    self.assertEqual(payload["status"], "success", payload["errors"])
+                    candidate = payload["self_heal_candidates"][0]
+                    self.assertEqual(candidate["original_id"], original_id)
+                    self.assertEqual(candidate["canonical_review_id"], review_id)
+                    self.assertEqual(candidate["recommendation"], "review-wiring-current")
+                    self.assertTrue(any(call["tool"] == "bd" and "show" in call["argv"]
+                                        and original_id in call["argv"] for call in calls))
+                    self.assertFalse(any(f"{original_id}-20261105" in call["argv"] for call in calls))
+                else:
+                    self.assertEqual(payload["status"], "partial")
+                    self.assertTrue(payload["errors"])
+                    self.assertTrue(payload["findings"])
+                    self.assertTrue(all(item["recommendation"] == "manual-triage"
+                                        for item in payload["findings"] + payload["self_heal_candidates"]))
+
     def test_invalid_project_prefix_or_in_prefix_discovery_manualizes_collection(self) -> None:
         original_id = "bu-abc"
         review_id = "bu-review"
