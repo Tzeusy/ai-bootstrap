@@ -2420,3 +2420,30 @@ beads (`bu-atsax`, `bu-m09qm`) whose prior coordinator session's heartbeat was
 - **Fix:** include the intended field transition in the same guarded update,
   such as `--status open` after verifying that is the correct state. Do not drop
   the assignee guard merely to make a label mutation succeed.
+
+
+## Step-0 discovery: attached child suffix is not a second Bead
+
+- **Symptom**: the complete scanner reports `partial` with
+  `invalid-record` / `open-prs` for a supporting head such as
+  `agent/bu-kiuh8v.2b`, although the original `bu-kiuh8v.2` and its independent
+  review explicitly bind that PR.
+- **Cause**: an attached child suffix is outside the canonical dotted-decimal
+  Bead grammar. Branch spelling cannot invent another issue or override an
+  explicit source/review association.
+- **Fix**: `normalize_pr_review_state.py` extends the PR58 conflict-checked
+  legacy resolver to lowercase letter/alphanumeric suffixes attached to an
+  otherwise canonical dotted-decimal child. It requires one canonical
+  review/PR anchor, rejects competing originals/reviews, and re-reads the exact
+  original and its current `gh-pr:<N>` reference. Missing, changed, foreign,
+  incomplete or malformed evidence still makes the whole collection partial
+  with no actionable recommendation. Never create a suffix alias, rename a
+  foreign branch, or skip a malformed known binding to clear the scan.
+- **Descriptive branches**: check explicit associations first. Only descriptive
+  hyphen names with neither a known PR binding nor a related known anchor infer
+  no identity; titles supply none. Ordinary canonical missing-ID lookups remain
+  failures. Custom hyphenated IDs remain valid when explicit evidence names
+  them. Software fixtures do not establish live global scan success; canonical
+  publication, reviewed installation and a fresh real scan remain separate.
+- Observed: 2026-11-07, `aib-r07`; scanner grammar/association issue, not a new
+  `bd` CLI version defect.

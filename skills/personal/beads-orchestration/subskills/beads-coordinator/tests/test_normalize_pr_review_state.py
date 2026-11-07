@@ -350,7 +350,7 @@ class NormalizePrReviewStateTests(unittest.TestCase):
 
     def test_fake_commands_match_strict_read_only_argv_allowlists(self) -> None:
         original_id = "aib-swr.1"
-        self_heal_id = "aib-self-heal.1"
+        self_heal_id = "aib-selfheal.1"
         result, calls, repo_root = self.run_fixture(
             {
                 "blocked_pr_review": [
@@ -741,34 +741,40 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                 self.assertIn({"code": code, "scope": scope}, payload["errors"])
 
     def test_preserves_dotted_child_and_reports_open_pr_cooldown(self) -> None:
-        original_id = "aib-swr.1"
-        review_id = "aib-review.1"
-        fixture = {
-            "blocked_pr_review": [
-                original_bead(original_id, 41),
-                review_task(review_id, original_id),
-            ],
-            "shows": {
-                original_id: [original_bead(original_id, 41)],
-                review_id: review_show(review_id, original_id),
-            },
-            "prs": {"41": pr_payload("OPEN", created_at="2026-08-14T03:57:00Z")},
-            "open_prs": [],
-        }
+        # Custom IDs are valid when explicit tracker/review evidence names them.
+        for original_id in ("aib-swr.1", "aib-owner-answers.1"):
+            with self.subTest(original_id=original_id):
+                review_id = "aib-review.1"
+                fixture = {
+                    "blocked_pr_review": [
+                        original_bead(original_id, 41),
+                        review_task(review_id, original_id),
+                    ],
+                    "shows": {
+                        original_id: [original_bead(original_id, 41)],
+                        review_id: review_show(review_id, original_id),
+                    },
+                    "prs": {"41": pr_payload("OPEN", created_at="2026-08-14T03:57:00Z")},
+                    "open_prs": [{"number": 41, "headRefName": f"agent/{original_id}",
+                                  "createdAt": "2026-08-14T03:57:00Z"}],
+                }
 
-        result, calls, _ = self.run_fixture(fixture)
+                result, calls, _ = self.run_fixture(fixture)
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        task = next(item for item in payload["findings"] if item["review_id"] == review_id)
-        self.assertEqual(task["original_id"], original_id)
-        self.assertEqual(task["canonical_review_id"], review_id)
-        self.assertEqual(task["pr_number"], 41)
-        self.assertEqual(task["pr_state"], "OPEN")
-        self.assertEqual(task["cooldown_until"], "2026-08-14T04:02:00Z")
-        self.assertEqual(task["recommendation"], "wait-for-cooldown")
-        self.assertTrue(any(call["tool"] == "bd" for call in calls))
-        self.assertTrue(any(call["tool"] == "gh" for call in calls))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], "success")
+                self.assertEqual(payload["errors"], [])
+                self.assertEqual(payload["self_heal_candidates"][0]["original_id"], original_id)
+                task = next(item for item in payload["findings"] if item["review_id"] == review_id)
+                self.assertEqual(task["original_id"], original_id)
+                self.assertEqual(task["canonical_review_id"], review_id)
+                self.assertEqual(task["pr_number"], 41)
+                self.assertEqual(task["pr_state"], "OPEN")
+                self.assertEqual(task["cooldown_until"], "2026-08-14T04:02:00Z")
+                self.assertEqual(task["recommendation"], "wait-for-cooldown")
+                self.assertTrue(any(call["tool"] == "bd" for call in calls))
+                self.assertTrue(any(call["tool"] == "gh" for call in calls))
 
     def test_duplicate_review_tasks_choose_the_chronological_oldest_then_id(self) -> None:
         original_id = "aib-swr.1"
@@ -1647,7 +1653,9 @@ class NormalizePrReviewStateTests(unittest.TestCase):
             self.assertNotIn(forbidden, result.stdout + result.stderr)
 
     def test_open_agent_branch_reports_only_project_prefix_self_heal_candidates(self) -> None:
-        for prefix, original_id in (("aib", "aib-swr.1"), ("bu", "bu-abc")):
+        for prefix, original_id in (("aib", "aib-swr.1"), ("bu", "bu-abc"),
+                                    ("syzygy", "syzygy-pdja.2"),
+                                    ("multi-part", "multi-part-123.2.10")):
             with self.subTest(prefix=prefix):
                 foreign_id = "custody-private-adopted-20260927"
                 fixture = {
@@ -1659,6 +1667,15 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                             "headRefName": f"agent/{original_id}",
                             "createdAt": "2026-08-14T03:00:00Z",
                         },
+                        *[
+                            {
+                                "number": 80 + index,
+                                "headRefName": f"agent/{prefix}-{suffix}",
+                                "title": f"Owner answers [{original_id}]",
+                                "createdAt": "2026-08-14T03:00:00Z",
+                            }
+                            for index, suffix in enumerate(("pdja-answers-4", "pdja.2-voice"))
+                        ],
                         {
                             "number": 4239,
                             "headRefName": f"agent/{foreign_id}",
@@ -1690,16 +1707,29 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                 self.assertEqual(looked_up, [original_id])
 
     def test_legacy_branch_requires_unambiguous_canonical_pr_association(self) -> None:
-        for case in (
+        dated_cases = (
             "dotted-anchor", "plain-anchor", "named-package", "named-hyphen-package",
             "canonical-control", "no-review",
             "second-review-anchor", "second-original-ref", "changed-pr-ref",
             "same-anchor-other-pr-open", "same-anchor-other-pr-merged",
             "foreign-record", "lookup-failure", "wrong-pr", "unrelated-head",
             "invalid-date", "unknown-suffix",
-        ):
-            with self.subTest(case=case):
-                original_id = "bu-abc" if case == "plain-anchor" else "bu-abc.1"
+        )
+        attached_cases = (
+            "dotted-anchor", "alphanumeric", "nested-child", "no-review",
+            "second-review-anchor", "second-original-ref", "changed-pr-ref",
+            "same-anchor-other-pr-open", "same-anchor-other-pr-merged",
+            "foreign-record", "missing-record", "lookup-failure", "wrong-pr",
+            "unrelated-head", "unrelated-descriptive", "invalid-created-at", "invalid-number", "bool-number",
+            "incomplete-context", "invalid-review-created-at", "invalid-package",
+            "uppercase-suffix", "hyphen-suffix", "plain-anchor-suffix",
+        )
+        for spelling, case in ([("dated", case) for case in dated_cases]
+                               + [("attached", case) for case in attached_cases]):
+            with self.subTest(spelling=spelling, case=case):
+                original_id = "bu-abc" if case in {"plain-anchor", "plain-anchor-suffix"} else "bu-abc.1"
+                if case == "nested-child":
+                    original_id += ".2"
                 review_id = "bu-review"
                 original = original_bead(original_id, 41)
                 fixture = {
@@ -1716,7 +1746,11 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                         "createdAt": "2026-08-14T03:00:00Z",
                     }],
                 }
-                if case == "canonical-control":
+                if spelling == "attached":
+                    fixture["open_prs"][0]["headRefName"] = f"agent/{original_id}b"
+                if case == "alphanumeric":
+                    fixture["open_prs"][0]["headRefName"] += "2"
+                elif case == "canonical-control":
                     fixture["open_prs"][0]["headRefName"] = f"agent/{original_id}"
                 elif case in {"named-package", "named-hyphen-package"}:
                     suffix = "chronicler" if case == "named-package" else "chronicler-public-2"
@@ -1742,12 +1776,33 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                     fixture["shows"][original_id][0]["external_ref"] = "gh-pr:42"
                 elif case == "foreign-record":
                     fixture["shows"][original_id][0]["id"] = "bu-foreign"
+                elif case == "missing-record":
+                    fixture["shows"][original_id] = []
+                elif case == "unrelated-descriptive":
+                    fixture["open_prs"][0]["headRefName"] = "agent/bu-unrelated-notes"
+                elif case == "invalid-created-at":
+                    fixture["open_prs"][0]["createdAt"] = "not-a-time"
+                elif case in {"invalid-number", "bool-number"}:
+                    fixture["open_prs"][0]["number"] = 0 if case == "invalid-number" else True
+                elif case == "incomplete-context":
+                    fixture["resolver_payloads"][review_id].pop("original_id")
+                elif case == "invalid-review-created-at":
+                    fixture["blocked_pr_review"][1]["created_at"] = "not-a-time"
+                elif case == "invalid-package":
+                    fixture["resolver_payloads"][review_id]["delivery_members"] = ["bu-other"]
+                elif case == "uppercase-suffix":
+                    fixture["open_prs"][0]["headRefName"] = f"agent/{original_id}B"
+                elif case == "hyphen-suffix":
+                    fixture["open_prs"][0]["headRefName"] += "-extra"
+                elif case == "plain-anchor-suffix":
+                    fixture["open_prs"][0]["headRefName"] = "agent/bu-abcb"
                 elif case == "lookup-failure":
                     fixture["failures"] = {f"bd-show:{original_id}": "lookup failed"}
                 elif case == "wrong-pr":
                     fixture["open_prs"][0]["number"] = 42
                 elif case == "unrelated-head":
-                    fixture["open_prs"][0]["headRefName"] = "agent/bu-unrelated.9-20261105"
+                    suffix = "b" if spelling == "attached" else "-20261105"
+                    fixture["open_prs"][0]["headRefName"] = f"agent/bu-unrelated.9{suffix}"
                 elif case == "invalid-date":
                     fixture["open_prs"][0]["headRefName"] = f"agent/{original_id}-20261340"
                 elif case == "unknown-suffix":
@@ -1757,15 +1812,22 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 payload = json.loads(result.stdout)
                 if case in {"dotted-anchor", "plain-anchor", "named-package",
-                            "named-hyphen-package", "canonical-control"}:
+                            "named-hyphen-package", "canonical-control", "alphanumeric", "nested-child"}:
                     self.assertEqual(payload["status"], "success", payload["errors"])
+                    self.assertEqual(payload["errors"], [])
+                    self.assertEqual(len(payload["self_heal_candidates"]), 1)
                     candidate = payload["self_heal_candidates"][0]
                     self.assertEqual(candidate["original_id"], original_id)
+                    self.assertEqual(candidate["pr_number"], 41)
+                    self.assertTrue(all(item["original_id"] == original_id
+                                        for item in payload["findings"]))
                     self.assertEqual(candidate["canonical_review_id"], review_id)
                     self.assertEqual(candidate["recommendation"], "review-wiring-current")
                     self.assertTrue(any(call["tool"] == "bd" and "show" in call["argv"]
                                         and original_id in call["argv"] for call in calls))
-                    self.assertFalse(any(f"{original_id}-20261105" in call["argv"] for call in calls))
+                    branch_id = fixture["open_prs"][0]["headRefName"].removeprefix("agent/")
+                    if branch_id != original_id:
+                        self.assertFalse(any(branch_id in call["argv"] for call in calls))
                 else:
                     self.assertEqual(payload["status"], "partial")
                     self.assertTrue(payload["errors"])
