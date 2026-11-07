@@ -1667,10 +1667,12 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                 ]
                 self.assertEqual(looked_up, [original_id])
 
-    def test_legacy_dated_branch_requires_unambiguous_canonical_pr_association(self) -> None:
+    def test_legacy_branch_requires_unambiguous_canonical_pr_association(self) -> None:
         for case in (
-            "dotted-anchor", "plain-anchor", "canonical-control", "no-review",
+            "dotted-anchor", "plain-anchor", "named-package", "named-hyphen-package",
+            "canonical-control", "no-review",
             "second-review-anchor", "second-original-ref", "changed-pr-ref",
+            "same-anchor-other-pr-open", "same-anchor-other-pr-merged",
             "foreign-record", "lookup-failure", "wrong-pr", "unrelated-head",
             "invalid-date", "unknown-suffix",
         ):
@@ -1694,8 +1696,17 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                 }
                 if case == "canonical-control":
                     fixture["open_prs"][0]["headRefName"] = f"agent/{original_id}"
+                elif case in {"named-package", "named-hyphen-package"}:
+                    suffix = "chronicler" if case == "named-package" else "chronicler-public-2"
+                    fixture["open_prs"][0]["headRefName"] = f"agent/{original_id}-{suffix}"
                 elif case == "no-review":
                     fixture["blocked_pr_review"] = [original]
+                elif case in {"same-anchor-other-pr-open", "same-anchor-other-pr-merged"}:
+                    fixture["blocked_pr_review"][0] = original_bead(original_id, 42)
+                    state = "MERGED" if case.endswith("merged") else "OPEN"
+                    other_pr = pr_payload(state, merged_at="2026-08-14T03:30:00Z")
+                    other_pr["number"] = 42
+                    fixture["prs"]["42"] = other_pr
                 elif case in {"second-review-anchor", "second-original-ref"}:
                     other_id = "bu-other.2"
                     fixture["blocked_pr_review"].append(original_bead(other_id, 41))
@@ -1723,7 +1734,8 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                 result, calls, _ = self.run_fixture(fixture)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 payload = json.loads(result.stdout)
-                if case in {"dotted-anchor", "plain-anchor", "canonical-control"}:
+                if case in {"dotted-anchor", "plain-anchor", "named-package",
+                            "named-hyphen-package", "canonical-control"}:
                     self.assertEqual(payload["status"], "success", payload["errors"])
                     candidate = payload["self_heal_candidates"][0]
                     self.assertEqual(candidate["original_id"], original_id)
@@ -1735,6 +1747,7 @@ class NormalizePrReviewStateTests(unittest.TestCase):
                 else:
                     self.assertEqual(payload["status"], "partial")
                     self.assertTrue(payload["errors"])
+                    self.assertTrue(payload["findings"])
                     self.assertTrue(all(item["recommendation"] == "manual-triage"
                                         for item in payload["findings"] + payload["self_heal_candidates"]))
 
