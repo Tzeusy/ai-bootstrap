@@ -298,6 +298,115 @@ class AdmissionPriorityTests(unittest.TestCase):
         emergency = self.plan(rows + [bead("bd-fire", priority=0)], normalized((anchor, review)), lanes=2)
         self.assertEqual([action["id"] for action in emergency["queue"]], ["bd-fire"])
 
+    def test_needed_prerequisites_distinguish_known_waits_from_queued_or_unknown_barriers(self):
+        cases = (
+            "healthy", "terminal-owner-gate", "human-backlog", "running-peer-wiring", "combined",
+            "terminal-clear", "terminal-unknown-gate", "terminal-unknown-head", "terminal-wrong-association", "queued-peer-review", "queued-peer-correction",
+            "queued-peer-resume", "dead-coordinator-resume", "running-peer-unknown-head",
+            "running-peer-wrong-association", "running-peer-dead-owner", "running-peer-malformed-wiring", "queued-peer-wiring",
+            "unknown-wiring", "partial-state", "own-held", "foreign-prerequisite",
+            "held-prerequisite", "unknown-prerequisite", "capacity-full", "overflow-full",
+            "local-review-first", "human-canonical-correction", "human-pr-resume", "human-formal-correction",
+        )
+        allowed = {"healthy", "terminal-owner-gate", "human-backlog", "running-peer-wiring", "combined",
+                   "local-review-first"}
+        for case in cases:
+            with self.subTest(case=case):
+                prerequisite = bead("bd-needed", priority=3)
+                retained = bead("bd-retained", status="blocked", assignee="coordinator:a",
+                                blocks_on=[prerequisite["id"]])
+                rows = [retained, prerequisite]
+                state = normalized()
+                lanes = 3
+                terminal = case.startswith("terminal-")
+                running = case.startswith("running-peer-") or case in {"combined", "capacity-full"}
+                if terminal or running or case in {"queued-peer-review", "queued-peer-correction",
+                                                   "queued-peer-wiring", "local-review-first", "human-canonical-correction", "human-formal-correction"}:
+                    anchor, review, pair_rows = review_pair(
+                        "other", owner="human-owner" if case.startswith("human-") else "coordinator:b",
+                        members=2 if case == "human-formal-correction" else 1)
+                    rows.extend(pair_rows)
+                    state = normalized((anchor, review))
+                    if terminal:
+                        state["findings"][0]["pr_state"] = "CLOSED"
+                        if case != "terminal-clear":
+                            review["dependencies"] = [{"issue_id": review["id"], "type": "blocks",
+                                                       "depends_on_id": "bd-owner-gate"}]
+                            if case != "terminal-unknown-gate":
+                                rows.append(bead("bd-owner-gate", status="blocked", labels=["owner-held"]))
+                        if case == "terminal-unknown-head":
+                            state["findings"][0]["head_sha"] = None
+                        if case == "terminal-wrong-association":
+                            anchor["external_ref"] = "gh-pr:2"
+                    if running or case == "queued-peer-wiring":
+                        review.update(status="in_progress" if running else "blocked", assignee="coordinator:r")
+                        state["self_heal_candidates"] = [{"original_id": anchor["id"],
+                            "canonical_review_id": review["id"], "pr_number": 1,
+                            "context_status": "resolved", "recommendation": "self-heal-original-wiring"}]
+                        if case == "running-peer-malformed-wiring":
+                            state["self_heal_candidates"][0]["pr_number"] = []
+                        if case == "running-peer-unknown-head":
+                            state["findings"][0]["head_sha"] = None
+                        if case == "running-peer-wrong-association":
+                            anchor["external_ref"] = "gh-pr:2"
+                        if case == "running-peer-dead-owner":
+                            review["assignee"] = "coordinator:gone"
+                    if case == "queued-peer-review":
+                        review["assignee"] = "coordinator:r"
+                    if case in {"queued-peer-correction", "human-canonical-correction", "human-formal-correction"}:
+                        review["metadata"] = {"review_receipt": {"head": SHA, "disposition": "corrections"}}
+                    if case == "local-review-first":
+                        anchor["assignee"] = "coordinator:a"
+                if case == "combined":
+                    terminal_anchor, terminal_review, terminal_rows = review_pair("terminal", owner="")
+                    terminal_review["dependencies"] = [{"issue_id": terminal_review["id"],
+                        "depends_on_id": "bd-owner-gate", "type": "blocks"}]
+                    rows.extend([*terminal_rows, bead("bd-owner-gate", status="blocked", labels=["owner-held"])])
+                    terminal_state = normalized((terminal_anchor, terminal_review))
+                    terminal_state["findings"][0]["pr_state"] = "CLOSED"
+                    state["findings"].extend(terminal_state["findings"])
+                if case in {"human-backlog", "combined"}:
+                    rows.append(bead("bd-personal", assignee="human-owner"))
+                if case == "human-pr-resume":
+                    rows.append(bead("bd-human-pr", assignee="human-owner", external_ref="gh-pr:2"))
+                if case in {"queued-peer-resume", "dead-coordinator-resume"}:
+                    rows.append(bead("bd-resume", assignee="coordinator:b" if case == "queued-peer-resume"
+                                     else "coordinator:gone"))
+                if case == "unknown-wiring":
+                    state["self_heal_candidates"] = [{"recommendation": "manual-triage"}]
+                if case == "partial-state":
+                    state["status"] = "partial"
+                if case in {"own-held", "foreign-prerequisite", "held-prerequisite", "unknown-prerequisite",
+                            "overflow-full"}:
+                    lanes = 1
+                    if case == "own-held":
+                        retained["labels"] = ["owner-held"]
+                    if case == "foreign-prerequisite":
+                        prerequisite["assignee"] = "coordinator:b"
+                    if case == "held-prerequisite":
+                        prerequisite["labels"] = ["owner-held"]
+                    if case == "unknown-prerequisite":
+                        rows.remove(prerequisite)
+                    if case == "overflow-full":
+                        rows.append(bead("bd-parked-overflow", status="blocked", assignee="coordinator:b"))
+                if case == "capacity-full":
+                    lanes = 1
+                # Known waits must not newly admit ordinary tier5 spillover.
+                if case in allowed - {"healthy", "local-review-first"}:
+                    rows.append(bead("bd-unrelated", priority=1))
+                before = json.dumps((rows, state), sort_keys=True)
+                payload = self.plan(rows, state, lanes=lanes)
+                expected = [prerequisite["id"]] if case in allowed else []
+                if case == "local-review-first":
+                    expected.insert(0, review["id"])
+                self.assertEqual([action["id"] for action in payload["queue"]], expected)
+                if case in allowed:
+                    action = next(action for action in payload["queue"] if action["id"] == prerequisite["id"])
+                    self.assertEqual(action["session_policy"], "allocate-owner")
+                self.assertLessEqual(len(payload["queue"]), payload["capacity"]["free"])
+                self.assertEqual(json.dumps((rows, state), sort_keys=True), before,
+                                 "ranking must preserve every gate and foreign/human claim")
+
     def test_historical_partial_source_does_not_require_an_active_review_inventory_entry(self):
         partial = bead("bd-partial", status="blocked", assignee="coordinator:b",
                        external_ref="gh-pr:53", blocks_on=["bd-owner-gate"])
