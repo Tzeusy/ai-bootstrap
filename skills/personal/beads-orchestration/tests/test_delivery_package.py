@@ -477,10 +477,51 @@ class ActiveBranchReconciliationTests(unittest.TestCase):
         self.assertEqual(journal["branch_reconciliation"]["binding"]["head"], self.head)
         before["bd-a"]["metadata"]["delivery"] = self.target
         self.assertEqual(self.client.rows, before)
-        released = package.release_claims(self.client, journal, self.path, recovery=False)
+        # Release validates historical evidence, not the future liveness of its PR.
+        self.pr.update(state="MERGED", headRefOid="0" * 40)
+        from unittest.mock import patch
+        with patch.object(package, "inspect_branch_binding", side_effect=AssertionError("no fresh PR/Git binding needed for release")):
+            released = package.release_claims(self.client, journal, self.path, recovery=False)
         self.assertEqual(released["state"], "released")
         self.assertEqual(self.client.rows["bd-a"]["metadata"]["delivery"], {**self.target, "state": "released"})
         self.assertEqual(json.loads(self.path.read_text())["branch_reconciliation"]["from"], self.old)
+
+    def test_completed_history_rejects_missing_or_conflicting_identity_and_binding_before_writes(self):
+        self.reconcile()
+        complete = json.loads(self.path.read_text())
+        completed_rows = copy.deepcopy(self.client.rows)
+        variants = ("missing-from", "missing-binding", "foreign-from", "changed-packet", "released-from",
+                    "wrong-root", "wrong-branch", "wrong-base", "invalid-pr", "invalid-head",
+                    "invalid-repository", "relative-worktree", "relative-common-dir", "invalid-state", "foreign-before", "malformed-before")
+        for variant in variants:
+            with self.subTest(variant=variant):
+                journal = copy.deepcopy(complete)
+                record = journal["branch_reconciliation"]
+                if variant == "missing-from": del record["from"]
+                elif variant == "missing-binding": del record["binding"]
+                elif variant == "foreign-from": record["from"]["owner"] = "coord-foreign"
+                elif variant == "changed-packet": record["from"]["packet"] = "other-packet"
+                elif variant == "released-from": record["from"]["state"] = "released"
+                elif variant == "invalid-state": journal["state"] = "claiming"
+                elif variant == "foreign-before": journal["before"]["bd-b"]["assignee"] = "coord-foreign"
+                elif variant == "malformed-before": journal["before"]["bd-b"]["assignee"] = []
+                else:
+                    key, value = {"wrong-root": ("repo_root", "/other-repository"),
+                                  "wrong-branch": ("branch", "agent/bd-a-neighbor"),
+                                  "wrong-base": ("base_branch", "other-base"),
+                                  "invalid-pr": ("pr", True), "invalid-head": ("head", "not-a-head"),
+                                  "invalid-repository": ("repository", "not-a-repo-slug"),
+                                  "relative-worktree": ("worktree", "relative"),
+                                  "relative-common-dir": ("common_dir", "relative")}[variant]
+                    record["binding"][key] = value
+                package.save_journal(self.path, journal)
+                journal_before = self.path.read_bytes()
+                self.client = MemoryReconciliationClient(self.root, completed_rows)
+                with self.assertRaises(ValueError):
+                    package.release_claims(self.client, journal, self.path, recovery=False)
+                self.assertEqual(self.client.writes, [])
+                self.assertEqual(self.client.rows, completed_rows)
+                self.assertEqual(self.path.read_bytes(), journal_before)
 
     def test_each_interrupted_phase_resumes_without_reclaim_or_duplicate_tracker_write(self):
         from unittest.mock import patch

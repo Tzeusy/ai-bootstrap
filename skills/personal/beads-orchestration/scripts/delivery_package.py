@@ -261,6 +261,54 @@ def check_ready(delivery: dict[str, Any], rows: dict[str, dict[str, Any]], clien
         walk(member)
 
 
+def validate_claim_history(journal: dict[str, Any], delivery: dict[str, Any]) -> None:
+    """Retain the exact original acquisition set and supported recovery records."""
+    if (journal.get("schema") != "beads-delivery-journal/v1"
+        or journal.get("attempted") != delivery["members"]
+        or not isinstance(journal.get("before"), dict) or set(journal["before"]) != set(delivery["members"])):
+        raise ValueError("invalid-reconciliation-claim-history")
+    if any(not isinstance(prior, dict) or set(prior) != {"status", "assignee", "metadata"}
+           or prior.get("status") not in ("open", "in_progress", "blocked", "closed")
+           or prior.get("assignee") not in (None, "", delivery["owner"])
+           or not isinstance(prior.get("metadata"), dict) for prior in journal["before"].values()):
+        raise ValueError("invalid-reconciliation-claim-history")
+
+
+def validate_branch_reconciliation(journal: dict[str, Any]) -> dict[str, Any] | None:
+    """Validate durable history, without asking whether its historical PR is open."""
+    if "branch_reconciliation" not in journal:
+        return None
+    saved = journal["branch_reconciliation"]
+    reason = "branch-reconciliation-incomplete-or-invalid-history"
+    if (not isinstance(saved, dict) or set(saved) != {"schema", "from", "to", "binding", "phase"}
+        or saved.get("schema") != "beads-branch-reconciliation/v1"
+        or saved.get("phase") not in ("prepared", "tracker-written", "complete")):
+        raise ValueError(reason)
+    if journal.get("state") not in (("active", "release-incomplete", "released") if saved["phase"] == "complete" else ("active",)):
+        raise ValueError(reason)
+    old, target = validate_delivery(saved["from"]), validate_delivery(saved["to"])
+    if ("branch" in old or "branch" not in target or target != {**old, "branch": target["branch"]}
+        or target.get("state", "active") != "active"
+        or journal.get("delivery") != (target if saved["phase"] == "complete" else old)):
+        raise ValueError(reason)
+    validate_claim_history(journal, old)
+    binding = saved["binding"]
+    if (not isinstance(binding, dict) or set(binding) != {"repo_root", "worktree", "common_dir",
+                                                       "repository", "pr", "head", "branch", "base_branch"}
+        or binding.get("repo_root") != journal.get("repo_root")
+        or binding.get("branch") != target["branch"] or binding.get("base_branch") != target["base_branch"]
+        or type(binding.get("pr")) is not int or binding["pr"] <= 0
+        or not isinstance(binding.get("head"), str) or not re.fullmatch(r"[0-9a-f]{40}", binding["head"])
+        or not isinstance(binding.get("repository"), str)
+        or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", binding["repository"])):
+        raise ValueError(reason)
+    for key in ("repo_root", "worktree", "common_dir"):
+        value = binding[key]
+        if not isinstance(value, str) or "\0" in value or not os.path.isabs(value) or os.path.normpath(value) != value:
+            raise ValueError(reason)
+    return saved
+
+
 def release_claims(client: Beads, journal: dict[str, Any], path: Path, *, recovery: bool, rollback: bool = False) -> dict[str, Any]:
     delivery = validate_delivery(journal["delivery"])
     if journal.get("repo_root") != client.repo_root:
@@ -270,10 +318,8 @@ def release_claims(client: Beads, journal: dict[str, Any], path: Path, *, recove
     if recovery and journal.get("state") not in {"claiming", "recovery-incomplete"}:
         raise ValueError("recover-requires-incomplete-claim-attempt-use-release-for-active-package")
     if not recovery and not rollback:
-        reconciliation = journal.get("branch_reconciliation")
-        if reconciliation is not None and (not isinstance(reconciliation, dict)
-            or reconciliation.get("schema") != "beads-branch-reconciliation/v1"
-            or reconciliation.get("phase") != "complete" or reconciliation.get("to") != delivery):
+        reconciliation = validate_branch_reconciliation(journal)
+        if reconciliation is not None and reconciliation["phase"] != "complete":
             raise ValueError("branch-reconciliation-incomplete-resume-first")
         current = metadata(client.show(delivery["anchor"])).get("delivery")
         if current not in (delivery, {**delivery, "state": "released"}):
@@ -423,25 +469,15 @@ def reconcile_branch(client: Beads, journal: dict[str, Any], path: Path,
         or journal.get("repo_root") != client.repo_root):
         raise ValueError("reconciliation-requires-exact-active-journal")
     current_delivery = validate_delivery(journal["delivery"])
-    saved = journal.get("branch_reconciliation")
-    old = validate_delivery(saved["from"]) if isinstance(saved, dict) and "from" in saved else current_delivery
+    saved = validate_branch_reconciliation(journal)
+    old = saved["from"] if saved is not None else current_delivery
     if ("branch" in old or "branch" not in target or target != {**old, "branch": target["branch"]}
-        or target.get("state", "active") != "active" or client.owner != old["owner"]
-        or journal.get("attempted") != old["members"]
-        or not isinstance(journal.get("before"), dict) or set(journal["before"]) != set(old["members"])):
+        or target.get("state", "active") != "active" or client.owner != old["owner"]):
         raise ValueError("reconciliation-identity-change-forbidden")
-    if any(not isinstance(prior, dict) or set(prior) != {"status", "assignee", "metadata"}
-           or prior.get("status") not in {"open", "in_progress", "blocked", "closed"}
-           or prior.get("assignee") is not None and not isinstance(prior["assignee"], str)
-           or not isinstance(prior.get("metadata"), dict) for prior in journal["before"].values()):
-        raise ValueError("invalid-reconciliation-claim-history")
+    validate_claim_history(journal, old)
     binding = inspect_branch_binding(client.repo_root, worktree, target, pr, head)
-    if saved is not None:
-        if (not isinstance(saved, dict) or set(saved) != {"schema", "from", "to", "binding", "phase"}
-            or saved.get("schema") != "beads-branch-reconciliation/v1" or saved.get("to") != target
-            or saved.get("binding") != binding or saved.get("phase") not in {"prepared", "tracker-written", "complete"}
-            or current_delivery != (target if saved["phase"] == "complete" else old)):
-            raise ValueError("conflicting-branch-reconciliation")
+    if saved is not None and (saved["to"] != target or saved["binding"] != binding):
+        raise ValueError("conflicting-branch-reconciliation")
 
     def rows_for(allowed: tuple[dict[str, Any], ...]) -> dict[str, dict[str, Any]]:
         rows = {member: client.show(member) for member in old["members"]}

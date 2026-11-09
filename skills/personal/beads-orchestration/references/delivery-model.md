@@ -291,7 +291,12 @@ PR state. Changed binding/ownership or malformed phases block for reconciliation
 Never hand-edit phases, release/reclaim, or infer success from an interrupted call.
 
 Release refuses an incomplete amendment or a journal/anchor delivery mismatch
-before any mutation, so a stale journal cannot erase an accepted branch. The
+before any mutation, so a stale journal cannot erase an accepted branch. Both
+resume and release validate the complete versioned history: original branch-free
+identity, branch-only target, preserved acquisition set/records, and a typed
+binding coherent with the journal repository, accepted branch and base. Release
+uses that historical binding without querying the old PR or requiring it to stay
+open; current member ownership and tracker delivery checks still apply. The
 completed amendment keeps its original `from` identity and `before` claim history;
 subsequent ordinary release records the amended identity. Existing recovery of an
 incomplete claim remains separate. A valid branch amendment is not live global
