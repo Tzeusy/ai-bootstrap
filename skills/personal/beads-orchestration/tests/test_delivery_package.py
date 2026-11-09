@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import importlib.util
+import copy
 import json
 import os
 import shutil
@@ -39,7 +40,9 @@ with path.open('r+') as stream:
   if state.get('race_on') == member:
    row['assignee'] = 'coord-other'; row['status'] = 'in_progress'; persist()
   if row.get('assignee') not in (None, '', actor): sys.exit(13)
-  row['assignee'] = actor; row['status'] = 'in_progress'; persist()
+  row['assignee'] = actor; row['status'] = 'in_progress'
+  if state.get('gate_after_claim') == member: state['rows']['bd-prereq']['status'] = 'open'
+  persist()
   if state.get('crash_on') == member:
    state.pop('crash_on'); persist(); os.kill(os.getppid(), signal.SIGKILL)
  else:
@@ -113,6 +116,104 @@ class DeliveryLifecycleTests(unittest.TestCase):
         self.assertEqual(package.package_index(list(rows.values())), {})
         self.assertEqual(rows["bd-a"]["metadata"]["unrelated"], {"enabled": True})
         self.assertEqual(rows["bd-b"]["metadata"]["unrelated"], {"enabled": True})
+
+    def test_actual_nested_blocking_edges_reject_open_before_claim_and_allow_closed(self):
+        for kind in ("actual", "legacy", "both"):
+            for status in ("open", "closed"):
+                with self.subTest(kind=kind, status=status):
+                    self.journal = self.root / f"journal-{kind}-{status}.json"
+                    state = {"rows": {m: row(m) for m in ("bd-a", "bd-b", "bd-c", "bd-prereq")}}
+                    edge = ({"id": "bd-prereq", "dependency_type": "blocks"} if kind == "actual" else
+                            {"depends_on_id": "bd-prereq", "issue_id": "bd-b", "type": "blocks"})
+                    if kind == "both": edge.update(id="bd-prereq", dependency_type="blocks")
+                    state["rows"]["bd-b"]["dependencies"] = [edge]
+                    state["rows"]["bd-prereq"]["status"] = status
+                    self.write(state)
+                    result = self.run_package("claim")
+                    if status == "open":
+                        self.assertNotEqual(result.returncode, 0, result.stdout)
+                        self.assertIn("external-blocker:bd-b:bd-prereq", result.stdout)
+                        self.assertEqual(self.read(), state)
+                        self.assertFalse(self.journal.exists())
+                    else:
+                        self.assertEqual(result.returncode, 0, result.stdout)
+                        self.assertEqual(self.run_package("release").returncode, 0)
+                        self.journal.unlink()
+
+    def test_malformed_or_conflicting_dependency_identity_never_claims(self):
+        for edges in ({}, [None], [{"id": "bd-prereq"}],
+                      [{"id": "bd-prereq", "dependency_type": None}],
+                      [{"id": "bd-prereq", "dependency_type": "blocks", "type": "parent-child"}],
+                      [{"id": "bd-prereq", "depends_on_id": "bd-c", "type": "blocks"}],
+                      [{"id": "bd-prereq", "issue_id": "bd-other", "type": "blocks"}],
+                      [{"dependency_type": "blocks"}], [{"id": [], "dependency_type": "blocks"}]):
+            with self.subTest(edges=edges):
+                state = self.read(); state["rows"]["bd-b"]["dependencies"] = edges; self.write(state)
+                result = self.run_package("claim")
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertEqual(self.read(), state)
+                self.assertFalse(self.journal.exists())
+
+    def test_actual_internal_edges_allow_acyclic_members_and_refuse_cycles(self):
+        state = self.read()
+        state["rows"]["bd-a"]["dependencies"] = [{"id": "bd-b", "dependency_type": "blocks"}]
+        state["rows"]["bd-b"]["dependencies"] = [{"id": "bd-a", "dependency_type": "blocks"}]
+        self.write(state)
+        result = self.run_package("claim")
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("cyclic-package-dependencies", result.stdout)
+        self.assertEqual(self.read(), state)
+        self.assertFalse(self.journal.exists())
+        state["rows"]["bd-b"]["dependencies"] = [{"id": "bd-c", "dependency_type": "parent-child"}]
+        self.write(state)
+        self.assertEqual(self.run_package("claim").returncode, 0)
+
+    def test_reopened_actual_gate_after_acquisition_compensates_and_keeps_preowned_claim(self):
+        state = self.read()
+        state["gate_after_claim"] = "bd-b"
+        state["rows"]["bd-a"].update(status="in_progress", assignee="coord-owner")
+        state["rows"]["bd-b"]["dependencies"] = [{"id": "bd-prereq", "dependency_type": "blocks"}]
+        state["rows"]["bd-prereq"].update(status="closed", assignee="coord-gate")
+        self.write(state)
+        result = self.run_package("claim")
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("external-blocker:bd-b:bd-prereq", result.stdout)
+        rows = self.read()["rows"]
+        self.assertEqual((rows["bd-a"]["status"], rows["bd-a"]["assignee"]), ("in_progress", "coord-owner"))
+        self.assertEqual((rows["bd-b"]["status"], rows["bd-b"]["assignee"]), ("open", ""))
+        self.assertEqual((rows["bd-prereq"]["status"], rows["bd-prereq"]["assignee"]), ("open", "coord-gate"))
+        self.assertEqual(json.loads(self.journal.read_text())["state"], "released")
+
+    def test_stale_active_journal_cannot_erase_tracker_branch_on_release(self):
+        self.assertEqual(self.run_package("claim").returncode, 0)
+        state = self.read()
+        state["rows"]["bd-a"]["metadata"]["delivery"]["branch"] = "agent/bd-a-vendors"
+        self.write(state)
+        journal_before = self.journal.read_bytes()
+        result = self.run_package("release")
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("journal-delivery-mismatch", result.stdout)
+        self.assertEqual(self.read(), state)
+        self.assertEqual(self.journal.read_bytes(), journal_before)
+
+    def test_claim_returns_exact_explicit_accepted_branch(self):
+        accepted = {**delivery(), "branch": "agent/bd-a-vendors-20261109"}
+        self.manifest.write_text(json.dumps(accepted))
+        result = self.run_package("claim")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)["branch"], accepted["branch"])
+        self.assertEqual(self.read()["rows"]["bd-a"]["metadata"]["delivery"], accepted)
+
+    def test_invalid_accepted_branch_never_claims_or_creates_journal(self):
+        before = self.read()
+        for branch in (None, "", "main", "master", "HEAD", "review/bd-review", "refs/heads/a", "agent/a..b", "-option", "agent/.hidden", "agent/a.lock", "agent/a@{1}", "agent/a b", "agent/a\nnext"):
+            with self.subTest(branch=branch):
+                self.manifest.write_text(json.dumps({**delivery(), "branch": branch}))
+                result = self.run_package("claim")
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn("invalid-delivery-branch", result.stdout)
+                self.assertEqual(self.read(), before)
+                self.assertFalse(self.journal.exists())
 
     def test_journal_cannot_release_matching_ids_in_a_different_repository(self):
         self.assertEqual(self.run_package("claim").returncode, 0)
@@ -278,6 +379,200 @@ class DeliveryAcceptanceTests(unittest.TestCase):
         self.assertTrue(package.content_verdict_reusable(record, dict(inputs)))
         self.assertFalse(package.content_verdict_reusable(record, {**inputs, "src/runtime.py": "changed"}))
         self.assertFalse(package.content_verdict_reusable({**record, "kind": "runtime"}, inputs))
+
+
+class MemoryReconciliationClient:
+    """Closed tracker collaborator: exact read identities and owner/status CAS."""
+    def __init__(self, root, rows):
+        self.repo_root, self.owner = str(root), "coord-owner"
+        self.rows = copy.deepcopy(rows)
+        self.writes = []
+
+    def show(self, member):
+        return copy.deepcopy(self.rows[member])
+
+    def call(self, *args):
+        assert args[0] == "update" and "--claim" not in args
+        record = self.rows[args[1]]
+        assert record["assignee"] == args[args.index("--if-assignee") + 1]
+        if "--if-status" in args:
+            assert record["status"] == args[args.index("--if-status") + 1]
+        if "--metadata" in args:
+            record["metadata"].update(json.loads(args[args.index("--metadata") + 1]))
+        for index, value in enumerate(args):
+            if value == "--unset-metadata": record["metadata"].pop(args[index + 1], None)
+        if "--assignee" in args: record["assignee"] = args[args.index("--assignee") + 1]
+        if "--status" in args: record["status"] = args[args.index("--status") + 1]
+        self.writes.append(args)
+        return [copy.deepcopy(record)]
+
+
+class ActiveBranchReconciliationTests(unittest.TestCase):
+    def setUp(self):
+        from unittest.mock import patch
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name) / "repo"
+        self.root.mkdir()
+        self.source = Path(self.tmp.name) / "source"
+        self.git_env = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null"}
+        def git(*args):
+            return subprocess.run(["git", *args], cwd=self.root, env=self.git_env,
+                                  capture_output=True, text=True, check=True)
+        git("init", "--template=", "-b", "main")
+        git("config", "user.name", "Fixture")
+        git("config", "user.email", "fixture@example.invalid")
+        (self.root / "fixture").write_text("owned source")
+        git("add", "fixture")
+        git("-c", "core.hooksPath=/dev/null", "commit", "-m", "fixture")
+        self.head = git("rev-parse", "HEAD").stdout.strip()
+        self.old = delivery()
+        self.target = {**self.old, "branch": "agent/bd-a-vendors"}
+        git("-c", "core.hooksPath=/dev/null", "worktree", "add", "-b", self.target["branch"], str(self.source), "HEAD")
+        self.pr = {"number": 60, "state": "OPEN", "headRefName": self.target["branch"],
+                   "headRefOid": self.head, "baseRefName": "main", "isCrossRepository": False,
+                   "headRepository": {"name": "fixture", "id": "nonessential-provider-field"},
+                   "headRepositoryOwner": {"login": "owner", "id": "provider-extra"}}
+        original_run = subprocess.run
+        def run(argv, **kwargs):
+            if argv[0] == "gh":
+                self.assertEqual(Path(kwargs["cwd"]), self.root)
+                output = "owner/fixture" if argv[1] == "repo" else json.dumps(self.pr)
+                return subprocess.CompletedProcess(argv, 0, output, "")
+            self.assertEqual(argv[0], "git")
+            self.assertNotIn("GIT_DIR", kwargs["env"])
+            self.assertNotIn("GIT_WORK_TREE", kwargs["env"])
+            return original_run(argv, **kwargs)
+        patcher = patch.object(package.subprocess, "run", side_effect=run)
+        patcher.start(); self.addCleanup(patcher.stop)
+        self.rows = {m: row(m) for m in self.old["members"]}
+        for record in self.rows.values():
+            record.update(assignee="coord-owner", status="blocked")
+            record["metadata"] = {"delivery_anchor": "bd-a", "unrelated": {"keep": True}}
+        self.rows["bd-a"]["metadata"]["delivery"] = copy.deepcopy(self.old)
+        self.rows["bd-a"]["external_ref"] = "gh-pr:60"
+        self.path = Path(self.tmp.name) / "journal.json"
+        self.journal = {"schema": "beads-delivery-journal/v1", "repo_root": str(self.root),
+                        "delivery": copy.deepcopy(self.old), "state": "active", "attempted": self.old["members"],
+                        "before": {m: {"status": "open", "assignee": "", "metadata": {}} for m in self.old["members"]}}
+        package.save_journal(self.path, self.journal, initial=True)
+        self.client = MemoryReconciliationClient(self.root, self.rows)
+
+    def reconcile(self, target=None):
+        with package.journal_lock(self.path):
+            journal = json.loads(self.path.read_text())
+            return package.reconcile_branch(self.client, journal, self.path, target or self.target,
+                worktree=str(self.source), pr=60, head=self.head)
+
+    def test_exact_actual_git_and_pr_binding_amends_only_branch_and_repeats_idempotently(self):
+        before = copy.deepcopy(self.client.rows)
+        original_journal = copy.deepcopy(self.journal)
+        self.assertEqual(self.reconcile()["reconciliation"], "complete")
+        self.assertEqual(self.reconcile()["reconciliation"], "complete")
+        self.assertEqual(len(self.client.writes), 1)
+        journal = json.loads(self.path.read_text())
+        self.assertEqual(journal["before"], original_journal["before"])
+        self.assertEqual(journal["branch_reconciliation"]["from"], self.old)
+        self.assertEqual(journal["delivery"], self.target)
+        self.assertEqual(journal["branch_reconciliation"]["binding"]["head"], self.head)
+        before["bd-a"]["metadata"]["delivery"] = self.target
+        self.assertEqual(self.client.rows, before)
+        released = package.release_claims(self.client, journal, self.path, recovery=False)
+        self.assertEqual(released["state"], "released")
+        self.assertEqual(self.client.rows["bd-a"]["metadata"]["delivery"], {**self.target, "state": "released"})
+        self.assertEqual(json.loads(self.path.read_text())["branch_reconciliation"]["from"], self.old)
+
+    def test_each_interrupted_phase_resumes_without_reclaim_or_duplicate_tracker_write(self):
+        from unittest.mock import patch
+        for malformed in ({}, [], "prepared", {"schema": "wrong", "phase": "complete"},
+                          {"schema": "beads-branch-reconciliation/v1", "phase": "complete", "to": self.target}):
+            with self.subTest(malformed=malformed):
+                bad = {**self.journal, "branch_reconciliation": malformed}
+                with self.assertRaisesRegex(ValueError, "reconciliation-incomplete"):
+                    package.release_claims(self.client, bad, self.path, recovery=False)
+                self.assertEqual(self.client.writes, [])
+        for point in ("prepared", "tracker-applied-no-ack", "tracker-written", "complete"):
+            with self.subTest(point=point):
+                package.save_journal(self.path, copy.deepcopy(self.journal))
+                self.client = MemoryReconciliationClient(self.root, self.rows)
+                save, call = package.save_journal, self.client.call
+                def interrupted_save(path, value, **kwargs):
+                    save(path, value, **kwargs)
+                    if value.get("branch_reconciliation", {}).get("phase") == point:
+                        raise RuntimeError("injected power loss after durable journal phase")
+                def interrupted_call(*args):
+                    result = call(*args)
+                    if point == "tracker-applied-no-ack":
+                        raise RuntimeError("injected lost tracker acknowledgement")
+                    return result
+                with patch.object(package, "save_journal", side_effect=interrupted_save), \
+                     patch.object(self.client, "call", side_effect=interrupted_call):
+                    with self.assertRaises(RuntimeError): self.reconcile()
+                interrupted = json.loads(self.path.read_text())
+                if interrupted["branch_reconciliation"]["phase"] != "complete":
+                    with self.assertRaisesRegex(ValueError, "reconciliation-incomplete"):
+                        package.release_claims(self.client, interrupted, self.path, recovery=False)
+                self.assertEqual(self.reconcile()["reconciliation"], "complete")
+                self.assertEqual(len(self.client.writes), 1)
+                final = json.loads(self.path.read_text())
+                self.assertEqual(final["delivery"], self.target)
+                self.assertEqual(final["branch_reconciliation"]["from"], self.old)
+                self.assertEqual(final["before"], self.journal["before"])
+
+    def test_wrong_identity_provider_git_and_foreign_claims_refuse_without_prepare(self):
+        for key, value in (("owner", "coord-other"), ("members", ["bd-a"]), ("packet", "other"),
+                           ("outcome", "bd-other"), ("base_branch", "other"), ("branch", "main")):
+            with self.subTest(identity=key):
+                with self.assertRaises(ValueError): self.reconcile({**self.target, key: value})
+                self.assertEqual(json.loads(self.path.read_text()), self.journal)
+        for key, value in (("state", "CLOSED"), ("headRefName", "agent/bd-a-neighbor"),
+                           ("headRefOid", "0" * 40), ("baseRefName", "other"), ("isCrossRepository", True),
+                           ("number", 61), ("headRepository", {"name": "other"})):
+            with self.subTest(provider=key):
+                original = copy.deepcopy(self.pr)
+                self.pr[key] = value
+                with self.assertRaises(ValueError): self.reconcile()
+                self.pr = original
+                self.assertEqual(json.loads(self.path.read_text()), self.journal)
+        for mutate in ("foreign-owner", "wrong-pointer", "wrong-pr", "held", "released"):
+            with self.subTest(tracker=mutate):
+                self.client = MemoryReconciliationClient(self.root, self.rows)
+                if mutate == "foreign-owner": self.client.rows["bd-b"]["assignee"] = "coord-peer"
+                if mutate == "wrong-pointer": self.client.rows["bd-b"]["metadata"]["delivery_anchor"] = "bd-c"
+                if mutate == "wrong-pr": self.client.rows["bd-a"]["external_ref"] = "gh-pr:61"
+                if mutate == "held": self.client.rows["bd-b"]["labels"] = ["owner-held"]
+                if mutate == "released": self.client.rows["bd-a"]["metadata"]["delivery"]["state"] = "released"
+                with self.assertRaises(ValueError): self.reconcile()
+                self.assertEqual(self.client.writes, [])
+                self.assertEqual(json.loads(self.path.read_text()), self.journal)
+        self.client = MemoryReconciliationClient(self.root, self.rows)
+        (self.source / "fixture").write_text("unexpected dirty source")
+        with self.assertRaisesRegex(ValueError, "tracked-source-dirty"): self.reconcile()
+        self.assertEqual(self.client.writes, [])
+
+    def test_prepared_foreign_takeover_and_tracker_phase_regression_never_overwrite(self):
+        from unittest.mock import patch
+        for phase in ("prepared", "tracker-written"):
+            with self.subTest(phase=phase):
+                package.save_journal(self.path, copy.deepcopy(self.journal))
+                self.client = MemoryReconciliationClient(self.root, self.rows)
+                save = package.save_journal
+                def crash(path, value, **kwargs):
+                    save(path, value, **kwargs)
+                    if value.get("branch_reconciliation", {}).get("phase") == phase:
+                        raise RuntimeError("crash")
+                with patch.object(package, "save_journal", side_effect=crash):
+                    with self.assertRaises(RuntimeError): self.reconcile()
+                if phase == "prepared": self.client.rows["bd-b"]["assignee"] = "coord-peer"
+                else: self.client.rows["bd-a"]["metadata"]["delivery"] = copy.deepcopy(self.old)
+                before = copy.deepcopy(self.client.rows)
+                with self.assertRaises(ValueError): self.reconcile()
+                self.assertEqual(self.client.rows, before)
+
+    def test_journal_consumers_cannot_overlap(self):
+        with package.journal_lock(self.path):
+            with self.assertRaises(BlockingIOError):
+                with package.journal_lock(self.path): pass
 
 
 @unittest.skipUnless(shutil.which("bd"), "native bd CLI is unavailable")

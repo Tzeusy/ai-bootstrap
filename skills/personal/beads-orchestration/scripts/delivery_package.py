@@ -12,6 +12,8 @@ relinquishes an active package explicitly and reopens unfinished work. Neither c
 from __future__ import annotations
 
 import argparse
+import fcntl
+from contextlib import contextmanager
 import json
 import os
 import re
@@ -23,6 +25,35 @@ from typing import Any
 SCHEMA = "beads-delivery/v1"
 ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
 HOLD_LABELS = {"no-dispatch", "needs-shaping", "owner-held", "human-gate", "held-for-owner", "scope:local-state"}
+
+
+
+def delivery_branch(delivery: dict[str, Any]) -> str:
+    """Return the accepted literal head; absence retains the strict anchor default."""
+    return delivery.get("branch", f"agent/{delivery['anchor']}")
+
+
+def validate_branch(branch: object, base_branch: str) -> None:
+    """Validate a literal local branch name, never a ref expression or override.
+
+    This is the branch-name subset of git-check-ref-format plus the package's
+    protected-base and independent-review boundaries. No Git process is needed
+    while validating tracker evidence.
+    """
+    if (
+        not isinstance(branch, str)
+        or not branch
+        or branch in {"@", "HEAD", "main", "master", base_branch}
+        or branch.startswith(("-", "refs/", "review/"))
+        or ".." in branch
+        or "@{" in branch
+        or any(ord(char) <= 32 or ord(char) == 127 or char in "~^:?*[\\" for char in branch)
+        or any(
+            not part or part.startswith(".") or part.endswith((".", ".lock"))
+            for part in branch.split("/")
+        )
+    ):
+        raise ValueError("invalid-delivery-branch")
 
 
 def validate_delivery(value: object) -> dict[str, Any]:
@@ -38,6 +69,7 @@ def validate_delivery(value: object) -> dict[str, Any]:
         raise ValueError("duplicate-members-or-missing-anchor")
     if value.get("state", "active") not in {"active", "released"}:
         raise ValueError("invalid-delivery-state")
+    validate_branch(delivery_branch(value), value["base_branch"])
     return value
 
 
@@ -131,6 +163,7 @@ def content_verdict_reusable(record: dict[str, Any], inputs: dict[str, str]) -> 
 class Beads:
     def __init__(self, repo_root: str, owner: str):
         self.repo_root = str(Path(repo_root).resolve())
+        self.owner = owner
         self.prefix = ["bd", "-C", self.repo_root, "--actor", owner]
 
     def call(self, *args: str) -> Any:
@@ -163,6 +196,28 @@ def save_journal(path: Path, value: dict[str, Any], *, initial: bool = False) ->
         os.close(directory_fd)
 
 
+def blocking_targets(member: str, value: object) -> list[str]:
+    """Accept nested bd-show and legacy edge rows, rejecting equivocal identity."""
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("invalid-dependency-collection")
+    targets = []
+    for dep in value:
+        if not isinstance(dep, dict):
+            raise ValueError("invalid-dependency-record")
+        kinds = [dep[key] for key in ("dependency_type", "type") if key in dep]
+        ids = [dep[key] for key in ("depends_on_id", "id") if key in dep]
+        if (not kinds or any(not isinstance(kind, str) or not kind or kind.strip() != kind for kind in kinds)
+            or len(set(kinds)) != 1 or not ids
+            or any(not isinstance(target, str) or not ID.fullmatch(target) for target in ids)
+            or len(set(ids)) != 1 or ("issue_id" in dep and dep["issue_id"] != member)):
+            raise ValueError("invalid-or-contradictory-dependency")
+        if kinds[0] == "blocks":
+            targets.append(ids[0])
+    return targets
+
+
 def check_ready(delivery: dict[str, Any], rows: dict[str, dict[str, Any]], client: Beads) -> None:
     members = set(delivery["members"])
     edges: dict[str, list[str]] = {member: [] for member in members}
@@ -184,12 +239,7 @@ def check_ready(delivery: dict[str, Any], rows: dict[str, dict[str, Any]], clien
         if member != delivery["anchor"] and str(row.get("external_ref") or "").startswith("gh-pr:"):
             raise ValueError(f"member-has-external-reference:{member}")
         edges[member] = []
-        for dep in row.get("dependencies") or []:
-            if dep.get("type") != "blocks" or dep.get("issue_id", member) != member:
-                continue
-            target = dep.get("depends_on_id") or dep.get("id")
-            if not isinstance(target, str) or not ID.fullmatch(target):
-                raise ValueError("invalid-blocking-dependency")
+        for target in blocking_targets(member, row.get("dependencies")):
             if target in members:
                 edges[member].append(target)
             elif client.show(target).get("status") != "closed":
@@ -219,6 +269,15 @@ def release_claims(client: Beads, journal: dict[str, Any], path: Path, *, recove
         return {"state": "released", "released": [], "failures": [], "work_preserved": True}
     if recovery and journal.get("state") not in {"claiming", "recovery-incomplete"}:
         raise ValueError("recover-requires-incomplete-claim-attempt-use-release-for-active-package")
+    if not recovery and not rollback:
+        reconciliation = journal.get("branch_reconciliation")
+        if reconciliation is not None and (not isinstance(reconciliation, dict)
+            or reconciliation.get("schema") != "beads-branch-reconciliation/v1"
+            or reconciliation.get("phase") != "complete" or reconciliation.get("to") != delivery):
+            raise ValueError("branch-reconciliation-incomplete-resume-first")
+        current = metadata(client.show(delivery["anchor"])).get("delivery")
+        if current not in (delivery, {**delivery, "state": "released"}):
+            raise ValueError("journal-delivery-mismatch-reconcile-before-release")
     failed: list[str] = []
     released: list[str] = []
     foreign: list[dict[str, str]] = []
@@ -293,25 +352,166 @@ def claim_delivery(client: Beads, delivery: dict[str, Any], path: Path) -> dict[
         raise
     journal["state"] = "active"
     save_journal(path, journal)
-    return {"state": "active", "anchor": delivery["anchor"], "members": delivery["members"], "branch": f"agent/{delivery['anchor']}"}
+    return {"state": "active", "anchor": delivery["anchor"], "members": delivery["members"], "branch": delivery_branch(delivery)}
+
+
+
+@contextmanager
+def journal_lock(path: Path):
+    """Serialize journal consumers; coordinator repository custody is also required."""
+    with path.with_suffix(path.suffix + ".lock").open("a") as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        yield
+
+
+def inspect_branch_binding(repo_root: str, worktree: str, delivery: dict[str, Any], pr: int, head: str) -> dict[str, Any]:
+    """Read actual Git and current same-repository PR identity; never trust a receipt."""
+    if type(pr) is not int or pr <= 0 or (not isinstance(head, str) or not re.fullmatch(r"[0-9a-f]{40}", head)):
+        raise ValueError("invalid-reconciliation-pr-or-head")
+    root, source = Path(repo_root).resolve(), Path(worktree).resolve()
+
+    def read(argv: list[str], cwd: Path) -> str:
+        environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        environment.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL="/dev/null")
+        result = subprocess.run(argv, cwd=cwd, env=environment, capture_output=True, text=True, timeout=30, check=False)
+        if result.returncode:
+            raise RuntimeError("reconciliation-binding-read-failed")
+        return result.stdout.strip()
+
+    if read(["git", "rev-parse", "--show-toplevel"], root) != str(root):
+        raise ValueError("reconciliation-repository-root-mismatch")
+    if read(["git", "rev-parse", "--show-toplevel"], source) != str(source):
+        raise ValueError("reconciliation-worktree-root-mismatch")
+    common = read(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], root)
+    if common != read(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], source):
+        raise ValueError("reconciliation-foreign-worktree")
+    if read(["git", "symbolic-ref", "--short", "HEAD"], source) != delivery_branch(delivery):
+        raise ValueError("reconciliation-branch-mismatch")
+    if read(["git", "rev-parse", "HEAD"], source) != head:
+        raise ValueError("reconciliation-head-mismatch")
+    if read(["git", "status", "--porcelain=v1", "--untracked-files=no"], source):
+        raise ValueError("reconciliation-tracked-source-dirty")
+    repo = read(["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"], root)
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo):
+        raise ValueError("invalid-reconciliation-repository")
+    data = json.loads(read(["gh", "pr", "view", str(pr), "--repo", repo, "--json",
+        "number,state,headRefName,headRefOid,baseRefName,isCrossRepository,headRepository,headRepositoryOwner"], root))
+    if not isinstance(data, dict) or type(data.get("number")) is not int or data["number"] != pr:
+        raise ValueError("reconciliation-pr-mismatch")
+    if (data.get("state") != "OPEN" or data.get("isCrossRepository") is not False
+        or data.get("headRefName") != delivery_branch(delivery) or data.get("headRefOid") != head
+        or data.get("baseRefName") != delivery["base_branch"]
+        or not isinstance(data.get("headRepository"), dict)
+        or data["headRepository"].get("name") != repo.split("/")[1]
+        or not isinstance(data.get("headRepositoryOwner"), dict)
+        or data["headRepositoryOwner"].get("login") != repo.split("/")[0]):
+        raise ValueError("reconciliation-pr-binding-mismatch")
+    return {"repo_root": str(root), "worktree": str(source), "common_dir": common,
+            "repository": repo, "pr": pr, "head": head, "branch": delivery_branch(delivery),
+            "base_branch": delivery["base_branch"]}
+
+
+def reconcile_branch(client: Beads, journal: dict[str, Any], path: Path,
+                     target: dict[str, Any], *, worktree: str, pr: int, head: str) -> dict[str, Any]:
+    """One-time branch-only amendment of an ACTIVE package, with durable resume.
+
+    Caller holds repository custody and journal_lock. No claim/release, status,
+    member pointer, arbitrary identity amendment or caller-supplied binding proof.
+    """
+    target = validate_delivery(target)
+    if (journal.get("schema") != "beads-delivery-journal/v1" or journal.get("state") != "active"
+        or journal.get("repo_root") != client.repo_root):
+        raise ValueError("reconciliation-requires-exact-active-journal")
+    current_delivery = validate_delivery(journal["delivery"])
+    saved = journal.get("branch_reconciliation")
+    old = validate_delivery(saved["from"]) if isinstance(saved, dict) and "from" in saved else current_delivery
+    if ("branch" in old or "branch" not in target or target != {**old, "branch": target["branch"]}
+        or target.get("state", "active") != "active" or client.owner != old["owner"]
+        or journal.get("attempted") != old["members"]
+        or not isinstance(journal.get("before"), dict) or set(journal["before"]) != set(old["members"])):
+        raise ValueError("reconciliation-identity-change-forbidden")
+    if any(not isinstance(prior, dict) or set(prior) != {"status", "assignee", "metadata"}
+           or prior.get("status") not in {"open", "in_progress", "blocked", "closed"}
+           or prior.get("assignee") is not None and not isinstance(prior["assignee"], str)
+           or not isinstance(prior.get("metadata"), dict) for prior in journal["before"].values()):
+        raise ValueError("invalid-reconciliation-claim-history")
+    binding = inspect_branch_binding(client.repo_root, worktree, target, pr, head)
+    if saved is not None:
+        if (not isinstance(saved, dict) or set(saved) != {"schema", "from", "to", "binding", "phase"}
+            or saved.get("schema") != "beads-branch-reconciliation/v1" or saved.get("to") != target
+            or saved.get("binding") != binding or saved.get("phase") not in {"prepared", "tracker-written", "complete"}
+            or current_delivery != (target if saved["phase"] == "complete" else old)):
+            raise ValueError("conflicting-branch-reconciliation")
+
+    def rows_for(allowed: tuple[dict[str, Any], ...]) -> dict[str, dict[str, Any]]:
+        rows = {member: client.show(member) for member in old["members"]}
+        for member, row in rows.items():
+            if (row.get("assignee") != old["owner"] or row.get("status") not in {"in_progress", "blocked", "closed"}
+                or set(row.get("labels") or []) & HOLD_LABELS):
+                raise ValueError("reconciliation-member-owner-state-or-hold-mismatch")
+        anchor = rows[old["anchor"]]
+        if (metadata(anchor).get("delivery") not in allowed
+            or anchor.get("external_ref") != f"gh-pr:{pr}"):
+            raise ValueError("reconciliation-anchor-delivery-or-pr-mismatch")
+        package_index(list(rows.values()))
+        return rows
+
+    allowed = (old,) if saved is None else (old, target) if saved["phase"] == "prepared" else (target,)
+    rows = rows_for(allowed)
+    if saved is None:
+        saved = {"schema": "beads-branch-reconciliation/v1", "from": old, "to": target,
+                 "binding": binding, "phase": "prepared"}
+        journal["branch_reconciliation"] = saved
+        save_journal(path, journal)
+    if saved["phase"] == "complete":
+        return {"state": "active", "branch": target["branch"], "reconciliation": "complete", "resumed": True}
+    # Re-read all claims and the current provider/Git binding after durable intent.
+    rows = rows_for((old, target) if saved["phase"] == "prepared" else (target,))
+    if inspect_branch_binding(client.repo_root, worktree, target, pr, head) != binding:
+        raise ValueError("reconciliation-binding-changed")
+    anchor = rows[old["anchor"]]
+    if metadata(anchor)["delivery"] == old:
+        client.call("update", old["anchor"], "--if-assignee", old["owner"],
+                    "--if-status", anchor["status"], "--metadata", json.dumps({"delivery": target}, separators=(",", ":")), "--json")
+    rows_for((target,))
+    saved["phase"] = "tracker-written"
+    save_journal(path, journal)
+    if inspect_branch_binding(client.repo_root, worktree, target, pr, head) != binding:
+        raise ValueError("reconciliation-binding-changed")
+    rows_for((target,))
+    journal["delivery"] = target
+    saved["phase"] = "complete"
+    save_journal(path, journal)
+    return {"state": "active", "branch": target["branch"], "reconciliation": "complete", "resumed": False}
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("validate", "claim", "recover", "release", "closure-plan"))
+    parser.add_argument("command", choices=("validate", "claim", "recover", "release", "reconcile-branch", "closure-plan"))
     parser.add_argument("--delivery-file", type=Path)
     parser.add_argument("--repo-root")
     parser.add_argument("--journal", type=Path)
     parser.add_argument("--results-file", type=Path)
+    parser.add_argument("--worktree")
+    parser.add_argument("--pr-number", type=int)
+    parser.add_argument("--expected-head")
     parser.add_argument("--landed-main", action="store_true", help="Use only after independently confirming landing on main; never inferred from an integration branch merge.")
     args = parser.parse_args()
     try:
-        if args.command in {"recover", "release"}:
+        if args.command in {"recover", "release", "reconcile-branch"}:
             if not args.repo_root or not args.journal:
                 raise ValueError("repo-root-and-journal-required")
-            journal = json.loads(args.journal.read_text(encoding="utf-8"))
-            delivery = validate_delivery(journal["delivery"])
-            result = release_claims(Beads(args.repo_root, delivery["owner"]), journal, args.journal, recovery=args.command == "recover")
+            with journal_lock(args.journal):
+                journal = json.loads(args.journal.read_text(encoding="utf-8"))
+                delivery = validate_delivery(journal["delivery"])
+                client = Beads(args.repo_root, delivery["owner"])
+                if args.command == "reconcile-branch":
+                    if not args.delivery_file or not args.worktree or not args.pr_number or not args.expected_head:
+                        raise ValueError("reconciliation-delivery-worktree-pr-head-required")
+                    result = reconcile_branch(client, journal, args.journal, load_delivery(args.delivery_file),
+                                              worktree=args.worktree, pr=args.pr_number, head=args.expected_head)
+                else:
+                    result = release_claims(client, journal, args.journal, recovery=args.command == "recover")
         else:
             if not args.delivery_file:
                 raise ValueError("delivery-file-required")

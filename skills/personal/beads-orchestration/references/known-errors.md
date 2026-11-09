@@ -2487,3 +2487,22 @@ existing capacity and one-package WIP overflow bounds also remain in force.
 Never exempt all prerequisite-tier actions or edit a snapshot to obtain real
 admission. After canonical delivery and reviewed installation, refresh complete
 Step 0 and use the unmodified stock queue plus atomic claims.
+
+
+## Active package branch and nested dependency identity (aib-1yq, aib-dxi)
+
+- Nested `bd show` dependencies use `dependency_type` and target `id`; the legacy
+  `type`/`depends_on_id` edge is also supported. Never silently skip an unresolved
+  blocking edge or trust its embedded target status. The shared package helper
+  validates identities and re-reads external gates before and after each claim.
+- An accepted nondefault implementation head belongs in typed `delivery.branch`;
+  missing means exactly `agent/<anchor>`, not a suffix or prefix guess. Bootstrap,
+  reports, review context and cleanup consume the same validated literal head.
+- Do not amend only tracker metadata for an active package: a stale journal may
+  otherwise overwrite the branch on release. Under controller custody use
+  `delivery_package.py reconcile-branch` with the existing journal, branch-only
+  target manifest and actual worktree/PR/head inputs. Resume its durable phases
+  with identical inputs after interruption; never hand-edit a phase, release and
+  reclaim, or treat successful metadata reconciliation as live queue admission.
+  The [delivery model](delivery-model.md#cleanup-evidence-and-existing-active-journals)
+  owns the protocol and its remaining delivery/installation boundaries.

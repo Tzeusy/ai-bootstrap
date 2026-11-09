@@ -14,7 +14,8 @@ compatibility: Requires a Beads-backed git repository with git worktrees, git, b
 
 # Beads Worker
 
-Implement a cohesive package in its isolated `agent/<ISSUE_ID>` worktree. ISSUE_ID
+Implement a cohesive package in its isolated accepted-branch worktree (default
+`agent/<ISSUE_ID>`). ISSUE_ID
 is an existing anchor; without a delivery manifest this remains a one-bead job.
 The same implementation owner retains ordinary test/review corrections and related
 packages until the accepted outcome is finished or explicitly handed off.
@@ -45,7 +46,7 @@ Do not spawn overlapping implementation tracks or commit Dolt-managed `.beads/`.
 
 | Field | Meaning |
 |---|---|
-| ISSUE_ID | Existing package anchor; branch remains agent/<anchor> |
+| ISSUE_ID | Existing package anchor; branch defaults to agent/<anchor>, or exact validated delivery.branch |
 | WORKTREE_PATH / REPO_ROOT | Isolated worktree and actual shared repository root |
 | DELIVERY_FILE | Optional beads-delivery/v1 manifest, required for a multi-bead package |
 | Current packet locator | Current instructions, member AC, authority references and recovery state |
@@ -97,7 +98,7 @@ work and resume event; never create a second substrate implementation privately.
 ## Publish and handoff
 
 Prefer one PR per cohesive package, targeting the approved integration base.
-Push `agent/<ISSUE_ID>` and use `gh pr create --body-file` with actual newlines.
+Push the exact accepted implementation branch and use `gh pr create --body-file` with actual newlines.
 PR maps every member to acceptance/evidence and explicitly names partial scope.
 Only the lifecycle controller sets anchor `external_ref` and one review relation.
 

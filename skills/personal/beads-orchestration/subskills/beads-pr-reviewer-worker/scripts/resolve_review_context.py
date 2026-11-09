@@ -13,7 +13,7 @@ from pathlib import Path
 PACKAGE_SCRIPTS = Path(__file__).resolve().parents[3] / "scripts"
 if str(PACKAGE_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(PACKAGE_SCRIPTS))
-from delivery_package import metadata as bead_metadata, package_index, validate_delivery
+from delivery_package import delivery_branch, metadata as bead_metadata, package_index, validate_delivery
 
 
 BEAD_ID_PATTERN = r"[a-z][a-z0-9]*(?:-[a-z0-9]+)+(?:\.[0-9]+)*"
@@ -254,7 +254,7 @@ def main():
             "number,url,state,isDraft,mergeStateStatus,reviewDecision,headRefName,baseRefName,mergedAt,headRefOid",
         ])
 
-        if delivery and (pr.get("headRefName") != f"agent/{original_id}" or pr.get("baseRefName") != delivery["base_branch"]):
+        if delivery and (pr.get("headRefName") != delivery_branch(delivery) or pr.get("baseRefName") != delivery["base_branch"]):
             fail("invalid-delivery-branch", "PR branch or base differs from the accepted package")
         output = {
             "ok": True,

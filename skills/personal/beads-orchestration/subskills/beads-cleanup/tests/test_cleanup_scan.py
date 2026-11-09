@@ -478,9 +478,14 @@ class CleanupScanTests(unittest.TestCase):
         self.assertEqual(payload["status"], "success")
 
     def test_serialized_member_metadata_uses_anchor_and_malformed_metadata_fails_closed(self):
-        member = bead("aib-terminal", "in_progress", notes=heartbeat("2026-08-14T03:00:00Z"))
+        member = bead("aib-terminal", "in_progress", assignee="coordinator:dead", notes=heartbeat("2026-08-14T03:00:00Z"))
         member["metadata"] = json.dumps({"delivery_anchor": "aib-adapters"})
-        result, calls, _ = self.run_fixture({"in_progress": [member], "open_prs": []})
+        anchor = bead("aib-adapters", "closed", metadata={"delivery": {
+            "schema": "beads-delivery/v1", "anchor": "aib-adapters",
+            "members": ["aib-adapters", "aib-terminal"], "owner": "coordinator:dead",
+            "outcome": "aib-runtime", "base_branch": "main", "packet": "Accepted package"}})
+        result, calls, _ = self.run_fixture({"in_progress": [member], "open_prs": [],
+                                           "shows": {"aib-adapters": [anchor]}})
         self.assertEqual(result.returncode, 0, result.stderr)
         claim = json.loads(result.stdout)["claims"][0]
         self.assertEqual(claim["delivery_anchor"], "aib-adapters")
@@ -519,7 +524,7 @@ class CleanupScanTests(unittest.TestCase):
         original["metadata"] = {"delivery": {"schema": "beads-delivery/v1", "anchor": anchor,
             "members": [anchor, member], "owner": "coordinator:dead", "outcome": "aib-runtime",
             "base_branch": "main", "packet": "Adapter corrections"}}
-        pending = bead(member, "in_progress", notes=heartbeat("2026-08-14T03:00:00Z"))
+        pending = bead(member, "in_progress", assignee="coordinator:dead", notes=heartbeat("2026-08-14T03:00:00Z"))
         pending["metadata"] = {"delivery_anchor": anchor}
         result, calls, _ = self.run_fixture({
             "in_progress": [pending], "blocked": [{**pending, "status": "blocked"}],
@@ -2195,6 +2200,119 @@ class CleanupScanTests(unittest.TestCase):
         self.assertNotIn("TOKEN=top-secret", result.stdout + result.stderr)
         self.assertNotIn("/private/absolute/path", result.stdout + result.stderr)
 
+
+
+class AcceptedBranchCleanupTests(unittest.TestCase):
+    """Actual scanner call paths with closed local process/metadata collaborators."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("_accepted_branch_cleanup", SCRIPT)
+        cls.scan = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.scan)
+
+    def rows(self):
+        delivery = {"schema": "beads-delivery/v1", "anchor": "aib-anchor",
+                    "members": ["aib-anchor", "aib-member"], "owner": "coordinator:foreign",
+                    "base_branch": "main", "packet": "Accepted retained head", "outcome": "aib-outcome",
+                    "branch": "agent/aib-anchor-vendors-20261109"}
+        anchor = bead("aib-anchor", "closed", metadata={"delivery": delivery})
+        member = bead("aib-member", "in_progress", assignee="coordinator:foreign",
+                      metadata={"delivery_anchor": "aib-anchor"},
+                      notes=heartbeat("2026-08-14T03:00:00Z"))
+        return delivery, anchor, member
+
+    def claims(self, row, errors, live=()):
+        return self.scan.scan_claims([row], repo_root=Path("/absent/private-fixture"),
+            worktree_names=set(), branch_path_ids={}, ambiguous_worktree_ids=set(),
+            live_owners=set(live), now=self.scan.parse_time("2026-08-14T04:00:00Z"), errors=errors)[0]
+
+    def test_accepted_branch_reaches_both_claim_and_worktree_probes(self):
+        from unittest.mock import patch
+        delivery, anchor, member = self.rows()
+        for row in (anchor, member):
+            with self.subTest(row=row["id"]):
+                probes = []
+                def command(argv, repo):
+                    self.assertEqual(argv[:4], ["git", "ls-remote", "--heads", "origin"])
+                    probes.append(argv[-1])
+                    return subprocess.CompletedProcess(argv, 0,
+                        "deadbeef\trefs/heads/" + argv[-1] if argv[-1] == delivery["branch"] else "", "")
+                def show(argv, repo):
+                    key = argv[2]
+                    return ([anchor if key == "aib-anchor" else member], None)
+                errors = []
+                with patch.object(self.scan, "run_command", side_effect=command), \
+                     patch.object(self.scan, "command_json", side_effect=show):
+                    claim = self.claims(row, errors)
+                    worktree = self.scan.scan_worktrees([row["id"]], repo_root=Path("/absent/private-fixture"), errors=errors)[0]
+                    blocker = self.scan.scan_blockers([row], repo_root=Path("/absent/private-fixture"), errors=errors)[0]
+                self.assertTrue(claim["remote_branch_exists"])
+                self.assertTrue(worktree["remote_branch_exists"])
+                self.assertEqual(probes, [delivery["branch"], delivery["branch"]])
+                self.assertEqual(claim["recommendation"], "recover-package")
+                self.assertEqual(worktree["recommendation"], "recover-package" if row is anchor else "preserve-active-worktree")
+                self.assertEqual(blocker["recommendation"], "remain-in-package")
+                self.assertEqual(errors, [])
+
+    def test_unverified_member_context_never_probes_or_releases_live_custody(self):
+        from copy import deepcopy
+        from unittest.mock import patch
+        for variant in ("missing", "ambiguous", "released", "foreign-owner", "missing-member", "protected", "wrong-anchor"):
+            with self.subTest(variant=variant):
+                delivery, anchor, member = self.rows()
+                if variant == "released": delivery["state"] = "released"
+                if variant == "foreign-owner": member["assignee"] = "coordinator:other"
+                if variant == "missing-member": delivery["members"] = ["aib-anchor"]
+                if variant == "protected": delivery["branch"] = "main"
+                if variant == "wrong-anchor": delivery["anchor"] = "aib-other"
+                payload = [] if variant == "missing" else [anchor, deepcopy(anchor)] if variant == "ambiguous" else [anchor]
+                errors = []
+                with patch.object(self.scan, "command_json", return_value=(payload, None)), \
+                     patch.object(self.scan, "run_command") as command:
+                    dead = self.claims(member, errors)
+                    live = self.claims(member, errors, (member["assignee"],))
+                    worktree = self.scan.scan_worktrees([member["id"]], repo_root=Path("/absent/private-fixture"), errors=errors)[0]
+                command.assert_not_called()
+                self.assertIsNone(dead["remote_branch_exists"])
+                self.assertEqual(dead["recommendation"], "manual-triage")
+                self.assertEqual(live["recommendation"], "preserve-live-claim")
+                self.assertEqual(worktree["recommendation"], "manual-triage")
+                self.assertTrue(errors)
+
+    def test_default_and_released_exact_heads_preserve_existing_recovery_boundary(self):
+        from unittest.mock import patch
+        for state, explicit in (("active", False), ("released", False), ("released", True)):
+            with self.subTest(state=state, explicit=explicit):
+                delivery, anchor, _ = self.rows()
+                delivery["state"] = state
+                if not explicit: del delivery["branch"]
+                expected = delivery.get("branch", "agent/aib-anchor")
+                errors = []
+                with patch.object(self.scan, "command_json", return_value=([anchor], None)), \
+                     patch.object(self.scan, "run_command", return_value=subprocess.CompletedProcess([], 0, "present", "")) as command:
+                    result = self.scan.scan_worktrees([anchor["id"]], repo_root=Path("/absent/private-fixture"), errors=errors)[0]
+                self.assertEqual(command.call_args.args[0][-1], expected)
+                self.assertEqual(result["recommendation"], "recover-package" if state == "active" else "cleanup-eligible-after-verification")
+                self.assertEqual(errors, [])
+
+    def test_unknown_record_and_failed_remote_probe_remain_unknown(self):
+        from unittest.mock import patch
+        _, anchor, member = self.rows()
+        with patch.object(self.scan, "run_command", return_value=subprocess.CompletedProcess([], 1, "", "private failure")):
+            errors = []
+            result = self.claims(anchor, errors)
+        self.assertIsNone(result["remote_branch_exists"])
+        self.assertEqual(result["recommendation"], "manual-triage")
+        self.assertTrue(errors)
+        with patch.object(self.scan, "command_json", return_value=(None, "command-failed")), \
+             patch.object(self.scan, "run_command") as command:
+            errors = []
+            result = self.scan.scan_worktrees([member["id"]], repo_root=Path("/absent/private-fixture"), errors=errors)[0]
+        command.assert_not_called()
+        self.assertIsNone(result["remote_branch_exists"])
+        self.assertEqual(result["recommendation"], "manual-triage")
 
 if __name__ == "__main__":
     unittest.main()

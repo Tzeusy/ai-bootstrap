@@ -381,6 +381,8 @@ class ResolveReviewContextTests(unittest.TestCase):
                    review_dependencies: list | None = None,
                    original_id: str = "aib-abc",
                    pr_number: int = 99,
+                   head_branch: str | None = None,
+                   base_branch: str = "main",
                    show_payloads: dict[str, object] | None = None) -> None:
         review_record = {
             "id": "aib-xyz",
@@ -395,8 +397,8 @@ class ResolveReviewContextTests(unittest.TestCase):
             "isDraft": False,
             "mergeStateStatus": "CLEAN",
             "reviewDecision": None,
-            "headRefName": f"agent/{original_id}",
-            "baseRefName": "main",
+            "headRefName": head_branch or f"agent/{original_id}",
+            "baseRefName": base_branch,
             "mergedAt": None,
             "headRefOid": "abc123",
         })
@@ -644,6 +646,37 @@ sys.exit(1)
             result = run_script("resolve_review_context.py", ["--issue-id", "aib-xyz"], env=fbd.env())
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(json.loads(result.stderr)["error_code"], "noncanonical-delivery-original")
+
+    def test_accepted_retained_branch_resolves_exactly_with_package_guards(self):
+        original_id = "bu-dhloi1.15"
+        accepted = f"agent/{original_id}-vendors-20261109"
+        owner = "coordinator:owner"
+        delivery = {"schema": "beads-delivery/v1", "anchor": original_id, "members": [original_id, "bu-helper.1"], "owner": owner, "outcome": original_id, "base_branch": "main", "packet": "Current frozen packet", "branch": accepted}
+        anchor = {"id": original_id, "assignee": owner, "status": "blocked", "external_ref": "gh-pr:5644", "metadata": {"delivery": delivery}}
+        member = {"id": "bu-helper.1", "assignee": owner, "status": "blocked", "metadata": {"delivery_anchor": original_id}}
+        cases = [("accepted", {}, 0, None), ("neighbor", {"head_branch": accepted + "-neighbor"}, 1, "invalid-delivery-branch"), ("foreign-head", {"head_branch": "agent/bu-other.15"}, 1, "invalid-delivery-branch"), ("wrong-base", {"base_branch": "other"}, 1, "invalid-delivery-branch"), ("released", {}, 1, "invalid-delivery-package"), ("foreign-owner", {}, 1, "invalid-delivery-package"), ("missing-member", {}, 1, "invalid-show-response"), ("protected", {}, 1, "invalid-delivery-package"), ("ambiguous", {}, 1, "ambiguous-original-id"), ("default-strict", {}, 1, "invalid-delivery-branch")]
+        for name, options, expected_exit, error in cases:
+            with self.subTest(case=name), FakeBinDir() as fbd:
+                current_delivery = dict(delivery)
+                current_member = {**member, "metadata": dict(member["metadata"])}
+                description = f"Original implementation bead: {original_id}"
+                if name == "released": current_delivery["state"] = "released"
+                if name == "foreign-owner": current_member["assignee"] = "coordinator:foreign"
+                if name == "protected": current_delivery["branch"] = "main"
+                if name == "default-strict": current_delivery.pop("branch")
+                if name == "ambiguous": description += "\nOriginal implementation bead: bu-other.15"
+                current_anchor = {**anchor, "metadata": {"delivery": current_delivery}}
+                payloads = {original_id: [current_anchor], member["id"]: [] if name == "missing-member" else [current_member]}
+                self._make_bins(fbd, description=description, original_id=original_id, pr_number=5644, show_payloads=payloads, **{"head_branch": accepted, **options})
+                result = run_script("resolve_review_context.py", ["--issue-id", "aib-xyz"], env=fbd.env())
+                self.assertEqual(result.returncode, expected_exit, result.stdout + result.stderr)
+                if error:
+                    self.assertEqual(json.loads(result.stderr)["error_code"], error)
+                else:
+                    result = json.loads(result.stdout)
+                    self.assertEqual(result["head_branch"], accepted)
+                    self.assertEqual(result["original_id"], original_id)
+                    self.assertEqual(result["delivery_members"], delivery["members"])
 
     def test_repeated_original_marker_candidates_fail_as_ambiguous(self) -> None:
         description = (

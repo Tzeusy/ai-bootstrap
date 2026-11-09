@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
-from delivery_package import load_delivery, validate_results
+from delivery_package import delivery_branch, load_delivery, validate_results
 
 
 VALID_STATUSES = {
@@ -104,10 +104,6 @@ def parse_quality_gates(raw_gates: list[str]) -> dict[str, str]:
 
 def validate_args(args: argparse.Namespace, blockers: list[object]) -> None:
     expected_branch = f"agent/{args.issue_id}"
-    if args.branch is None:
-        args.branch = expected_branch
-    if args.branch != expected_branch and args.status != "invalid-runtime-context":
-        raise ValueError("Branch must match the delivery anchor")
     args.delivery = None
     args.member_results = None
     args.delivery_error = None
@@ -130,6 +126,13 @@ def validate_args(args: argparse.Namespace, blockers: list[object]) -> None:
                 args.member_results = validate_results(args.delivery, json.loads(args.member_results_json))
     elif args.member_results_json is not None:
         raise ValueError("member-results-json requires delivery-file")
+
+    if args.delivery is not None:
+        expected_branch = delivery_branch(args.delivery)
+    if args.branch is None:
+        args.branch = expected_branch
+    if args.branch != expected_branch and args.status != "invalid-runtime-context":
+        raise ValueError("Branch must match the accepted delivery branch")
 
     if args.recovery_state not in VALID_RECOVERY_STATES:
         raise ValueError(
