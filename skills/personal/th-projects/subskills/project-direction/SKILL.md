@@ -189,7 +189,7 @@ branch, PR, and review cycle while retaining member acceptance.
    closed beads, active PRs, and the proposed graph. Propose cohesive packages
    among existing beads or serialize shared decisions; keep independent rollback
    paths separate. Do not split into sub-epics to satisfy child-count targets.
-3. Populate every implementation bead's **Dispatch Readiness Packet** in its
+3. Populate every implementation bead's **Current Operative Packet** in its
    structured description/design/acceptance fields, using concise current
    instructions and exact authority/history references. Approved direction,
    adopted behavior, packet-complete scope, and runnable-now are distinct;

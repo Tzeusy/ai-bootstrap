@@ -308,16 +308,16 @@ if require_file "$WORK_ALLOCATION" \
     "references/work-allocation.md exists"; then
   check_pattern "$WORK_ALLOCATION" 'one bead.*cohesive.*independently verifiable outcome' \
     "work allocation: one cohesive outcome per bead"
-  check_pattern "$WORK_ALLOCATION" 'overhead|amortiz' \
-    "work allocation: agent overhead affects granularity"
-  check_pattern "$WORK_ALLOCATION" '^## Dispatch Readiness Packet' \
-    "work allocation: structured dispatch packet exists"
-  check_pattern "$WORK_ALLOCATION" 'cohesion.*two or more|two or more.*cohesion' \
-    "work allocation: cohesion threshold is explicit"
+  check_pattern "$WORK_ALLOCATION" 'Tracking and delivery granularity can differ' \
+    "work allocation: tracking and delivery granularity are distinct"
+  check_pattern "$WORK_ALLOCATION" '^## Current Operative Packet' \
+    "work allocation: structured operative packet exists"
+  check_pattern "$WORK_ALLOCATION" 'alone do not establish cohesion' \
+    "work allocation: cohesion needs a shared surface, not a shared name"
   check_pattern "$WORK_ALLOCATION" 'representation.*propagation.*enforcement' \
     "work allocation: additive contract rollout is explicit"
-  check_pattern "$WORK_ALLOCATION" 'two-correction checkpoint' \
-    "work allocation: repeated correction checkpoint exists"
+  check_pattern "$WORK_ALLOCATION" 'Repeated substantive corrections' \
+    "work allocation: repeated corrections refresh the behavior matrix"
 fi
 check_pattern "$DIRECTION_SKILL" 'references/work-allocation.md' \
   "project-direction: allocation contract is progressively discoverable"

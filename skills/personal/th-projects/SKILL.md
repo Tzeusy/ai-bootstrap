@@ -162,8 +162,8 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   governing gate and record it durably.
 - Work graphs follow
   [`references/work-allocation.md`](references/work-allocation.md): one bead and
-  primary agent per cohesive independently verifiable outcome, with enough work
-  to amortize context/worktree/CI/review overhead and no overlapping ownership.
+  primary agent per cohesive independently verifiable outcome, related beads
+  sharing one delivery package where cohesive, and no overlapping ownership.
 - **Cache-first orchestration.** Plan and run work as a few long-lived,
   cache-warm sessions that ride autocompaction, not as many fresh subagents.
   A subagent here is justified by independence (adversarial or fresh-context
