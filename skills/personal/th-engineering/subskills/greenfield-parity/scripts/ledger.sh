@@ -13,9 +13,9 @@ command -v bd >/dev/null || { echo "ledger.sh: bd CLI not found; cannot build le
 command -v jq >/dev/null || { echo "ledger.sh: jq not found" >&2; exit 2; }
 cd "$root"
 echo "## Open / in-progress"
-bd list --json | jq -r '.[] | select(.status != "closed") | "\(.id) \(.status) [\((.labels // []) | join(","))] \(.title)"'
+bd list --json --limit 0 | jq -r '.[] | select(.status != "closed") | "\(.id) \(.status) [\((.labels // []) | join(","))] \(.title)"'
 echo; echo "## Recently closed (last $limit)"
-bd list --status closed --json | jq -r '.[] | "\(.id) \(.closed_at // "") \(.title)"' | sort -k2 -r | head -n "$limit"
+bd list --status closed --sort closed --limit "$limit" --json | jq -r '.[] | "\(.id) \(.closed_at // "") \(.title)"'
 echo; echo "## Audit-keyed beads"
 bd search "Audit-key: greenfield:" 2>/dev/null | sed '/^No issues/d' || true
 echo; echo "## Prior review packets"
@@ -26,9 +26,22 @@ last="$(ls docs/reviews/*greenfield-delta.md 2>/dev/null | sort | tail -1 || tru
 echo; echo "## Prior owner questionnaires (packets + answers)"
 qroot="${QUESTIONNAIRE_STATE_ROOT:-$HOME/.tmp/user-questionnaire}"
 repo="$(basename "$(pwd -P)")"
+# questionnaire_web.py keeps answers in <qroot>/<packet stem>-<sha1(abs packet path)[:8]>/,
+# not beside the packet; derive that state dir the same way.
 found=0
-for d in "$qroot"/*"$repo"*greenfield*/ "$qroot"/*"$repo"*greenfield*; do
-  [ -e "$d" ] || continue; found=1
-  echo "$d"; [ -f "$d/answers.json" ] && jq -r '"  completed: \(.completed_at // "no") apply_now: \(.apply_now) answered: \(.items | length)"' "$d/answers.json"
+for d in "$qroot"/*"$repo"*greenfield*/; do
+  [ -d "$d" ] || continue; found=1
+  echo "${d%/}"
+  for packet in "$d"*.md; do
+    [ -f "$packet" ] || continue
+    abs="$(realpath "$packet")"; stem="$(basename "$abs" .md)"
+    digest="$(printf '%s' "$abs" | sha1sum | cut -c1-8)"
+    answers="$qroot/$stem-$digest/answers.json"
+    if [ -f "$answers" ]; then
+      jq -r --arg p "$(basename "$packet")" '"  \($p): completed: \(.completed_at // "no") apply_now: \(.apply_now) answered: \(.items | length)"' "$answers"
+    else
+      echo "  $(basename "$packet"): no answers recorded"
+    fi
+  done
 done
 [ "$found" = 1 ] || echo "(none)"
