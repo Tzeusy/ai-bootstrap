@@ -101,7 +101,7 @@ owner authorization remain binding. No live fleets are restarted by updating ski
 
 Related personal workflow skills include:
 
-- `th-projects` — superskill routing to `project-shape` (doctrine/spec/topology setup), `project-feature-request` (feature request → spec delta), `project-review` (repo audits + spec reconciliation), and `project-direction` (spec-driven prioritization)
+- `th-projects` — superskill routing to `project-shape` (doctrine/spec/topology setup), `project-feature-request` (feature request → spec delta), `project-review` (repo health audits), `spec-concretization` (bidirectional spec↔code reconciliation), and `project-direction` (spec-driven prioritization)
 - `about/craft-and-care/` for this repository's own execution-quality bar (in-repo sessions are routed there by `CLAUDE.md`/`AGENTS.md`)
 
 ## Quick Start

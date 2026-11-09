@@ -1,0 +1,14 @@
+[
+ {"id": "fx-1", "status": "closed", "issue_type": "task", "title": "Validate config at startup", "design": "Requirements: REQ-core-config-001", "closed_at": "2026-09-01T00:00:00Z"},
+ {"id": "fx-2", "status": "open", "issue_type": "task", "title": "Implement hot reload", "design": "Audit-key: spec:missing:core-config\nRequirements: REQ-core-config-003", "notes": "2026-10-01 spec-concretization @abc1234def: covers REQ-core-config-003", "labels": ["config"]},
+ {"id": "fx-3", "status": "in_progress", "issue_type": "task", "assignee": "someone", "title": "Env var expansion", "description": "Implements REQ-core-config-009 from the old draft"},
+ {"id": "fx-4", "status": "open", "issue_type": "task", "title": "Tidy config loader", "spec_id": "openspec/specs/core-config/spec.md"},
+ {"id": "fx-5", "status": "blocked", "issue_type": "task", "title": "Unrelated docs pass", "description": "see REQ-core-config-0011 elsewhere"},
+ {"id": "fx-6", "status": "closed", "issue_type": "task", "title": "Old cleanup", "closed_at": "2026-10-02T00:00:00Z"},
+ {"id": "fx-7", "status": "pinned", "issue_type": "task", "title": "Report all invalid fields", "design": "Requirements: REQ_CORE_CONFIG_004"},
+ {"id": "fx-8", "status": "open", "issue_type": "task", "title": "Error aggregation rewrite", "design": "Requirements: REQ-core-config-004"},
+ {"id": "fx-9", "status": "open", "issue_type": "epic", "title": "Config epic", "design": "Requirements: REQ-core-config-001"},
+ {"id": "fx-10", "status": "open", "issue_type": "task", "title": "Config closeout", "design": "Audit-key: spec:closeout:core-config\nVerifies: REQ-core-config-003"},
+ {"id": "fx-11", "status": "open", "issue_type": "task", "title": "Foreign tree work", "spec_id": "projects/foo/openspec/specs/core-config/spec.md"},
+ {"id": "fx-12", "status": "open", "issue_type": "task", "title": "Reload plumbing", "spec_id": "openspec/changes/add-reload"}
+]

@@ -1,0 +1,3 @@
+- [x] 1.1 Parse SIGHUP
+- [ ] 1.2 Reload without dropping connections
+- [ ] 1.3 Cite REQ-core-config-003 in a test

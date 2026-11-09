@@ -20,7 +20,8 @@ The user is now asking for a corrective action plan.
 
 **Rationale**: Drift is already confirmed; the ask is for action, not audit.
 `project-direction` SKILL.md under "Adapting to Focus":
-> **Spec-drift check** ("does code match spec?"): Phase 2 emphasizes B + C + D;
+> **Spec-drift check** (already-confirmed drift, e.g. from a review or
+> spec-concretization packet; …): Phase 2 emphasizes B + C + D;
 > produce a corrective changeset (change-tier) **only for confirmed drift the
 > user wants fixed**.
 
