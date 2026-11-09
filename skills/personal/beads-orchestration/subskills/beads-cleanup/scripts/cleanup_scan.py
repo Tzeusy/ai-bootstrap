@@ -30,7 +30,7 @@ from review_relation_graph import normalized_finding_relation_error  # noqa: E40
 PACKAGE_SCRIPTS = Path(__file__).resolve().parents[3] / "scripts"
 if str(PACKAGE_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(PACKAGE_SCRIPTS))
-from delivery_package import metadata as bead_metadata, validate_delivery  # noqa: E402
+from delivery_package import delivery_branch, package_index, metadata as bead_metadata, validate_delivery  # noqa: E402
 
 
 SCHEMA = "beads-cleanup-scan/v1"
@@ -220,8 +220,8 @@ def heartbeat_state(record: dict[str, Any], now: datetime) -> str:
     return "stale" if now - timestamp >= STALL_THRESHOLD else "fresh"
 
 
-def remote_branch_exists(issue_id: str, repo_root: Path) -> tuple[bool | None, str | None]:
-    result = run_command(["git", "ls-remote", "--heads", "origin", f"agent/{issue_id}"], repo_root)
+def remote_branch_exists(branch: str, repo_root: Path) -> tuple[bool | None, str | None]:
+    result = run_command(["git", "ls-remote", "--heads", "origin", branch], repo_root)
     if result is None or result.returncode != 0:
         return None, failure_code(result)
     return bool(result.stdout.strip()), None
@@ -870,6 +870,34 @@ def delivery_anchor(record: dict[str, Any]) -> str | None:
     return pointer
 
 
+
+def record_remote_branch(record: dict[str, Any] | None, repo_root: Path) -> tuple[bool | None, str | None]:
+    """Probe only a validated record's exact head; unresolved packages stay unknown."""
+    if record is None or record_id(record) is None:
+        return None, "invalid-record"
+    try:
+        anchor = delivery_anchor(record)
+        raw = bead_metadata(record).get("delivery")
+        if anchor and raw is None:
+            payload, error = command_json(["bd", "show", anchor, "--json"], repo_root)
+            if error:
+                return None, error
+            anchor_record, error = requested_record(payload, anchor)
+            if error or anchor_record is None:
+                return None, error or "invalid-record"
+            # The pointer alone is not authority for a foreign or released package.
+            package_index([record, anchor_record])
+            raw = bead_metadata(anchor_record).get("delivery")
+            if raw is None:
+                return None, "unresolved-delivery-pointer"
+        elif anchor:
+            package_index([record])
+        branch = delivery_branch(validate_delivery(raw)) if raw is not None else f"agent/{record_id(record)}"
+    except (ValueError, TypeError):
+        return None, "invalid-delivery-context"
+    return remote_branch_exists(branch, repo_root)
+
+
 def scan_claims(
     records: list[dict[str, Any]] | None,
     *,
@@ -898,7 +926,7 @@ def scan_claims(
             ambiguous_worktree_ids=ambiguous_worktree_ids,
         )
         exists = ambiguous or (anchor or issue_id) in worktree_names or (worktree is not None and worktree.is_dir())
-        branch, branch_error = remote_branch_exists(anchor or issue_id, repo_root)
+        branch, branch_error = record_remote_branch(record, repo_root)
         if ambiguous:
             unpublished, unpublished_error = None, "ambiguous-worktree"
         else:
@@ -1059,7 +1087,7 @@ def scan_worktrees(
             report_error(errors, evidence_error or "invalid-bead-status", "worktrees")
         worktree = repo_root / ".worktrees" / "parallel-agents" / worktree_id
         exists = worktree.is_dir()
-        branch, branch_error = remote_branch_exists(issue_id, repo_root)
+        branch, branch_error = record_remote_branch(record, repo_root)
         unpublished, unpublished_error = unpublished_work(worktree, repo_root) if exists else (None, None)
         if branch_error:
             report_error(errors, branch_error, "worktrees")

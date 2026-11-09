@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
-from delivery_package import load_delivery, validate_results
+from delivery_package import delivery_branch, load_delivery, validate_results
 
 
 def git_worktree_identity(path: str) -> tuple[str, str, str] | None:
@@ -75,6 +75,8 @@ def main() -> int:
     if args.delivery_file:
         try:
             delivery = load_delivery(args.delivery_file)
+            if not args.review_id:
+                expected_branch = delivery_branch(delivery)
             if delivery["anchor"] != args.issue_id or delivery.get("state", "active") != "active":
                 reasons.append("delivery-anchor-or-state-mismatch")
             if args.review_id:

@@ -27,7 +27,8 @@ Resolve `ASSERT_WORKER_CONTEXT` from the absolute path of the loaded
    - the helper's actual process cwd equals `CURRENT_PATH`
    - `CURRENT_PATH == WORKTREE_PATH`
    - `CURRENT_PATH != REPO_ROOT`
-   - the helper-derived actual branch equals `agent/${ISSUE_ID}`
+   - the helper-derived actual branch equals the validated manifest branch,
+     or exactly `agent/${ISSUE_ID}` when none is declared
    - the branch is not `main` or `master`
    - `WORKTREE_PATH` and `REPO_ROOT` are Git worktree roots with the same
      canonical common Git directory
@@ -44,7 +45,8 @@ If validation fails, stop immediately and report `invalid-runtime-context`.
 For a cohesive multi-bead assignment, pass `--delivery-file "$DELIVERY_FILE"`
 to the assertion. The file is the current `beads-delivery/v1` manifest from
 the canonical anchor metadata, not a list inferred from branch names.
-`ISSUE_ID` is its anchor; the branch stays `agent/<anchor>` and all member
+`ISSUE_ID` is its anchor; the branch is its validated exact `branch` or the
+strict `agent/<anchor>` default, and all member
 claims belong to its recorded owner. Bootstrap rejects a mismatched anchor
 or inactive manifest. Claim and recovery semantics live in
 [`delivery_package.py`](../../../scripts/delivery_package.py).

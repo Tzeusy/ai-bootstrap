@@ -75,6 +75,17 @@ IDs; PR description maps member acceptance and remaining work. Keep commits
 logically reviewable and bisectable; use fixups only when repository policy allows.
 A persistent owner can deliver several such packages to main without being replaced.
 
+An explicitly accepted nondefault head is recorded as optional `branch` in the
+anchor's typed `metadata.delivery`. Absence means exactly `agent/<anchor>`;
+there is no suffix inference. Claim output, implementation bootstrap/report and
+review resolution use that same exact literal branch. It must be a valid branch
+name, distinct from protected/integration bases and `review/` snapshots. The
+existing owner/controller records or reconciles it under ordinary custody and
+canonical PR association checks; a worker argument cannot override it. An
+existing active package is not released, renamed or stripped of metadata merely
+to pass a helper. Base, active membership, ownership and review isolation checks
+remain binding.
+
 A **bounded milestone integration branch** is useful when an intermediate state
 cannot safely land, or tightly coupled changes otherwise repeat fixed queue/review
 cost. It is a package, not a default branch per weeks-long epic. Record its base,
@@ -246,3 +257,55 @@ state before editing. Registry expiry alone never proves local work is disposabl
 When a session dies, recover package claims together under existing guarded dead-owner
 rules, preserve pushed branches and quarantine unpublished work. Never delete a
 worktree merely because a PR opened or a member left `in_progress`.
+
+
+### Cleanup evidence and existing active journals
+
+Cleanup probes the exact validated accepted head for both anchor and member
+worktrees. A member pointer requires a singleton exact anchor read, active
+membership, and the same owner for nonclosed records; missing/conflicting/released evidence stays
+unknown/manual-triage rather than silently substituting `agent/<id>`. Fresh
+heartbeats and live foreign coordinator claims remain preserved. Active package
+blockers continue to recommend remaining in the package.
+
+For an already active package, the controller uses the existing helper's
+`reconcile-branch` command under ordinary repository custody. Supply the exact
+current delivery file with only `branch` added, the existing journal and repository
+root, `--worktree`, `--pr-number` and `--expected-head`. The command reads actual
+Git root/common-directory/clean tracked source/branch/head and current same-repo
+OPEN PR head/base plus the anchor's canonical PR reference. It rejects arbitrary
+owner/member/base/packet/outcome changes, released packages, holds, foreign claims,
+wrong pointers and an already divergent anchor. It does not claim, release, change
+status or grant dispatch authority.
+
+The journal's old identity and claim history are preserved in a versioned
+`branch_reconciliation` entry. Durable phases are `prepared`, `tracker-written`,
+and `complete`; a lost tracker acknowledgement resumes only if exact old or target
+identity is observed, and a recorded tracker write cannot regress to old metadata.
+Resume the same command with identical parameters after interruption. Journal
+consumers serialize on a nonblocking sidecar lock; repository custody additionally
+excludes same-owner writers across journals and tools. Tracker writes retain owner
+and observed-status guards and are re-read before journal completion. This is a
+bounded recovery protocol, not a cross-store atomic transaction or lease on future
+PR state. Changed binding/ownership or malformed phases block for reconciliation.
+Never hand-edit phases, release/reclaim, or infer success from an interrupted call.
+
+Release refuses an incomplete amendment or a journal/anchor delivery mismatch
+before any mutation, so a stale journal cannot erase an accepted branch. Both
+resume and release validate the complete versioned history: original branch-free
+identity, branch-only target, preserved acquisition set/records, and a typed
+binding coherent with the journal repository, accepted branch and base. Release
+uses that historical binding without querying the old PR or requiring it to stay
+open; current member ownership and tracker delivery checks still apply. The
+completed amendment keeps its original `from` identity and `before` claim history;
+subsequent ordinary release records the amended identity. Existing recovery of an
+incomplete claim remains separate. A valid branch amendment is not live global
+admission, current CI, owner approval, or delivery of the target package.
+
+Package readiness reads nested `bd show` dependency rows (`dependency_type`, target
+`id`) and the supported legacy edge shape (`type`, source `issue_id`, target
+`depends_on_id`). Mixed rows must agree. Missing/malformed/conflicting types,
+sources or targets fail closed. External blockers are re-read and must be closed;
+acyclic internal edges remain internal, and cycles refuse. The same checks run
+after each atomic claim: a gate reopening compensates new claims while preserving
+prior ownership. Metadata reconciliation does not bypass those acquisition gates.
