@@ -26,11 +26,19 @@ Not defined here:
   archive, and divergence resolution patterns:
   [`../subskills/project-shape/references/pillar-spec-and-spine.md`](../subskills/project-shape/references/pillar-spec-and-spine.md).
 
+## Sign-off marker
+
+A change is signed when its `proposal.md` carries one line
+`Sign-off: <identity> <YYYY-MM-DD>`, written when the owner approves the
+delta (feature-request's Approved handoff; direction Phase 2 sign-off). Only
+a signed change governs implementation and overrides main specs; agents
+record the owner's approval, they never sign.
+
 ## Two File Kinds — Never Mix Their Headings
 
 | Kind | Location | H2 headings | Written when |
 |------|----------|-------------|--------------|
-| **Main spec** | `openspec/specs/{spec-name}/spec.md` | `## Purpose`, `## Requirements`, optional final `## Source References` | Bookkeeping observed behavior (reconciliation R4); `openspec archive` syncing a finished change |
+| **Main spec** | `openspec/specs/{spec-name}/spec.md` | `## Purpose`, `## Requirements`, optional final `## Source References` | Bookkeeping observed behavior that serves cited doctrine (spec-concretization flow A, feature-request amendment); `openspec archive` syncing a finished change |
 | **Delta spec** | `openspec/changes/{change}/specs/{spec-name}/spec.md` | `## ADDED Requirements`, `## MODIFIED Requirements`, `## REMOVED Requirements`, `## RENAMED Requirements`; initial `## Purpose` only for a genuinely new capability, final `## Source References` when required by repository | Proposing future behavior (feature funnel Gate 5, direction Phase 2) |
 
 Authoritative routing rule:

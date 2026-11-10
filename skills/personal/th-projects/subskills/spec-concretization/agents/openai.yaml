@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spec Concretization"
+  short_description: "Reconcile specs and code both ways: vision-gated specs for undocumented behavior, a backlog-deduplicated plan for unbuilt requirements"
+  default_prompt: "Run a full spec-concretization pass: build the ledger, classify every requirement and observable behavior, draft and vision-gate specs for code-ahead behavior, reconcile spec-ahead requirements against the existing backlog, plan all remaining work, and close out with a convergence record."

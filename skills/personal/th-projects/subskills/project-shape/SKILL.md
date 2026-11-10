@@ -150,7 +150,7 @@ For an existing project, assess cross-pillar coherence and keep docs current.
 4. **Cross-check** — cross-pillar review if changes affect multiple pillars.
 5. **Present** — show diff + review summary before committing.
 
-**Related:** [`../project-direction/SKILL.md`](../project-direction/SKILL.md) for full direction analysis with priority-weighted plans; [`../project-review/SKILL.md`](../project-review/SKILL.md) (spec-reconciliation mode) for detailed spec-code divergence; [`../project-feature-request/SKILL.md`](../project-feature-request/SKILL.md) for a single idea through the funnel.
+**Related:** [`../project-direction/SKILL.md`](../project-direction/SKILL.md) for full direction analysis with priority-weighted plans; [`../spec-concretization/SKILL.md`](../spec-concretization/SKILL.md) for exhaustive spec↔code reconciliation; [`../project-feature-request/SKILL.md`](../project-feature-request/SKILL.md) for a single idea through the funnel.
 
 ## Workflow 4: Generate Project Overview
 

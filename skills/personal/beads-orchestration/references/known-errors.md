@@ -402,6 +402,22 @@ an explicit method) reappears in other scripts.
   Server history is not mirrored, only its current state.
 - Observed: 2026-07-19 (1.0.4), 2026-10-21 (1.3.1), aib repo.
 
+## Mirror push rejected: workspace behind origin `refs/dolt/data`
+
+- **Symptom (bd 1.3.1)**: `scripts/beads-mirror-push.sh` fails at step 5 with
+  `push to origin/main: ... ! [rejected] main -> main (non-fast-forward)`;
+  `bd dolt pull` inside `~/.tmp/beads-mirror/<db>` then aborts with `merge
+  conflicts in issues require operator resolution`.
+- **Cause**: another machine or session mirrored since this workspace was
+  last bootstrapped; the workspace is only a cache of origin's ref, and its
+  stale history conflicts with the newer one.
+- **Fix (2026-11-09)**: the server is the source of truth, so rebuild the
+  cache: `mv ~/.tmp/beads-mirror/<db> ~/.tmp/beads-mirror/<db>.stale-<date>`
+  and rerun the script — it re-clones, bootstraps from origin's current ref,
+  imports the server state, and fast-forwards (`refs/dolt/data: <old> ->
+  <new>`). Delete the moved-aside copy once the push is confirmed.
+- Observed: 2026-11-09, bd 1.3.1, aib repo.
+
 ## Bootstrapped database from an older `refs/dolt/data` needs schema migrations
 
 - **Symptom**: after `bd bootstrap --yes` of a ref written by an older bd,

@@ -19,6 +19,7 @@ Decide what a project works on next. Ground every decision in specs, repo eviden
 Do not use when:
 - One concrete new feature, idea → spec → `../project-feature-request/SKILL.md`.
 - Score repo health / confirm findings → `../project-review/SKILL.md` (hands its packet here).
+- Exhaustive spec↔code reconciliation, or "does code match spec?" before any drift is confirmed → `../spec-concretization/SKILL.md`.
 - Backlog mechanics only, no direction analysis → `/beads-orchestration` (beads-writer).
 - Recurring orchestrated pursuit loop (lane-sequenced surface audits + ideation at
   scale + gated work plan) → `../relentless-vision-pursuit/SKILL.md`;
@@ -62,7 +63,7 @@ value changes the plan; otherwise state the assumption and proceed:
 | Maturity | prototype, beta, production, mission-critical | Infer |
 | Spec location | openspec/, spec/, docs/design/, or none | Infer from scan |
 | Focus | full direction, launch gate, feature evaluation, spec-drift check, work decomposition | Full |
-| Inputs on hand | project-review packet, feature-request spec delta, cold start | Cold start |
+| Inputs on hand | project-review packet, feature-request spec delta, spec-concretization report, cold start | Cold start |
 
 Then check for upstream inputs — they change how much of each phase runs (Receiver Protocol below).
 
@@ -83,6 +84,12 @@ did doctrine, topology, design, spec work — do not re-run while its recorded
 doctrine/spec commit still matches. If the baseline changed, revalidate only the
 affected mandates. Phase 2 narrows to integrating the delta; Phase 3 sequences
 it against existing work.
+
+**From `../spec-concretization/` (run report).** Read the newest
+`docs/reviews/*-spec-concretization.md`; fresh = its `Concretized:` SHA
+matches HEAD. Its Escalations section is the input: architecture/trust/
+migration gaps enter Phase 2 as design work; sequencing questions arrive with
+their beads already filed — Phase 3 orders them, it does not re-create them.
 
 **Cold start.** No packet, no delta → run phases as written.
 
@@ -167,7 +174,9 @@ Acceptance: spec intent, implemented spine, gap analysis coherent and actionable
 ### Phase 3: Beads Generation (Planning Graph Only)
 
 Call `/beads-orchestration` (beads-writer) to build a full acyclic dependency
-graph from the approved changeset. Load
+graph from the approved changeset — approval recorded as the
+`Sign-off: <identity> <date>` line in its `proposal.md`
+([spec-format § Sign-off marker](../../references/spec-format.md#sign-off-marker)). Load
 [`references/work-allocation.md`](../../references/work-allocation.md) before
 decomposing: preserve one finite accepted owner outcome and distinguish tracking
 from coherent delivery packages. Existing related beads may share one owner,
@@ -180,7 +189,7 @@ branch, PR, and review cycle while retaining member acceptance.
    closed beads, active PRs, and the proposed graph. Propose cohesive packages
    among existing beads or serialize shared decisions; keep independent rollback
    paths separate. Do not split into sub-epics to satisfy child-count targets.
-3. Populate every implementation bead's **Dispatch Readiness Packet** in its
+3. Populate every implementation bead's **Current Operative Packet** in its
    structured description/design/acceptance fields, using concise current
    instructions and exact authority/history references. Approved direction,
    adopted behavior, packet-complete scope, and runnable-now are distinct;
@@ -227,7 +236,7 @@ Focus modes change which phases do real work and which tier applies — the phas
 - **Milestone synthesis** (vision-generative: "what next" with no proposals on hand, or a milestone just closed): doctrine *produces* the candidates instead of judging proposed ones — mandate coverage matrix, ideas-ledger unparking, ranked milestone brief; user selects before anything enters Phases 2-3. Read [`references/milestone-synthesis.md`](references/milestone-synthesis.md).
 - **Ideation** (vision-generative, divergent: "brainstorm what we could build", "what features would fit this project"): milestone synthesis's divergent twin — doctrine *grounds* new candidates instead of gating proposed ones. Mandate citation relaxes to a fit trace; candidates classed mandate-grounded vs vision-extending; user triages the brief (pursue → feature-request funnel, park → ledger, discard). No Phases 2-3 from this mode — pursued candidates re-enter via the funnel. Read [`references/ideation.md`](references/ideation.md).
 - **Feature evaluation** ("should we build X?"): a *new, single* request routes to `../project-feature-request/SKILL.md` (its funnel returns a spec delta here). Run this mode only for portfolio questions (X vs competing priorities): Phase 1 verify-tier doctrine check on X, Phase 2 narrowed to the 8-dimension evaluation in `references/alignment-review.md`, Phase 3 only if X is approved. No commits unless specs changed.
-- **Spec-drift check** ("does code match spec?"): Phase 1 verify-tier (doctrine consumed). Phase 2 emphasizes B + C + D; produce a corrective changeset (change-tier) only for confirmed drift the user wants fixed — else deliver the drift inventory read-only. Phase 3 only when a changeset was produced.
+- **Spec-drift check** (already-confirmed drift, e.g. from a review or spec-concretization packet; the inventory itself is `../spec-concretization/`): Phase 1 verify-tier (doctrine consumed). Phase 2 emphasizes B + C + D; produce a corrective changeset (change-tier) only for confirmed drift the user wants fixed — else deliver the drift inventory read-only. Phase 3 only when a changeset was produced.
 - **Work decomposition** ("break this down"): assumes an approved spec. Phase 1 skipped unless the spec lacks a doctrine link. Phase 2 = one verify-tier pass confirming implementability. Phase 3 is the primary artifact (mechanical validations + verify-tier pass).
 
 ## Edge Cases

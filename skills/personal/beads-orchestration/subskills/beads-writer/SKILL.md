@@ -28,7 +28,7 @@ Write a concise current packet grounded in the proportional governing contract f
 
 - The work already exists as a well-formed bead and should now be implemented: use `beads-worker`
 - The task is to review a whole repository or generate a roadmap from audit findings: use `th-projects` (project-review or project-direction subskills)
-- The task is exhaustive spec-versus-code reconciliation rather than issue writing: use `th-projects` (project-review spec-reconciliation mode)
+- The task is exhaustive spec-versus-code reconciliation rather than issue writing: use `th-projects` (spec-concretization subskill)
 
 ## Core Rules
 
