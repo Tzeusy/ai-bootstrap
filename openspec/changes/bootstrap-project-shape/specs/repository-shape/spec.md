@@ -27,6 +27,16 @@ Scope: v1-mandatory
 - **WHEN** a mirrored skill name is flattened by basename in a tool-specific skills directory
 - **THEN** provenance and ownership are still determined from the source directory under `skills/`
 
+#### Scenario: Explicit external product capability
+
+- **WHEN** a user opts into the HUD installation
+- **THEN** only `th-hud-publish` and `hud-projection` additionally reference
+  the selected tze-hud main checkout, their ownership is reported as
+  `external`, and their authoritative manuals/adapter remain in that product
+  rather than being copied into this repository
+- **AND** the local source selection and pairing material remain untracked;
+  ordinary installation without that selection retains the shared catalog
+
 ### Requirement: Provenance Visibility
 
 The repository MUST preserve visible provenance for shared skills so contributors can distinguish locally authored workflow logic from upstream-derived material and intentional forks.

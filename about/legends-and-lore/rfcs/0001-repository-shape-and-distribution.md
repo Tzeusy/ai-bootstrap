@@ -53,6 +53,14 @@ project-shape pillar or part of its shared-skill distribution flow:
 - The repository is designed to be cloned or vendored as a submodule into a local machine.
 - Tool-specific roots are then symlinked or copied into home-directory config locations.
 - Shared skills may be copied or symlinked into tool-specific skill directories, but their authored source remains under `skills/`.
+- Explicit local opt-in may additionally link externally owned product
+  capabilities. The HUD installer selects only `th-hud-publish` and
+  `hud-projection` from a tze-hud main checkout, records that source in ignored
+  `.tze-hud-repo`, and reuses the normal direct-link/shallow-wrapper generator.
+  Manifests identify these entries as `external`; their manuals and adapter
+  remain authoritative in tze-hud, with no copied workflow or credentials.
+  This does not enable automatic discovery of external repositories or
+  repository-navigation skills in global catalogs.
 - In practice, local installation may pass through in-repo mirror surfaces such as `.claude/skills` or directly into home-directory skill paths; neither mirror layer supersedes the source tree.
 - Repository-shape navigation is repo-scoped: the tool skill surfaces
   (`.claude/skills`, `.codex/skills`, `.gemini/skills`) double as the user's

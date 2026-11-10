@@ -46,3 +46,9 @@ flowchart TD
 - `projects/` makes product offerings discoverable without turning them into a
   root pillar, shared skill, tool facade, or installation dependency.
 - Generated or vendored outputs may sit under a skill or tool facade, but only with a documented regeneration path.
+- An explicit `scripts/install-tze-hud.sh` installation additionally exposes
+  two externally owned HUD capabilities from the selected tze-hud main
+  checkout. They are direct links/shallow wrappers, not authored or vendored
+  ai-bootstrap skills. Ignored `.tze-hud-repo` selects their source; catalog
+  manifests report `external` ownership. The product retains its manuals,
+  adapter, pairing and runtime authority. See the root README for installation.

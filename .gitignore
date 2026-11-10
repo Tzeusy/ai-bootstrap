@@ -114,3 +114,7 @@ scratch/
 .worktrees/parallel-agents/aib-wfl/
 .worktrees/parallel-agents/aib-52g/
 .worktrees/parallel-agents/aib-5jq/
+
+# Optional product-owned HUD skill source (local checkout path only).
+/.tze-hud-repo
+/.tze-hud-repo.*
