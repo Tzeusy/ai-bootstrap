@@ -86,12 +86,32 @@ class UsageCollectorTests(unittest.TestCase):
     def test_restart_reuses_offsets_and_unchanged_polls_do_not_rewrite_cache(self):
         """Spec: REQ-progress-dashboard-003."""
         self.write(codex())
-        self.poll()
+        empty = telemetry._empty
+
+        def append_after_stat(source, identity):
+            self.write(codex(150, 60, 15), mode="a")
+            return empty(source, identity)
+
+        with mock.patch.object(telemetry, "_empty", side_effect=append_after_stat):
+            self.assertEqual(self.poll()["totals"]["total_tokens"], 105)
+        cache = json.loads(self.collector.cache_path.read_text())
+        entry = cache["sources"]["parent"]
+        self.assertEqual(entry["offset"], entry["size_seen"])
+        self.assertLess(entry["offset"], self.log.stat().st_size)
+        self.assertEqual(self.poll()["totals"]["total_tokens"], 165)
+        # Older collectors could consume an append after fstat and persist
+        # offset > size_seen. That valid legacy cache must resume without replay.
+        cache = json.loads(self.collector.cache_path.read_text())
+        cache["sources"]["parent"]["size_seen"] -= 1
+        self.collector.cache_path.write_text(json.dumps(cache))
+        with mock.patch.object(telemetry, "_consume", wraps=telemetry._consume) as consume:
+            self.assertEqual(self.poll()["totals"]["total_tokens"], 165)
+        self.assertEqual(consume.call_args.args[1], b"")
         collector = telemetry.UsageCollector(self.workspace)
         with mock.patch.object(telemetry, "_consume", wraps=telemetry._consume) as consume, \
                 mock.patch.object(collector, "_save", wraps=collector._save) as save:
             result = collector.poll([self.source])
-        self.assertEqual(result["totals"]["total_tokens"], 105)
+        self.assertEqual(result["totals"]["total_tokens"], 165)
         self.assertEqual(consume.call_args.args[1], b"")
         save.assert_not_called()
         self.assertEqual(json.loads(collector.cache_path.read_text())["sources"]["parent"]["offset"],

@@ -112,7 +112,7 @@ def _valid_cache_entry(agent_id: str, entry: Any) -> bool:
         return False
     if not all(_count(entry.get(key)) for key in (
         "offset", "size_seen", "invalid_events", "skipped_lines"
-    )) or entry["offset"] > entry["size_seen"]:
+    )):
         return False
     digest_valid = _digest(entry.get("tail_digest")) if entry["offset"] else entry.get("tail_digest") == ""
     if not digest_valid or type(entry.get("discard_partial")) is not bool:
@@ -294,7 +294,9 @@ class UsageCollector:
                 ):
                     entry = _empty(source, identity)
                 stream.seek(entry["offset"])
-                _consume(entry, stream.read(MAX_BYTES_PER_POLL))
+                # Keep this sample coherent with fstat; later appends wait for
+                # the next tick instead of advancing beyond size_seen.
+                _consume(entry, stream.read(min(MAX_BYTES_PER_POLL, stat.st_size - entry["offset"])))
                 entry["size_seen"] = stat.st_size
                 entry["tail_digest"] = _tail_digest(stream, entry["offset"])
         except OSError:
