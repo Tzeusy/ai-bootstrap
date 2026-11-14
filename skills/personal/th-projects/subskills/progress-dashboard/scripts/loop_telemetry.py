@@ -400,7 +400,7 @@ class UsageCollector:
             raise ValueError("telemetry cache is invalid; restore or remove its local cache") from None
         return cache
 
-    def poll(self, sources: list[dict]) -> dict[str, Any]:
+    def poll(self, sources: list[dict], *, preserve_unlisted=False) -> dict[str, Any]:
         """Return a redacted projection; missing/error sources never become zero usage."""
         normalized = [validate_source(source) for source in sources]
         if len({source["id"] for source in normalized}) != len(normalized):
@@ -417,7 +417,7 @@ class UsageCollector:
             cache = self._load()
             before = json.dumps(cache, sort_keys=True)
             rows = []
-            retained = {}
+            retained = dict(cache["sources"]) if preserve_unlisted else {}
             for source in normalized:
                 entry, row = self._read_source(source, cache["sources"].get(source["id"]))
                 if entry is not None:

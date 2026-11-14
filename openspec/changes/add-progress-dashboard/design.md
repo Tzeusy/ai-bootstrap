@@ -42,7 +42,11 @@ local read-only `state_5.sqlite`, bounded at200 sessions. Published roster IDs,
 runtime paths or explicit thread IDs identify children; ambiguous names refuse
 attribution. No transcript directory is crawled. Explicit nonmatching attachments
 retain precedence; duplicate log attribution refuses. A temporary index failure
-keeps established sources/offsets and displays a warning. No unrelated session
+keeps established sources/offsets across restart and displays a warning. Derived
+`runtime-sources.json` bindings are configuration-pinned and written only when
+changed; current explicit attachments still win during an outage. Failed lookup
+never prunes unresolved parser offsets, even if the derived binding cache is
+damaged. No unrelated session
 content, index path or transcript path is returned to the browser.
 
 Native Codex `token_usage_record` totals are filtered by thread identity and

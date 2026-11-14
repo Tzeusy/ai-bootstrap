@@ -28,7 +28,10 @@ def configuration(thread_id: str, home: str | Path | None = None) -> dict:
         raise ValueError("Codex watch requires a runtime thread UUID") from None
     if home is not None and not isinstance(home, (str, Path)):
         raise ValueError("Codex home must be a directory path")
-    home = Path(home or os.environ.get("CODEX_HOME") or "~/.codex").expanduser().resolve()
+    try:
+        home = Path(home or os.environ.get("CODEX_HOME") or "~/.codex").expanduser().resolve()
+    except (OSError, RuntimeError):
+        raise ValueError("Codex home cannot be resolved") from None
     return {"provider": "codex", "thread_id": thread_id, "home": str(home)}
 
 
@@ -84,14 +87,24 @@ def resolve(config: dict, actor: str, agents: list[dict], explicit: list[dict]) 
             matches.append((agent["id"], candidates[0]))
         elif len(candidates) > 1:
             warnings.append("An agent name matches multiple owned sessions; publish its thread_id.")
+    bindings = []
+    for agent_id, row in matches:
+        source = validate_source({"id": agent_id, "provider": "codex", "path": row["rollout_path"],
+                                  "thread_id": row["id"]})
+        bindings.append((source, {"thread_id": row["id"], "agent_path": row["agent_path"],
+                                  "model": row["model"]}))
+    sources, runtime, merged_warnings = _merge(bindings, explicit)
+    return sources, runtime, sorted(set(warnings + merged_warnings))
+
+
+def _merge(bindings: list[tuple[dict, dict]], explicit: list[dict]) -> tuple[list[dict], dict, list[str]]:
     normalized = [validate_source(source) for source in explicit]
     if len({row["id"] for row in normalized}) != len(normalized):
         raise ValueError("usage source agent ids must be unique")
     sources = {row["id"]: row for row in normalized}
-    runtime = {}
-    for agent_id, row in matches:
-        source = validate_source({"id": agent_id, "provider": "codex", "path": row["rollout_path"],
-                                  "thread_id": row["id"]})
+    runtime, warnings = {}, []
+    for source, metadata in bindings:
+        agent_id = source["id"]
         prior = sources.get(agent_id)
         if prior and any(prior.get(key) != source[key] for key in ("provider", "path")):
             continue  # Explicit nonmatching sources retain precedence.
@@ -99,6 +112,27 @@ def resolve(config: dict, actor: str, agents: list[dict], explicit: list[dict]) 
             warnings.append("A runtime log is already attributed to another agent; duplicate measurement refused.")
             continue
         sources[agent_id] = source
-        runtime[agent_id] = {"thread_id": row["id"], "agent_path": row["agent_path"],
-                             "model": row["model"]}
+        runtime[agent_id] = metadata
     return list(sources.values()), runtime, sorted(set(warnings))
+
+
+def retain(config: dict, actor: str, agents: list[dict], saved: dict, explicit: list[dict]) -> tuple[list[dict], dict, list[str]]:
+    """Reuse proven bindings across restart; current explicit attachments win."""
+    if (not isinstance(saved, dict) or saved.get("config") != config
+        or not isinstance(saved.get("sources"), list) or len(saved["sources"]) > MAX_SESSIONS
+        or not isinstance(saved.get("metadata"), dict)):
+        raise ValueError("retained runtime bindings are invalid; restore the runtime index")
+    expected = {actor, *[agent["id"] for agent in agents]}
+    bindings = []
+    for row in saved["sources"]:
+        source = validate_source(row)
+        metadata = saved["metadata"].get(source["id"])
+        if (source["provider"] != "codex" or not source.get("thread_id")
+            or not isinstance(metadata, dict) or set(metadata) != {"thread_id", "agent_path", "model"}
+            or metadata["thread_id"] != source["thread_id"]
+            or any(metadata[key] is not None and not isinstance(metadata[key], str)
+                   for key in ("agent_path", "model"))):
+            raise ValueError("retained runtime identity is invalid; restore the runtime index")
+        if source["id"] in expected:
+            bindings.append((source, metadata))
+    return _merge(bindings, explicit)

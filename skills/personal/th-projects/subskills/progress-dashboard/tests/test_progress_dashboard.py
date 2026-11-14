@@ -287,6 +287,32 @@ class RuntimeTests(WorkspaceFixture, unittest.TestCase):
             self.assertEqual((self.folder / "telemetry-cache.json").read_bytes(), before)
             self.assertFalse(self.index.exists())  # mode=ro never creates a replacement index.
             self.assertEqual((self.folder / "handover.md").read_bytes(), handover)
+            explicit = self.home / "explicit.jsonl"
+            explicit.write_text(json.dumps({"type": "assistant", "message": {"id": "new-work",
+                "usage": {"input_tokens": 4, "output_tokens": 1}}}) + "\n")
+            dashboard.attach(self.folder, "reviewer", "claude", str(explicit))
+            changed = server.sample_usage()
+            reviewer = next(row for row in changed["agents"] if row["id"] == "reviewer")
+            self.assertEqual((reviewer["provider"], reviewer["total_tokens"]), ("claude", 5))
+            self.assertNotIn("thread_id", reviewer)
+            before_restart = (self.folder / "telemetry-cache.json").read_bytes()
+            restarted = DashboardServer(self.folder, "127.0.0.1", 0, "outage-restart")
+            try:
+                self.assertEqual(restarted.view()["telemetry"]["totals"]["total_tokens"], 18)
+                self.assertEqual((self.folder / "telemetry-cache.json").read_bytes(), before_restart)
+                # A lost/corrupt derived binding cache must not prune offsets;
+                # restored native lookup can resume without a full log replay.
+                (self.folder / "runtime-sources.json").write_text("invalid bindings")
+                partial = restarted.sample_usage()
+                self.assertEqual(partial["totals"]["total_tokens"], 5)
+                self.assertEqual((self.folder / "telemetry-cache.json").read_bytes(), before_restart)
+                (self.home / "unavailable.sqlite").rename(self.index)
+                recovered = restarted.sample_usage()
+                self.assertEqual(recovered["totals"]["total_tokens"], 18)
+                self.assertNotIn("error", recovered)
+                self.assertEqual((self.folder / "telemetry-cache.json").read_bytes(), before_restart)
+            finally:
+                restarted.server_close()
         finally:
             server.server_close()
 

@@ -33,8 +33,6 @@ class DashboardServer(ThreadingHTTPServer):
         self.telemetry_lock = threading.Lock()
         self.stopping = threading.Event()
         self.collector = UsageCollector(folder)
-        self.runtime_sources = []
-        self.runtime_metadata = {}
         self.telemetry = self.sample_usage()
         self.allowed_hosts = {f"{bind}:{self.server_port}"}
         if bind == "127.0.0.1":
@@ -49,20 +47,36 @@ class DashboardServer(ThreadingHTTPServer):
                 state = model.load(self.folder / "state.json")
             if not isinstance(sources, list):
                 raise ValueError("usage sources must be a list")  # noqa: TRY004 - state validation uses ValueError
-            metadata, warnings = {}, []
+            metadata, warnings, lookup_failed = {}, [], False
             if runtime:
-                from runtime_sources import resolve
+                from runtime_sources import resolve, retain
                 try:
                     resolved, metadata, warnings = resolve(runtime, state["actor"], state["agents"], sources)
-                    self.runtime_sources, self.runtime_metadata = resolved, metadata
+                    proven = {"config": runtime, "sources": [row for row in resolved if row["id"] in metadata],
+                              "metadata": metadata}
+                    with model.lock(self.folder):
+                        path = self.folder / "runtime-sources.json"
+                        try:
+                            previous = model.load(path, {})
+                        except ValueError:
+                            previous = None  # A successful index lookup repairs only derived bindings.
+                        if previous != proven:
+                            model.save(path, proven)
                     sources = resolved
                 except ValueError as error:
-                    # A transient index failure must not discard known offsets
-                    # or erase previously established scoped attribution.
-                    sources = self.runtime_sources or sources
-                    metadata = self.runtime_metadata
+                    lookup_failed = True
                     warnings = [str(error)]
-            result = self.collector.poll(sources)
+                    try:
+                        with model.lock(self.folder):
+                            saved = model.load(self.folder / "runtime-sources.json",
+                                {"config": runtime, "sources": [], "metadata": {}})
+                        sources, metadata, retained_warnings = retain(runtime, state["actor"], state["agents"], saved, sources)
+                        warnings.extend(retained_warnings)
+                    except ValueError as retained_error:
+                        warnings.append(str(retained_error))
+            # Even without valid retained bindings, a failed lookup must never
+            # prune offsets for currently unresolved automatic sources.
+            result = self.collector.poll(sources, preserve_unlisted=lookup_failed)
             for row in result["agents"]:
                 row.update(metadata.get(row["id"], {}))
             if warnings:

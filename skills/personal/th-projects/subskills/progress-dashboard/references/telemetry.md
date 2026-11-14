@@ -25,7 +25,10 @@ next server tick; no per-child command or orchestrator polling is needed.
 A conflicting watch refuses. `init --codex-thread ""` leaves runtime binding
 explicit. An unavailable/unsupported index reports a warning; progress/feedback
 remain usable. A temporary lookup failure retains previously established
-sources and offsets. No transcript-directory crawl, unrelated-session read,
+sources and offsets across server restart. `runtime-sources.json` persists only
+proven bindings, pinned to that configuration, and changes only with attribution.
+Current explicit attachments retain precedence during outages; even a damaged
+binding cache cannot prune unresolved parser offsets. No transcript-directory crawl, unrelated-session read,
 auth-file access or runtime status inference occurs. Runtime model/thread/path
 are shown separately from parent-reported work/model/branch/PR context.
 
