@@ -3,11 +3,11 @@
 
 (() => {
   const byId = id => document.getElementById(id);
-  const text = (id, value) => {
-    const node = byId(id);
+  const setText = (node, value) => {
     const content = String(value ?? "");
     if (node.textContent !== content) node.textContent = content;
   };
+  const text = (id, value) => setText(byId(id), value);
   const number = value => Number.isFinite(value) ? new Intl.NumberFormat().format(value) : "Unknown";
   const compact = value => Number.isFinite(value) ? new Intl.NumberFormat(undefined, {notation: "compact", maximumFractionDigits: 1}).format(value) : "Unknown";
   const form = byId("feedback-form");
@@ -132,10 +132,105 @@
     }
   }
 
+  function updateBlock(destination, value, render) {
+    const signature = JSON.stringify(value);
+    if (destination.dataset.signature === signature) return;
+    render();
+    destination.dataset.signature = signature;
+  }
+
+  function contextRow(destination, label, value, code = false) {
+    const content = el("dd");
+    content.append(value instanceof Node ? value : el(code ? "code" : "span", null, value || "Not reported"));
+    destination.append(el("dt", null, label), content);
+  }
+
+  function pullRequestLink(value, name, id) {
+    try {
+      const url = new URL(value);
+      if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) return null;
+      const link = el("a", null, url.href);
+      link.href = url.href;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.dataset.focusKey = `pr:${id}`;
+      link.setAttribute("aria-label", `Pull request for ${name}: ${url.href} (opens in a new tab)`);
+      return link;
+    } catch { return null; }
+  }
+
+  function createAgent(agent) {
+    const article = el("article", "agent");
+    article.dataset.agentId = agent.id;
+    const heading = el("div", "agent-heading");
+    heading.append(el("h3"), el("span", "badge"), el("span", "agent-role"), commentButton(agent.id, agent.name || agent.id));
+    const details = el("details", "agent-details");
+    const summary = el("summary", null, "Work details");
+    summary.dataset.focusKey = `agent-details:${agent.id}`;
+    details.append(summary, el("div", "agent-actions"), el("dl", "agent-context agent-work-context"), el("h4", null, "Runtime attribution"), el("dl", "agent-context agent-runtime-context"));
+    article.append(heading, el("p", "agent-task"), el("p", "agent-summary"), el("div", "agent-meta"), details);
+    return article;
+  }
+
+  function updateAgent(article, agent, measured) {
+    const name = agent.name || agent.id;
+    setText(article.querySelector("h3"), name);
+    const badge = article.querySelector(".badge");
+    badge.className = `badge ${statusClass(agent.status)}`;
+    setText(badge, agent.status || "Unknown");
+    const role = article.querySelector(".agent-role");
+    setText(role, agent.role);
+    role.hidden = !agent.role;
+    article.querySelector(".task-feedback").setAttribute("aria-label", `Comment on ${name}`);
+    const task = article.querySelector(".agent-task");
+    setText(task, agent.task);
+    task.hidden = !agent.task;
+    setText(article.querySelector(".agent-summary"), agent.summary || "Work summary not reported yet.");
+    const meta = article.querySelector(".agent-meta");
+    meta.replaceChildren();
+    if (measured?.model || agent.model) meta.append(el("span", null, measured?.model || agent.model));
+    meta.append(el("span", null, measured?.status === "measured" ? `${number(measured.total_tokens)} tokens · ${measured.provider || "runtime"}` : "Token usage unknown"));
+    meta.append(relativeTime(agent.updated_at, "Status · "));
+    if (measured?.status === "measured") meta.append(relativeTime(measured.observed_at, "Usage · "));
+
+    const details = article.querySelector(".agent-details");
+    details.firstChild.setAttribute("aria-label", `Work details for ${name}`);
+    const actions = details.querySelector(".agent-actions");
+    updateBlock(actions, agent.activity || [], () => {
+      actions.replaceChildren(el("h4", null, "Reported recent actions"));
+      if (!agent.activity?.length) actions.append(el("p", "muted", "No recent actions reported."));
+      else {
+        const list = el("ul");
+        for (const action of agent.activity.slice(0, 8)) list.append(el("li", null, action));
+        actions.append(list);
+      }
+    });
+    const work = details.querySelector(".agent-work-context");
+    updateBlock(work, [agent.branch, agent.worktree, agent.pr_url, name], () => {
+      work.replaceChildren();
+      contextRow(work, "Branch", agent.branch, true);
+      contextRow(work, "Worktree", agent.worktree || "Not reported; may share the parent checkout.", Boolean(agent.worktree));
+      contextRow(work, "Pull request", pullRequestLink(agent.pr_url, name, agent.id) || "Not reported");
+    });
+    const runtime = details.querySelector(".agent-runtime-context");
+    updateBlock(runtime, [measured, agent.model, agent.thread_id], () => {
+      runtime.replaceChildren();
+      contextRow(runtime, "Source", measured?.provider || "Not attached");
+      contextRow(runtime, "Runtime model", measured?.model);
+      if (agent.model && agent.model !== measured?.model) contextRow(runtime, "Reported model", agent.model);
+      contextRow(runtime, "Thread", measured?.thread_id, true);
+      if (agent.thread_id && agent.thread_id !== measured?.thread_id) contextRow(runtime, "Reported thread", agent.thread_id, true);
+      contextRow(runtime, "Agent path", measured?.agent_path, true);
+      contextRow(runtime, "Usage status", `${measured?.status || "unknown"}${measured?.reason ? ` · ${measured.reason.replaceAll("-", " ")}` : ""}`);
+      contextRow(runtime, "Usage reported", relativeTime(measured?.observed_at, ""));
+      runtime.lastChild.firstChild.title = dateLabel(measured?.observed_at);
+    });
+  }
+
   function renderAgents(agents, telemetry) {
     const destination = byId("agent-list");
     const existing = new Map([...destination.querySelectorAll(".agent")].map(node => [node.dataset.agentId, node]));
-    for (const node of destination.querySelectorAll(".empty")) node.remove();
+    for (const node of destination.querySelectorAll(":scope > .empty")) node.remove();
     if (!agents.length) destination.append(el("p", "empty", "No subagents recorded. This loop may be working on its own."));
     const usage = new Map((telemetry.agents || []).map(agent => [agent.id, agent]));
     for (const agent of agents) {
@@ -144,28 +239,13 @@
       const prior = existing.get(agent.id);
       existing.delete(agent.id);
       if (prior?.dataset.signature === signature) continue;
-      const article = el("article", "agent");
-      article.dataset.agentId = agent.id;
+      const article = prior || createAgent(agent);
+      updateAgent(article, agent, measured);
       article.dataset.signature = signature;
-      const heading = el("div", "agent-heading");
-      const name = agent.name || agent.id;
-      heading.append(el("h3", null, name), el("span", `badge ${statusClass(agent.status)}`, agent.status || "Unknown"));
-      if (agent.role) heading.append(el("span", "agent-role", agent.role));
-      heading.append(commentButton(agent.id, name));
-      article.append(heading);
-      if (agent.task) article.append(el("p", "agent-task", agent.task));
-      if (agent.summary) article.append(el("p", "agent-summary", agent.summary));
-      const meta = el("div", "agent-meta");
-      if (agent.model) meta.append(el("span", null, agent.model));
-      meta.append(el("span", null, measured?.status === "measured" ? `${number(measured.total_tokens)} tokens · ${measured.provider || "runtime"}` : "Token usage unknown"));
-      meta.append(relativeTime(agent.updated_at, "Status · "));
-      if (measured?.status === "measured") meta.append(relativeTime(measured.observed_at, "Usage · "));
-      article.append(meta);
-      if (prior) prior.replaceWith(article);
-      else destination.append(article);
+      if (!prior) destination.append(article);
     }
     for (const node of existing.values()) node.remove();
-    // Reorder retained rows without recreating their controls.
+    // Reorder retained rows without recreating their controls or disclosures.
     const ordered = new Map([...destination.querySelectorAll(".agent")].map(node => [node.dataset.agentId, node]));
     agents.forEach((agent, index) => {
       const node = ordered.get(agent.id);

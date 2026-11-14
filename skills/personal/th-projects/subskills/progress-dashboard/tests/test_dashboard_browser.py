@@ -68,7 +68,15 @@ class DashboardBrowserTests(unittest.TestCase):
             "tasks": [{"id": "work", "title": "Implement the workspace", "status": "in-progress", "detail": "Persist progress and feedback.", "evidence": "Focused checks"},
                       {"id": "review", "title": "Independently verify", "status": "todo", "detail": "Review the complete behavior.", "evidence": ""}],
             "findings": ["Unknown counters stay unknown."],
-            "agents": [{"id": "reviewer", "name": "Independent reviewer", "role": "Verifier", "status": "waiting", "task": "Review the workspace", "summary": "Waiting for a reviewable checkpoint.", "model": "example", "updated_at": model.now()}],
+            "agents": [{
+                "id": "reviewer", "name": "Independent reviewer", "role": "Verifier",
+                "status": "waiting", "task": "Review the workspace",
+                "summary": "Waiting for a reviewable checkpoint.",
+                "model": "example", "updated_at": model.now(),
+                "branch": "agent/review-progress", "worktree": str(self.root / "review-worktree"),
+                "pr_url": "https://github.com/example/progress/pull/123",
+                "activity": ["Reviewed the storage contract.", "Checked feedback retry behavior."],
+            }],
         }
         model.checkpoint(self.folder, self.snapshot, 0)
         self.server = DashboardServer(self.folder, "127.0.0.1", 0, "browser-fixture")
@@ -176,8 +184,46 @@ class DashboardBrowserTests(unittest.TestCase):
             page.locator("#refresh").evaluate("node => node.click()")
         expect(button).to_be_focused()
         self.assertTrue(button.evaluate("node => node === window.retainedAgentButton"))
+        page.locator("#feedback-text").fill("Keep this draft while inspecting the agent.")
+        agent = page.locator('.agent[data-agent-id="reviewer"]')
+        disclosure = agent.locator(".agent-details")
+        disclosure.locator("summary").click()
+        disclosure.locator("summary").focus()
+        disclosure.evaluate("node => window.retainedAgentDetails = node")
+        self.assertTrue(agent.locator(".agent-summary").is_visible())
+        expect(disclosure).to_contain_text("Reviewed the storage contract.")
+        expect(disclosure).to_contain_text("agent/review-progress")
+        measured = {
+            "id": "reviewer", "provider": "codex", "status": "measured",
+            "input_tokens": 100, "cached_input_tokens": 80, "output_tokens": 23, "total_tokens": 123,
+            "observed_at": model.now(), "thread_id": "11111111-1111-4111-8111-111111111111",
+            "agent_path": "/root/reviewer", "model": "runtime-model",
+        }
+        with self.server.telemetry_lock:
+            self.server.telemetry = {"agents": [measured], "totals": {"input_tokens": 100, "cached_input_tokens": 80, "output_tokens": 23, "total_tokens": 123}, "coverage": {"attached": 1, "measured": 1}, "sampled_at": model.now()}
+        with page.expect_response("**/api/state"):
+            page.locator("#refresh").evaluate("node => node.click()")
+        expect(disclosure).to_have_attribute("open", "")
+        expect(disclosure.locator("summary")).to_be_focused()
+        self.assertTrue(disclosure.evaluate("node => node === window.retainedAgentDetails"))
+        expect(disclosure).to_contain_text("runtime-model")
+        expect(disclosure).to_contain_text(measured["thread_id"])
+        expect(disclosure).to_contain_text("/root/reviewer")
+        link = disclosure.get_by_role("link")
+        expect(link).to_have_attribute("href", "https://github.com/example/progress/pull/123")
+        expect(link).to_have_attribute("rel", "noopener noreferrer")
+        link.focus()
+        with self.server.telemetry_lock:
+            self.server.telemetry["agents"] = [{**measured, "input_tokens": 177, "total_tokens": 200}]
+            self.server.telemetry["totals"] = {**self.server.telemetry["totals"], "input_tokens": 177, "total_tokens": 200}
+        with page.expect_response("**/api/state"):
+            page.locator("#refresh").evaluate("node => node.click()")
+        expect(link).to_be_focused()
+        expect(disclosure).to_have_attribute("open", "")
+        expect(page.locator("#feedback-text")).to_have_value("Keep this draft while inspecting the agent.")
+        button.focus()
         # An unrelated child report must also preserve this agent's control.
-        other = {**self.snapshot["agents"][0], "id": "builder", "name": "Builder", "status": "running"}
+        other = {**self.snapshot["agents"][0], "id": "builder", "name": "Builder", "status": "running", "branch": "", "worktree": "", "pr_url": "", "activity": []}
         model.checkpoint(self.folder, {"agents": [*self.snapshot["agents"], other]}, 1)
         with page.expect_response("**/api/state"):
             page.locator("#refresh").evaluate("node => node.click()")
@@ -189,6 +235,12 @@ class DashboardBrowserTests(unittest.TestCase):
         with page.expect_response("**/api/state"):
             page.locator("#refresh").evaluate("node => node.click()")
         expect(builder_button).to_be_focused()
+        missing = page.locator('.agent[data-agent-id="builder"] .agent-details')
+        missing.locator("summary").click()
+        expect(missing).to_contain_text("No recent actions reported.")
+        expect(missing).to_contain_text("Not reported; may share the parent checkout.")
+        self.assertEqual(missing.get_by_role("link").count(), 0)
+        expect(disclosure).to_have_attribute("open", "")
         details = page.locator('.document[data-name="in-progress.md"]')
         details.locator("summary").click()
         details.locator("summary").focus()
@@ -232,6 +284,11 @@ class DashboardBrowserTests(unittest.TestCase):
         feedback_link = page.locator('nav a[href="#feedback"]')
         expect(feedback_link).to_be_in_viewport()
         expect(page.locator('nav a[href="#work"]')).to_have_attribute("aria-current", "true")
+        agent_details = page.locator(".agent-details").first
+        agent_details.locator("summary").click()
+        expect(agent_details).to_have_attribute("open", "")
+        expect(agent_details).to_contain_text("agent/review-progress")
+        self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
         feedback_link.click()
         expect(page.locator("#feedback-heading")).to_be_in_viewport()
         expect(feedback_link).to_have_attribute("aria-current", "true")
@@ -281,6 +338,8 @@ class DashboardBrowserTests(unittest.TestCase):
         self.page.get_by_text("Usage by session", exact=True).click()
         self.page.get_by_text("codex · error", exact=True).wait_for()
         self.page.get_by_text("unreadable source", exact=True).wait_for()
+        for disclosure in self.page.locator(".agent-details").all():
+            disclosure.locator("summary").click()
         self.page.emulate_media(color_scheme="dark")
         for width in (320, 390, 650, 768, 970, 1280):
             self.page.set_viewport_size({"width": width, "height": 900})

@@ -11,7 +11,7 @@ metadata:
     - OpenAI Codex
   status: active
   last_reviewed: "2026-11-14"
-compatibility: Python 3.11+ and uv; stdlib-only server on Linux/macOS. Optional usage adapters consume explicitly attached Codex or Claude JSONL transcripts. No frontend build or model API.
+compatibility: Python 3.11+ and uv; stdlib-only server on Linux/macOS. Codex uses its local runtime relationship index; explicit Codex/Claude JSONL attachment remains available. No frontend build or model API.
 ---
 
 # Progress Dashboard
@@ -38,6 +38,10 @@ uv run "$DASHBOARD" --slug "$SLUG" serve
 ```
 
 Report the workspace and printed private URL; keep the URL outside commits/PRs.
+In Codex, `init` binds `CODEX_THREAD_ID` automatically; the server resolves
+published children through the runtime index. Keep actual agent IDs/names in
+the roster. See [usage adapters](references/telemetry.md) for existing workspaces,
+an unavailable index or other runtimes.
 The server defaults to loopback. For remote access, custom roots, or recovery,
 read [lifecycle](references/lifecycle.md). Initial `init --no-feedback` disables
 feedback. Repeating `init` verifies identity and repairs projections.
@@ -68,6 +72,10 @@ identical content keeps the revision. Minimal snapshot:
  "agents":[{"id":"reviewer-1","status":"running","task":"task-1",
             "summary":"Checking failure and recovery paths."}]}
 ```
+
+At native delegation/report events, include each agent's concise paragraph
+`summary`, known `branch`/`worktree`/`pr_url`, and up to eight `activity` strings.
+These populate expandable work details; no extra agent interview is needed.
 
 Without changes, use `status --since "$REVISION" --after-feedback "$FEEDBACK_CURSOR"`
 at an existing safe checkpoint. Retain returned revision and `feedback_cursor`;
@@ -103,7 +111,7 @@ An ongoing run names its server owner and stop command.
 
 ## Load only the needed slice
 
-- [Usage adapters](references/telemetry.md): attach known parent/child logs;
+- [Usage adapters](references/telemetry.md): automatic Codex attribution or explicit logs;
   explain measured, partial and unknown usage without estimating.
 - [Artifacts](references/artifacts.md): publish images, diagrams or PDFs through
   the existing shell without rebuilding it.

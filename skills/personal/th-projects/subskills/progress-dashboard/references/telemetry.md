@@ -1,13 +1,42 @@
 # Measured usage
 
-Read when attaching a known runtime log or explaining usage coverage. Counters
-come from runtime records; agent status comes from the parent's native results.
-Neither requires another model reading or summarizing child transcripts.
-The fixed [usage adapter](../scripts/loop_telemetry.py) owns parsing and offsets;
-inspect it only when maintaining collector behavior.
+Read for automatic runtime attribution, explicit log attachment or coverage.
+Counters come from runtime records; work summaries/status come from native
+reports at existing parent checkpoints. No model reads child transcripts.
 
-Attach explicitly known non-secret JSONL locators once per parent/child. The ID
-must be the workspace actor or an already-published roster entry:
+## Codex parent and known children
+
+`init` automatically watches `CODEX_THREAD_ID` when available. An existing
+workspace, missing environment variable or custom runtime home uses:
+
+```bash
+uv run "$DASHBOARD" --slug "$SLUG" watch-codex --thread-id "$PARENT_THREAD_ID"
+# Optional: --home "$CODEX_RUNTIME_HOME"
+```
+
+The [runtime resolver](../scripts/runtime_sources.py) queries only this parent's
+indexed spawn relationships in the local read-only `state_5.sqlite` (at most200
+sessions). It includes retained/archived descendants and matches only published
+roster IDs: thread UUID, full agent path, then unique path basename. Publish an
+agent's `thread_id` when names are ambiguous. Future child logs attach at the
+next server tick; no per-child command or orchestrator polling is needed.
+
+`runtime.json` pins parent/home; repeat init never changes an existing binding.
+A conflicting watch refuses. `init --codex-thread ""` leaves runtime binding
+explicit. An unavailable/unsupported index reports a warning; progress/feedback
+remain usable. A temporary lookup failure retains previously established
+sources and offsets across server restart. `runtime-sources.json` persists only
+proven bindings, pinned to that configuration, and changes only with attribution.
+Changed explicit thread selectors invalidate old retained attribution.
+Current explicit attachments retain precedence during outages; even a damaged
+binding cache cannot prune unresolved parser offsets. No transcript-directory crawl, unrelated-session read,
+auth-file access or runtime status inference occurs. Runtime model/thread/path
+are shown separately from parent-reported work/model/branch/PR context.
+
+## Explicit sources and other runtimes
+
+Known Codex/Claude logs can still attach directly. The ID must be the workspace
+actor or a published roster entry:
 
 ```bash
 uv run "$DASHBOARD" --slug "$SLUG" attach --id "$ACTOR" \
@@ -16,25 +45,30 @@ uv run "$DASHBOARD" --slug "$SLUG" attach --id reviewer-1 \
   --provider claude --path "$EXPLICIT_CHILD_TRANSCRIPT"
 ```
 
-If a locator is unavailable, leave usage unknown. Do not discover logs by
-crawling private runtime state; no launch/checkpoint/background scan or auth-file
-read is needed. Duplicate paths refuse to prevent double counting.
+Explicit nonmatching attachments take precedence over automatic resolution.
+Duplicate paths refuse double counting. Missing/unsupported locators remain
+unknown; do not guess or crawl other runtime directories to fill them.
 
-The collector consumes at most 1MiB per source per three-second server tick.
-`telemetry-cache.json` retains offsets/counters across restart and is rewritten
-only when changed. Completed agents retain attribution. Changed file identity or
-truncation resets the source measurement; that is not uninterrupted lifetime use.
+## Counters, freshness and efficiency
 
-Codex uses the latest cumulative `event_msg/token_count` totals; repeated samples
-do not add tokens. Claude deduplicates streamed assistant records by hashed
-message ID. Claude input includes uncached input, cache reads and cache writes;
-cached input is the read subset, already included in input. Context tokens mean
-latest usage sample, not context-window capacity. No prices or inferred token
-estimates are displayed.
+The [usage adapter](../scripts/loop_telemetry.py) reads at most1MiB per source per
+three-second tick. Cache offsets/counters survive restart and unchanged polls do
+not rewrite them. New thread-bound attribution may require one bounded catch-up.
+Changed file identity/truncation resets measurement; that is not uninterrupted
+lifetime use.
 
-Unknown/error sources have null counters. `catching-up` means a bounded read has
-not reached EOF. Aggregate totals cover measured sources only; coverage includes
-the parent and known agents even when unattached. Read per-source timestamps
-before claiming freshness. HTTP success proves reachability, not fresh model
-activity or complete usage coverage. Report measured versus unknown usage when
-relevant; never fill gaps with guesses.
+Codex native `token_usage_record` thread totals supersede lagging legacy
+`event_msg/token_count` totals. Thread IDs and fork-history ordinals exclude
+copied parent/foreign records; streams are never added together. Older logs
+still use their latest valid cumulative sample. Claude deduplicates streamed
+assistant records by hashed message ID. Claude input includes uncached, cache
+reads and cache writes; cached input is the read subset, already included in
+input. Context tokens describe the latest usage sample, not window capacity.
+No inferred token estimates or prices are displayed.
+
+Unknown/error counters stay null; `catching-up` means a bounded read has not
+reached its observed EOF. Totals cover measured sources only; expected coverage
+includes the parent and published agents. Completed agents retain attribution
+and naturally older usage timestamps. HTTP success proves connectivity, not
+fresh model activity or complete coverage. Never replace missing counts with
+zero or equate cache percentage with measured savings.

@@ -20,6 +20,7 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 MAX_BYTES_PER_POLL = 1024 * 1024
 MAX_LINE_BYTES = 256 * 1024
@@ -75,7 +76,13 @@ def validate_source(source: dict[str, Any]) -> dict[str, str]:
             for part in candidate.parts
         ):
             raise ValueError("usage sources must be non-secret JSONL logs")
-    return {"id": source["id"], "provider": source["provider"], "path": str(path)}
+    result = {"id": source["id"], "provider": source["provider"], "path": str(path)}
+    if "thread_id" in source:
+        try:
+            result["thread_id"] = str(UUID(source["thread_id"]))
+        except (ValueError, TypeError, AttributeError):
+            raise ValueError("usage source thread_id must be a UUID") from None
+    return result
 
 
 def _empty(source: dict[str, str], identity: list[int]) -> dict[str, Any]:
@@ -92,6 +99,9 @@ def _empty(source: dict[str, str], identity: list[int]) -> dict[str, Any]:
         "messages": {},
         "invalid_events": 0,
         "skipped_lines": 0,
+        "thread_id": source.get("thread_id"),
+        "history_start_ordinal": None,
+        "usage_format": "legacy",
     }
 
 
@@ -137,6 +147,12 @@ def _valid_cache_entry(agent_id: str, entry: Any) -> bool:
         entry["observed_at"] is not None and _timestamp(entry["observed_at"]) is None
     ):
         return False
+    if entry.get("thread_id") is not None and not isinstance(entry["thread_id"], str):
+        return False
+    if entry.get("history_start_ordinal") is not None and not _count(entry["history_start_ordinal"]):
+        return False
+    if entry.get("usage_format", "legacy") not in ("legacy", "thread"):
+        return False
     messages = entry.get("messages")
     return isinstance(messages, dict) and len(messages) <= MAX_MESSAGES and all(
         _digest(key)
@@ -145,16 +161,7 @@ def _valid_cache_entry(agent_id: str, entry: Any) -> bool:
     )
 
 
-def _codex(entry: dict[str, Any], record: dict[str, Any]) -> None:
-    payload = record.get("payload")
-    if record.get("type") != "event_msg" or not isinstance(payload, dict):
-        return
-    if payload.get("type") != "token_count":
-        return
-    info = payload.get("info")
-    if info is None:  # Runtime rate-limit-only updates have no usage sample.
-        return
-    usage = info.get("total_token_usage") if isinstance(info, dict) else None
+def _codex_sample(entry: dict[str, Any], usage: Any, context: Any, timestamp: Any) -> None:
     if not isinstance(usage, dict) or not all(_count(usage.get(key)) for key in (
         "input_tokens", "output_tokens", "total_tokens"
     )):
@@ -179,11 +186,49 @@ def _codex(entry: dict[str, Any], record: dict[str, Any]) -> None:
     # Claude's per-message sums keep uncertainty sticky for the entire file.
     entry["invalid_events"] = 0
     entry["skipped_lines"] = 0
-    last = info.get("last_token_usage")
-    context = last.get("total_tokens") if isinstance(last, dict) else None
     entry["context_tokens"] = context if _count(context) else None
-    timestamp = _timestamp(record.get("timestamp"))
+    timestamp = _timestamp(timestamp)
     entry["observed_at"] = max(filter(None, (entry["observed_at"], timestamp)), default=None)
+
+
+def _codex(entry: dict[str, Any], record: dict[str, Any]) -> None:
+    payload = record.get("payload")
+    if not isinstance(payload, dict):
+        return
+    if record.get("type") == "session_meta":
+        identity = payload.get("id")
+        if isinstance(identity, str) and entry.get("thread_id") and identity != entry["thread_id"]:
+            raise ValueError("Codex source metadata does not match its attached thread")
+        if isinstance(identity, str) and not entry.get("thread_id"):
+            entry["thread_id"] = identity
+        cutoff = payload.get("subagent_history_start_ordinal")
+        if identity == entry.get("thread_id") and _count(cutoff):
+            entry["history_start_ordinal"] = cutoff
+        return
+    cutoff = entry.get("history_start_ordinal")
+    if cutoff is not None and _count(record.get("ordinal")) and record["ordinal"] <= cutoff:
+        return  # A fork's copied parent history is not child usage.
+    if record.get("type") == "token_usage_record":
+        if not entry.get("thread_id") or payload.get("thread_id") != entry["thread_id"]:
+            return
+        # Runtime thread totals are authoritative; legacy event emission can lag
+        # many requests. Never add the two streams or let lagging events regress it.
+        if entry.get("usage_format") != "thread":
+            entry["usage"] = None
+        current = payload.get("usage")
+        context = current.get("total_tokens") if isinstance(current, dict) else None
+        _codex_sample(entry, payload.get("thread_token_usage"), context, record.get("timestamp"))
+        entry["usage_format"] = "thread"
+    elif (record.get("type") == "event_msg" and payload.get("type") == "token_count"
+          and entry.get("usage_format", "legacy") != "thread"):
+        if cutoff is not None and not _count(record.get("ordinal")):
+            return  # Legacy fork records without provenance cannot be attributed.
+        info = payload.get("info")
+        if info is not None:
+            last = info.get("last_token_usage") if isinstance(info, dict) else None
+            context = last.get("total_tokens") if isinstance(last, dict) else None
+            usage = info.get("total_token_usage") if isinstance(info, dict) else None
+            _codex_sample(entry, usage, context, record.get("timestamp"))
 
 
 def _claude(entry: dict[str, Any], record: dict[str, Any]) -> None:
@@ -355,7 +400,7 @@ class UsageCollector:
             raise ValueError("telemetry cache is invalid; restore or remove its local cache") from None
         return cache
 
-    def poll(self, sources: list[dict]) -> dict[str, Any]:
+    def poll(self, sources: list[dict], *, preserve_unlisted=False) -> dict[str, Any]:
         """Return a redacted projection; missing/error sources never become zero usage."""
         normalized = [validate_source(source) for source in sources]
         if len({source["id"] for source in normalized}) != len(normalized):
@@ -372,7 +417,7 @@ class UsageCollector:
             cache = self._load()
             before = json.dumps(cache, sort_keys=True)
             rows = []
-            retained = {}
+            retained = dict(cache["sources"]) if preserve_unlisted else {}
             for source in normalized:
                 entry, row = self._read_source(source, cache["sources"].get(source["id"]))
                 if entry is not None:

@@ -83,6 +83,30 @@ class UsageCollectorTests(unittest.TestCase):
         self.assertNotIn("private-message-never-cached", cache)
         self.assertNotIn("message-a", cache)
 
+    def test_codex_native_thread_records_exclude_fork_history_and_outlive_lagging_events(self):
+        """Spec: REQ-progress-dashboard-004."""
+        own = "00000000-0000-4000-8000-000000000001"
+        foreign = "00000000-0000-4000-8000-000000000002"
+        self.source["thread_id"] = own
+
+        def native(thread, total, stamp="2026-11-14T10:10:00Z", ordinal=30):
+            return {"type": "token_usage_record", "timestamp": stamp, "ordinal": ordinal, "payload": {
+                "thread_id": thread, "thread_token_usage": {"input_tokens": total - 5,
+                "cached_input_tokens": 20, "output_tokens": 5, "total_tokens": total},
+                "usage": {"total_tokens": 33}}}
+
+        self.write({"type": "session_meta", "payload": {"id": own, "subagent_history_start_ordinal": 20}},
+                   {**codex(9999), "ordinal": 10}, native(foreign, 99999, ordinal=11))
+        self.assertIsNone(self.poll()["totals"]["total_tokens"])
+        self.write(native(own, 105), native(foreign, 99999), {**codex(50), "ordinal": 31}, mode="a")
+        measured = self.poll()
+        self.assertEqual(measured["totals"]["total_tokens"], 105)
+        self.assertEqual(measured["agents"][0]["observed_at"], "2026-11-14T10:10:00+00:00")
+        self.collector = telemetry.UsageCollector(self.workspace)
+        self.write({**codex(9999), "ordinal": 32},
+                   native(own, 205, "2026-11-14T10:11:00Z", ordinal=33), mode="a")
+        self.assertEqual(self.poll()["totals"]["total_tokens"], 205)
+
     def test_restart_reuses_offsets_and_unchanged_polls_do_not_rewrite_cache(self):
         """Spec: REQ-progress-dashboard-003."""
         self.write(codex())

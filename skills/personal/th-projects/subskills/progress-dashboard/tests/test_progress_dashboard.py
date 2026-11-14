@@ -5,12 +5,14 @@
 """Exercise persistence, feedback transport and detached server lifecycle."""
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import tempfile
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
@@ -20,6 +22,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 import progress_dashboard as dashboard
 from dashboard_server import DashboardServer
+from runtime_sources import configuration, resolve, retain
 
 
 class WorkspaceFixture:
@@ -231,6 +234,112 @@ class WorkspaceTests(WorkspaceFixture, unittest.TestCase):
                     self.assertEqual(degraded.sample_usage()["totals"]["total_tokens"], 13)
                 finally:
                     degraded.server_close()
+
+
+class RuntimeTests(WorkspaceFixture, unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        self.home = Path(self.tmp.name) / "runtime"
+        self.home.mkdir()
+        self.parent = "00000000-0000-4000-8000-000000000001"
+        self.child = "00000000-0000-4000-8000-000000000002"
+        self.foreign = "00000000-0000-4000-8000-000000000003"
+        self.index = self.home / "state_5.sqlite"
+        self.parent_log = self.home / "parent.jsonl"
+        self.child_log = self.home / "child.jsonl"
+        for identity, path in ((self.parent, self.parent_log), (self.child, self.child_log)):
+            path.write_text(json.dumps({"type": "token_usage_record", "timestamp": "2026-11-14T10:10:00Z",
+                "payload": {"thread_id": identity, "thread_token_usage": {"input_tokens": 10,
+                "cached_input_tokens": 5, "output_tokens": 3, "total_tokens": 13}}}) + "\n")
+        with closing(sqlite3.connect(self.index, isolation_level=None)) as db:
+            db.executescript("CREATE TABLE threads(id TEXT PRIMARY KEY, rollout_path TEXT, agent_path TEXT, model TEXT);"
+                             "CREATE TABLE thread_spawn_edges(parent_thread_id TEXT, child_thread_id TEXT, status TEXT);")
+            db.executemany("INSERT INTO threads VALUES(?,?,?,?)", [
+                (self.parent, str(self.parent_log), None, "runtime-model"),
+                (self.child, str(self.child_log), "/root/reviewer", "runtime-model"),
+                (self.foreign, str(self.home / "never-read.jsonl"), "/foreign/reviewer", "unrelated")])
+            db.execute("INSERT INTO thread_spawn_edges VALUES(?,?,?)", (self.parent, self.child, "closed"))
+
+    def test_watch_resolves_only_owned_agents_and_survives_index_outage_without_replay(self):
+        """Spec: REQ-progress-dashboard-004."""
+        result = subprocess.run([sys.executable, str(SCRIPTS / "progress_dashboard.py"),
+            "--root", self.tmp.name, "--slug", "automatic", "init", "--title", "Automatic usage",
+            "--actor", "parent", "--repo-root", self.tmp.name], env={**os.environ,
+            "CODEX_THREAD_ID": self.parent, "CODEX_HOME": str(self.home)},
+            capture_output=True, text=True, check=True)
+        self.assertEqual(json.loads(result.stdout)["watching"], "codex")
+        self.assertEqual(dashboard.load(Path(self.tmp.name) / "automatic/runtime.json")["thread_id"], self.parent)
+        dashboard.checkpoint(self.folder, self.snapshot(), 0)
+        handover = (self.folder / "handover.md").read_bytes()
+        dashboard.watch_codex(self.folder, self.parent, self.home)
+        server = DashboardServer(self.folder, "127.0.0.1", 0, "owned-runtime")
+        try:
+            view = server.view()
+            self.assertEqual(view["telemetry"]["coverage"], {"attached": 2, "expected": 2, "measured": 2})
+            self.assertEqual(view["telemetry"]["totals"]["total_tokens"], 26)
+            self.assertEqual(next(r for r in view["telemetry"]["agents"] if r["id"] == "reviewer")["thread_id"], self.child)
+            self.assertNotIn(str(self.home), json.dumps(view))
+            self.index.rename(self.home / "unavailable.sqlite")
+            before = (self.folder / "telemetry-cache.json").read_bytes()
+            degraded = server.sample_usage()
+            self.assertEqual(degraded["totals"]["total_tokens"], 26)
+            self.assertIn("runtime index unavailable", degraded["error"])
+            self.assertEqual((self.folder / "telemetry-cache.json").read_bytes(), before)
+            self.assertFalse(self.index.exists())  # mode=ro never creates a replacement index.
+            self.assertEqual((self.folder / "handover.md").read_bytes(), handover)
+            explicit = self.home / "explicit.jsonl"
+            explicit.write_text(json.dumps({"type": "assistant", "message": {"id": "new-work",
+                "usage": {"input_tokens": 4, "output_tokens": 1}}}) + "\n")
+            dashboard.attach(self.folder, "reviewer", "claude", str(explicit))
+            changed = server.sample_usage()
+            reviewer = next(row for row in changed["agents"] if row["id"] == "reviewer")
+            self.assertEqual((reviewer["provider"], reviewer["total_tokens"]), ("claude", 5))
+            self.assertNotIn("thread_id", reviewer)
+            before_restart = (self.folder / "telemetry-cache.json").read_bytes()
+            restarted = DashboardServer(self.folder, "127.0.0.1", 0, "outage-restart")
+            try:
+                self.assertEqual(restarted.view()["telemetry"]["totals"]["total_tokens"], 18)
+                self.assertEqual((self.folder / "telemetry-cache.json").read_bytes(), before_restart)
+                # A lost/corrupt derived binding cache must not prune offsets;
+                # restored native lookup can resume without a full log replay.
+                (self.folder / "runtime-sources.json").write_text("invalid bindings")
+                partial = restarted.sample_usage()
+                self.assertEqual(partial["totals"]["total_tokens"], 5)
+                self.assertEqual((self.folder / "telemetry-cache.json").read_bytes(), before_restart)
+                (self.home / "unavailable.sqlite").rename(self.index)
+                recovered = restarted.sample_usage()
+                self.assertEqual(recovered["totals"]["total_tokens"], 18)
+                self.assertNotIn("error", recovered)
+                self.assertEqual((self.folder / "telemetry-cache.json").read_bytes(), before_restart)
+            finally:
+                restarted.server_close()
+        finally:
+            server.server_close()
+
+    def test_watch_refuses_ambiguous_names_and_preserves_explicit_source_precedence(self):
+        """Spec: REQ-progress-dashboard-004."""
+        config = configuration(self.parent, self.home)
+        with closing(sqlite3.connect(self.index, isolation_level=None)) as db:
+            db.execute("INSERT INTO thread_spawn_edges VALUES(?,?,?)", (self.child, self.foreign, "open"))
+            db.execute("INSERT INTO thread_spawn_edges VALUES(?,?,?)", (self.child, self.parent, "closed"))
+        sources, metadata, warnings = resolve(config, "owner", [{"id": "reviewer"}], [])
+        self.assertEqual([row["id"] for row in sources], ["owner"])
+        self.assertTrue(warnings)
+        explicit = {"id": "reviewer", "provider": "claude", "path": str(self.home / "explicit.jsonl")}
+        sources, metadata, warnings = resolve(config, "owner", [{"id": "reviewer", "thread_id": self.child}], [explicit])
+        self.assertEqual(next(r for r in sources if r["id"] == "reviewer"), explicit)
+        self.assertNotIn("reviewer", metadata)
+        self.assertFalse(warnings)
+        proven, identities, _ = resolve(config, "owner", [{"id": "reviewer", "thread_id": self.child}], [])
+        saved = {"config": config, "sources": proven, "metadata": identities}
+        # A reused workflow label must not retain old-thread counts after the
+        # parent publishes a new explicit selector during an index outage.
+        retained, identities, _ = retain(config, "owner", [{"id": "reviewer", "thread_id": self.foreign}], saved, [])
+        self.assertEqual([row["id"] for row in retained], ["owner"])
+        self.assertNotIn("reviewer", identities)
+        with self.assertRaises(ValueError):
+            dashboard.watch_codex(self.folder, "invalid", self.home)
+        self.assertFalse((self.folder / "runtime.json").exists())
 
 
 class HttpTests(WorkspaceFixture, unittest.TestCase):

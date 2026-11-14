@@ -113,6 +113,17 @@ summary .count { margin-left: .3rem; }
 .agent-task { font-size: .84rem; margin: .35rem 0 0; overflow-wrap: anywhere; }
 .agent-summary { font-size: .8rem; color: var(--ink-2); margin: .3rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .agent-meta { display: flex; flex-wrap: wrap; gap: .35rem .7rem; color: var(--muted); margin-top: .5rem; font-size: .67rem; }
+.agent-details { margin-top: .65rem; font-size: .76rem; }
+.agent-details > summary { color: var(--clay); width: fit-content; }
+.agent-details h4 { margin: .85rem 0 .4rem; font: 600 .73rem var(--sans); }
+.agent-actions ul { margin: .4rem 0 .8rem; padding-left: 1.2rem; color: var(--ink-2); }
+.agent-actions li { margin-block: .25rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.agent-actions p { font-size: .74rem; }
+.agent-context { display: grid; grid-template-columns: minmax(75px, 100px) minmax(0, 1fr); gap: .35rem .8rem; margin: .65rem 0; padding: .75rem; background: var(--subtle); border-radius: 6px; }
+.agent-context dt { color: var(--muted); font-size: .69rem; }
+.agent-context dd { margin: 0; color: var(--ink-2); font-size: .73rem; overflow-wrap: anywhere; min-width: 0; }
+.agent-context code { font-size: .95em; }
+.agent-context a { display: inline-block; max-width: 100%; }
 .badge { font: .66rem/1.5 var(--sans); border: 1px solid var(--line); border-radius: 4px; padding: .08rem .35rem; color: var(--muted); }
 .badge.active { background: var(--green-tint); color: var(--green); border-color: transparent; }
 .badge.waiting { background: var(--amber-tint); color: var(--amber); border-color: transparent; }

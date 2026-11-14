@@ -43,9 +43,45 @@ class DashboardServer(ThreadingHTTPServer):
         try:
             with model.lock(self.folder):
                 sources = model.load(self.folder / "sources.json", [])
+                runtime = model.load(self.folder / "runtime.json", {})
+                state = model.load(self.folder / "state.json")
             if not isinstance(sources, list):
                 raise ValueError("usage sources must be a list")  # noqa: TRY004 - state validation uses ValueError
-            return self.collector.poll(sources)
+            metadata, warnings, lookup_failed = {}, [], False
+            if runtime:
+                from runtime_sources import resolve, retain
+                try:
+                    resolved, metadata, warnings = resolve(runtime, state["actor"], state["agents"], sources)
+                    proven = {"config": runtime, "sources": [row for row in resolved if row["id"] in metadata],
+                              "metadata": metadata}
+                    with model.lock(self.folder):
+                        path = self.folder / "runtime-sources.json"
+                        try:
+                            previous = model.load(path, {})
+                        except ValueError:
+                            previous = None  # A successful index lookup repairs only derived bindings.
+                        if previous != proven:
+                            model.save(path, proven)
+                    sources = resolved
+                except ValueError as error:
+                    lookup_failed = True
+                    warnings = [str(error)]
+                    try:
+                        with model.lock(self.folder):
+                            saved = model.load(self.folder / "runtime-sources.json",
+                                {"config": runtime, "sources": [], "metadata": {}})
+                        sources, metadata, retained_warnings = retain(runtime, state["actor"], state["agents"], saved, sources)
+                        warnings.extend(retained_warnings)
+                    except ValueError as retained_error:
+                        warnings.append(str(retained_error))
+            # Even without valid retained bindings, a failed lookup must never
+            # prune offsets for currently unresolved automatic sources.
+            result = self.collector.poll(sources, preserve_unlisted=lookup_failed)
+            for row in result["agents"]:
+                row.update(metadata.get(row["id"], {}))
+            if warnings:
+                result["error"] = "Runtime attribution: " + " ".join(warnings)
+            return result
         except (ValueError, OSError) as error:
             # Optional usage must not take progress or feedback down with it.
             # Do not include transcript paths/content in the browser diagnostic.

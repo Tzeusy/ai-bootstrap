@@ -67,7 +67,7 @@ Scope: v1-mandatory
 
 ### Requirement: Honest Incremental Usage and Agent Overview
 
-The dashboard MUST summarize parent and child-agent observations with source freshness, MUST collect supported explicitly attached usage logs incrementally, and MUST distinguish measured, partial, unknown and errored counters without fabricating estimates or double-counting cached input.
+The dashboard MUST summarize parent and child-agent observations with source freshness, MUST collect supported attached usage logs incrementally, MUST resolve known Codex children through a read-only parent-scoped runtime relationship index when configured, and MUST distinguish measured, partial, unknown and errored counters without fabricating estimates or double-counting cached input or inherited fork history.
 
 ID: REQ-progress-dashboard-004
 Source: owner refinement 2026-11-14 progress, tokens and subagents in one visual layer
@@ -82,6 +82,16 @@ Scope: v1-mandatory
 
 - **WHEN** a source is missing, malformed, unsupported or not fully consumed
 - **THEN** the page displays its unknown/error/partial state and excludes unmeasured rows from aggregate coverage rather than representing them as measured zero, while optional usage failure leaves progress and feedback available
+
+#### Scenario: A configured Codex parent launches known agents
+
+- **WHEN** the runtime index links a published agent to the configured parent session
+- **THEN** background metadata lookup resolves its log and runtime identity without per-child manual attachment, transcript-directory crawling, unrelated-session reads or model calls, and thread-filtered runtime counters supersede legacy cumulative events
+
+#### Scenario: The owner inspects an agent's work
+
+- **WHEN** an agent has reported a summary, recent actions and delivery branch/worktree/PR at an existing checkpoint
+- **THEN** its expandable detail view shows those reports alongside runtime attribution and freshness, retains open state and keyboard focus through usage refreshes, and identifies missing reports without inventing work or delivery links
 
 ### Requirement: Durable Authority-Safe Steering
 
