@@ -1,3 +1,9 @@
+## Purpose
+
+Give each running workflow a reusable local progress view with agent and usage
+observations plus durable steering, without model-driven refresh overhead or a
+second task/authorization authority.
+
 ## ADDED Requirements
 
 ### Requirement: Reusable Session-Owned Progress Workspace
