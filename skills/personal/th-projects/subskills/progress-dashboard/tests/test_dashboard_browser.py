@@ -112,19 +112,19 @@ class DashboardBrowserTests(unittest.TestCase):
 
     def test_progress_feedback_acknowledgement_and_safe_content(self):
         page = self.page
-        self.assertEqual(page.locator("#token-total").inner_text(), "Unknown")
+        self.assertEqual(page.locator("#token-total").inner_text(), "—")
         page.locator("#feedback-text").fill("Keep this bounded and token efficient.")
-        model.checkpoint(self.folder, {"findings": ["<img src=x onerror=window.unsafe=true>"]}, 1)
+        model.checkpoint(self.folder, {"findings": ["<img src=x onerror=window.unsafe=true>"]})
         self.refresh()
-        page.locator("#findings").get_by_text("<img src=x onerror=window.unsafe=true>", exact=True).wait_for()
+        page.locator("#finding-list").get_by_text("<img src=x onerror=window.unsafe=true>", exact=True).wait_for()
         self.assertEqual(page.locator("#feedback-text").input_value(), "Keep this bounded and token efficient.")
         self.assertIsNone(page.evaluate("window.unsafe"))
-        self.assertEqual(page.locator("#findings img").count(), 0)
+        self.assertEqual(page.locator("#finding-list img").count(), 0)
         page.reload()
         page.get_by_role("heading", name="A useful progress workspace", exact=True).wait_for()
         self.assertEqual(page.locator("#feedback-text").input_value(), "Keep this bounded and token efficient.")
         page.locator("#feedback-target").select_option("reviewer")
-        page.get_by_role("button", name="Send feedback", exact=True).click()
+        page.get_by_role("button", name="Send", exact=True).click()
         self.saved_result()
         rows = self.saved()
         self.assertEqual(len(rows), 1)
@@ -150,10 +150,10 @@ class DashboardBrowserTests(unittest.TestCase):
 
         page.route("**/api/feedback", interrupt_confirmation)
         page.locator("#feedback-text").fill("One message even if confirmation is interrupted.")
-        page.get_by_role("button", name="Send feedback", exact=True).click()
+        page.get_by_role("button", name="Send", exact=True).click()
         expect(page.locator("#feedback-result")).to_contain_text("Your draft is kept")
         self.assertEqual(len(self.saved()), 1)
-        page.get_by_role("button", name="Send feedback", exact=True).click()
+        page.get_by_role("button", name="Send", exact=True).click()
         self.saved_result()
         self.assertEqual(len(self.saved()), 1)
         original = model.record_feedback
@@ -165,100 +165,105 @@ class DashboardBrowserTests(unittest.TestCase):
 
         with patch.object(model, "record_feedback", slow_record):
             page.locator("#feedback-text").fill("The message being saved.")
-            page.get_by_role("button", name="Send feedback", exact=True).click()
+            page.get_by_role("button", name="Send", exact=True).click()
             self.assertFalse(page.locator("#feedback-text").is_disabled())
             page.locator("#feedback-text").fill("A new thought while saving.")
             self.saved_result()
         self.assertEqual(page.locator("#feedback-text").input_value(), "A new thought while saving.")
         self.assertEqual(len(self.saved()), 2)
 
-    def test_refresh_preserves_agent_focus_document_disclosures_and_drafts(self):
+    def test_refresh_preserves_agent_focus_disclosures_and_drafts(self):
         page = self.page
+        agent = page.locator('.agent[data-agent-id="reviewer"]')
+        summary = agent.locator("summary")
+        summary.click()
+        agent.evaluate("node => window.retainedAgent = node")
         button = page.get_by_role("button", name="Comment on Independent reviewer", exact=True)
         button.focus()
-        button.evaluate("node => window.retainedAgentButton = node")
         # The collector samples every three seconds even when counters did not change.
         with self.server.telemetry_lock:
             self.server.telemetry = {**self.server.telemetry, "sampled_at": "2099-01-01T00:00:00Z"}
         with page.expect_response("**/api/state"):
             page.locator("#refresh").evaluate("node => node.click()")
         expect(button).to_be_focused()
-        self.assertTrue(button.evaluate("node => node === window.retainedAgentButton"))
         page.locator("#feedback-text").fill("Keep this draft while inspecting the agent.")
-        agent = page.locator('.agent[data-agent-id="reviewer"]')
-        disclosure = agent.locator(".agent-details")
-        disclosure.locator("summary").click()
-        disclosure.locator("summary").focus()
-        disclosure.evaluate("node => window.retainedAgentDetails = node")
-        self.assertTrue(agent.locator(".agent-summary").is_visible())
-        expect(disclosure).to_contain_text("Reviewed the storage contract.")
-        expect(disclosure).to_contain_text("agent/review-progress")
+        expect(agent).to_contain_text("Waiting for a reviewable checkpoint.")
+        expect(agent).to_contain_text("Reviewed the storage contract.")
+        expect(agent).to_contain_text("agent/review-progress")
+        expect(agent).to_contain_text("Not measured: no usage source attached")
         measured = {
             "id": "reviewer", "provider": "codex", "status": "measured",
             "input_tokens": 100, "cached_input_tokens": 80, "output_tokens": 23, "total_tokens": 123,
             "observed_at": model.now(), "thread_id": "11111111-1111-4111-8111-111111111111",
             "agent_path": "/root/reviewer", "model": "runtime-model",
         }
+        link = agent.get_by_role("link")
+        expect(link).to_have_attribute("href", "https://github.com/example/progress/pull/123")
+        expect(link).to_have_attribute("rel", "noopener noreferrer")
+        link.focus()
+        link.evaluate("node => window.retainedLink = node")
         with self.server.telemetry_lock:
             self.server.telemetry = {"agents": [measured], "totals": {"input_tokens": 100, "cached_input_tokens": 80, "output_tokens": 23, "total_tokens": 123}, "coverage": {"attached": 1, "measured": 1}, "sampled_at": model.now()}
         with page.expect_response("**/api/state"):
             page.locator("#refresh").evaluate("node => node.click()")
-        expect(disclosure).to_have_attribute("open", "")
-        expect(disclosure.locator("summary")).to_be_focused()
-        self.assertTrue(disclosure.evaluate("node => node === window.retainedAgentDetails"))
-        expect(disclosure).to_contain_text("runtime-model")
-        expect(disclosure).to_contain_text(measured["thread_id"])
-        expect(disclosure).to_contain_text("/root/reviewer")
-        link = disclosure.get_by_role("link")
-        expect(link).to_have_attribute("href", "https://github.com/example/progress/pull/123")
-        expect(link).to_have_attribute("rel", "noopener noreferrer")
-        link.focus()
-        with self.server.telemetry_lock:
-            self.server.telemetry["agents"] = [{**measured, "input_tokens": 177, "total_tokens": 200}]
-            self.server.telemetry["totals"] = {**self.server.telemetry["totals"], "input_tokens": 177, "total_tokens": 200}
-        with page.expect_response("**/api/state"):
-            page.locator("#refresh").evaluate("node => node.click()")
+        # Changing usage patches the row; the open report and its controls are the same nodes.
+        expect(agent).to_contain_text("20 new input · 80 cached · 23 output")
+        expect(agent).to_contain_text("example · codex · session 11111111")
+        expect(agent).to_have_attribute("open", "")
         expect(link).to_be_focused()
-        expect(disclosure).to_have_attribute("open", "")
+        self.assertTrue(agent.evaluate("node => node === window.retainedAgent"))
+        self.assertTrue(link.evaluate("node => node === window.retainedLink"))
         expect(page.locator("#feedback-text")).to_have_value("Keep this draft while inspecting the agent.")
-        button.focus()
-        # An unrelated child report must also preserve this agent's control.
-        other = {**self.snapshot["agents"][0], "id": "builder", "name": "Builder", "status": "running", "branch": "", "worktree": "", "pr_url": "", "activity": []}
-        model.checkpoint(self.folder, {"agents": [*self.snapshot["agents"], other]}, 1)
+        # A delta for another agent and a status change leave this row's state alone.
+        summary.focus()
+        model.checkpoint(self.folder, {"agents": [{"id": "builder", "name": "Builder"}, {"id": "reviewer", "status": "running"}]})
         with page.expect_response("**/api/state"):
             page.locator("#refresh").evaluate("node => node.click()")
-        expect(button).to_be_focused()
-        self.assertTrue(button.evaluate("node => node === window.retainedAgentButton"))
-        builder_button = page.get_by_role("button", name="Comment on Builder", exact=True)
-        builder_button.focus()
-        model.checkpoint(self.folder, {"agents": [other, *self.snapshot["agents"]]}, 2)
-        with page.expect_response("**/api/state"):
-            page.locator("#refresh").evaluate("node => node.click()")
-        expect(builder_button).to_be_focused()
-        missing = page.locator('.agent[data-agent-id="builder"] .agent-details')
-        missing.locator("summary").click()
-        expect(missing).to_contain_text("No recent actions reported.")
-        expect(missing).to_contain_text("Not reported; may share the parent checkout.")
-        self.assertEqual(missing.get_by_role("link").count(), 0)
-        expect(disclosure).to_have_attribute("open", "")
-        details = page.locator('.document[data-name="in-progress.md"]')
-        details.locator("summary").click()
-        details.locator("summary").focus()
-        model.checkpoint(self.folder, {"findings": ["A new report arrived."]}, 3)
-        with page.expect_response("**/api/state"):
-            page.locator("#refresh").evaluate("node => node.click()")
-        expect(details).to_have_attribute("open", "")
-        expect(details.locator("summary")).to_be_focused()
-        page.get_by_role("button", name="Comment on Independent reviewer", exact=True).click()
+        expect(summary).to_be_focused()
+        expect(summary).to_contain_text("Running")
+        expect(agent).to_have_attribute("open", "")
+        builder = page.locator('.agent[data-agent-id="builder"]')
+        builder.locator("summary").click()
+        expect(builder).to_contain_text("Not measured")
+        self.assertEqual(builder.get_by_role("link").count(), 0)
+        button.click()
         expect(page.locator("#feedback-text")).to_be_focused()
         expect(page.locator("#feedback-target")).to_have_value("reviewer")
         page.locator("#feedback-text").fill("Keep the review independent.")
-        page.locator("#feedback-text").press("Tab")
-        expect(page.locator("#submit-feedback")).to_be_focused()
-        page.locator("#submit-feedback").press("Enter")
+        page.locator("#feedback-text").press("Control+Enter")
         self.saved_result()
         expect(page.locator("#nav-feedback")).to_have_text("1")
+        expect(page.locator("#feedback-total")).to_have_text("1 pending")
         expect(page.locator("#submit-feedback")).to_be_disabled()
+
+    def test_templated_panels_task_links_and_derived_activity(self):
+        page = self.page
+        expect(page.locator("#visuals")).to_be_hidden()
+        expect(page.locator('nav a[href="#visuals"]')).to_be_hidden()
+        model.checkpoint(self.folder, {
+            "agents": [{"id": "reviewer", "task": "review"}],
+            "tasks": [{"id": "work", "status": "complete"}],
+            "panels": [
+                {"id": "gates", "title": "Delivery gates", "kind": "steps", "rows": [["Tests", "done", "31 pass"], ["<b>Review</b>", "active"]]},
+                {"id": "size", "title": "Payload", "kind": "bars", "rows": [["Before", 2140, "bytes"], ["After", 96, "bytes"]]},
+                {"id": "counts", "title": "Round", "kind": "stats", "rows": [["Findings", 7], ["Fixed", 6, "1 deferred"]]},
+                {"id": "prs", "title": "Pull requests", "kind": "table", "rows": [["PR", "Files"], ["#65", 14]]}]})
+        self.refresh()
+        panels = page.locator("#panel-list .panel")
+        expect(panels).to_have_count(4)
+        expect(panels.nth(0)).to_contain_text("<b>Review</b>")
+        self.assertEqual(page.locator("#panel-list b").count(), 0)
+        widths = panels.nth(1).locator(".bar .fresh").evaluate_all("nodes => nodes.map(node => node.getBoundingClientRect().width)")
+        self.assertGreater(widths[0], widths[1] * 10)
+        expect(panels.nth(2)).to_contain_text("1 deferred")
+        expect(panels.nth(3).get_by_role("columnheader", name="Files")).to_be_visible()
+        expect(page.locator("#nav-visuals")).to_have_text("4")
+        expect(page.locator("#task-total")).to_have_text("1/2")
+        expect(page.locator("#activity-list li").first).to_contain_text("Published: Pull requests")
+        expect(page.locator("#activity-list")).to_contain_text("Implement the workspace: complete")
+        # A task names the agents working on it; the chip opens that agent's report.
+        page.locator('.task[data-task-id="review"]').get_by_role("link", name="Independent reviewer").click()
+        expect(page.locator('.agent[data-agent-id="reviewer"]')).to_have_attribute("open", "")
 
     def test_stale_checkpoint_offline_recovery_and_mobile_feedback_navigation(self):
         page = self.page
@@ -266,8 +271,8 @@ class DashboardBrowserTests(unittest.TestCase):
         state["updated_at"] = "2020-01-01T00:00:00Z"
         model.save(self.folder / "state.json", state)
         self.refresh()
-        expect(page.locator("#connection-text")).to_have_text("Page connected")
-        expect(page.locator("#checkpoint-time")).to_contain_text("status may be stale")
+        expect(page.locator("#connection-text")).to_have_text("Live")
+        expect(page.locator("#checkpoint-time")).to_contain_text("may be stale")
         with self.server.telemetry_lock:
             self.server.telemetry = {**self.server.telemetry, "error": "Telemetry unavailable; check the attached sources."}
         self.refresh()
@@ -282,9 +287,9 @@ class DashboardBrowserTests(unittest.TestCase):
         page.get_by_role("heading", name="A useful progress workspace", exact=True).wait_for()
         self.page = page
         feedback_link = page.locator('nav a[href="#feedback"]')
-        expect(feedback_link).to_be_in_viewport()
+        expect(page.locator("#top-title")).to_have_text("A useful progress workspace")
         expect(page.locator('nav a[href="#work"]')).to_have_attribute("aria-current", "true")
-        agent_details = page.locator(".agent-details").first
+        agent_details = page.locator('.agent[data-agent-id="reviewer"]')
         agent_details.locator("summary").click()
         expect(agent_details).to_have_attribute("open", "")
         expect(agent_details).to_contain_text("agent/review-progress")
@@ -292,10 +297,11 @@ class DashboardBrowserTests(unittest.TestCase):
         feedback_link.click()
         expect(page.locator("#feedback-heading")).to_be_in_viewport()
         expect(feedback_link).to_have_attribute("aria-current", "true")
+        expect(feedback_link).to_be_in_viewport()
         page.locator("#feedback-text").fill("Keep this draft if the connection fails.")
         page.route("**/api/state", lambda route: route.abort())
         self.refresh()
-        expect(page.locator("#load-error")).to_contain_text("Showing the last received snapshot")
+        expect(page.locator("#load-error")).to_contain_text("Showing the last snapshot")
         expect(page.locator("#feedback-text")).to_have_value("Keep this draft if the connection fails.")
         page.unroute("**/api/state")
         self.refresh()
@@ -308,7 +314,7 @@ class DashboardBrowserTests(unittest.TestCase):
         finished = {**builder, "id": "researcher", "name": "Runtime researcher", "status": "complete", "summary": "Missing counters must stay unknown."}
         image = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160"><rect width="640" height="160" fill="#faf9f5"/><text x="30" y="85" font-family="serif" font-size="24" fill="#24231f">Checkpoint → workspace → owner feedback</text></svg>'
         (self.folder / "artifacts" / "flow.svg").write_text(image)
-        model.checkpoint(self.folder, {"tasks": [complete, *self.snapshot["tasks"]], "agents": [builder, *self.snapshot["agents"], finished], "findings": ["Unknown counters stay unknown.", "Feedback waits for a safe checkpoint."], "artifacts": [{"path": "flow.svg", "label": "Workspace feedback flow"}]}, 1)
+        model.checkpoint(self.folder, {"tasks": [complete, *self.snapshot["tasks"]], "agents": [builder, *self.snapshot["agents"], finished], "findings": ["Unknown counters stay unknown.", "Feedback waits for a safe checkpoint."], "artifacts": [{"path": "flow.svg", "label": "Workspace feedback flow"}]})
         source = self.root / "usage.jsonl"
         source.write_text(json.dumps({"type": "event_msg", "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 80, "output_tokens": 23, "total_tokens": 123}}}}) + "\n")
         model.attach(self.folder, "parent", "codex", str(source))
@@ -316,13 +322,16 @@ class DashboardBrowserTests(unittest.TestCase):
         self.server.telemetry = self.server.collector.poll(model.load(self.folder / "sources.json"))
         self.refresh()
         expect(self.page.locator("#token-total")).to_have_text("123")
-        self.assertIn("1 of 4", self.page.locator("#token-caption").inner_text())
-        expect(self.page.locator("#completed-count")).to_have_text("1 / 3")
-        expect(self.page.locator("#agent-total")).to_have_text("3 recorded")
-        expect(self.page.locator("#agent-caption")).to_have_text("1 working · 1 waiting · 1 complete")
+        expect(self.page.locator("#token-caption")).to_have_text("80% of input cached · 23 output")
+        expect(self.page.locator("#token-coverage")).to_have_text("1 of 4 sessions measured")
+        expect(self.page.locator("#task-total")).to_have_text("1/3")
+        expect(self.page.locator("#agent-total")).to_have_text("1 running")
+        expect(self.page.locator("#agent-caption")).to_have_text("1 waiting · 1 done")
         expect(self.page.locator("#nav-findings")).to_have_text("2")
-        self.page.locator("#completed-details > summary").click()
-        expect(self.page.locator("#complete")).to_contain_text("Reviewed contract.")
+        done = self.page.locator('.task-group[data-key="complete"]')
+        expect(done.get_by_text("Reviewed contract.")).to_be_hidden()
+        done.locator("summary").click()
+        expect(done).to_contain_text("Reviewed contract.")
         preview = self.page.get_by_role("img", name="Workspace feedback flow", exact=True)
         preview.scroll_into_view_if_needed()
         expect(preview).to_be_visible()
@@ -332,14 +341,11 @@ class DashboardBrowserTests(unittest.TestCase):
         artifact = self.root / "download.svg"
         transfer.value.save_as(artifact)
         self.assertEqual(artifact.read_text(), image)
-        expect(self.page.locator("#token-coverage")).to_be_visible()
-        self.assertIn("3 unknown", self.page.locator("#token-caption").inner_text())
-        self.assertIn("Token usage unknown", self.page.locator("#agent-list").inner_text())
-        self.page.get_by_text("Usage by session", exact=True).click()
-        self.page.get_by_text("codex · error", exact=True).wait_for()
-        self.page.get_by_text("unreadable source", exact=True).wait_for()
-        for disclosure in self.page.locator(".agent-details").all():
+        expect(self.page.locator('.agent[data-agent-id="parent"] .agent-tokens')).to_contain_text("123")
+        for disclosure in self.page.locator(".agent").all():
             disclosure.locator("summary").click()
+        expect(self.page.locator('.agent[data-agent-id="reviewer"]')).to_contain_text("Not measured: unreadable source")
+        expect(self.page.locator('.agent[data-agent-id="builder"]')).to_contain_text("Not measured: no usage source attached")
         self.page.emulate_media(color_scheme="dark")
         for width in (320, 390, 650, 768, 970, 1280):
             self.page.set_viewport_size({"width": width, "height": 900})

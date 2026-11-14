@@ -10,7 +10,9 @@ label in a checkpoint:
 {"artifacts":[{"path":"architecture.svg","label":"Workspace architecture"}]}
 ```
 
-The list replaces the current artifact collection; retain other visible items.
+Artifacts merge by `path`; `{"path":"old.svg","drop":true}` unpublishes one. For a
+chart or table built from numbers, prefer a [panel](protocol.md#panels): it
+needs no renderer and no file.
 Supported formats: PNG, JPEG, WebP, GIF, SVG, PDF and Excalidraw source. Use the
 existing Excalidraw renderer for diagrams; publish rendered output alongside
 source when useful. PDFs and source files download as attachments.
