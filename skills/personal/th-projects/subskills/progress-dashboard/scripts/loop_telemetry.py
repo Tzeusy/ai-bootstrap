@@ -95,6 +95,56 @@ def _empty(source: dict[str, str], identity: list[int]) -> dict[str, Any]:
     }
 
 
+def _digest(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(
+        character in "0123456789abcdef" for character in value
+    )
+
+
+def _valid_cache_entry(agent_id: str, entry: Any) -> bool:
+    """Check persisted parser state before trusting offsets or incremental sums."""
+    if not isinstance(entry, dict) or entry.get("id") != agent_id:
+        return False
+    if entry.get("provider") not in ("codex", "claude") or not isinstance(entry.get("path"), str):
+        return False
+    identity = entry.get("identity")
+    if not isinstance(identity, list) or len(identity) != 2 or not all(map(_count, identity)):
+        return False
+    if not all(_count(entry.get(key)) for key in (
+        "offset", "size_seen", "invalid_events", "skipped_lines"
+    )) or entry["offset"] > entry["size_seen"]:
+        return False
+    digest_valid = _digest(entry.get("tail_digest")) if entry["offset"] else entry.get("tail_digest") == ""
+    if not digest_valid or type(entry.get("discard_partial")) is not bool:
+        return False
+    usage = entry.get("usage")
+    if "usage" not in entry or (usage is not None and (
+        not isinstance(usage, dict)
+        or not all(_count(usage.get(key)) for key in ("input_tokens", "output_tokens", "total_tokens"))
+        or "cached_input_tokens" not in usage
+        or (usage["cached_input_tokens"] is not None and (
+            not _count(usage["cached_input_tokens"])
+            or usage["cached_input_tokens"] > usage["input_tokens"]
+        ))
+        or (entry["provider"] == "claude" and usage["cached_input_tokens"] is None)
+    )):
+        return False
+    if "context_tokens" not in entry or (
+        entry["context_tokens"] is not None and not _count(entry["context_tokens"])
+    ):
+        return False
+    if "observed_at" not in entry or (
+        entry["observed_at"] is not None and _timestamp(entry["observed_at"]) is None
+    ):
+        return False
+    messages = entry.get("messages")
+    return isinstance(messages, dict) and len(messages) <= MAX_MESSAGES and all(
+        _digest(key)
+        and isinstance(values, list) and len(values) == 4 and all(map(_count, values))
+        for key, values in messages.items()
+    )
+
+
 def _codex(entry: dict[str, Any], record: dict[str, Any]) -> None:
     payload = record.get("payload")
     if record.get("type") != "event_msg" or not isinstance(payload, dict):
@@ -295,6 +345,9 @@ class UsageCollector:
             with os.fdopen(descriptor, "r", encoding="utf-8") as stream:
                 cache = json.load(stream)
             if cache.get("schema") != 1 or not isinstance(cache.get("sources"), dict):
+                raise ValueError
+            if not all(_valid_cache_entry(agent_id, entry)
+                       for agent_id, entry in cache["sources"].items()):
                 raise ValueError
         except (ValueError, AttributeError):
             raise ValueError("telemetry cache is invalid; restore or remove its local cache") from None

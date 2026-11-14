@@ -218,17 +218,19 @@ class WorkspaceTests(WorkspaceFixture, unittest.TestCase):
         finally:
             server.server_close()
         previous_cache = cache.read_bytes()
-        cache.write_text("corrupt local cache")
-        degraded = DashboardServer(self.folder, "127.0.0.1", 0, "usage-recovery")
-        try:
-            view = degraded.view()
-            self.assertIn("check the local telemetry cache", view["telemetry"]["error"])
-            self.assertEqual(view["state"]["title"], "A useful outcome")
-            self.assertEqual(cache.read_text(), "corrupt local cache")
-            cache.write_bytes(previous_cache)
-            self.assertEqual(degraded.sample_usage()["totals"]["total_tokens"], 13)
-        finally:
-            degraded.server_close()
+        for damaged in ("corrupt local cache", '{"schema":1,"sources":{"owner":"damaged entry"}}'):
+            with self.subTest(cache=damaged):
+                cache.write_text(damaged)
+                degraded = DashboardServer(self.folder, "127.0.0.1", 0, "usage-recovery")
+                try:
+                    view = degraded.view()
+                    self.assertIn("check the local telemetry cache", view["telemetry"]["error"])
+                    self.assertEqual(view["state"]["title"], "A useful outcome")
+                    self.assertEqual(cache.read_text(), damaged)
+                    cache.write_bytes(previous_cache)
+                    self.assertEqual(degraded.sample_usage()["totals"]["total_tokens"], 13)
+                finally:
+                    degraded.server_close()
 
 
 class HttpTests(WorkspaceFixture, unittest.TestCase):

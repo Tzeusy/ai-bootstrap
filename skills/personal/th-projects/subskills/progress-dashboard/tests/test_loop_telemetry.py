@@ -263,13 +263,27 @@ class UsageCollectorTests(unittest.TestCase):
         self.assertIsNone(result["totals"]["total_tokens"])
 
     def test_damaged_cache_is_an_explicit_failure_not_an_automatic_full_log_rescan(self):
-        self.workspace.mkdir()
-        self.collector.cache_path.write_text("not valid JSON")
         self.write(codex())
-        with self.assertRaisesRegex(ValueError, "telemetry cache is invalid"), \
-                mock.patch.object(telemetry, "_consume") as consume:
-            self.poll()
-        consume.assert_not_called()
+        self.poll()
+        valid_entry = json.loads(self.collector.cache_path.read_text())["sources"]["parent"]
+        corrupt_entries = ["damaged entry", {}, *(
+            {**valid_entry, key: value} for key, value in (
+                ("offset", "offset"), ("identity", [1]), ("discard_partial", 1),
+                ("usage", {"input_tokens": 1}), ("context_tokens", -1),
+                ("observed_at", []), ("messages", {"a" * 64: [1, 2]}),
+            )
+        )]
+        damaged_caches = ["not valid JSON", *(
+            json.dumps({"schema": 1, "sources": {"parent": entry}}) for entry in corrupt_entries
+        )]
+        for damaged in damaged_caches:
+            with self.subTest(cache=damaged):
+                self.collector.cache_path.write_text(damaged)
+                with self.assertRaisesRegex(ValueError, "telemetry cache is invalid"), \
+                        mock.patch.object(telemetry, "_consume") as consume:
+                    self.poll()
+                consume.assert_not_called()
+                self.assertEqual(self.collector.cache_path.read_text(), damaged)
         self.collector.cache_path.unlink()
         target = self.root / "unrelated.json"
         original = '{"schema":1,"sources":{}}'
