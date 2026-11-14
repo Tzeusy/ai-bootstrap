@@ -14,7 +14,7 @@ description: >
   "what's the next milestone",
   "brainstorm features", "run the vision pursuit", "relentlessly improve this
   project", "prepare decisions for me to review", "walk me through the blocked
-  decisions", "collect owner signoffs".
+  decisions", "collect owner signoffs", "give this session a dashboard".
 metadata:
   owner: tze
   authors:
@@ -30,7 +30,7 @@ compatibility: Subskill scripts require bash, git, grep, find, and uv; project-s
 # TH Projects
 
 Superskill router for spec-driven project governance. Six lifecycle subskills
-plus one cross-cutting human-gate transport live under `subskills/`; each is a
+plus two cross-cutting progress/owner transports live under `subskills/`; each is a
 complete standard package. Subskills **not** in global catalog — discover lazily
 here, load **at most one** subskill body per task. A subskill may route you to a
 sibling (e.g. project-review runs project-shape's scanner); follow that link
@@ -60,6 +60,11 @@ Six subskills, one lifecycle:
 accumulates, independently reviews, presents, and records owner decisions; it
 does not create doctrine, specs, priorities, or implementation authority.
 
+**Progress dashboard** gives any running workflow a reusable local progress
+workspace, agent/usage overview and asynchronous steering surface. Scripts handle
+rendering and telemetry without model refresh cycles. It observes the owning
+workflow; formal decisions still use questionnaire and its real authority gates.
+
 VISION is a **continuous constraint**, not a one-time gate: proposal, spec,
 allocation, implementation discovery, reconciliation, and milestone closeout
 must still serve cited doctrine. Implementation discoveries re-enter at the
@@ -86,6 +91,7 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 | Exhaustive bidirectional spec↔code reconciliation. Code ahead of spec → draft requirements, vision-gate them, land `serves` as bookkeeping, owner-gate the rest. Spec ahead of code → reconcile every unmet requirement against open/closed beads, plan all remaining work. Audit mode for the read-only question. Idempotent re-runs. | [subskills/spec-concretization/SKILL.md](subskills/spec-concretization/SKILL.md) | "reconcile spec vs implementation", "does code match the spec", "what's implemented but undocumented", "what's specified but not built", "plan the work to finish the spec" |
 | Recurring generative pursuit of the project's ideal: lane-sequenced audits of every surface against the applicable bar + vision-grounded ideation lenses → ranked move list, tier-board movement across runs, gated (never auto-released) work plan. | [subskills/relentless-vision-pursuit/SKILL.md](subskills/relentless-vision-pursuit/SKILL.md) | "run the vision pursuit", "what's the next best step toward the vision", "relentlessly improve this project", "audit the whole project against the ideal" |
 | Accumulate genuine hard owner gates into a local asynchronous packet, independently vet each problem scope and recommendation, publish it as a local web form (scripted, prints a URL), ingest the owner's asynchronous answers, walk the owner through one decision at a time, or route recorded signoffs through the canonical owning workflow. Pursuit, greenfield-parity, and spec-concretization runs end here with their owner dossier. | [subskills/user-questionnaire/SKILL.md](subskills/user-questionnaire/SKILL.md) | "prepare decisions for me to review", "review when I wake up", "publish the questionnaire", "ingest my answers", "walk me through blocked decisions", "collect owner signoffs" |
+| Publish a session-owned progress workspace and local interactive dashboard for current work, findings, child agents, measured token usage, visuals and durable feedback. Works across workflows without new model wakeups. | [subskills/progress-dashboard/SKILL.md](subskills/progress-dashboard/SKILL.md) | "give this session a dashboard", "show loop progress", "monitor subagents", "steer this run in a browser" |
 
 ## Routing rules
 
@@ -120,6 +126,10 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   competing priorities → direction; tracker mechanics → beads-orchestration.
   Use questionnaire only when asynchronous accumulation, adversarial review,
   walkthrough, or durable signoff recording is the actual task.
+- **Progress vs. decisions**: dashboard is ongoing visibility and steering;
+  questionnaire is independently vetted formal owner decisions. The dashboard
+  never replaces the tracker, changes a gate, or consumes another subskill's
+  implementation logic. Workflows may invoke it as a thin optional transport.
 - **Scope guard**: single-PR/diff review → `/code-review`, not here.
   Change-level engineering-quality judgment (engineering bar, readability, test
   rigor, dependency hygiene, cruft cleanup, skill reviews, diagrams) →

@@ -39,3 +39,5 @@ jobs:
         run: >
           uv run skills/personal/th-engineering/subskills/skill-standards/scripts/audit_skill.py
           --all skills/personal --strict
+      - name: Exercise progress workspace and telemetry
+        run: bash tests/progress-dashboard-test.sh

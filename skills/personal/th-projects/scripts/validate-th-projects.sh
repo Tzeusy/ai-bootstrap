@@ -644,6 +644,18 @@ else
   _fail "spec-trace: affected admission regressions failed (exit $rc): $out"
 fi
 
+# ── Progress dashboard: deterministic persistence/HTTP and incremental usage ──
+section "progress-dashboard behavior"
+for test_file in test_progress_dashboard.py test_loop_telemetry.py; do
+  rc=0
+  out=$(uv run "$ROOT/subskills/progress-dashboard/tests/$test_file" -q 2>&1) || rc=$?
+  if [[ $rc -eq 0 ]]; then
+    _pass "progress-dashboard: $test_file"
+  else
+    _fail "progress-dashboard: $test_file failed (exit $rc): $out"
+  fi
+done
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo "=================================================="

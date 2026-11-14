@@ -46,3 +46,8 @@ flowchart TD
 - `projects/` makes product offerings discoverable without turning them into a
   root pillar, shared skill, tool facade, or installation dependency.
 - Generated or vendored outputs may sit under a skill or tool facade, but only with a documented regeneration path.
+- `th-projects/subskills/progress-dashboard/` owns reusable progress files, UI
+  assets, incremental usage adapters and a per-session local server. Runtime
+  snapshots/feedback stay under `~/.tmp/<slug>/`; the server is a disposable view
+  of an owning workflow, not a shared service or control plane. Beads loopers and
+  other workflows call its helper instead of embedding dashboard infrastructure.
