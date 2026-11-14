@@ -33,6 +33,8 @@ class DashboardServer(ThreadingHTTPServer):
         self.telemetry_lock = threading.Lock()
         self.stopping = threading.Event()
         self.collector = UsageCollector(folder)
+        self.runtime_sources = []
+        self.runtime_metadata = {}
         self.telemetry = self.sample_usage()
         self.allowed_hosts = {f"{bind}:{self.server_port}"}
         if bind == "127.0.0.1":
@@ -43,9 +45,29 @@ class DashboardServer(ThreadingHTTPServer):
         try:
             with model.lock(self.folder):
                 sources = model.load(self.folder / "sources.json", [])
+                runtime = model.load(self.folder / "runtime.json", {})
+                state = model.load(self.folder / "state.json")
             if not isinstance(sources, list):
                 raise ValueError("usage sources must be a list")  # noqa: TRY004 - state validation uses ValueError
-            return self.collector.poll(sources)
+            metadata, warnings = {}, []
+            if runtime:
+                from runtime_sources import resolve
+                try:
+                    resolved, metadata, warnings = resolve(runtime, state["actor"], state["agents"], sources)
+                    self.runtime_sources, self.runtime_metadata = resolved, metadata
+                    sources = resolved
+                except ValueError as error:
+                    # A transient index failure must not discard known offsets
+                    # or erase previously established scoped attribution.
+                    sources = self.runtime_sources or sources
+                    metadata = self.runtime_metadata
+                    warnings = [str(error)]
+            result = self.collector.poll(sources)
+            for row in result["agents"]:
+                row.update(metadata.get(row["id"], {}))
+            if warnings:
+                result["error"] = "Runtime attribution: " + " ".join(warnings)
+            return result
         except (ValueError, OSError) as error:
             # Optional usage must not take progress or feedback down with it.
             # Do not include transcript paths/content in the browser diagnostic.

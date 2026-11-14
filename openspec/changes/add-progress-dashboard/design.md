@@ -10,7 +10,10 @@ flowchart LR
     C --> J[Local state.json]
     J --> M[Three generated Markdown views]
     J --> S[Session background server]
-    T[Explicit parent / child usage logs] --> I[Bounded incremental collector]
+    R[Configured Codex parent] --> X[Read-only indexed spawn relationships]
+    X --> T[Matched parent / published child usage logs]
+    E[Explicit attached logs] --> T
+    T --> I[Bounded incremental collector]
     I --> S
     S --> B[Browser progress and agent overview]
     B --> F[Durable feedback inbox]
@@ -29,6 +32,22 @@ at ten entries and 8KiB. Surfaced items remain pending until disposition; an
 oversized item is visibly a preview and requires an exact full-item read before
 interpretation. Native
 delegation/report events supply child summaries; no transcript summarizer runs.
+Agent work details retain these reports, up to eight recent actions, and known
+branch/worktree/PR context. Missing context remains unreported. Stable disclosure
+shells keep those details open while runtime counters change.
+
+Codex initialization binds `CODEX_THREAD_ID` once (or an explicit parent UUID).
+Every server tick queries only that parent's indexed spawn relationships in the
+local read-only `state_5.sqlite`, bounded at200 sessions. Published roster IDs,
+runtime paths or explicit thread IDs identify children; ambiguous names refuse
+attribution. No transcript directory is crawled. Explicit nonmatching attachments
+retain precedence; duplicate log attribution refuses. A temporary index failure
+keeps established sources/offsets and displays a warning. No unrelated session
+content, index path or transcript path is returned to the browser.
+
+Native Codex `token_usage_record` totals are filtered by thread identity and
+supersede lagging legacy `event_msg/token_count` emission. Copied fork history is
+excluded using native history ordinals; later samples never add both streams.
 
 Conditional browser responses ignore collector heartbeat timestamps when all
 meaningful content is unchanged. UI rows and disclosure controls retain identity
@@ -59,7 +78,10 @@ and one feedback POST. A capability URL, strict Host/Origin checks and CSP cover
 the local browser transport. Default binding is loopback; an explicit Tailscale
 IPv4 bind is available without modifying Tailscale configuration. There are no
 commands, tracker writes, arbitrary file routes, or authority-granting APIs.
-Transcript paths are explicit and private; only normalized counters reach the UI.
+Transcript locators are explicit or proven through the configured parent's spawn
+graph and remain private; only matched runtime identities and normalized counters
+reach the UI. Agent summaries/actions are workflow reports rather than excerpts
+from child transcripts.
 Repeated launch reuses the verified instance. Stop authenticates instance/PID and
 preserves the workspace and waits for its listener to stop; stale metadata never
 authorizes signalling another PID. Read-only commands do not create a workspace

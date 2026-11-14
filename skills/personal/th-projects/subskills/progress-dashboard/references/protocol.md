@@ -32,7 +32,10 @@ model-generated telemetry fields are accepted.
   "agents": [
     {"id":"reviewer-1","name":"Independent review","role":"reviewer",
      "status":"running","task":"task-1","summary":"Checking recovery paths.",
-     "model":"runtime-reported model","updated_at":"2026-11-14T09:30:00+00:00"}
+     "model":"runtime-reported model","updated_at":"2026-11-14T09:30:00+00:00",
+     "branch":"review/task-1","worktree":"/repo/.worktrees/review-task-1",
+     "pr_url":"https://github.com/example/project/pull/42",
+     "activity":["Reviewed failure and recovery paths.","Reported one cache defect; checking its correction."]}
   ],
   "artifacts": [{"path":"architecture.svg","label":"Workspace architecture"}]
 }
@@ -45,6 +48,14 @@ Agent status is `running`, `waiting`, `complete`, `failed` or `unknown`; it is a
 observation, not a liveness lease. Native delegation/results supply summaries,
 not a model reading child sessions. Supply known timestamps; omitted agent
 timestamps are maintained by the helper. Stale timestamps remain visible.
+`summary` is the current one-paragraph work report. Optional `activity` contains
+at most eight recent concise reports (1000 characters each), replacing its prior
+list. Branch/worktree/PR describe the actual delivery context, including shared
+worktrees; report retirement in activity when a checkout has been removed. PR
+links must be absolute HTTP(S) URLs without credentials. Omitted context stays
+visibly unreported. No background Git/GitHub query infers it. Optional `thread_id`
+disambiguates agents whose runtime paths share a basename; runtime attribution
+is separately measured, not supplied as token fields in a snapshot.
 
 Unknown fields, duplicate identities and malformed statuses refuse publication.
 Limits: snapshot 256KiB, tasks 200, findings/agents 100 each, artifacts 40. Keep

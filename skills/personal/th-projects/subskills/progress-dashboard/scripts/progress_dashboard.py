@@ -23,6 +23,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.error import URLError
+from urllib.parse import urlsplit
 from urllib.request import urlopen
 
 SCHEMA = "progress-dashboard/v1"
@@ -195,13 +196,23 @@ def validate_snapshot(folder: Path, incoming: dict) -> dict:
             result[key] = [text(row, "finding") for row in rows]
             continue
         fields = {"tasks": ("id", "title", "status", "detail", "evidence"),
-                  "agents": ("id", "name", "role", "status", "task", "summary", "model", "updated_at"),
+                  "agents": ("id", "name", "role", "status", "task", "summary", "model", "updated_at",
+                             "branch", "worktree", "pr_url", "thread_id", "activity"),
                   "artifacts": ("path", "label")}[key]
         cleaned, identities = [], set()
         for row in rows:
             if not isinstance(row, dict) or set(row) - set(fields):
                 raise ValueError(f"invalid {key} entry")
-            entry = {field: text(row.get(field, ""), field) for field in fields}
+            entry = {field: text(row.get(field, ""), field) for field in fields if field != "activity"}
+            if key == "agents":
+                activity = row.get("activity", [])
+                if not isinstance(activity, list) or len(activity) > 8:
+                    raise ValueError("agent activity must be a list of at most eight recent reports")
+                entry["activity"] = [text(item, "agent activity", 1000) for item in activity]
+                if entry["pr_url"]:
+                    parsed = urlsplit(entry["pr_url"])
+                    if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password:
+                        raise ValueError("agent pr_url must be an absolute HTTP(S) URL without credentials")
             ident = entry.get("id", entry.get("path"))
             if not ident or ident in identities:
                 raise ValueError(f"{key} entries require unique identities")
@@ -359,6 +370,22 @@ def attach(folder: Path, agent_id: str, provider: str, source: str) -> dict:
     return {"attached": agent_id, "provider": provider}
 
 
+def watch_codex(folder: Path, thread_id: str, home=None) -> dict:
+    from runtime_sources import configuration, resolve
+
+    config = configuration(thread_id, home)
+    with lock(folder):
+        state = load(folder / "state.json")
+        existing = load(folder / "runtime.json", {})
+        if existing and existing != config:
+            raise ValueError("workspace already watches another Codex parent or home")
+        # Validate the configured parent and index before committing the locator.
+        resolve(config, state["actor"], state["agents"], load(folder / "sources.json", []))
+        if existing != config:
+            save(folder / "runtime.json", config)
+    return {"watching": "codex", "thread_id": config["thread_id"]}
+
+
 def health(info: dict) -> bool:
     try:
         with urlopen(info["url"] + "api/health", timeout=0.5) as reply:
@@ -437,6 +464,9 @@ def parser() -> argparse.ArgumentParser:
         init.add_argument("--" + arg, required=True)
     init.add_argument("--outcome", default="")
     init.add_argument("--no-feedback", action="store_true")
+    init.add_argument("--codex-thread", default=os.environ.get("CODEX_THREAD_ID"),
+                      help="watch this Codex parent and known children; defaults to CODEX_THREAD_ID")
+    init.add_argument("--codex-home", help="runtime home; defaults to CODEX_HOME or ~/.codex")
     update = commands.add_parser("checkpoint", help="merge a small snapshot and return bounded pending feedback")
     update.add_argument("--input", default="-", help="JSON file or - for stdin")
     update.add_argument("--expected-revision", type=int, required=True)
@@ -457,6 +487,9 @@ def parser() -> argparse.ArgumentParser:
     source.add_argument("--id", required=True)
     source.add_argument("--provider", choices=("codex", "claude"), required=True)
     source.add_argument("--path", required=True)
+    watch = commands.add_parser("watch-codex", help="resolve this parent and its known agents from the runtime index")
+    watch.add_argument("--thread-id", default=os.environ.get("CODEX_THREAD_ID"))
+    watch.add_argument("--home")
     for command in ("serve", "_serve"):
         server = commands.add_parser(command)
         server.add_argument("--bind", default="127.0.0.1")
@@ -476,6 +509,11 @@ def main() -> int:
             state = initialize(folder, title=args.title, actor=args.actor, repo_root=args.repo_root,
                                outcome=args.outcome, feedback=not args.no_feedback)
             result = {"workspace": str(folder), "revision": state["revision"], "files": FILES}
+            if args.codex_thread and not (folder / "runtime.json").exists():
+                try:
+                    result.update(watch_codex(folder, args.codex_thread, args.codex_home))
+                except ValueError as error:
+                    result["usage_warning"] = str(error)
         elif args.command == "checkpoint":
             result = checkpoint(folder, json.loads(read_input(args.input)), args.expected_revision, args.after_feedback)
         elif args.command in ("status", "inbox"):
@@ -494,6 +532,8 @@ def main() -> int:
             result = {"handover": "updated"}
         elif args.command == "attach":
             result = attach(folder, args.id, args.provider, args.path)
+        elif args.command == "watch-codex":
+            result = watch_codex(folder, args.thread_id, args.home)
         elif args.command == "serve":
             result = serve(folder, args.bind, args.port)
         elif args.command == "stop":
