@@ -33,27 +33,32 @@ class DashboardServer(ThreadingHTTPServer):
         self.telemetry_lock = threading.Lock()
         self.stopping = threading.Event()
         self.collector = UsageCollector(folder)
-        with model.lock(folder):
-            sources = model.load(folder / "sources.json", [])
-        self.telemetry = self.collector.poll(sources)
+        self.telemetry = self.sample_usage()
         self.allowed_hosts = {f"{bind}:{self.server_port}"}
         if bind == "127.0.0.1":
             self.allowed_hosts.add(f"localhost:{self.server_port}")
 
+    def sample_usage(self) -> dict:
+        sources = []
+        try:
+            with model.lock(self.folder):
+                sources = model.load(self.folder / "sources.json", [])
+            if not isinstance(sources, list):
+                raise ValueError("usage sources must be a list")  # noqa: TRY004 - state validation uses ValueError
+            return self.collector.poll(sources)
+        except (ValueError, OSError) as error:
+            # Optional usage must not take progress or feedback down with it.
+            # Do not include transcript paths/content in the browser diagnostic.
+            return {"agents": [], "totals": None,
+                    "coverage": {"attached": len(sources) if isinstance(sources, list) else 0, "measured": 0},
+                    "sampled_at": model.now(), "error": f"Telemetry unavailable ({type(error).__name__}); "
+                    "check the local telemetry cache and attached sources."}
+
     def collect(self):
         while not self.stopping.is_set():
-            try:
-                with model.lock(self.folder):
-                    sources = model.load(self.folder / "sources.json", [])
-                telemetry = self.collector.poll(sources)
-                with self.telemetry_lock:
-                    self.telemetry = telemetry
-            except (ValueError, OSError) as error:
-                # Metadata/counter failures must be visible without logging transcript content.
-                with self.telemetry_lock:
-                    self.telemetry = {"agents": [], "totals": None,
-                        "coverage": {"attached": 0, "measured": 0}, "sampled_at": model.now(),
-                        "error": type(error).__name__}
+            telemetry = self.sample_usage()
+            with self.telemetry_lock:
+                self.telemetry = telemetry
             self.stopping.wait(3)
 
     def view(self) -> dict:
@@ -133,12 +138,16 @@ class Handler(BaseHTTPRequestHandler):
             if route == "api/health":
                 self.json(200, {"instance": self.server.instance, "pid": os.getpid()})
             elif route == "api/state":
-                body = json.dumps(self.server.view(), ensure_ascii=False, sort_keys=True).encode()
-                etag = '"' + hashlib.sha256(body).hexdigest() + '"'
+                view = self.server.view()
+                # An idle collector heartbeat is not a change to displayed work
+                # or observed usage. Keep conditional polling useful while idle.
+                meaningful = {**view, "telemetry": {key: value for key, value in view["telemetry"].items()
+                                                     if key != "sampled_at"}}
+                etag = '"' + hashlib.sha256(json.dumps(meaningful, sort_keys=True).encode()).hexdigest() + '"'
                 if self.headers.get("If-None-Match") == etag:
                     self.respond(304, etag=etag)
                 else:
-                    self.respond(200, body, etag=etag)
+                    self.respond(200, json.dumps(view, ensure_ascii=False, sort_keys=True).encode(), etag=etag)
             elif route in ("", "index.html", "style.css", "app.js"):
                 path = ASSETS / (route or "index.html")
                 self.respond(200, path.read_bytes(), mimetypes.guess_type(path)[0] or "text/plain")

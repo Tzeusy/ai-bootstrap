@@ -29,6 +29,7 @@ SCHEMA = "progress-dashboard/v1"
 FILES = ("in-progress.md", "todo.md", "complete.md", "handover.md")
 STATUSES = ("in-progress", "todo", "complete")
 MAX_JSON = 256 * 1024
+FEEDBACK_BATCH_BYTES = 8 * 1024
 
 
 def now() -> str:
@@ -82,15 +83,18 @@ def lock(folder: Path, name="workspace.lock"):
         yield
 
 
-def workspace(slug: str, root: str | Path | None = None) -> Path:
+def workspace(slug: str, root: str | Path | None = None, *, create=True) -> Path:
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,79}", slug):
         raise ValueError("slug must contain 1–80 lowercase letters, digits or hyphens")
     base = Path(root or "~/.tmp").expanduser().resolve()
-    base.mkdir(parents=True, exist_ok=True)
     folder = base / slug
     if folder.is_symlink():
         raise ValueError("workspace must not be a symlink")
-    folder.mkdir(mode=0o700, exist_ok=True)
+    if create:
+        base.mkdir(parents=True, exist_ok=True)
+        folder.mkdir(mode=0o700, exist_ok=True)
+    elif not folder.is_dir():
+        raise ValueError("workspace does not exist; initialize it first")
     if folder.stat().st_uid != os.getuid():
         raise ValueError("workspace belongs to another user")
     os.chmod(folder, 0o700)
@@ -213,12 +217,33 @@ def validate_snapshot(folder: Path, incoming: dict) -> dict:
     return result
 
 
-def pending(folder: Path, limit=10) -> dict:
+def pending(folder: Path, limit=10, after=0) -> dict:
+    if type(after) is not int or after < 0:
+        raise ValueError("feedback cursor must be a non-negative integer")
     rows = [r for r in load(folder / "feedback.json", []) if r["status"] == "pending"]
-    return {"pending_count": len(rows), "feedback": rows[:limit]}
+    unseen = [row for row in rows if row["id"] > after]
+    batch, cursor, used = [], after, 2
+    for row in unseen[:limit]:
+        item = {key: row[key] for key in ("id", "kind", "target", "revision", "text")}
+        size = len(json.dumps(item, ensure_ascii=False).encode()) + 1
+        if used + size > FEEDBACK_BATCH_BYTES:
+            if batch:
+                break
+            # Never present a clipped instruction as if it were the full message.
+            item.pop("text")
+            item["target_preview"] = item.pop("target")[:200]
+            item.update(text_preview=row["text"][:200], truncated=True)
+            size = len(json.dumps(item, ensure_ascii=False).encode()) + 1
+        batch.append(item)
+        cursor = row["id"]
+        used += size
+    return {"pending_count": len(rows), "feedback": batch, "feedback_cursor": cursor,
+            "feedback_more": any(row["id"] > cursor for row in unseen)}
 
 
-def checkpoint(folder: Path, incoming: dict, expected: int) -> dict:
+def checkpoint(folder: Path, incoming: dict, expected: int, after_feedback=0) -> dict:
+    if type(after_feedback) is not int or after_feedback < 0:
+        raise ValueError("feedback cursor must be a non-negative integer")
     update = validate_snapshot(folder, incoming)
     with lock(folder):
         state = load(folder / "state.json")
@@ -236,7 +261,14 @@ def checkpoint(folder: Path, incoming: dict, expected: int) -> dict:
             # JSON commits the snapshot; projections are repairable from it on resume.
             save(folder / "state.json", state)
         project(folder, state)
-        return {"revision": state["revision"], **pending(folder)}
+        return {"revision": state["revision"], **pending(folder, after=after_feedback)}
+
+
+def feedback_item(folder: Path, feedback_id: int) -> dict:
+    for row in load(folder / "feedback.json", []):
+        if row["id"] == feedback_id:
+            return {key: value for key, value in row.items() if key != "client_id"}
+    raise ValueError("feedback id not found")
 
 
 def save_feedback(folder: Path, rows: list) -> None:
@@ -376,7 +408,23 @@ def stop(folder: Path) -> dict:
         if not info or not health(info):
             return {"stopped": False, "reason": "no verified live server; no process signalled"}
         os.kill(info["pid"], signal.SIGTERM)
-        return {"stopped": True}
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if not health(info):
+                return {"stopped": True}
+            time.sleep(0.05)
+        raise ValueError("server did not stop within five seconds; its verified instance was signalled once")
+
+
+def read_input(source: str) -> str:
+    if source == "-":
+        raw = sys.stdin.buffer.read(MAX_JSON + 1)
+    else:
+        with Path(source).open("rb") as stream:
+            raw = stream.read(MAX_JSON + 1)
+    if len(raw) > MAX_JSON:
+        raise ValueError("input exceeds 256KiB")
+    return raw.decode("utf-8")
 
 
 def parser() -> argparse.ArgumentParser:
@@ -389,12 +437,16 @@ def parser() -> argparse.ArgumentParser:
         init.add_argument("--" + arg, required=True)
     init.add_argument("--outcome", default="")
     init.add_argument("--no-feedback", action="store_true")
-    update = commands.add_parser("checkpoint", help="merge a small JSON snapshot; return new feedback only")
+    update = commands.add_parser("checkpoint", help="merge a small snapshot and return bounded pending feedback")
     update.add_argument("--input", default="-", help="JSON file or - for stdin")
     update.add_argument("--expected-revision", type=int, required=True)
+    update.add_argument("--after-feedback", type=int, default=0, help="last surfaced feedback id")
     status = commands.add_parser("status", help="compact checkpoint status, never the full dashboard")
     status.add_argument("--since", type=int)
-    commands.add_parser("inbox", help="read pending feedback without consuming it")
+    status.add_argument("--after-feedback", type=int, default=0)
+    inbox = commands.add_parser("inbox", help="read bounded new feedback or one full item; never consumes it")
+    inbox.add_argument("--after-feedback", type=int, default=0)
+    inbox.add_argument("--id", type=int, help="read one full feedback item before acting on a preview")
     ack = commands.add_parser("ack", help="record the disposition of one feedback item")
     ack.add_argument("--id", type=int, required=True)
     ack.add_argument("--response", required=True)
@@ -419,26 +471,26 @@ def main() -> int:
     os.umask(0o077)
     args = parser().parse_args()
     try:
-        folder = workspace(args.slug, args.root)
+        folder = workspace(args.slug, args.root, create=args.command == "init")
         if args.command == "init":
             state = initialize(folder, title=args.title, actor=args.actor, repo_root=args.repo_root,
                                outcome=args.outcome, feedback=not args.no_feedback)
             result = {"workspace": str(folder), "revision": state["revision"], "files": FILES}
         elif args.command == "checkpoint":
-            raw = sys.stdin.read(MAX_JSON + 1) if args.input == "-" else Path(args.input).read_text(encoding="utf-8")
-            if len(raw.encode()) > MAX_JSON:
-                raise ValueError("snapshot exceeds 256KiB")
-            result = checkpoint(folder, json.loads(raw), args.expected_revision)
+            result = checkpoint(folder, json.loads(read_input(args.input)), args.expected_revision, args.after_feedback)
         elif args.command in ("status", "inbox"):
             with lock(folder):
                 state = load(folder / "state.json")
-                result = {"revision": state["revision"], **pending(folder)}
-                if args.command == "status":
-                    result.update(changed=state["revision"] != args.since, phase=state["phase"])
+                if args.command == "inbox" and args.id is not None:
+                    result = {"feedback": feedback_item(folder, args.id)}
+                else:
+                    result = {"revision": state["revision"], **pending(folder, after=args.after_feedback)}
+                    if args.command == "status":
+                        result.update(changed=state["revision"] != args.since, phase=state["phase"])
         elif args.command == "ack":
             result = acknowledge(folder, args.id, args.response)
         elif args.command == "handover":
-            handover(folder, Path(args.input).read_text(encoding="utf-8"), args.owner_request)
+            handover(folder, read_input(args.input), args.owner_request)
             result = {"handover": "updated"}
         elif args.command == "attach":
             result = attach(folder, args.id, args.provider, args.path)

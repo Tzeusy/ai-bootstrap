@@ -3,7 +3,11 @@
 
 (() => {
   const byId = id => document.getElementById(id);
-  const text = (id, value) => { byId(id).textContent = value ?? ""; };
+  const text = (id, value) => {
+    const node = byId(id);
+    const content = String(value ?? "");
+    if (node.textContent !== content) node.textContent = content;
+  };
   const number = value => Number.isFinite(value) ? new Intl.NumberFormat().format(value) : "Unknown";
   const compact = value => Number.isFinite(value) ? new Intl.NumberFormat(undefined, {notation: "compact", maximumFractionDigits: 1}).format(value) : "Unknown";
   const form = byId("feedback-form");
@@ -33,7 +37,13 @@
   function changed(key, value, render) {
     const signature = JSON.stringify(value);
     if (signatures.get(key) !== signature) {
+      const focused = document.activeElement;
+      const focusKey = focused?.dataset.focusKey;
       render();
+      // A changed row must not strand a keyboard user at the document root.
+      if (focusKey && document.activeElement !== focused) {
+        [...document.querySelectorAll("[data-focus-key]")].find(node => node.dataset.focusKey === focusKey)?.focus({preventScroll: true});
+      }
       signatures.set(key, signature);
     }
   }
@@ -45,9 +55,9 @@
   }
 
   function age(value) {
-    if (typeof value !== "string" || !value) return "not yet reported";
+    if (typeof value !== "string" || !value) return "time unknown";
     const elapsed = Date.now() - new Date(value).getTime();
-    if (!Number.isFinite(elapsed)) return "not yet reported";
+    if (!Number.isFinite(elapsed)) return "time unknown";
     if (elapsed < 60000) return "just now";
     if (elapsed < 3600000) return `${Math.floor(elapsed / 60000)}m ago`;
     if (elapsed < 86400000) return `${Math.floor(elapsed / 3600000)}h ago`;
@@ -82,6 +92,7 @@
   function commentButton(id, label) {
     const button = el("button", "task-feedback", "Comment");
     button.type = "button";
+    button.dataset.focusKey = `comment:${id}`;
     button.setAttribute("aria-label", `Comment on ${label}`);
     button.addEventListener("click", () => {
       if ([...target.options].some(option => option.value === id)) target.value = id;
@@ -123,11 +134,19 @@
 
   function renderAgents(agents, telemetry) {
     const destination = byId("agent-list");
-    destination.replaceChildren();
+    const existing = new Map([...destination.querySelectorAll(".agent")].map(node => [node.dataset.agentId, node]));
+    for (const node of destination.querySelectorAll(".empty")) node.remove();
     if (!agents.length) destination.append(el("p", "empty", "No subagents recorded. This loop may be working on its own."));
     const usage = new Map((telemetry.agents || []).map(agent => [agent.id, agent]));
     for (const agent of agents) {
+      const measured = usage.get(agent.id);
+      const signature = JSON.stringify([agent, measured]);
+      const prior = existing.get(agent.id);
+      existing.delete(agent.id);
+      if (prior?.dataset.signature === signature) continue;
       const article = el("article", "agent");
+      article.dataset.agentId = agent.id;
+      article.dataset.signature = signature;
       const heading = el("div", "agent-heading");
       const name = agent.name || agent.id;
       heading.append(el("h3", null, name), el("span", `badge ${statusClass(agent.status)}`, agent.status || "Unknown"));
@@ -138,20 +157,29 @@
       if (agent.summary) article.append(el("p", "agent-summary", agent.summary));
       const meta = el("div", "agent-meta");
       if (agent.model) meta.append(el("span", null, agent.model));
-      const measured = usage.get(agent.id);
       meta.append(el("span", null, measured?.status === "measured" ? `${number(measured.total_tokens)} tokens · ${measured.provider || "runtime"}` : "Token usage unknown"));
-      meta.append(relativeTime(agent.updated_at, "Status reported "));
-      if (measured?.observed_at) meta.append(relativeTime(measured.observed_at, "Usage reported "));
+      meta.append(relativeTime(agent.updated_at, "Status · "));
+      if (measured?.status === "measured") meta.append(relativeTime(measured.observed_at, "Usage · "));
       article.append(meta);
-      destination.append(article);
+      if (prior) prior.replaceWith(article);
+      else destination.append(article);
     }
+    for (const node of existing.values()) node.remove();
+    // Reorder retained rows without recreating their controls.
+    const ordered = new Map([...destination.querySelectorAll(".agent")].map(node => [node.dataset.agentId, node]));
+    agents.forEach((agent, index) => {
+      const node = ordered.get(agent.id);
+      if (destination.children[index] !== node) destination.insertBefore(node, destination.children[index] || null);
+    });
     const rows = byId("usage-rows");
     rows.replaceChildren();
     for (const usageRow of telemetry.agents || []) {
       const row = el("tr");
       const name = agents.find(agent => agent.id === usageRow.id)?.name || usageRow.id;
       const first = el("td", null, name);
-      first.append(el("small", null, `${usageRow.provider || "Unknown source"} · ${usageRow.status === "measured" ? age(usageRow.observed_at) : usageRow.status || "unknown"}`));
+      first.append(el("small", null, `${usageRow.provider || "Unknown source"} · ${usageRow.status || "unknown"}`));
+      if (usageRow.status === "measured") first.append(relativeTime(usageRow.observed_at, "Usage · "));
+      if (usageRow.reason) first.append(el("small", null, usageRow.reason.replaceAll("-", " ")));
       row.append(first);
       for (const field of ["input_tokens", "cached_input_tokens", "output_tokens", "total_tokens"]) row.append(el("td", null, usageRow.status === "measured" ? number(usageRow[field]) : "Unknown"));
       rows.append(row);
@@ -183,6 +211,7 @@
       const caption = el("figcaption");
       const link = el("a", null, "Download");
       link.href = url;
+      link.setAttribute("aria-label", `Download ${artifact.label || artifact.path}`);
       link.download = artifact.path.split("/").pop();
       caption.append(el("span", null, artifact.label || artifact.path), link);
       figure.append(caption);
@@ -226,26 +255,28 @@
 
   function renderDocuments(documents) {
     const destination = byId("document-list");
-    const prior = new Set([...destination.querySelectorAll("details[open]")].map(node => node.dataset.name));
-    destination.replaceChildren();
     for (const name of ["in-progress.md", "todo.md", "complete.md"]) {
-      const details = el("details", "document");
-      details.dataset.name = name;
-      details.open = prior.has(name);
-      const body = el("div", "document-body");
-      details.append(el("summary", null, name), body);
-      renderDocument(body, documents[name]);
-      destination.append(details);
+      let details = [...destination.children].find(node => node.dataset.name === name);
+      if (!details) {
+        details = el("details", "document");
+        details.dataset.name = name;
+        details.append(el("summary", null, name), el("div", "document-body"));
+        destination.append(details);
+      }
+      changed(`document:${name}`, documents[name], () => renderDocument(details.lastChild, documents[name]));
     }
-    renderDocument(byId("handover-content"), documents["handover.md"]);
+    changed("document:handover", documents["handover.md"], () => renderDocument(byId("handover-content"), documents["handover.md"]));
   }
 
   function renderFeedback(feedback) {
     const destination = byId("feedback-history");
-    const pinnedBottom = destination.scrollTop + destination.clientHeight >= destination.scrollHeight - 25;
+    const previousScroll = destination.scrollTop;
+    const pinnedBottom = previousScroll + destination.clientHeight >= destination.scrollHeight - 25;
     destination.replaceChildren();
     const pending = feedback.filter(item => item.status === "pending").length;
     text("feedback-pending", pending ? `${pending} awaiting checkpoint` : "");
+    text("nav-feedback", pending);
+    byId("nav-feedback").hidden = !pending;
     if (!feedback.length) destination.append(el("p", "empty small", "Your feedback and the loop’s replies will appear here."));
     for (const item of feedback) {
       const article = el("article", "feedback-item");
@@ -264,7 +295,7 @@
       }
       destination.append(article);
     }
-    if (pinnedBottom) destination.scrollTop = destination.scrollHeight;
+    destination.scrollTop = pinnedBottom ? destination.scrollHeight : previousScroll;
   }
 
   function updateTargets(state) {
@@ -297,6 +328,10 @@
     const telemetry = data.telemetry || {agents: [], totals: {}, coverage: {attached: 0, measured: 0}};
     const completed = tasks.filter(task => task.status === "complete").length;
     const running = agents.filter(agent => statusClass(agent.status) === "active").length;
+    const waiting = agents.filter(agent => statusClass(agent.status) === "waiting").length;
+    const completeAgents = agents.filter(agent => agent.status === "complete").length;
+    const failedAgents = agents.filter(agent => agent.status === "failed").length;
+    const unknownAgents = agents.length - running - waiting - completeAgents - failedAgents;
     document.title = `${state.title || state.slug} · Progress workspace`;
     text("loop-name", state.slug);
     text("title", state.title || state.slug);
@@ -315,12 +350,18 @@
     const expected = telemetry.coverage?.expected ?? attached;
     text("token-total", measured ? compact(telemetry.totals?.total_tokens) : "Unknown");
     byId("token-total").title = measured ? `${number(telemetry.totals?.total_tokens)} reported tokens` : "No measured runtime counters";
-    text("token-caption", expected ? `${measured} of ${expected} sessions measured · ${attached} attached` : "No usage counters attached");
+    byId("token-coverage").hidden = !measured || measured >= expected;
+    text("usage-warning", telemetry.error || "");
+    byId("usage-warning").hidden = !telemetry.error;
+    text("token-caption", telemetry.error ? "Usage unavailable · see session details" : expected ? `${measured} of ${expected} sessions measured · ${expected - measured} unknown` : "No usage counters attached");
+    byId("token-caption").title = `${attached} sessions attached. Missing or incomplete counters are excluded from totals.`;
     text("token-breakdown", measured ? `${compact(telemetry.totals?.input_tokens)} in · ${compact(telemetry.totals?.output_tokens)} out · ${compact(telemetry.totals?.cached_input_tokens)} cached` : "Unavailable usage stays unknown");
-    text("agent-total", agents.length ? `${running} / ${agents.length}` : "Solo loop");
-    text("agent-caption", agents.length ? "Reported working / recorded agents" : "No subagents recorded");
+    text("agent-total", `${agents.length} recorded`);
+    const activity = [[running, "working"], [waiting, "waiting"], [completeAgents, "complete"], [failedAgents, "failed"], [unknownAgents, "unknown"]];
+    text("agent-caption", agents.length ? activity.filter(([count]) => count).map(([count, label]) => `${count} ${label}`).join(" · ") : "No subagents recorded");
     text("nav-work", tasks.length);
     text("nav-agents", agents.length);
+    text("nav-findings", (state.findings || []).length);
     text("nav-artifacts", (state.artifacts || []).length);
     text("completed-badge", completed);
     text("work-revision", `Checkpoint ${state.revision}`);
@@ -329,30 +370,38 @@
       const destination = byId("findings");
       destination.replaceChildren(...(state.findings?.length ? state.findings.map(finding => el("p", "finding", finding)) : [el("p", "empty", "Findings and useful context will appear as the work progresses.")]));
     });
-    changed("agents", [agents, telemetry], () => renderAgents(agents, telemetry));
+    changed("agents", [agents, telemetry.agents], () => renderAgents(agents, telemetry));
     changed("artifacts", state.artifacts || [], () => renderArtifacts(state.artifacts || []));
     changed("documents", data.documents || {}, () => renderDocuments(data.documents || {}));
     changed("feedback", data.feedback || [], () => renderFeedback(data.feedback || []));
     updateTargets(state);
     const enabled = data.feedback_enabled !== false;
     for (const field of form.elements) field.disabled = !enabled;
-    byId("submit-feedback").disabled = !enabled || sending;
+    updateSubmitState();
     text("feedback-explanation", enabled ? "Leave feedback here. The loop reads it at its next safe checkpoint." : "Feedback is disabled for this workspace. You can still inspect progress and previous replies.");
     updateFreshness();
+    updateNavigation();
   }
 
   function updateFreshness() {
     if (!current) return;
     const updated = current.state.updated_at;
-    const stale = Date.now() - new Date(updated).getTime() > 300000;
-    text("checkpoint-time", `Checkpoint ${age(updated)}${stale ? " · may be waiting" : ""}`);
+    const elapsed = Date.now() - new Date(updated).getTime();
+    const stale = !Number.isFinite(elapsed) || elapsed > 300000;
+    text("checkpoint-time", `Checkpoint ${age(updated)}${stale ? " · status may be stale" : ""}`);
+    byId("checkpoint-time").classList.toggle("stale", stale);
     byId("checkpoint-time").title = `Progress last reported ${dateLabel(updated)}. Page refreshes do not imply the loop is currently executing.`;
     text("footer-state", `Checkpoint ${current.state.revision} · ${dateLabel(updated)}`);
     for (const node of document.querySelectorAll("[data-relative-time]")) node.textContent = `${node.dataset.timePrefix}${age(node.dataset.relativeTime)}`;
-    if (!failures && lastSuccess) text("connection-text", document.hidden ? "Updates paused" : "Connected");
+    if (!failures && lastSuccess) text("connection-text", document.hidden ? "Updates paused" : "Page connected");
+  }
+
+  function updateSubmitState() {
+    byId("submit-feedback").disabled = !current || current.feedback_enabled === false || sending || !feedbackText.value.trim();
   }
 
   function saveDraft() {
+    updateSubmitState();
     try {
       sessionStorage.setItem(draftKey, JSON.stringify({text: feedbackText.value, kind: kind.value, target: target.value, pending: pendingSubmission}));
       text("draft-state", feedbackText.value ? "Draft kept in this tab" : "");
@@ -393,7 +442,8 @@
     sending = true;
     byId("submit-feedback").disabled = true;
     text("submit-feedback", "Sending…");
-    setResult("");
+    form.setAttribute("aria-busy", "true");
+    setResult("Saving feedback…");
     try {
       const response = await fetch("api/feedback", {method: "POST", headers: {"Content-Type": "application/json", "X-Loop-Feedback": "1"}, body: JSON.stringify({...content, client_id: submission.client_id, revision: submission.revision}), signal: AbortSignal.timeout(12000)});
       const body = await response.json();
@@ -414,6 +464,8 @@
       sending = false;
       for (const field of form.elements) field.disabled = current?.feedback_enabled === false;
       text("submit-feedback", "Send feedback");
+      form.setAttribute("aria-busy", "false");
+      updateSubmitState();
     }
   }
 
@@ -468,13 +520,24 @@
   document.addEventListener("keydown", event => {
     if (event.key === "f" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.target.closest("input,textarea,select,[contenteditable]")) { event.preventDefault(); feedbackText.focus(); }
   });
-  if ("IntersectionObserver" in window) {
-    const observer = new IntersectionObserver(entries => {
-      const visible = entries.find(entry => entry.isIntersecting);
-      if (!visible) return;
-      for (const link of document.querySelectorAll("nav a")) link.setAttribute("aria-current", String(link.hash === `#${visible.target.id}`));
-    }, {rootMargin: "-15% 0px -60% 0px"});
-    for (const section of document.querySelectorAll(".work-column > section[id]")) observer.observe(section);
+  function updateNavigation() {
+    const mobile = matchMedia("(max-width: 650px)").matches;
+    const stacked = matchMedia("(max-width: 970px)").matches;
+    const anchor = (mobile ? document.querySelector(".navigation") : document.querySelector(".topbar")).getBoundingClientRect().bottom + 48;
+    const sections = document.querySelectorAll(stacked ? ".work-column > section[id], #feedback" : ".work-column > section[id]");
+    let active = "work";
+    for (const section of sections) {
+      if (section.getBoundingClientRect().top <= anchor) active = section.id;
+    }
+    for (const link of document.querySelectorAll("nav a")) link.setAttribute("aria-current", String(link.hash === `#${active}`));
   }
+  let navigationFrame = null;
+  const scheduleNavigation = () => {
+    if (navigationFrame !== null) return;
+    navigationFrame = requestAnimationFrame(() => { navigationFrame = null; updateNavigation(); });
+  };
+  document.addEventListener("scroll", scheduleNavigation, {passive: true});
+  window.addEventListener("resize", scheduleNavigation);
+
   poll();
 })();

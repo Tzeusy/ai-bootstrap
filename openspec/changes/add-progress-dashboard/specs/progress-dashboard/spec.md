@@ -60,6 +60,11 @@ Scope: v1-mandatory
 - **WHEN** a substantive workflow event changes progress or the parent needs pending steering
 - **THEN** the parent publishes only changed fields or requests compact status/inbox data, retaining its existing wake cadence
 
+#### Scenario: Feedback has already been surfaced or exceeds the batch budget
+
+- **WHEN** a parent supplies its feedback cursor or a pending message exceeds the bounded ten-entry/8KiB response budget
+- **THEN** routine responses omit previously surfaced messages without consuming them, label oversized previews explicitly, and provide a full-item lookup required before interpreting or acknowledging a preview
+
 ### Requirement: Honest Incremental Usage and Agent Overview
 
 The dashboard MUST summarize parent and child-agent observations with source freshness, MUST collect supported explicitly attached usage logs incrementally, and MUST distinguish measured, partial, unknown and errored counters without fabricating estimates or double-counting cached input.
@@ -76,7 +81,7 @@ Scope: v1-mandatory
 #### Scenario: Usage is unavailable or still catching up
 
 - **WHEN** a source is missing, malformed, unsupported or not fully consumed
-- **THEN** the page displays its unknown/error/partial state and excludes unmeasured rows from aggregate coverage rather than representing them as measured zero
+- **THEN** the page displays its unknown/error/partial state and excludes unmeasured rows from aggregate coverage rather than representing them as measured zero, while optional usage failure leaves progress and feedback available
 
 ### Requirement: Durable Authority-Safe Steering
 
