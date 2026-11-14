@@ -113,3 +113,10 @@ Scope: v1-mandatory
 
 - **WHEN** a request lacks the private URL, has an invalid host/origin, traverses artifact paths or targets an unpublished file
 - **THEN** the server refuses it without exposing unrelated local content or recording feedback
+
+## Source References
+
+- `openspec/changes/add-progress-dashboard/proposal.md`: the owner's bounded request and standalone placement refinement.
+- `about/heart-and-soul/vision.md`: shared-skill ownership, local-only runtime state, and human/agent legibility.
+- `skills/personal/th-projects/subskills/progress-dashboard/references/protocol.md`: snapshot, feedback, usage and lifecycle interfaces.
+- `tests/progress-dashboard-test.sh`: repository entrypoint to the canonical behavior suites, without copied test logic.
