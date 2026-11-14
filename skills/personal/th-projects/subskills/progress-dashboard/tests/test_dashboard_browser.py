@@ -173,6 +173,7 @@ class DashboardBrowserTests(unittest.TestCase):
         expect(self.page.locator("#token-total")).to_have_text("123")
         self.assertIn("1 of 2", self.page.locator("#token-caption").inner_text())
         self.assertIn("Token usage unknown", self.page.locator("#agent-list").inner_text())
+        self.page.get_by_text("Usage by session", exact=True).click()
         self.page.get_by_text("codex · not yet reported", exact=True).wait_for()
         self.page.emulate_media(color_scheme="dark")
         for width in (320, 390, 650, 768, 970, 1280):
