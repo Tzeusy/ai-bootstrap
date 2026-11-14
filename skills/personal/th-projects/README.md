@@ -19,6 +19,7 @@ README is a signpost for humans browsing the repo, nothing more.
 | `subskills/project-direction/` | Prioritized spec-driven work plan; milestone synthesis |
 | `subskills/relentless-vision-pursuit/` | Recurring doctrine-grounded pursuit of the project's ideal |
 | `subskills/user-questionnaire/` | Vetted asynchronous owner-decision packets and signoff walkthroughs |
+| `subskills/progress-dashboard/` | Session-owned progress workspace, background usage/agent overview, and asynchronous steering |
 | `references/spec-format.md` | Shared OpenSpec file contract (IDs, headings, test tagging) |
 | `references/work-allocation.md` | Shared cohesive-bead, ownership, overhead, and discovery-triage contract |
 | `scripts/spec-trace-check.py` | Mechanical spec-traceability validator (`uv run`) |
