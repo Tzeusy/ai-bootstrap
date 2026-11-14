@@ -21,11 +21,12 @@
       <p class="rail-title" id="loop-name">Session workspace</p>
       <nav>
         <a href="#work">Work <span class="nav-count" id="nav-work">—</span></a>
+        <a href="#findings-section">Findings <span class="nav-count" id="nav-findings">—</span></a>
         <a href="#agents">Agents <span class="nav-count" id="nav-agents">—</span></a>
         <a href="#artifacts">Artifacts <span class="nav-count" id="nav-artifacts">—</span></a>
+        <a href="#feedback">Feedback <span class="nav-count" id="nav-feedback" hidden></span></a>
         <a href="#notes">Notes</a>
         <a href="#handover">Handover</a>
-        <a href="#feedback">Feedback</a>
       </nav>
       <div class="rail-foot">
         <span class="rail-label">SESSION</span>
@@ -43,10 +44,11 @@
         <p id="outcome" class="outcome" hidden></p>
       </section>
       <section class="metrics" aria-label="Progress and usage">
-        <div class="metric"><span class="metric-label">Work completed</span><strong id="completed-count">—</strong><span id="work-caption" class="metric-caption">Waiting for a snapshot</span><progress id="work-progress" max="1" value="0" aria-label="Tasks completed"></progress></div>
-        <div class="metric"><span class="metric-label">Tokens reported</span><strong id="token-total">Unknown</strong><span id="token-caption" class="metric-caption">No usage counters attached</span><span id="token-breakdown" class="token-breakdown"></span></div>
-        <div class="metric"><span class="metric-label">Agent activity</span><strong id="agent-total">—</strong><span id="agent-caption" class="metric-caption">At the last checkpoint</span><a class="text-link" href="#agents">See the team ↓</a></div>
+        <div class="metric"><span class="metric-label">Recorded tasks completed</span><strong id="completed-count">—</strong><span id="work-caption" class="metric-caption">Waiting for a snapshot</span><progress id="work-progress" max="1" value="0" aria-label="Recorded tasks completed" aria-describedby="work-scope"></progress></div>
+        <div class="metric"><span class="metric-label">Tokens reported</span><div class="metric-value"><strong id="token-total">Unknown</strong><span id="token-coverage" class="badge waiting" hidden>Partial</span></div><span id="token-caption" class="metric-caption">No usage counters attached</span><span id="token-breakdown" class="token-breakdown"></span></div>
+        <div class="metric"><span class="metric-label">Child agents</span><strong id="agent-total">—</strong><span id="agent-caption" class="metric-caption">At the last checkpoint</span><a class="text-link" href="#agents">See the team ↓</a></div>
       </section>
+      <p id="work-scope" class="scope-note">Counts reflect the work currently recorded by the session.</p>
       <div class="content-grid">
         <div class="work-column">
           <section id="work" class="section" aria-labelledby="work-heading">
@@ -57,9 +59,10 @@
           </section>
           <section id="findings-section" class="section" aria-labelledby="findings-heading"><div class="section-heading"><h2 id="findings-heading">What we’ve learned</h2></div><div id="findings"></div></section>
           <section id="agents" class="section" aria-labelledby="agents-heading">
-            <div class="section-heading"><h2 id="agents-heading">Working together</h2><span class="muted small">No child sessions to open</span></div>
+            <div class="section-heading"><h2 id="agents-heading">Working together</h2><span class="muted small">Latest reported status</span></div>
             <div id="agent-list"></div>
-            <details class="usage-details"><summary>Usage by session</summary><div class="table-scroll"><table><caption class="sr-only">Reported token usage for attached sessions</caption><thead><tr><th scope="col">Session / source</th><th scope="col">Input</th><th scope="col">Cached input</th><th scope="col">Output</th><th scope="col">Total</th></tr></thead><tbody id="usage-rows"></tbody></table></div><p id="usage-note" class="muted small"></p></details>
+            <p id="usage-warning" class="notice warning" role="status" hidden></p>
+            <details class="usage-details"><summary>Usage by session</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Session usage table"><table><caption class="sr-only">Reported token usage for attached sessions</caption><thead><tr><th scope="col">Session / source</th><th scope="col">Input</th><th scope="col">Cached input</th><th scope="col">Output</th><th scope="col">Total</th></tr></thead><tbody id="usage-rows"></tbody></table></div><p id="usage-note" class="muted small"></p></details>
           </section>
           <section id="artifacts" class="section" aria-labelledby="artifacts-heading"><div class="section-heading"><h2 id="artifacts-heading">Artifacts</h2><span class="muted small">Diagrams, graphs, and evidence</span></div><div id="artifact-list"></div></section>
           <section id="notes" class="section" aria-labelledby="notes-heading"><div class="section-heading"><h2 id="notes-heading">Workspace notes</h2></div><p class="muted small">Readable snapshots of the current work. The owning workflow remains the task authority.</p><div id="document-list"></div></section>
@@ -69,16 +72,16 @@
           <section id="feedback" class="feedback-panel">
             <div class="section-heading"><h2 id="feedback-heading">Steer the session</h2><span class="key-hint" title="Focus feedback with the f key">f</span></div>
             <p id="feedback-explanation" class="muted small">Leave feedback here. The loop reads it at its next safe checkpoint.</p>
-            <form id="feedback-form">
+            <form id="feedback-form" aria-describedby="feedback-explanation feedback-boundary">
               <div class="form-row"><label for="feedback-kind">Intent<select id="feedback-kind" name="kind"><option value="feedback">Feedback</option><option value="steer">Direction</option><option value="question">Question</option></select></label><label for="feedback-target">Regarding<select id="feedback-target" name="target"><option value="loop">Whole loop</option></select></label></div>
               <label class="sr-only" for="feedback-text">Your feedback or direction</label>
-              <textarea id="feedback-text" name="text" rows="5" maxlength="8000" required placeholder="What should the loop focus on? What would you change?"></textarea>
+              <textarea aria-keyshortcuts="f" id="feedback-text" name="text" rows="5" maxlength="8000" required placeholder="What should the loop focus on? What would you change?"></textarea>
               <div class="submit-row"><span class="muted small" id="draft-state"></span><button type="submit" class="primary-button" id="submit-feedback" disabled>Send feedback</button></div>
               <p id="feedback-result" class="form-result small" role="status" aria-live="polite"></p>
             </form>
-            <p class="feedback-boundary">Feedback queues guidance; it does not run commands or grant approval for a gated action.</p>
+            <p id="feedback-boundary" class="feedback-boundary">Feedback queues guidance; it does not run commands or grant approval for a gated action.</p>
             <div class="feedback-history-heading"><h3>Conversation</h3><span id="feedback-pending" class="muted small"></span></div>
-            <div id="feedback-history"><p class="empty small">Your feedback and the loop’s replies will appear here.</p></div>
+            <div id="feedback-history" tabindex="0" role="region" aria-label="Feedback and loop replies"><p class="empty small">Your feedback and the loop’s replies will appear here.</p></div>
           </section>
         </aside>
       </div>

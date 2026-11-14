@@ -9,7 +9,6 @@ import subprocess
 import sys
 import tempfile
 import threading
-import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -105,6 +104,50 @@ class WorkspaceTests(WorkspaceFixture, unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "disabled"):
             dashboard.record_feedback(self.folder, self.feedback())
 
+    def test_feedback_cursor_bounds_utf8_output_without_consuming_or_clipping_instructions(self):
+        long_target = "target-" + "界" * 7900
+        dashboard.checkpoint(self.folder, {"tasks": [{"id": long_target, "title": "Long identity", "status": "todo"}]}, 0)
+        message = "Only after checking the full message: " + "界" * 7800
+        dashboard.record_feedback(self.folder, self.feedback())
+        dashboard.record_feedback(self.folder, self.feedback("request-2", target=long_target, text=message, revision=1))
+        dashboard.record_feedback(self.folder, self.feedback("request-3"))
+        first = dashboard.pending(self.folder)
+        self.assertEqual([row["id"] for row in first["feedback"]], [1])
+        self.assertTrue(first["feedback_more"])
+        second = dashboard.pending(self.folder, after=first["feedback_cursor"])
+        self.assertLessEqual(len(json.dumps(second["feedback"], ensure_ascii=False).encode()), dashboard.FEEDBACK_BATCH_BYTES)
+        self.assertTrue(second["feedback"][0]["truncated"])
+        self.assertNotIn("text", second["feedback"][0])
+        self.assertNotIn("client_id", second["feedback"][0])
+        self.assertEqual(dashboard.feedback_item(self.folder, 2)["text"], message)
+        self.assertEqual(dashboard.pending(self.folder, after=second["feedback_cursor"])["feedback"], [])
+        self.assertEqual(dashboard.pending(self.folder)["pending_count"], 3)
+        dashboard.acknowledge(self.folder, 2, "Full message read; deferred until its prerequisite is met")
+        self.assertEqual(dashboard.pending(self.folder)["pending_count"], 2)
+
+    def test_cli_errors_preserve_state_and_do_not_create_missing_workspaces(self):
+        script = str(SCRIPTS / "progress_dashboard.py")
+        missing = Path(self.tmp.name) / "missing-root"
+        result = subprocess.run([sys.executable, script, "--root", str(missing), "--slug", "typo", "status"],
+                                capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertFalse(missing.exists())
+        before = (self.folder / "state.json").read_bytes()
+        oversized = Path(self.tmp.name) / "snapshot.json"
+        oversized.write_bytes(b"x" * (dashboard.MAX_JSON + 1))
+        result = subprocess.run([sys.executable, script, "--root", self.tmp.name, "--slug", "demo",
+                                 "checkpoint", "--expected-revision", "0", "--input", str(oversized)],
+                                capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual((self.folder / "state.json").read_bytes(), before)
+        dashboard.record_feedback(self.folder, self.feedback())
+        result = subprocess.run([sys.executable, script, "--root", self.tmp.name, "--slug", "demo",
+                                 "inbox", "--after-feedback", "1"], capture_output=True, text=True, check=True)
+        self.assertEqual(json.loads(result.stdout)["feedback"], [])
+        result = subprocess.run([sys.executable, script, "--root", self.tmp.name, "--slug", "demo",
+                                 "inbox", "--id", "1"], capture_output=True, text=True, check=True)
+        self.assertEqual(json.loads(result.stdout)["feedback"]["text"], self.feedback()["text"])
+
     def test_acknowledgement_limit_preserves_readable_history(self):
         rows = [{**self.feedback(f"request-{i:04}", text="x" * 7200), "id": i + 1,
                  "created_at": dashboard.now(), "status": "pending", "response": None} for i in range(400)]
@@ -174,6 +217,20 @@ class WorkspaceTests(WorkspaceFixture, unittest.TestCase):
             self.assertIsNone(child["total_tokens"])
         finally:
             server.server_close()
+        previous_cache = cache.read_bytes()
+        for damaged in ("corrupt local cache", '{"schema":1,"sources":{"owner":"damaged entry"}}'):
+            with self.subTest(cache=damaged):
+                cache.write_text(damaged)
+                degraded = DashboardServer(self.folder, "127.0.0.1", 0, "usage-recovery")
+                try:
+                    view = degraded.view()
+                    self.assertIn("check the local telemetry cache", view["telemetry"]["error"])
+                    self.assertEqual(view["state"]["title"], "A useful outcome")
+                    self.assertEqual(cache.read_text(), damaged)
+                    cache.write_bytes(previous_cache)
+                    self.assertEqual(degraded.sample_usage()["totals"]["total_tokens"], 13)
+                finally:
+                    degraded.server_close()
 
 
 class HttpTests(WorkspaceFixture, unittest.TestCase):
@@ -207,9 +264,13 @@ class HttpTests(WorkspaceFixture, unittest.TestCase):
             etag = reply.headers["ETag"]
         self.assertEqual(state["state"]["summary"], content)
         self.assertIsNone(state["telemetry"]["totals"]["total_tokens"])
+        self.server.telemetry["sampled_at"] = "2026-11-14T23:59:59+00:00"
         with self.assertRaises(HTTPError) as error:
             self.request("api/state", headers={"If-None-Match": etag})
         self.assertEqual(error.exception.code, 304)
+        self.server.telemetry["error"] = "Usage collector unavailable"
+        with self.request("api/state", headers={"If-None-Match": etag}) as reply:
+            self.assertNotEqual(reply.headers["ETag"], etag)
         with self.request("api/feedback", self.feedback()) as reply:
             self.assertEqual(json.load(reply)["feedback"]["status"], "pending")
         self.assertEqual(dashboard.pending(self.folder)["pending_count"], 1)
@@ -254,9 +315,6 @@ class LifecycleTests(unittest.TestCase):
                 self.assertTrue(reused["reused"])
                 self.assertEqual(reused["url"], server["url"])
                 self.assertTrue(dashboard.stop(folder)["stopped"])
-                deadline = time.monotonic() + 3
-                while dashboard.health(dashboard.load(folder / "server.json")) and time.monotonic() < deadline:
-                    time.sleep(.02)
                 self.assertFalse(dashboard.health(dashboard.load(folder / "server.json")))
                 # A stale PID, even our own, must never receive a signal.
                 info = dashboard.load(folder / "server.json")

@@ -1,4 +1,4 @@
 interface:
   display_name: "Progress Dashboard"
-  short_description: "A live session workspace with progress, usage, agents and feedback"
-  default_prompt: "Use progress-dashboard to publish a durable session progress workspace with measured usage and asynchronous steering."
+  short_description: "Local session progress, agents, measured usage and queued feedback"
+  default_prompt: "Use progress-dashboard to publish this session's progress at existing checkpoints, preserving its tracker and authorization gates."

@@ -78,6 +78,7 @@ class DashboardBrowserTests(unittest.TestCase):
         self.context = self.browser.new_context(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
         self.addCleanup(self.context.close)
         self.page = self.context.new_page()
+        self.page.set_default_timeout(5000)
         self.errors = []
         self.page.on("pageerror", lambda error: self.errors.append(str(error)))
         self.page.goto(f"http://127.0.0.1:{self.server.server_port}/{self.server.instance}/")
@@ -163,7 +164,94 @@ class DashboardBrowserTests(unittest.TestCase):
         self.assertEqual(page.locator("#feedback-text").input_value(), "A new thought while saving.")
         self.assertEqual(len(self.saved()), 2)
 
+    def test_refresh_preserves_agent_focus_document_disclosures_and_drafts(self):
+        page = self.page
+        button = page.get_by_role("button", name="Comment on Independent reviewer", exact=True)
+        button.focus()
+        button.evaluate("node => window.retainedAgentButton = node")
+        # The collector samples every three seconds even when counters did not change.
+        with self.server.telemetry_lock:
+            self.server.telemetry = {**self.server.telemetry, "sampled_at": "2099-01-01T00:00:00Z"}
+        with page.expect_response("**/api/state"):
+            page.locator("#refresh").evaluate("node => node.click()")
+        expect(button).to_be_focused()
+        self.assertTrue(button.evaluate("node => node === window.retainedAgentButton"))
+        # An unrelated child report must also preserve this agent's control.
+        other = {**self.snapshot["agents"][0], "id": "builder", "name": "Builder", "status": "running"}
+        model.checkpoint(self.folder, {"agents": [*self.snapshot["agents"], other]}, 1)
+        with page.expect_response("**/api/state"):
+            page.locator("#refresh").evaluate("node => node.click()")
+        expect(button).to_be_focused()
+        self.assertTrue(button.evaluate("node => node === window.retainedAgentButton"))
+        builder_button = page.get_by_role("button", name="Comment on Builder", exact=True)
+        builder_button.focus()
+        model.checkpoint(self.folder, {"agents": [other, *self.snapshot["agents"]]}, 2)
+        with page.expect_response("**/api/state"):
+            page.locator("#refresh").evaluate("node => node.click()")
+        expect(builder_button).to_be_focused()
+        details = page.locator('.document[data-name="in-progress.md"]')
+        details.locator("summary").click()
+        details.locator("summary").focus()
+        model.checkpoint(self.folder, {"findings": ["A new report arrived."]}, 3)
+        with page.expect_response("**/api/state"):
+            page.locator("#refresh").evaluate("node => node.click()")
+        expect(details).to_have_attribute("open", "")
+        expect(details.locator("summary")).to_be_focused()
+        page.get_by_role("button", name="Comment on Independent reviewer", exact=True).click()
+        expect(page.locator("#feedback-text")).to_be_focused()
+        expect(page.locator("#feedback-target")).to_have_value("reviewer")
+        page.locator("#feedback-text").fill("Keep the review independent.")
+        page.locator("#feedback-text").press("Tab")
+        expect(page.locator("#submit-feedback")).to_be_focused()
+        page.locator("#submit-feedback").press("Enter")
+        self.saved_result()
+        expect(page.locator("#nav-feedback")).to_have_text("1")
+        expect(page.locator("#submit-feedback")).to_be_disabled()
+
+    def test_stale_checkpoint_offline_recovery_and_mobile_feedback_navigation(self):
+        page = self.page
+        state = model.load(self.folder / "state.json")
+        state["updated_at"] = "2020-01-01T00:00:00Z"
+        model.save(self.folder / "state.json", state)
+        self.refresh()
+        expect(page.locator("#connection-text")).to_have_text("Page connected")
+        expect(page.locator("#checkpoint-time")).to_contain_text("status may be stale")
+        with self.server.telemetry_lock:
+            self.server.telemetry = {**self.server.telemetry, "error": "Telemetry unavailable; check the attached sources."}
+        self.refresh()
+        expect(page.locator("#usage-warning")).to_have_text("Telemetry unavailable; check the attached sources.")
+        expect(page.locator("#token-caption")).to_contain_text("Usage unavailable")
+        mobile = self.browser.new_context(viewport={"width": 320, "height": 740}, is_mobile=True, has_touch=True, reduced_motion="reduce")
+        self.addCleanup(mobile.close)
+        page = mobile.new_page()
+        page.set_default_timeout(5000)
+        page.on("pageerror", lambda error: self.errors.append(str(error)))
+        page.goto(self.page.url)
+        page.get_by_role("heading", name="A useful progress workspace", exact=True).wait_for()
+        self.page = page
+        feedback_link = page.locator('nav a[href="#feedback"]')
+        expect(feedback_link).to_be_in_viewport()
+        expect(page.locator('nav a[href="#work"]')).to_have_attribute("aria-current", "true")
+        feedback_link.click()
+        expect(page.locator("#feedback-heading")).to_be_in_viewport()
+        expect(feedback_link).to_have_attribute("aria-current", "true")
+        page.locator("#feedback-text").fill("Keep this draft if the connection fails.")
+        page.route("**/api/state", lambda route: route.abort())
+        self.refresh()
+        expect(page.locator("#load-error")).to_contain_text("Showing the last received snapshot")
+        expect(page.locator("#feedback-text")).to_have_value("Keep this draft if the connection fails.")
+        page.unroute("**/api/state")
+        self.refresh()
+        expect(page.locator("#load-error")).to_be_hidden()
+        expect(page.locator("#feedback-text")).to_have_value("Keep this draft if the connection fails.")
+
     def test_partial_usage_stays_visible_and_small_screens_fit(self):
+        complete = {"id": "contract", "title": "Agree the bounded contract", "status": "complete", "detail": "Keep the owning workflow authoritative.", "evidence": "Reviewed contract."}
+        builder = {**self.snapshot["agents"][0], "id": "builder", "name": "Workspace builder", "status": "running", "summary": "Storage and feedback checks pass; browser checks remain."}
+        finished = {**builder, "id": "researcher", "name": "Runtime researcher", "status": "complete", "summary": "Missing counters must stay unknown."}
+        image = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160"><rect width="640" height="160" fill="#faf9f5"/><text x="30" y="85" font-family="serif" font-size="24" fill="#24231f">Checkpoint → workspace → owner feedback</text></svg>'
+        (self.folder / "artifacts" / "flow.svg").write_text(image)
+        model.checkpoint(self.folder, {"tasks": [complete, *self.snapshot["tasks"]], "agents": [builder, *self.snapshot["agents"], finished], "findings": ["Unknown counters stay unknown.", "Feedback waits for a safe checkpoint."], "artifacts": [{"path": "flow.svg", "label": "Workspace feedback flow"}]}, 1)
         source = self.root / "usage.jsonl"
         source.write_text(json.dumps({"type": "event_msg", "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 80, "output_tokens": 23, "total_tokens": 123}}}}) + "\n")
         model.attach(self.folder, "parent", "codex", str(source))
@@ -171,10 +259,28 @@ class DashboardBrowserTests(unittest.TestCase):
         self.server.telemetry = self.server.collector.poll(model.load(self.folder / "sources.json"))
         self.refresh()
         expect(self.page.locator("#token-total")).to_have_text("123")
-        self.assertIn("1 of 2", self.page.locator("#token-caption").inner_text())
+        self.assertIn("1 of 4", self.page.locator("#token-caption").inner_text())
+        expect(self.page.locator("#completed-count")).to_have_text("1 / 3")
+        expect(self.page.locator("#agent-total")).to_have_text("3 recorded")
+        expect(self.page.locator("#agent-caption")).to_have_text("1 working · 1 waiting · 1 complete")
+        expect(self.page.locator("#nav-findings")).to_have_text("2")
+        self.page.locator("#completed-details > summary").click()
+        expect(self.page.locator("#complete")).to_contain_text("Reviewed contract.")
+        preview = self.page.get_by_role("img", name="Workspace feedback flow", exact=True)
+        preview.scroll_into_view_if_needed()
+        expect(preview).to_be_visible()
+        self.assertTrue(preview.evaluate("node => node.complete && node.naturalWidth > 0"))
+        with self.page.expect_download() as transfer:
+            self.page.get_by_role("link", name="Download Workspace feedback flow", exact=True).click()
+        artifact = self.root / "download.svg"
+        transfer.value.save_as(artifact)
+        self.assertEqual(artifact.read_text(), image)
+        expect(self.page.locator("#token-coverage")).to_be_visible()
+        self.assertIn("3 unknown", self.page.locator("#token-caption").inner_text())
         self.assertIn("Token usage unknown", self.page.locator("#agent-list").inner_text())
         self.page.get_by_text("Usage by session", exact=True).click()
-        self.page.get_by_text("codex · not yet reported", exact=True).wait_for()
+        self.page.get_by_text("codex · error", exact=True).wait_for()
+        self.page.get_by_text("unreadable source", exact=True).wait_for()
         self.page.emulate_media(color_scheme="dark")
         for width in (320, 390, 650, 768, 970, 1280):
             self.page.set_viewport_size({"width": width, "height": 900})

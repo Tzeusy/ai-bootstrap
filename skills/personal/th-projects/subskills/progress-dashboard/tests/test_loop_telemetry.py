@@ -86,12 +86,32 @@ class UsageCollectorTests(unittest.TestCase):
     def test_restart_reuses_offsets_and_unchanged_polls_do_not_rewrite_cache(self):
         """Spec: REQ-progress-dashboard-003."""
         self.write(codex())
-        self.poll()
+        empty = telemetry._empty
+
+        def append_after_stat(source, identity):
+            self.write(codex(150, 60, 15), mode="a")
+            return empty(source, identity)
+
+        with mock.patch.object(telemetry, "_empty", side_effect=append_after_stat):
+            self.assertEqual(self.poll()["totals"]["total_tokens"], 105)
+        cache = json.loads(self.collector.cache_path.read_text())
+        entry = cache["sources"]["parent"]
+        self.assertEqual(entry["offset"], entry["size_seen"])
+        self.assertLess(entry["offset"], self.log.stat().st_size)
+        self.assertEqual(self.poll()["totals"]["total_tokens"], 165)
+        # Older collectors could consume an append after fstat and persist
+        # offset > size_seen. That valid legacy cache must resume without replay.
+        cache = json.loads(self.collector.cache_path.read_text())
+        cache["sources"]["parent"]["size_seen"] -= 1
+        self.collector.cache_path.write_text(json.dumps(cache))
+        with mock.patch.object(telemetry, "_consume", wraps=telemetry._consume) as consume:
+            self.assertEqual(self.poll()["totals"]["total_tokens"], 165)
+        self.assertEqual(consume.call_args.args[1], b"")
         collector = telemetry.UsageCollector(self.workspace)
         with mock.patch.object(telemetry, "_consume", wraps=telemetry._consume) as consume, \
                 mock.patch.object(collector, "_save", wraps=collector._save) as save:
             result = collector.poll([self.source])
-        self.assertEqual(result["totals"]["total_tokens"], 105)
+        self.assertEqual(result["totals"]["total_tokens"], 165)
         self.assertEqual(consume.call_args.args[1], b"")
         save.assert_not_called()
         self.assertEqual(json.loads(collector.cache_path.read_text())["sources"]["parent"]["offset"],
@@ -263,13 +283,27 @@ class UsageCollectorTests(unittest.TestCase):
         self.assertIsNone(result["totals"]["total_tokens"])
 
     def test_damaged_cache_is_an_explicit_failure_not_an_automatic_full_log_rescan(self):
-        self.workspace.mkdir()
-        self.collector.cache_path.write_text("not valid JSON")
         self.write(codex())
-        with self.assertRaisesRegex(ValueError, "telemetry cache is invalid"), \
-                mock.patch.object(telemetry, "_consume") as consume:
-            self.poll()
-        consume.assert_not_called()
+        self.poll()
+        valid_entry = json.loads(self.collector.cache_path.read_text())["sources"]["parent"]
+        corrupt_entries = ["damaged entry", {}, *(
+            {**valid_entry, key: value} for key, value in (
+                ("offset", "offset"), ("identity", [1]), ("discard_partial", 1),
+                ("usage", {"input_tokens": 1}), ("context_tokens", -1),
+                ("observed_at", []), ("messages", {"a" * 64: [1, 2]}),
+            )
+        )]
+        damaged_caches = ["not valid JSON", *(
+            json.dumps({"schema": 1, "sources": {"parent": entry}}) for entry in corrupt_entries
+        )]
+        for damaged in damaged_caches:
+            with self.subTest(cache=damaged):
+                self.collector.cache_path.write_text(damaged)
+                with self.assertRaisesRegex(ValueError, "telemetry cache is invalid"), \
+                        mock.patch.object(telemetry, "_consume") as consume:
+                    self.poll()
+                consume.assert_not_called()
+                self.assertEqual(self.collector.cache_path.read_text(), damaged)
         self.collector.cache_path.unlink()
         target = self.root / "unrelated.json"
         original = '{"schema":1,"sources":{}}'

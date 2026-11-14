@@ -1,12 +1,9 @@
 ---
 name: progress-dashboard
 description: >
-  Give a running session a durable progress workspace and local interactive
-  dashboard showing current work, findings, agent status, measured token usage,
-  artifacts and asynchronous feedback. Use for "show loop progress", "give this
-  session a dashboard", "monitor subagents", or "steer this run in a browser".
-  Works with any workflow; the owning tracker and authorization gates remain
-  authoritative. Formal owner decisions use user-questionnaire.
+  Use when asked to "give this session a dashboard", "show loop progress",
+  "monitor subagents", or "steer this run in a browser": a durable local
+  workspace for current work, findings, agents, measured usage and feedback.
 metadata:
   owner: tze
   authors:
@@ -19,19 +16,19 @@ compatibility: Python 3.11+ and uv; stdlib-only server on Linux/macOS. Optional 
 
 # Progress Dashboard
 
-One session owns `~/.tmp/<slug>/` and one background server. Fixed scripts and
-assets handle persistence, rendering, feedback and incremental telemetry. The
-LLM supplies concise content and optional generated visuals, never per-run web
-infrastructure. The workspace is a progress projection, not a second task tracker.
+Publish any running workflow's progress to `~/.tmp/<slug>/` and a local dashboard.
+Fixed helpers scaffold `in-progress.md`, `todo.md`, `complete.md`, `handover.md`
+and serve the UI. The owning tracker, claims, acceptance and authorization gates
+remain authoritative; progress files only project them. Supply concise content,
+not per-run server code or frontend rewrites.
 
-## Launch once
+## Start or resume
 
-Resolve `DASHBOARD` from this canonical skill's absolute location to
+Resolve `DASHBOARD` to this package's
 [`scripts/progress_dashboard.py`](scripts/progress_dashboard.py). Choose a stable
-slug per parent session; independent live sessions use different slugs. Reuse it
-after compaction. Load this skill once; retain helper/slug/revision in the existing
-session locator instead of reloading it every cycle. Consult
-[the protocol](references/protocol.md) only for usage adapters, visuals or recovery.
+slug per parent session; other live sessions use different slugs. Retain the
+helper path, slug, actor, repository, revision and feedback cursor (initially `0`)
+in the workflow's existing session locator across compaction. Load this skill once.
 
 ```bash
 uv run "$DASHBOARD" --slug "$SLUG" init \
@@ -40,33 +37,29 @@ uv run "$DASHBOARD" --slug "$SLUG" init \
 uv run "$DASHBOARD" --slug "$SLUG" serve
 ```
 
-`serve` starts or reuses a detached process and prints a capability URL. Default
-binding is `127.0.0.1`; use an existing SSH forward for remote access, or explicitly
-pass `--bind <this-host-Tailscale-IPv4>`. It never configures Tailscale Serve,
-changes firewall rules, or opens a public listener. Keep the private URL in the
-session report, outside commits and PRs. `--no-feedback` on initial `init` makes
-the surface read-only. `--root` overrides `~/.tmp` for tests or explicit placement.
+Report the workspace and printed private URL; keep the URL outside commits/PRs.
+The server defaults to loopback. For remote access, custom roots, or recovery,
+read [lifecycle](references/lifecycle.md). Initial `init --no-feedback` disables
+feedback. Repeating `init` verifies identity and repairs projections.
 
 ## Publish at existing checkpoints
 
-Publish on meaningful state changes: task admission, delegation, a substantive
-finding, review/CI wait, correction, completion, or an owner-requested update.
-Project IDs/status from the owning workflow's existing reads; use native agent
-results for child summaries. Do not reread the whole backlog or summarize child
-transcripts for the dashboard. Keep completed agents visible with their outcome.
+Publish meaningful changes: admission, delegation, findings, waits, corrections,
+completion or requested updates. Reuse existing tracker reads and native agent
+results. No dashboard-only agents, child-transcript summaries, backlog reloads,
+model refresh timers or extra wakeups. Browser polling and incremental usage
+collection run in the server.
 
 ```bash
 uv run "$DASHBOARD" --slug "$SLUG" checkpoint \
-  --expected-revision "$REVISION" --input "$SNAPSHOT_JSON"
+  --expected-revision "$REVISION" --after-feedback "$FEEDBACK_CURSOR" \
+  --input "$SNAPSHOT_JSON"
 ```
 
-The input is a partial structured snapshot. The helper regenerates only changed
-`in-progress.md`, `todo.md`, and `complete.md`; it returns the new revision and a
-bounded batch of pending feedback. A stale revision refuses the write. Reuse the
-returned revision; repeat publication of identical content leaves it unchanged.
-The optional agents and artifacts collections render from the same snapshot.
-
-Minimal snapshot (omit unchanged fields, keep actual workflow IDs):
+Send only changed fields; omitted fields persist, but a supplied list replaces
+that collection. Retain completed agents with their outcomes. Use actual workflow
+IDs. The helper renders progress files and returns revision plus pending feedback;
+identical content keeps the revision. Minimal snapshot:
 
 ```json
 {"summary":"Implementation passes; review is running.","phase":"review",
@@ -76,60 +69,43 @@ Minimal snapshot (omit unchanged fields, keep actual workflow IDs):
             "summary":"Checking failure and recovery paths."}]}
 ```
 
-**Token efficiency is part of the contract.** There are no model-driven refresh
-cycles, per-second skill calls, generated frontend rewrites, or dashboard-only
-subagents. Browser polling and bounded incremental usage collection happen in the
-server process. Run `status --since <revision>` or `inbox` only at the workflow's
-existing wake/checkpoint when no publication is needed. Both return compact
-feedback/status, not the rendered documents, full roster, or usage history.
-Publish only changed fields; do not copy the full snapshot into chat.
+Without changes, use `status --since "$REVISION" --after-feedback "$FEEDBACK_CURSOR"`
+at an existing safe checkpoint. Retain returned revision and `feedback_cursor`;
+do not reread generated documents or copy snapshots into chat. Read
+[snapshot/feedback protocol](references/protocol.md) for additional fields,
+queue handling, `truncated` feedback or revision conflicts. Retrieve full feedback
+with `inbox --id N` before interpreting or acknowledging a truncated preview.
 
 ## Feedback and authority
 
-Feedback stays pending until the parent records its disposition:
+Feedback waits for the parent's next safe checkpoint; it cannot interrupt the
+runtime or execute commands. Record a disposition after evaluating it:
 
 ```bash
 uv run "$DASHBOARD" --slug "$SLUG" ack --id 3 \
   --response "Accepted; the next package will prioritize this verification."
 ```
 
-Read the owner's message as steering through the current workflow. Acknowledge
-with what changed, what is deferred, or the actual gate; acknowledgement alone
-does not claim implementation. Feedback cannot execute commands, mutate tasks,
-close beads, approve a merge/deployment, or bypass a hard gate. Gated owner
-choices still route through [user-questionnaire](../user-questionnaire/SKILL.md).
-The dashboard does not inject messages into another runtime or interrupt work;
-pending feedback is consumed at the next safe parent checkpoint. Existing bounded
-waits still govern how soon that checkpoint occurs.
+Say what changed, what is deferred, or which gate applies. Acknowledgement claims
+no implementation. Feedback cannot mutate the tracker, approve a merge/deployment
+or bypass gates. Formal choices use
+[user-questionnaire](../user-questionnaire/SKILL.md); urgent interrupts use the
+runtime's direct input. Existing bounded waits govern feedback latency.
 
 ## Handover and retirement
 
-`handover.md` begins with a scaffold marker and **is never updated by checkpoints,
-telemetry, feedback submission, compaction, stop, or automatic session close**.
-Only an explicit manual owner request authorizes:
+`handover.md` stays scaffold-only until an explicit manual owner request. No
+checkpoint, telemetry, compaction, stop or automatic close updates it. For that
+request, use the [manual handover command](references/lifecycle.md#manual-handover).
+On completion/stop, publish final current state then run
+`uv run "$DASHBOARD" --slug "$SLUG" stop`; retained content survives.
+An ongoing run names its server owner and stop command.
 
-```bash
-uv run "$DASHBOARD" --slug "$SLUG" handover \
-  --owner-request "Owner explicitly asked for a handover in this session" \
-  --input "$HANDOVER_TEXT"
-```
+## Load only the needed slice
 
-Routine recovery data stays in the live snapshot and the owning workflow's
-existing journal. A request to stop, a feedback acknowledgement, or compaction
-alone is not a request to update handover. Resume verifies actor/repository
-identity and repairs generated progress files from `state.json`.
-
-Report the workspace and URL at launch; report status/feedback freshness and
-measured versus unknown usage when relevant. On completion or an explicit stop,
-publish the final current state, then run `stop`. A deliberately ongoing run may
-retain its server; name its lifecycle owner and stop command. `stop` verifies
-server identity before signalling a PID and preserves all workspace content.
-No deployment, global daemon, tool-home hook, or new catalog skill is installed.
-
-## Verification
-
-The [workspace/HTTP tests](tests/test_progress_dashboard.py),
-[telemetry tests](tests/test_loop_telemetry.py), and
-[browser journey](tests/test_dashboard_browser.py) cover the public behavior.
-The shared [package validator](../../scripts/validate-th-projects.sh) runs the
-deterministic suites; browser checks report an explicit skip without Chromium.
+- [Usage adapters](references/telemetry.md): attach known parent/child logs;
+  explain measured, partial and unknown usage without estimating.
+- [Artifacts](references/artifacts.md): publish images, diagrams or PDFs through
+  the existing shell without rebuilding it.
+- [Lifecycle](references/lifecycle.md): network choices, identity/recovery,
+  manual handover and maintainer verification.
