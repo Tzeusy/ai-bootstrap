@@ -204,11 +204,8 @@ def validate_snapshot(folder: Path, incoming: dict) -> dict:
             identities.add(ident)
             if key == "tasks" and (entry["status"] not in STATUSES or not entry["title"]):
                 raise ValueError("tasks require title and status in-progress, todo or complete")
-            if key == "agents":
-                if entry["status"] not in ("running", "waiting", "complete", "failed", "unknown"):
-                    raise ValueError("invalid agent status")
-                if not entry["updated_at"]:
-                    entry["updated_at"] = now()
+            if key == "agents" and entry["status"] not in ("running", "waiting", "complete", "failed", "unknown"):
+                raise ValueError("invalid agent status")
             if key == "artifacts":
                 artifact_path(folder, entry["path"])
             cleaned.append(entry)
@@ -227,6 +224,12 @@ def checkpoint(folder: Path, incoming: dict, expected: int) -> dict:
         state = load(folder / "state.json")
         if state["revision"] != expected:
             raise ValueError(f"revision conflict: current revision is {state['revision']}")
+        previous_agents = {row["id"]: row for row in state["agents"]}
+        for agent in update.get("agents", []):
+            if not agent["updated_at"]:
+                previous = previous_agents.get(agent["id"], {})
+                unchanged = all(value == previous.get(key) for key, value in agent.items() if key != "updated_at")
+                agent["updated_at"] = previous["updated_at"] if unchanged else now()
         if any(state[key] != value for key, value in update.items()):
             state.update(update)
             state.update(revision=expected + 1, updated_at=now())
@@ -234,6 +237,13 @@ def checkpoint(folder: Path, incoming: dict, expected: int) -> dict:
             save(folder / "state.json", state)
         project(folder, state)
         return {"revision": state["revision"], **pending(folder)}
+
+
+def save_feedback(folder: Path, rows: list) -> None:
+    serialized = json.dumps(rows, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+    if len(serialized.encode()) > 3 * 1024 * 1024:
+        raise ValueError("feedback history is full; shorten the disposition or start a new workspace")
+    atomic(folder / "feedback.json", serialized)
 
 
 def record_feedback(folder: Path, body: dict) -> dict:
@@ -265,9 +275,7 @@ def record_feedback(folder: Path, body: dict) -> dict:
         row = {**body, "text": message, "id": len(rows) + 1, "created_at": now(),
                "status": "pending", "response": None}
         rows.append(row)
-        if len(json.dumps(rows).encode()) > 3 * 1024 * 1024:
-            raise ValueError("feedback history is full; start a new workspace")
-        save(folder / "feedback.json", rows)
+        save_feedback(folder, rows)
         return row
 
 
@@ -280,7 +288,7 @@ def acknowledge(folder: Path, feedback_id: int, response: str) -> dict:
         for row in rows:
             if row["id"] == feedback_id:
                 row.update(status="acknowledged", response=response, acknowledged_at=now())
-                save(folder / "feedback.json", rows)
+                save_feedback(folder, rows)
                 return {"id": feedback_id, "status": "acknowledged"}
         raise ValueError("feedback id not found")
 

@@ -165,7 +165,7 @@ class DashboardBrowserTests(unittest.TestCase):
 
     def test_partial_usage_stays_visible_and_small_screens_fit(self):
         source = self.root / "usage.jsonl"
-        source.write_text(json.dumps({"type": "event_msg", "timestamp": model.now(), "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 80, "output_tokens": 23, "total_tokens": 123}}}}) + "\n")
+        source.write_text(json.dumps({"type": "event_msg", "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 80, "output_tokens": 23, "total_tokens": 123}}}}) + "\n")
         model.attach(self.folder, "parent", "codex", str(source))
         model.attach(self.folder, "reviewer", "codex", str(self.root / "waiting.jsonl"))
         self.server.telemetry = self.server.collector.poll(model.load(self.folder / "sources.json"))
@@ -173,6 +173,7 @@ class DashboardBrowserTests(unittest.TestCase):
         expect(self.page.locator("#token-total")).to_have_text("123")
         self.assertIn("1 of 2", self.page.locator("#token-caption").inner_text())
         self.assertIn("Token usage unknown", self.page.locator("#agent-list").inner_text())
+        self.page.get_by_text("codex · not yet reported", exact=True).wait_for()
         self.page.emulate_media(color_scheme="dark")
         for width in (320, 390, 650, 768, 970, 1280):
             self.page.set_viewport_size({"width": width, "height": 900})

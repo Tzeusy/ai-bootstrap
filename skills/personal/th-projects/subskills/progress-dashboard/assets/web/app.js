@@ -39,11 +39,13 @@
   }
 
   function dateLabel(value) {
+    if (typeof value !== "string" || !value) return "Unknown time";
     const date = new Date(value);
     return Number.isFinite(date.getTime()) ? date.toLocaleString(undefined, {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"}) : "Unknown time";
   }
 
   function age(value) {
+    if (typeof value !== "string" || !value) return "not yet reported";
     const elapsed = Date.now() - new Date(value).getTime();
     if (!Number.isFinite(elapsed)) return "not yet reported";
     if (elapsed < 60000) return "just now";

@@ -13,6 +13,7 @@ import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -32,6 +33,7 @@ class WorkspaceFixture:
     def snapshot(self):
         return {"summary": "Implementing the accepted scope", "phase": "implementation",
                 "tasks": [{"id": "task-1", "title": "Ship behavior", "status": "in-progress", "detail": "Current work"}],
+                "agents": [{"id": "reviewer", "status": "running", "summary": "Reviewing the package"}],
                 "findings": ["Focused verification passes"]}
 
     def feedback(self, key="request-1", **kwargs):
@@ -43,10 +45,13 @@ class WorkspaceTests(WorkspaceFixture, unittest.TestCase):
         """Spec: REQ-progress-dashboard-001, REQ-progress-dashboard-002."""
         handover = self.folder / "handover.md"
         before = handover.stat().st_mtime_ns
-        dashboard.checkpoint(self.folder, self.snapshot(), 0)
+        with patch.object(dashboard, "now", return_value="2026-11-14T09:00:00+00:00"):
+            dashboard.checkpoint(self.folder, self.snapshot(), 0)
         self.assertIn("task-1", (self.folder / "in-progress.md").read_text())
         document_mtime = (self.folder / "in-progress.md").stat().st_mtime_ns
-        self.assertEqual(dashboard.checkpoint(self.folder, self.snapshot(), 1)["revision"], 1)
+        with patch.object(dashboard, "now", return_value="2026-11-14T09:10:00+00:00"):
+            self.assertEqual(dashboard.checkpoint(self.folder, self.snapshot(), 1)["revision"], 1)
+        self.assertEqual(dashboard.load(self.folder / "state.json")["agents"][0]["updated_at"], "2026-11-14T09:00:00+00:00")
         self.assertEqual((self.folder / "in-progress.md").stat().st_mtime_ns, document_mtime)
         dashboard.initialize(self.folder, title="Ignored resume title", actor="owner", repo_root=self.tmp.name)
         self.assertEqual(handover.stat().st_mtime_ns, before)
@@ -99,6 +104,26 @@ class WorkspaceTests(WorkspaceFixture, unittest.TestCase):
         dashboard.save(self.folder / "state.json", state)
         with self.assertRaisesRegex(ValueError, "disabled"):
             dashboard.record_feedback(self.folder, self.feedback())
+
+    def test_acknowledgement_limit_preserves_readable_history(self):
+        rows = [{**self.feedback(f"request-{i:04}", text="x" * 7200), "id": i + 1,
+                 "created_at": dashboard.now(), "status": "pending", "response": None} for i in range(400)]
+        dashboard.save_feedback(self.folder, rows)
+        acknowledged = 0
+        for row in rows:
+            before = (self.folder / "feedback.json").read_bytes()
+            try:
+                dashboard.acknowledge(self.folder, row["id"], "r" * 8000)
+                acknowledged += 1
+            except ValueError as error:
+                self.assertIn("history is full", str(error))
+                self.assertEqual((self.folder / "feedback.json").read_bytes(), before)
+                break
+        self.assertGreater(acknowledged, 0)
+        self.assertLess(acknowledged, len(rows))
+        self.assertLessEqual((self.folder / "feedback.json").stat().st_size, 3 * 1024 * 1024)
+        self.assertEqual(dashboard.pending(self.folder)["pending_count"], 400 - acknowledged)
+        dashboard.acknowledge(self.folder, acknowledged + 1, "Deferred")
 
     def test_artifact_allowlist_and_symlink_boundaries(self):
         image = self.folder / "artifacts/diagram.svg"
@@ -198,6 +223,13 @@ class HttpTests(WorkspaceFixture, unittest.TestCase):
         for headers in ({"Origin": "https://elsewhere.invalid"}, {"Host": "evil.invalid"}, {"X-Loop-Feedback": "0"}):
             with self.subTest(headers=headers), self.assertRaises(HTTPError) as error:
                 self.request("api/feedback", self.feedback(), headers)
+            self.assertEqual(error.exception.code, 403)
+        forwarded = {"Host": "localhost:18080", "Origin": "http://localhost:18080"}
+        with self.request("api/feedback", self.feedback(), forwarded) as response:
+            self.assertEqual(json.load(response)["feedback"]["status"], "pending")
+        for host in ("localhost:0", "localhost:70000", "evil.invalid:18080", "localhost.evil.invalid:18080"):
+            with self.subTest(host=host), self.assertRaises(HTTPError) as error:
+                self.request("api/state", headers={"Host": host})
             self.assertEqual(error.exception.code, 403)
 
     def test_only_explicitly_published_artifacts_are_served(self):

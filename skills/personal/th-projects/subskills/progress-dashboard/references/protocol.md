@@ -110,7 +110,9 @@ feedback is retained with its original context, not silently rewritten. Writes
 and acknowledgements serialize under the workspace lock. A failed save preserves
 the browser draft. `ack --id N --response <disposition>` durably records what the
 parent did with it; reads never consume it. Feedback history is bounded at 2000
-entries/3MiB with explicit refusal, never silent deletion.
+entries/3MiB with explicit refusal, never silent deletion. The serialized byte
+limit also covers acknowledgement dispositions; a refused update preserves the
+previous readable inbox and can be retried with a shorter disposition.
 
 There is no event injection into Codex/Claude and no new LLM wake timer. Steering
 is observed at the existing next safe checkpoint. Critical immediate interrupts

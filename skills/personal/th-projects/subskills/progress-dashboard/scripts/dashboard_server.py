@@ -109,7 +109,14 @@ class Handler(BaseHTTPRequestHandler):
         self.respond(status, json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode())
 
     def route(self) -> str | None:
-        if self.headers.get("Host") not in self.server.allowed_hosts:
+        host = self.headers.get("Host", "")
+        # SSH forwards retain the browser-facing loopback port in Host. Allow
+        # those literal authorities, never a rebinding domain or arbitrary name.
+        authority = host.rsplit(":", 1)
+        forwarded = (len(authority) == 2 and authority[0] in ("localhost", "127.0.0.1")
+                     and authority[1].isascii() and authority[1].isdigit()
+                     and 1 <= int(authority[1]) <= 65535)
+        if host not in self.server.allowed_hosts and not forwarded:
             self.json(403, {"error": "unrecognized host"})
             return None
         path = urlsplit(self.path).path
