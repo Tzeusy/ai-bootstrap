@@ -5,10 +5,20 @@ on:
     branches: [main]
     paths:
       - "skills/personal/**"
+      - "scripts/link-ai-skills.sh"
+      - "scripts/sync-mcp.sh"
+      - "scripts/install-tze-hud.sh"
+      - "tests/link-ai-skills-test.sh"
+      - "tests/test_tze_hud_install.py"
       - ".github/workflows/skill-audit.yml"
   pull_request:
     paths:
       - "skills/personal/**"
+      - "scripts/link-ai-skills.sh"
+      - "scripts/sync-mcp.sh"
+      - "scripts/install-tze-hud.sh"
+      - "tests/link-ai-skills-test.sh"
+      - "tests/test_tze_hud_install.py"
       - ".github/workflows/skill-audit.yml"
 
 jobs:
@@ -17,6 +27,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+      - name: Verify skill catalogs and isolated HUD installation
+        run: |
+          bash tests/link-ai-skills-test.sh
+          python3 tests/test_tze_hud_install.py
       - name: Run audit behavioral regressions
         run: uv run --script skills/personal/th-tooling/subskills/audit-skill-hygiene/tests/test_skill_usage_audit.py
       - name: Self-test the audit script

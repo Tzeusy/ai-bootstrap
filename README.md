@@ -142,6 +142,52 @@ ln -sfn "$(pwd)/opencode" "$HOME/.config/opencode"
 
 This repo is intended to work standalone. Do not assume an enclosing parent repo or nested prefixes for local paths; the source of truth is this repository root, and the destination is the corresponding path under `$HOME`.
 
+### Optional user-scope HUD installation
+
+On Linux/WSL, after linking the standard tool homes to this checkout, run:
+
+```bash
+./scripts/install-tze-hud.sh /path/to/tze-hud
+```
+
+The argument must be the tze-hud repository root on its `main` branch, with
+the stdio adapter and both product skills present. Requires Bash, Git,
+Python 3, jq, and at least one installed `claude`, `codex`, or `gemini` CLI.
+The installer registers missing user-scope `tze-hud` MCP entries using that
+checkout's real Python stdio adapter. Pair separately using tze-hud's own
+instructions; no endpoint, PSK, or authentication material is supplied here.
+
+It also adds `th-hud-publish` and `hud-projection` to the generated catalogs:
+Claude/Gemini use direct links and Codex uses shallow wrappers pointing back
+to the product's canonical `SKILL.md`. These are deliberately enabled external
+product capabilities, not copies of ai-bootstrap workflows or repository
+navigation skills. Their instructions and adapter remain owned by tze-hud.
+
+The selected absolute path is stored in ignored `.tze-hud-repo`; ordinary
+`link-ai-skills.sh` refreshes retain it. `TZE_HUD_REPO` explicitly overrides
+that selection for a refresh. Catalog manifests mark these entries `external`.
+Missing sources, a non-main source, and unmanaged name collisions fail rather
+than silently dropping or replacing skills. Keep the selected checkout at
+that location on main; moving/removing it requires deliberate link cleanup
+and reinstalling. With no selection, the ordinary shared catalog is unchanged.
+
+Existing MCP entries are kept and reported for verification; registration
+does not prove an existing entry points to this checkout. Inspect/correct
+that entry using the client's MCP controls before relying on it. Registration
+failures propagate, but earlier client/catalog changes are not rolled back;
+resolve the failure and rerun. Custom tool-home locations are not supported
+by this installer. After pairing and restarting the client, open a **fresh
+authenticated Claude session outside tze-hud** and confirm it lists all five
+HUD tools. Fixture tests prove installation mechanics; they do not prove
+live discovery, connectivity, or Windows acceptance.
+
+To verify the installer without touching installed clients:
+
+```bash
+python3 tests/test_tze_hud_install.py
+bash tests/link-ai-skills-test.sh
+```
+
 ## Recommended Entry Points
 
 - Want sustained accepted-outcome delivery: start with `beads-looper`

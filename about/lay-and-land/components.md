@@ -51,3 +51,9 @@ flowchart TD
   snapshots/feedback stay under `~/.tmp/<slug>/`; the server is a disposable view
   of an owning workflow, not a shared service or control plane. Beads loopers and
   other workflows call its helper instead of embedding dashboard infrastructure.
+- An explicit `scripts/install-tze-hud.sh` installation additionally exposes
+  two externally owned HUD capabilities from the selected tze-hud main
+  checkout. They are direct links/shallow wrappers, not authored or vendored
+  ai-bootstrap skills. Ignored `.tze-hud-repo` selects their source; catalog
+  manifests report `external` ownership. The product retains its manuals,
+  adapter, pairing and runtime authority. See the root README for installation.
