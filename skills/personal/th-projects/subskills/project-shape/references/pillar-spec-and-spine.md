@@ -73,9 +73,9 @@ Four patterns to watch for and resolve:
 
 | Pattern | Signal | Resolution |
 |---------|--------|------------|
-| **Code ahead of spec** | Implementation exists, no spec covers it | Bookkeep observed behavior in the main spec with `[Observed]` evidence; use a signed-off delta only to propose behavior changes |
-| **Spec ahead of code** | v1-mandatory requirement, no implementation | Create implementation tasks for unimplemented requirements |
-| **Spec-code mismatch** | Behavior contradicts spec | Determine which is correct (consult RFC/doctrine), fix the wrong one |
+| **Code ahead of spec** | Implementation exists, no spec covers it | Draft from observed behavior, vision-gate it, bookkeep only behavior that serves cited doctrine (`[Observed]` main-spec edit); doctrine-neutral or conflicting behavior is an owner decision (`../../spec-concretization/` flow A) |
+| **Spec ahead of code** | v1-mandatory requirement, no implementation | Reconcile with the existing backlog first, then plan the remaining work (`../../spec-concretization/` flow B) |
+| **Spec-code mismatch** | Behavior contradicts spec | Spec wins by default (fix the code); amend the spec only on named evidence (doctrine/RFC/decision/external consumer) with owner sign-off |
 | **New feature** | Neither spec nor code exists | Start with explore, then spec, then code |
 
 ## Domain Organization

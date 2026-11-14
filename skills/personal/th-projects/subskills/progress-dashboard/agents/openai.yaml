@@ -1,0 +1,4 @@
+interface:
+  display_name: "Progress Dashboard"
+  short_description: "Local session progress, agents, measured usage and queued feedback"
+  default_prompt: "Use progress-dashboard to publish this session's progress at existing checkpoints, preserving its tracker and authorization gates."

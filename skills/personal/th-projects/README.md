@@ -14,10 +14,12 @@ README is a signpost for humans browsing the repo, nothing more.
 | `SKILL.md` | Router: lifecycle, routing table, shared invariants |
 | `subskills/project-shape/` | Five-pillar knowledge architecture (bootstrap/audit) |
 | `subskills/project-feature-request/` | Idea funnel → signed-off spec delta; amendment mode |
-| `subskills/project-review/` | Scored repo health audit; spec reconciliation |
+| `subskills/project-review/` | Scored repo health audit |
+| `subskills/spec-concretization/` | Bidirectional spec↔code reconciliation: vision-gated specs for code-ahead behavior, backlog-reconciled plan for spec-ahead requirements |
 | `subskills/project-direction/` | Prioritized spec-driven work plan; milestone synthesis |
 | `subskills/relentless-vision-pursuit/` | Recurring doctrine-grounded pursuit of the project's ideal |
 | `subskills/user-questionnaire/` | Vetted asynchronous owner-decision packets and signoff walkthroughs |
+| `subskills/progress-dashboard/` | Session-owned progress workspace, background usage/agent overview, and asynchronous steering |
 | `references/spec-format.md` | Shared OpenSpec file contract (IDs, headings, test tagging) |
 | `references/work-allocation.md` | Shared cohesive-bead, ownership, overhead, and discovery-triage contract |
 | `scripts/spec-trace-check.py` | Mechanical spec-traceability validator (`uv run`) |

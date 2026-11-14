@@ -112,13 +112,13 @@ else
     fi
   done
 
-  # Routing variety: fixtures must cover both project-review and project-direction
-  # (the "does code match spec?" case routes to review; "act on confirmed drift"
-  # routes to direction — both must be present)
-  if grep -q 'project-review' <<<"$all_routes"; then
-    _pass "project-direction: fixtures include a project-review routing case"
+  # Routing variety: the "does code match spec?" case routes to
+  # spec-concretization's audit mode; "act on confirmed drift" routes to
+  # direction — both must be present.
+  if grep -q 'spec-concretization' <<<"$all_routes"; then
+    _pass "project-direction: fixtures include a spec-concretization audit routing case"
   else
-    _fail "project-direction: fixtures must include a case routing to project-review"
+    _fail "project-direction: fixtures must include a case routing to spec-concretization"
   fi
   if grep -q 'project-direction' <<<"$all_routes"; then
     _pass "project-direction: fixtures include a project-direction routing case"
@@ -281,7 +281,10 @@ WORK_ALLOCATION="$ROOT/references/work-allocation.md"
 FEATURE_SKILL="$ROOT/subskills/project-feature-request/SKILL.md"
 DIRECTION_SKILL="$ROOT/subskills/project-direction/SKILL.md"
 LAUNCH_GATE="$ROOT/subskills/project-direction/references/launch-gate.md"
-RECONCILIATION="$ROOT/subskills/project-review/references/spec-reconciliation.md"
+CONCRETIZATION_DIR="$ROOT/subskills/spec-concretization"
+CONCRETIZATION_SKILL="$CONCRETIZATION_DIR/SKILL.md"
+CONCRETIZATION_SPEC_AHEAD="$CONCRETIZATION_DIR/references/spec-ahead.md"
+CONCRETIZATION_CODE_AHEAD="$CONCRETIZATION_DIR/references/code-ahead.md"
 QUESTIONNAIRE_DIR="$ROOT/subskills/user-questionnaire"
 QUESTIONNAIRE_SKILL="$QUESTIONNAIRE_DIR/SKILL.md"
 QUESTIONNAIRE_REVIEW="$QUESTIONNAIRE_DIR/references/adversarial-review.md"
@@ -305,16 +308,16 @@ if require_file "$WORK_ALLOCATION" \
     "references/work-allocation.md exists"; then
   check_pattern "$WORK_ALLOCATION" 'one bead.*cohesive.*independently verifiable outcome' \
     "work allocation: one cohesive outcome per bead"
-  check_pattern "$WORK_ALLOCATION" 'overhead|amortiz' \
-    "work allocation: agent overhead affects granularity"
-  check_pattern "$WORK_ALLOCATION" '^## Dispatch Readiness Packet' \
-    "work allocation: structured dispatch packet exists"
-  check_pattern "$WORK_ALLOCATION" 'cohesion.*two or more|two or more.*cohesion' \
-    "work allocation: cohesion threshold is explicit"
+  check_pattern "$WORK_ALLOCATION" 'Tracking and delivery granularity can differ' \
+    "work allocation: tracking and delivery granularity are distinct"
+  check_pattern "$WORK_ALLOCATION" '^## Current Operative Packet' \
+    "work allocation: structured operative packet exists"
+  check_pattern "$WORK_ALLOCATION" 'alone do not establish cohesion' \
+    "work allocation: cohesion needs a shared surface, not a shared name"
   check_pattern "$WORK_ALLOCATION" 'representation.*propagation.*enforcement' \
     "work allocation: additive contract rollout is explicit"
-  check_pattern "$WORK_ALLOCATION" 'two-correction checkpoint' \
-    "work allocation: repeated correction checkpoint exists"
+  check_pattern "$WORK_ALLOCATION" 'Repeated substantive corrections' \
+    "work allocation: repeated corrections refresh the behavior matrix"
 fi
 check_pattern "$DIRECTION_SKILL" 'references/work-allocation.md' \
   "project-direction: allocation contract is progressively discoverable"
@@ -338,8 +341,28 @@ if require_file "$LAUNCH_GATE" "project-direction/references/launch-gate.md exis
   check_pattern "$LAUNCH_GATE" 'never by the reviewer or the administering session' \
     "launch gate: no verdict performs an owner act"
 fi
-check_pattern "$RECONCILIATION" 'work-allocation.md' \
-  "spec reconciliation: gaps use the shared allocation contract"
+if require_file "$CONCRETIZATION_SKILL" "spec-concretization/SKILL.md exists"; then
+  check_pattern "$CONCRETIZATION_SKILL" 'Divergence defaults to the spec' \
+    "spec concretization: divergence never launders drift into the spec"
+  check_pattern "$CONCRETIZATION_SKILL" 'Only `serves` enters the spec unasked' \
+    "spec concretization: only doctrine-serving behavior lands without the owner"
+  check_pattern "$CONCRETIZATION_SKILL" 'Reconcile before you create' \
+    "spec concretization: backlog reconciliation precedes new beads"
+  check_pattern "$CONCRETIZATION_SKILL" 'concretization-ledger.py' \
+    "spec concretization: ledger script is progressively discoverable"
+fi
+if require_file "$CONCRETIZATION_CODE_AHEAD" "spec-concretization/references/code-ahead.md exists"; then
+  check_pattern "$CONCRETIZATION_CODE_AHEAD" '\*\*Do not read\*\* implementation' \
+    "spec concretization: vision gate reviewer is un-anchored from the code"
+  check_pattern "$CONCRETIZATION_CODE_AHEAD" '^\| `neutral` \| No mandate supports it' \
+    "spec concretization: vision verdict vocabulary is closed"
+fi
+if require_file "$CONCRETIZATION_SPEC_AHEAD" "spec-concretization/references/spec-ahead.md exists"; then
+  check_pattern "$CONCRETIZATION_SPEC_AHEAD" 'work-allocation.md' \
+    "spec concretization: gaps use the shared allocation contract"
+  check_pattern "$CONCRETIZATION_SPEC_AHEAD" 'exactly one owning bead' \
+    "spec concretization: coverage matrix requires one owner per requirement"
+fi
 if require_file "$QUESTIONNAIRE_SKILL" \
     "user-questionnaire/SKILL.md exists"; then
   check_pattern "$QUESTIONNAIRE_SKILL" 'problem scope' \
@@ -381,6 +404,36 @@ require_file "$QUESTIONNAIRE_VALIDATOR" \
   "user-questionnaire/scripts/validate_questionnaire.py exists"
 require_file "$QUESTIONNAIRE_WEB" \
   "user-questionnaire/scripts/questionnaire_web.py exists"
+
+# ── 4b. spec-concretization ledger tests + scenario fixtures ─────────────────
+section "spec-concretization"
+
+if [[ -d "$CONCRETIZATION_DIR/tests" ]]; then
+  rc=0
+  out=$(uv run --with pytest pytest -q "$CONCRETIZATION_DIR/tests" 2>&1) || rc=$?
+  if [[ $rc -eq 0 ]]; then
+    _pass "spec-concretization: ledger seam tests pass"
+  else
+    _fail "spec-concretization: ledger tests failed (exit $rc): $(tail -n 20 <<<"$out")"
+  fi
+  shopt -s nullglob
+  scenario_dirs=("$CONCRETIZATION_DIR"/tests/fixtures/scenarios/*/)
+  shopt -u nullglob
+  if [[ ${#scenario_dirs[@]} -lt 4 ]]; then
+    _fail "spec-concretization: expected >=4 scenario fixtures, found ${#scenario_dirs[@]}"
+  fi
+  for fixture_dir in "${scenario_dirs[@]}"; do
+    name="$(basename "$fixture_dir")"
+    fixture="$fixture_dir/FIXTURE.md"
+    if require_file "$fixture" "spec-concretization/$name/FIXTURE.md exists"; then
+      check_pattern "$fixture" '^## Expected Outcome' "spec-concretization/$name: declares ## Expected Outcome"
+      check_pattern "$fixture" '^\*\*Decision\*\*:' "spec-concretization/$name: declares **Decision**:"
+      check_pattern "$fixture" '^## Key Assertions' "spec-concretization/$name: declares ## Key Assertions"
+    fi
+  done
+else
+  _fail "spec-concretization: tests/ directory missing"
+fi
 
 # ── 5. user-questionnaire validator tests ────────────────────────────────────
 section "user-questionnaire validator tests"
@@ -590,6 +643,18 @@ if [[ $rc -eq 0 ]]; then
 else
   _fail "spec-trace: affected admission regressions failed (exit $rc): $out"
 fi
+
+# ── Progress dashboard: deterministic persistence/HTTP and incremental usage ──
+section "progress-dashboard behavior"
+for test_file in test_progress_dashboard.py test_loop_telemetry.py; do
+  rc=0
+  out=$(uv run "$ROOT/subskills/progress-dashboard/tests/$test_file" -q 2>&1) || rc=$?
+  if [[ $rc -eq 0 ]]; then
+    _pass "progress-dashboard: $test_file"
+  else
+    _fail "progress-dashboard: $test_file failed (exit $rc): $out"
+  fi
+done
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""

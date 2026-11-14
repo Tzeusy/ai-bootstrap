@@ -3,16 +3,18 @@ name: th-projects
 description: >
   Use for project-level engineering governance: bootstrap or audit the
   doctrine/spec/topology/standards shape; concretize or amend one feature
-  spec; reconcile specs and implementation; audit repo health; prioritize
-  work; synthesize milestones; ideate from doctrine; run a recurring
+  spec; reconcile specs and implementation both ways (vision-gated specs for
+  undocumented behavior, backlog-deduplicated plan for unbuilt requirements);
+  audit repo health; prioritize work; synthesize milestones; ideate from doctrine; run a recurring
   vision-pursuit; or accumulate and walk through independently vetted owner
   decisions. Triggers: "project shape",
   "bootstrap docs", "what should we work on next", "should we build this",
   "spec this feature", "the spec is wrong", "review this project", "audit the
-  codebase", "does code match the spec", "what's the next milestone",
+  codebase", "does code match the spec", "reconcile spec vs implementation",
+  "what's the next milestone",
   "brainstorm features", "run the vision pursuit", "relentlessly improve this
   project", "prepare decisions for me to review", "walk me through the blocked
-  decisions", "collect owner signoffs".
+  decisions", "collect owner signoffs", "give this session a dashboard".
 metadata:
   owner: tze
   authors:
@@ -27,32 +29,41 @@ compatibility: Subskill scripts require bash, git, grep, find, and uv; project-s
 
 # TH Projects
 
-Superskill router for spec-driven project governance. Five lifecycle subskills
-plus one cross-cutting human-gate transport live under `subskills/`; each is a
+Superskill router for spec-driven project governance. Six lifecycle subskills
+plus two cross-cutting progress/owner transports live under `subskills/`; each is a
 complete standard package. Subskills **not** in global catalog — discover lazily
 here, load **at most one** subskill body per task. A subskill may route you to a
 sibling (e.g. project-review runs project-shape's scanner); follow that link
 from the subskill, not here.
 
-Five subskills, one lifecycle:
+Six subskills, one lifecycle:
 
 1. **Shape** — set normative baseline: what project believes, how designed,
    what must be built, where things live, engineering bar for changing it.
 2. **Feature request** — run one concrete proposal through idea funnel against
    baseline → signed-off spec delta.
 3. **Review** — audit implementation vs baseline + generic health criteria
-   (incl. exhaustive spec↔code reconciliation) → confirmed findings.
-4. **Direction** — baseline + spec deltas + findings → prioritized, spec-linked
+   → confirmed findings.
+4. **Concretize** — exhaustive spec↔code reconciliation, both directions:
+   code ahead → drafted specs judged against doctrine before they land;
+   spec ahead → unmet requirements reconciled with the backlog, then all
+   remaining work planned.
+5. **Direction** — baseline + spec deltas + findings → prioritized, spec-linked
    work plan; hand execution to beads. Before a project's *first* spec, its
    launch gate judges whether goals and requirements are settled enough to
    specify from.
-5. **Pursuit** — recurring generative loop against the baseline's ideal:
+6. **Pursuit** — recurring generative loop against the baseline's ideal:
    sequential surface audits + ideation lenses → ranked moves, tier-board
    movement, gated work plan; pursued moves re-enter via feature request.
 
 **Questionnaire** crosses that lifecycle only at hard human gates. It
 accumulates, independently reviews, presents, and records owner decisions; it
 does not create doctrine, specs, priorities, or implementation authority.
+
+**Progress dashboard** gives any running workflow a reusable local progress
+workspace, agent/usage overview and asynchronous steering surface. Scripts handle
+rendering and telemetry without model refresh cycles. It observes the owning
+workflow; formal decisions still use questionnaire and its real authority gates.
 
 VISION is a **continuous constraint**, not a one-time gate: proposal, spec,
 allocation, implementation discovery, reconciliation, and milestone closeout
@@ -76,9 +87,11 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
 | Bootstrap or audit the project's knowledge architecture (five pillars: heart-and-soul, legends-and-lore, openspec, lay-and-land, craft-and-care); decide where an idea should be documented; generate a layman overview. | [subskills/project-shape/SKILL.md](subskills/project-shape/SKILL.md) | "set up project structure", "bootstrap docs", "where should this go", "audit documentation health" |
 | Concretize ONE fuzzy feature/project request into a signed-off spec delta: motif, doctrine gate, topology placement, design sketch, WHEN/THEN scenarios. Also amendment mode: fix a spec found wrong/ambiguous mid-implementation. | [subskills/project-feature-request/SKILL.md](subskills/project-feature-request/SKILL.md) | "I want to add X", "spec this feature", "turn this idea into requirements", "what would it take to build X", "the spec is wrong" |
 | Decide what to work on next; evaluate competing priorities; check roadmap alignment; turn approved specs into a prioritized beads work plan. Also the vision-generative modes when nothing is proposed: milestone synthesis (derive work doctrine already implies) and ideation (brainstorm new feature candidates grounded in doctrine); and the launch gate, which judges whether goals and requirements are settled enough to author a project's first specs. | [subskills/project-direction/SKILL.md](subskills/project-direction/SKILL.md) | "what's highest leverage", "what should we work on next", "break this down", "is this roadmap aligned", "what's the next milestone", "brainstorm features for this project", "are we ready to write specs" |
-| Repo-wide health audit: code quality, reliability, security, docs, maintainability — scored, evidence-based, with a planning handoff packet. Includes the exhaustive spec-reconciliation mode (bidirectional spec↔code gap audit + remediation). | [subskills/project-review/SKILL.md](subskills/project-review/SKILL.md) | "review this project", "audit the codebase", "assess project health", "reconcile spec vs implementation", "what's implemented but undocumented" |
+| Repo-wide health audit: code quality, reliability, security, docs, maintainability — scored, evidence-based, with a planning handoff packet. | [subskills/project-review/SKILL.md](subskills/project-review/SKILL.md) | "review this project", "audit the codebase", "assess project health" |
+| Exhaustive bidirectional spec↔code reconciliation. Code ahead of spec → draft requirements, vision-gate them, land `serves` as bookkeeping, owner-gate the rest. Spec ahead of code → reconcile every unmet requirement against open/closed beads, plan all remaining work. Audit mode for the read-only question. Idempotent re-runs. | [subskills/spec-concretization/SKILL.md](subskills/spec-concretization/SKILL.md) | "reconcile spec vs implementation", "does code match the spec", "what's implemented but undocumented", "what's specified but not built", "plan the work to finish the spec" |
 | Recurring generative pursuit of the project's ideal: lane-sequenced audits of every surface against the applicable bar + vision-grounded ideation lenses → ranked move list, tier-board movement across runs, gated (never auto-released) work plan. | [subskills/relentless-vision-pursuit/SKILL.md](subskills/relentless-vision-pursuit/SKILL.md) | "run the vision pursuit", "what's the next best step toward the vision", "relentlessly improve this project", "audit the whole project against the ideal" |
-| Accumulate genuine hard owner gates into a local asynchronous packet, independently vet each problem scope and recommendation, publish it as a local web form (scripted, prints a URL), ingest the owner's asynchronous answers, walk the owner through one decision at a time, or route recorded signoffs through the canonical owning workflow. Pursuit and greenfield-parity runs end here with their owner dossier. | [subskills/user-questionnaire/SKILL.md](subskills/user-questionnaire/SKILL.md) | "prepare decisions for me to review", "review when I wake up", "publish the questionnaire", "ingest my answers", "walk me through blocked decisions", "collect owner signoffs" |
+| Accumulate genuine hard owner gates into a local asynchronous packet, independently vet each problem scope and recommendation, publish it as a local web form (scripted, prints a URL), ingest the owner's asynchronous answers, walk the owner through one decision at a time, or route recorded signoffs through the canonical owning workflow. Pursuit, greenfield-parity, and spec-concretization runs end here with their owner dossier. | [subskills/user-questionnaire/SKILL.md](subskills/user-questionnaire/SKILL.md) | "prepare decisions for me to review", "review when I wake up", "publish the questionnaire", "ingest my answers", "walk me through blocked decisions", "collect owner signoffs" |
+| Publish a session-owned progress workspace and local interactive dashboard for current work, findings, child agents, measured token usage, visuals and durable feedback. Works across workflows without new model wakeups. | [subskills/progress-dashboard/SKILL.md](subskills/progress-dashboard/SKILL.md) | "give this session a dashboard", "show loop progress", "monitor subagents", "steer this run in a browser" |
 
 ## Routing rules
 
@@ -94,6 +107,14 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   with this repo" → review. "What to do about it / next" → direction.
   "Relentlessly push this toward its vision" → pursuit. Full review hands off
   to direction inside the subskills.
+- **Review vs. concretize**: review *scores* repo health and notes spec
+  contradictions it meets; concretization *exhausts* spec↔code and acts on
+  both directions. "Does code match the spec?" with no ask to act →
+  concretization's audit mode. One already-confirmed drift → direction's
+  spec-drift focus; one spec wrong mid-task → feature-request amendment.
+- **Feature vs. concretize**: concretize *one* idea or request into a spec
+  → feature-request; concretize *the specs against the code* (all specs,
+  both directions) → spec-concretization.
 - **Feature vs. direction**: one concrete proposal → feature-request; many
   competing priorities or "what next" → direction; no proposal at all and the
   ask is to *invent* candidates → direction (ideation), whose pursued picks
@@ -105,6 +126,10 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   competing priorities → direction; tracker mechanics → beads-orchestration.
   Use questionnaire only when asynchronous accumulation, adversarial review,
   walkthrough, or durable signoff recording is the actual task.
+- **Progress vs. decisions**: dashboard is ongoing visibility and steering;
+  questionnaire is independently vetted formal owner decisions. The dashboard
+  never replaces the tracker, changes a gate, or consumes another subskill's
+  implementation logic. Workflows may invoke it as a thin optional transport.
 - **Scope guard**: single-PR/diff review → `/code-review`, not here.
   Change-level engineering-quality judgment (engineering bar, readability, test
   rigor, dependency hygiene, cruft cleanup, skill reviews, diagrams) →
@@ -147,8 +172,8 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   governing gate and record it durably.
 - Work graphs follow
   [`references/work-allocation.md`](references/work-allocation.md): one bead and
-  primary agent per cohesive independently verifiable outcome, with enough work
-  to amortize context/worktree/CI/review overhead and no overlapping ownership.
+  primary agent per cohesive independently verifiable outcome, related beads
+  sharing one delivery package where cohesive, and no overlapping ownership.
 - **Cache-first orchestration.** Plan and run work as a few long-lived,
   cache-warm sessions that ride autocompaction, not as many fresh subagents.
   A subagent here is justified by independence (adversarial or fresh-context
@@ -162,7 +187,7 @@ rg -n "^name:|^description:" "$PKG"/subskills/*/SKILL.md
   |---|---|---|
   | Doctrine (`about/heart-and-soul/`) | draft, review, blast-radius sweep | adopt every amendment |
   | Spec delta (proposed behavior) | draft + reconcile changeset | sign off before implementation |
-  | Main-spec bookkeeping of [Observed] behavior | edit directly | — |
+  | Main-spec bookkeeping of [Observed] behavior that serves cited doctrine | edit directly | adopt observed behavior doctrine does not support |
   | Beads/planning graph | generate from approved changeset | approve the changeset it derives from |
 
 - **Run to the gate, not to a plan.** A run ends at a hard human gate (table

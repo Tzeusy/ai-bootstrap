@@ -28,8 +28,8 @@ ones, Phase 3 for the graph).
    `v1.md` ship item, each success criterion, each non-negotiable that implies
    a capability. Cite file + rule number per mandate.
 2. **Build the mandate coverage matrix.** For each mandate: spec coverage
-   (Full / Partial / None — reuse the coverage vocabulary from
-   `../../project-review/references/spec-reconciliation.md`) and
+   (Full: requirements cover it · Partial: some aspects specified · None:
+   no requirement) and
    implementation state from the scan. A mandate with no spec is spec work
    first (Core Rule 1), never a straight-to-code candidate.
 3. **Scan the ideas ledger.** Any parked entry whose "what would need to

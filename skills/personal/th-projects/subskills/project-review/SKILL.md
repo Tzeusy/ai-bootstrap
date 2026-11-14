@@ -1,6 +1,6 @@
 ---
 name: project-review
-description: Use when auditing a repository's overall health, tech debt, maintainability, or architecture quality; processing a third-party repo-wide audit; or exhaustively reconciling OpenSpec specs against implementation. Triggers include "review this project", "audit the codebase", "assess project health", "does code match the spec", and "reconcile spec vs implementation" — not single-PR review or backlog prioritization.
+description: Use when auditing a repository's overall health, tech debt, maintainability, or architecture quality; or processing a third-party repo-wide audit. Triggers include "review this project", "audit the codebase", "assess project health", and "process this third-party review" — not single-PR review, spec↔code reconciliation, or backlog prioritization.
 metadata:
   owner: tze
   authors:
@@ -17,9 +17,9 @@ metadata:
 
 Blunt, evidence-based audit of a repo across 15 categories. Establish the normative baseline via sibling `project-shape` first; hand confirmed findings to sibling `project-direction` for scheduling. README is a claim to validate, not primary truth when shape artifacts exist.
 
-**Sample triggers:** "review this project" · "audit the codebase" · "assess project health" · "process this third-party review" · "reconcile spec vs implementation".
+**Sample triggers:** "review this project" · "audit the codebase" · "assess project health" · "process this third-party review".
 
-**Not for:** single-PR/diff review (use `/code-review`; change-level quality bars live in `/th-engineering`), or deciding what to build next (sibling [`project-direction`](../project-direction/SKILL.md)).
+**Not for:** single-PR/diff review (use `/code-review`; change-level quality bars live in `/th-engineering`), exhaustive spec↔code reconciliation (sibling [`spec-concretization`](../spec-concretization/SKILL.md); Agent A still reports shape-vs-code contradictions it meets), or deciding what to build next (sibling [`project-direction`](../project-direction/SKILL.md)).
 
 Normative source order: 1. `about/heart-and-soul/` + `about/legends-and-lore/` → 2. `openspec/` → 3. `about/lay-and-land/` → 4. README/docs/issues → 5. inference from code+history.
 
@@ -149,7 +149,6 @@ Output the report per `report-template.md`. Make the boundary explicit: `project
 - **Focused review** (user names categories): dispatch only relevant subagents. Still include normative baseline, scorecard for scoped categories, risk register, handoff packet.
 - **Quick health check** (fast answer): shape scan + project scan + Agent A, then a brief orchestrator sweep of obvious high-risk areas (tests, CI, auth/secrets, docs). Output: exec summary, provisional scorecard, top 5 risks, explicit low-confidence markers. Don't pass this off as a full review.
 - **Third-party deep-dive** ("process this review/audit"): fact-check external findings, filter through actual context, convert confirmed findings into a handoff packet, route planning to `project-direction`. Read [`references/third-party-review.md`](references/third-party-review.md) for the five-step protocol.
-- **Spec reconciliation** ("reconcile spec vs implementation", "what's implemented but undocumented", "what's specified but missing"): exhaustive bidirectional spec↔code mapping, report-only by default. Remediation requires explicit authorization; then observed behavior gets spec bookkeeping, cohesive unimplemented outcomes get beads, and strategic gaps escalate to `project-direction`. Read [`references/spec-reconciliation.md`](references/spec-reconciliation.md). Samples nothing.
 
 ## Anti-patterns
 
@@ -157,7 +156,7 @@ Output the report per `report-template.md`. Make the boundary explicit: `project
 - Accepting external-review severities at face value
 - Treating all recommendations as equally important
 - Enterprise-framing a personal project
-- Creating beads/execution artifacts from `project-review` (scoped exception: spec-reconciliation remediation)
+- Creating beads/execution artifacts from `project-review`
 - Preserving the review as canon instead of extracting durable doctrine/spec/planning updates
 
 ## References
@@ -171,10 +170,8 @@ Output the report per `report-template.md`. Make the boundary explicit: `project
 | [`references/subagent-template.md`](references/subagent-template.md) | Phase 2 | Dispatch template and required prompt fields |
 | [`references/report-template.md`](references/report-template.md) | Phase 3-4 | Output structure, scorecard, handoff packet layout |
 | [`references/project-type-adaptations.md`](references/project-type-adaptations.md) | Phase 1-3 | Category weighting by project type, maturity expectations, hybrid handling |
-| [`references/spec-reconciliation.md`](references/spec-reconciliation.md) | Spec reconciliation mode | Bidirectional spec↔code inventory, coverage table, gap analysis, remediation |
 | [`references/third-party-review.md`](references/third-party-review.md) | Processing an external review/audit | Fact-check, context-filter, ROI tiers, planning-input prep, episodic-artifact handling |
 | [`references/review-veracity-gate.md`](references/review-veracity-gate.md) | Phase 3.5 | Full gate procedure: per-claim verification steps, classification rules, Veracity Ledger format, special evidence rules |
-| [`../../references/spec-format.md`](../../references/spec-format.md) | Writing/extending specs during reconciliation | OpenSpec file format: heading hierarchy, WHEN/THEN rules, naming (shared contract) |
 
 ## Scripts
 

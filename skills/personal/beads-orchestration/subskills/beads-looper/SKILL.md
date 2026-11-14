@@ -65,6 +65,18 @@ current packet, published/local branch and journal before edits. Compaction stat
 includes actor, outcome, anchor/members, session locator, current PR/head, review
 findings/evidence and waits. Do not treat session launch as continuation by name alone.
 
+Each parent loop launches/resumes a session view through
+[progress-dashboard](../../../th-projects/subskills/progress-dashboard/SKILL.md).
+Load it once; retain its helper, slug and revision with the session locator.
+Publish changed content and native child-agent observations at existing substantive
+checkpoints; read/acknowledge feedback at those checkpoints. The dashboard owns
+all files, rendering, usage collection and server lifecycle. There are no extra
+model wakeups, transcript-summary passes or per-subagent servers. Its Markdown
+files project Beads; they do not replace canonical lifecycle state. Update
+`handover.md` only on a manual owner request, never automatically on compaction
+or stop. Stop the dashboard when this loop retires unless an ongoing preview has
+an explicit lifecycle owner.
+
 ## Invariants
 
 - Mutate only held claims; adopt dead peers only under

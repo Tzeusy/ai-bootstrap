@@ -111,7 +111,7 @@ scenarios only when externally observable.
 
 The fast path back into the funnel when an implementer discovers, mid-task,
 that the governing spec is wrong, ambiguous, or incomplete. Spec drift is
-created at exactly this moment — catching it here keeps project-review's
+created at exactly this moment — catching it here keeps spec-concretization's
 exhaustive reconciliation a backstop, not routine maintenance.
 
 Start with a Gate 2 VISION sanity check, then route by blast radius — not by the
@@ -142,7 +142,8 @@ doctrine/spec baseline commit, the spec delta, open questions, and the human
 sign-off identity/date. A stale baseline is not approval: revalidate affected
 VISION mandates before allocation. Then:
 
-- **Approved** → hand the spec delta to `../project-direction/SKILL.md` for
+- **Approved** → record `Sign-off: <identity> <date>` in the changeset's
+  `proposal.md` (spec-format § Sign-off marker), then hand the spec delta to `../project-direction/SKILL.md` for
   sequencing and decomposition; for a small single-task request, file directly
   via `/beads-orchestration` (beads-writer) with the spec reference.
 - **Doctrine conflict** → record the rejection and its reasoning where the
