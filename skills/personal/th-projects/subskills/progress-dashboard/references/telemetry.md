@@ -59,7 +59,8 @@ lifetime use.
 
 Codex native `token_usage_record` thread totals supersede lagging legacy
 `event_msg/token_count` totals. Thread IDs and fork-history ordinals exclude
-copied parent/foreign records; streams are never added together. Older logs
+copied parent/foreign records, including copied session metadata, before identity
+checks; streams are never added together. Older logs
 still use their latest valid cumulative sample. Claude deduplicates streamed
 assistant records by hashed message ID. Claude input includes uncached, cache
 reads and cache writes; cached input is the read subset, already included in

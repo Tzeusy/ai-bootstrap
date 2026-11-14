@@ -195,6 +195,9 @@ def _codex(entry: dict[str, Any], record: dict[str, Any]) -> None:
     payload = record.get("payload")
     if not isinstance(payload, dict):
         return
+    cutoff = entry.get("history_start_ordinal")
+    if cutoff is not None and _count(record.get("ordinal")) and record["ordinal"] <= cutoff:
+        return  # Forks copy parent metadata as well as events and usage.
     if record.get("type") == "session_meta":
         identity = payload.get("id")
         if isinstance(identity, str) and entry.get("thread_id") and identity != entry["thread_id"]:
@@ -205,9 +208,6 @@ def _codex(entry: dict[str, Any], record: dict[str, Any]) -> None:
         if identity == entry.get("thread_id") and _count(cutoff):
             entry["history_start_ordinal"] = cutoff
         return
-    cutoff = entry.get("history_start_ordinal")
-    if cutoff is not None and _count(record.get("ordinal")) and record["ordinal"] <= cutoff:
-        return  # A fork's copied parent history is not child usage.
     if record.get("type") == "token_usage_record":
         if not entry.get("thread_id") or payload.get("thread_id") != entry["thread_id"]:
             return

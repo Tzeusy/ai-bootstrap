@@ -96,6 +96,7 @@ class UsageCollectorTests(unittest.TestCase):
                 "usage": {"total_tokens": 33}}}
 
         self.write({"type": "session_meta", "payload": {"id": own, "subagent_history_start_ordinal": 20}},
+                   {"type": "session_meta", "ordinal": 1, "payload": {"id": foreign}},
                    {**codex(9999), "ordinal": 10}, native(foreign, 99999, ordinal=11))
         self.assertIsNone(self.poll()["totals"]["total_tokens"])
         self.write(native(own, 105), native(foreign, 99999), {**codex(50), "ordinal": 31}, mode="a")
