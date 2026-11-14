@@ -99,12 +99,14 @@ class DashboardServer(ThreadingHTTPServer):
 
     def view(self) -> dict:
         with model.lock(self.folder):
-            state = model.load(self.folder / "state.json")
-            documents = model.documents(state)
-            handover = self.folder / "handover.md"
-            if handover.is_symlink():
-                raise ValueError("handover must not be a symlink")
-            documents["handover.md"] = handover.read_text(encoding="utf-8")
+            state = model.snapshot(self.folder)
+            handover = None
+            # The scaffold is noise; show the document once the owner has requested one.
+            if (self.folder / "handover-request.json").exists():
+                path = self.folder / "handover.md"
+                if path.is_symlink():
+                    raise ValueError("handover must not be a symlink")
+                handover = path.read_text(encoding="utf-8")
             feedback = model.load(self.folder / "feedback.json", [])
         with self.telemetry_lock:
             telemetry = {**self.telemetry, "agents": list(self.telemetry["agents"]),
@@ -118,7 +120,7 @@ class DashboardServer(ThreadingHTTPServer):
                 "reason": "not-attached"})
         telemetry["coverage"]["expected"] = len(expected | observed)
         # Local transcript locators and feedback idempotency keys are not browser data.
-        return {"state": state, "documents": documents, "telemetry": telemetry,
+        return {"state": state, "handover": handover, "workspace": str(self.folder), "telemetry": telemetry,
                 "feedback": [{k: v for k, v in row.items() if k != "client_id"} for row in feedback],
                 "feedback_enabled": state["feedback_enabled"]}
 

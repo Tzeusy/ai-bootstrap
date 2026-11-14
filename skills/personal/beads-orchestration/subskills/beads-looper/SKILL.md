@@ -67,8 +67,8 @@ findings/evidence and waits. Do not treat session launch as continuation by name
 
 Each parent loop launches/resumes a session view through
 [progress-dashboard](../../../th-projects/subskills/progress-dashboard/SKILL.md).
-Load it once; retain its helper, slug and revision with the session locator.
-Publish changed content and native child-agent observations at existing substantive
+Load it once; retain its helper path and slug with the session locator.
+Publish only changed rows and native child-agent observations at existing substantive
 checkpoints; read/acknowledge feedback at those checkpoints. The dashboard owns
 all files, rendering, usage collection and server lifecycle. There are no extra
 model wakeups, transcript-summary passes or per-subagent servers. Its Markdown

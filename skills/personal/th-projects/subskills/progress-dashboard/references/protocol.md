@@ -1,128 +1,128 @@
 # Snapshot and feedback protocol
 
-Read for additional schema fields, feedback queue handling, transport or revision
-conflicts. Routine publication needs only the skill's minimal example. Commands
-use this package's [CLI](../scripts/progress_dashboard.py) as `DASHBOARD`; global
-`--slug`/`--root` flags precede the subcommand.
-The [server transport](../scripts/dashboard_server.py) owns browser requests;
+Read for the full field list, panel templates, removal, feedback queue handling
+or concurrent writers. Routine publication needs only the skill's example.
+Commands use this package's [CLI](../scripts/progress_dashboard.py) as
+`DASHBOARD`; global `--slug`/`--root` flags precede the subcommand. The
+[server transport](../scripts/dashboard_server.py) owns browser requests;
 inspect it only when maintaining HTTP behavior.
 
-## Snapshot fields
+## Delta checkpoints
 
-`state.json` (`progress-dashboard/v1`) stores the committed display snapshot.
-`in-progress.md`, `todo.md` and `complete.md` are deterministic, per-file atomic
-projections with revision stamps. They remain readable without the server. A
-crash between writes is repaired by `init` or the next checkpoint; the browser
-renders a coherent snapshot directly from JSON. Do not edit generated Markdown.
+`checkpoint` reads JSON from stdin (or `--input FILE`) and merges it into
+`state.json` (`progress-dashboard/v1`). Omitted fields and rows persist.
 
-Optional fields below replace their value; omitted fields persist. Lists replace
-their collection, so retain completed agents when publishing a roster. No
-model-generated telemetry fields are accepted.
+| Field | Merge | Row fields |
+|---|---|---|
+| `summary`, `phase` | replace | text |
+| `tasks` | by `id` | `title`, `status`, `detail`, `evidence` |
+| `agents` | by `id` | `name`, `role`, `status`, `task`, `summary`, `model`, `branch`, `worktree`, `pr_url`, `thread_id`, `updated_at`, `activity` |
+| `findings` | append, deduplicated | strings |
+| `artifacts` | by `path` | `label` |
+| `panels` | by `id` | `title`, `kind`, `rows`, `note` |
+
+- A row carries its identity plus only the fields that changed.
+- New tasks need `title` (status defaults to `todo`); new agents default to
+  `running`; new panels need `title` and `kind`.
+- Agent `activity` appends up to eight reports per checkpoint and keeps the
+  latest eight. Panel `rows` replace that panel's rows.
+- `{"id":"x","drop":true}` removes a row. `"replace":["findings"]` rebuilds the
+  named collections from this checkpoint alone (an empty rebuild clears them).
+- Unknown fields, duplicate identities and malformed statuses refuse the whole
+  checkpoint and leave state untouched. No telemetry fields are accepted.
+
+Task status is `in-progress`, `todo` or `complete`; blocked work stays
+in-progress with its condition in `detail`. Use real tracker IDs. Agent status
+is `running`, `waiting`, `complete`, `failed` or `unknown`: an observation, not
+a liveness lease. `task` holds a task `id` so the page links the two. The helper
+stamps `updated_at` when an agent row changes. PR links must be absolute
+HTTP(S) URLs without credentials. `thread_id` disambiguates runtime attribution
+when agent paths share a basename.
+
+Limits: checkpoint 256KiB, tasks 200, findings/agents 100, artifacts 40, panels
+12 with 30 rows of 6 cells. Keep content concise, not near the limits.
+
+## Panels
+
+Panels are the only way to add a chart or table: the page owns every mark,
+color and layout, so a panel is rows, never markup.
 
 ```json
-{
-  "summary": "Core behavior passes; independent review is running.",
-  "phase": "review",
-  "tasks": [
-    {"id":"task-1","title":"Deliver accepted behavior","status":"in-progress",
-     "detail":"Waiting on independent review.",
-     "evidence":"Focused tests pass; PR records the head and checks."}
-  ],
-  "findings": ["The background collector does not wake the model."],
-  "agents": [
-    {"id":"reviewer-1","name":"Independent review","role":"reviewer",
-     "status":"running","task":"task-1","summary":"Checking recovery paths.",
-     "model":"runtime-reported model","updated_at":"2026-11-14T09:30:00+00:00",
-     "branch":"review/task-1","worktree":"/repo/.worktrees/review-task-1",
-     "pr_url":"https://github.com/example/project/pull/42",
-     "activity":["Reviewed failure and recovery paths.","Reported one cache defect; checking its correction."]}
-  ],
-  "artifacts": [{"path":"architecture.svg","label":"Workspace architecture"}]
-}
+{"panels":[
+ {"id":"gates","title":"Delivery gates","kind":"steps",
+  "rows":[["Tests","done","31 pass"],["Review","active"],["Merge","todo"]]},
+ {"id":"size","title":"Bundle size","kind":"bars","note":"Bytes, gzip.",
+  "rows":[["Before",2140],["After",96]]}]}
 ```
 
-Task status is `in-progress`, `todo` or `complete`; blocked/waiting work remains
-in-progress with its precise condition in `detail`. Use actual tracker IDs when
-one exists; projections never replace claims, acceptance, dependencies or status.
-Agent status is `running`, `waiting`, `complete`, `failed` or `unknown`; it is an
-observation, not a liveness lease. Native delegation/results supply summaries,
-not a model reading child sessions. Supply known timestamps; omitted agent
-timestamps are maintained by the helper. Stale timestamps remain visible.
-`summary` is the current one-paragraph work report. Optional `activity` contains
-at most eight recent concise reports (1000 characters each), replacing its prior
-list. Branch/worktree/PR describe the actual delivery context, including shared
-worktrees; report retirement in activity when a checkout has been removed. PR
-links must be absolute HTTP(S) URLs without credentials. Omitted context stays
-visibly unreported. No background Git/GitHub query infers it. Optional `thread_id`
-disambiguates agents whose runtime paths share a basename; runtime attribution
-is separately measured, not supplied as token fields in a snapshot.
+| `kind` | Row shape | Rendered as |
+|---|---|---|
+| `stats` | `[label, value, note?]` | headline figures |
+| `bars` | `[label, number ≥ 0, note?]` | horizontal bars on one shared scale |
+| `steps` | `[label, done\|active\|todo\|failed, note?]` | ordered checklist |
+| `table` | first row is the header; cells are text or numbers | table |
 
-Unknown fields, duplicate identities and malformed statuses refuse publication.
-Limits: snapshot 256KiB, tasks 200, findings/agents 100 each, artifacts 40. Keep
-content concise rather than using those limits as targets.
+## Derived views
 
-## Compact checkpoint responses
+The helper, not the model, derives:
 
-`checkpoint --expected-revision N --input snapshot.json` merges supplied fields.
-Empty/unchanged content retains the revision and repairs projections. It returns
-`revision` plus the feedback envelope below. `status --since N` adds `changed`
-and `phase`; `changed` compares snapshot revisions only, so inspect feedback even
-when false. `inbox` returns revision and the same feedback envelope. These do not
-return full documents, roster or usage history.
+- `in-progress.md`, `todo.md`, `complete.md`: atomic Markdown projections,
+  readable without the server and repaired by `start`/`init` or the next
+  checkpoint. Do not edit them.
+- The activity log: each checkpoint records phase changes, task and agent
+  status changes, new findings and newly published visuals (latest 60).
+- Counts, progress meter, task-to-agent links and per-session usage bars.
 
-Checkpoint/status/inbox accept `--after-feedback N` (default `0`). Retain returned
-`feedback_cursor` beside revision and pass it at the next existing checkpoint.
-The response includes `pending_count` (all unacknowledged items, including ones
-already surfaced), `feedback_cursor`, `feedback_more`, and `feedback`.
+## Checkpoint responses and feedback
 
-Batches contain at most ten items and 8KiB of feedback payload, projecting only
-`id`, `kind`, `target`, `revision` and `text`. When the first item exceeds the
-budget, `target_preview`/`text_preview` replace `target`/`text`, with
-`truncated:true`. Retrieve its exact record before interpreting, acting on or
-acknowledging it:
+Every `checkpoint`, `inbox` and `status` reply is compact:
+`{revision, pending_count, feedback, feedback_cursor, feedback_more}`;
+`status --since N` adds `changed` and `phase`. Unchanged content keeps the
+revision. None return documents, roster or usage.
+
+`feedback` holds items not yet surfaced to the session, at most ten and 8KiB
+per reply, each `{id, kind, target, revision, text}`. The workspace retains the
+cursor, so no flag is needed. `feedback_more` permits another `inbox` at the
+same checkpoint. `pending_count` counts every unacknowledged item, including
+ones already surfaced; after losing context, `inbox --after-feedback 0`
+re-reads them all. Reading never acknowledges.
+
+An oversized first item arrives as `target_preview`/`text_preview` with
+`truncated:true`. Read it in full before interpreting or acknowledging:
 
 ```bash
 uv run "$DASHBOARD" --slug "$SLUG" inbox --id "$FEEDBACK_ID"
 ```
 
-The explicit lookup returns `{feedback: <full record>}` without `client_id`. A cursor only
-marks what this session has surfaced; reads do not consume or acknowledge items.
-Keep unresolved IDs/dispositions in existing workflow state. `feedback_more`
-permits another bounded read at the same safe checkpoint. After losing the
-session cursor, resume from `0`; acknowledged items stay excluded.
+`ack --id N --response <disposition>` durably records what the parent did: what
+changed, what is deferred or which gate applies. Acknowledgement claims no
+implementation. History is bounded at 2000 entries/3MiB with explicit refusal,
+never silent deletion; a refused update can be retried with a shorter response.
 
-## Revision conflicts
+There is no runtime event injection or model timer. Feedback waits for an
+existing safe checkpoint; urgent interrupts use direct runtime input. Formal
+owner decisions use user-questionnaire and the owning operational gate.
 
-A conflict refuses publication. Run `status --since "$REVISION"` with the saved
-feedback cursor, then inspect only fields you intend to change from local
-`state.json` (for example, `jq '{summary,phase}' "$WORKSPACE/state.json"`).
-Reconcile against authoritative work and retry with the current revision. Do not
-resend a stale full snapshot or reload all generated documents. No background
-process queries a tracker, GitHub or a model.
+## Concurrent writers
 
-## Feedback and browser transport
+Deltas from one parent need no revision. When several writers share a slug,
+pass `--expected-revision N`; a mismatch refuses publication. Then run
+`status`, reconcile against authoritative work and resend only the intended
+delta. Never resend a stale full snapshot.
+
+## Browser transport
 
 The fixed [HTML](../assets/web/index.html), [CSS](../assets/web/style.css) and
-[JavaScript](../assets/web/app.js) run offline without a build. A random capability
-prefix gates routes. `GET <prefix>/api/state` returns snapshot, rendered documents,
-usage and feedback history; ETags support unchanged responses. Use compact CLI
-responses for model checkpoints instead of fetching this browser payload. No raw
-transcripts, arbitrary-file browser, execution or lifecycle mutation API exists.
-Host/Origin validation and a JSON-only custom-header POST protect feedback.
+[JavaScript](../assets/web/app.js) run offline without a build. A random
+capability prefix gates routes. `GET <prefix>/api/state` returns the snapshot,
+usage, feedback history and any requested handover; ETags support unchanged
+responses. Model checkpoints use the compact CLI replies, never this payload.
+No raw transcripts, arbitrary-file browser, execution or lifecycle mutation API
+exists. Host/Origin validation and a JSON-only custom-header POST protect
+feedback.
 
 `POST <prefix>/api/feedback` requires `X-Loop-Feedback: 1` and JSON fields
 `client_id`, `kind` (`feedback|steer|question`), `target` (`loop` or a current
 task/agent ID), `text`, and viewed `revision`. Stable client IDs make retries
-idempotent after a lost response. Feedback preserves its viewed revision; old
-messages keep their original context. Failed saves preserve browser drafts.
-Writes and acknowledgements serialize under the workspace lock.
-
-`ack --id N --response <disposition>` durably records what the parent did. State
-what changed, what is deferred or which gate applies; acknowledgement alone
-claims no implementation. History is bounded at 2000 entries/3MiB with explicit
-refusal, never silent deletion. The byte limit includes dispositions; a refused
-update preserves the readable inbox and can be retried with a shorter response.
-
-There is no runtime event injection or new LLM timer. Feedback waits for an
-existing safe parent checkpoint; urgent interrupts use direct runtime input.
-Formal owner decisions use user-questionnaire and the owning operational gate.
+idempotent after a lost response. Failed saves preserve browser drafts. Writes
+and acknowledgements serialize under the workspace lock.

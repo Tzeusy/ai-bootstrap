@@ -1,31 +1,31 @@
-/* Fixed, offline rendering. Polling never invokes a model or a task tracker. */
+/* Fixed, offline rendering. Every visual is derived here from snapshot data;
+   polling never invokes a model or a task tracker. */
 "use strict";
 
 (() => {
   const byId = id => document.getElementById(id);
-  const setText = (node, value) => {
-    const content = String(value ?? "");
+  const text = (id, value) => {
+    const node = byId(id), content = String(value ?? "");
     if (node.textContent !== content) node.textContent = content;
   };
-  const text = (id, value) => setText(byId(id), value);
-  const number = value => Number.isFinite(value) ? new Intl.NumberFormat().format(value) : "Unknown";
-  const compact = value => Number.isFinite(value) ? new Intl.NumberFormat(undefined, {notation: "compact", maximumFractionDigits: 1}).format(value) : "Unknown";
-  const form = byId("feedback-form");
-  const feedbackText = byId("feedback-text");
-  const kind = byId("feedback-kind");
-  const target = byId("feedback-target");
-  const result = byId("feedback-result");
+  const counted = value => Number.isFinite(value);
+  const compact = value => counted(value)
+    ? new Intl.NumberFormat("en", {notation: "compact", maximumFractionDigits: 1}).format(value) : "—";
+  const exact = value => counted(value) ? new Intl.NumberFormat("en").format(value) : "unknown";
+  const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+  const TASK_GROUPS = [["in-progress", "In progress"], ["todo", "Up next"], ["complete", "Done"]];
+  const STATUS = { // label, tone, glyph: state is never carried by color alone
+    running: ["Running", "active", "●"], waiting: ["Waiting", "waiting", "◐"], complete: ["Done", "done", "✓"],
+    failed: ["Failed", "failed", "✕"], unknown: ["Unknown", "quiet", "?"],
+    "in-progress": ["In progress", "active", "●"], todo: ["Up next", "quiet", "○"],
+    done: ["Done", "done", "✓"], active: ["Active", "active", "●"],
+  };
+  const KINDS = {feedback: "Comment", steer: "Direction", question: "Question"};
+  const form = byId("feedback-form"), feedbackText = byId("feedback-text");
+  const kind = byId("feedback-kind"), target = byId("feedback-target");
   const draftKey = `progress-dashboard-draft:${location.pathname}`;
-  let current = null;
-  let etag = null;
-  let timer = null;
-  let inFlight = false;
-  let failures = 0;
-  let lastSuccess = null;
-  let sending = false;
-  let pendingSubmission = null;
-  let targetSignature = "";
-  const signatures = new Map();
+  let current = null, etag = null, timer = null, inFlight = false, failures = 0;
+  let sending = false, pendingSubmission = null, targetSignature = "";
 
   function el(tag, className, content) {
     const node = document.createElement(tag);
@@ -34,29 +34,8 @@
     return node;
   }
 
-  function changed(key, value, render) {
-    const signature = JSON.stringify(value);
-    if (signatures.get(key) !== signature) {
-      const focused = document.activeElement;
-      const focusKey = focused?.dataset.focusKey;
-      render();
-      // A changed row must not strand a keyboard user at the document root.
-      if (focusKey && document.activeElement !== focused) {
-        [...document.querySelectorAll("[data-focus-key]")].find(node => node.dataset.focusKey === focusKey)?.focus({preventScroll: true});
-      }
-      signatures.set(key, signature);
-    }
-  }
-
-  function dateLabel(value) {
-    if (typeof value !== "string" || !value) return "Unknown time";
-    const date = new Date(value);
-    return Number.isFinite(date.getTime()) ? date.toLocaleString(undefined, {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"}) : "Unknown time";
-  }
-
   function age(value) {
-    if (typeof value !== "string" || !value) return "time unknown";
-    const elapsed = Date.now() - new Date(value).getTime();
+    const elapsed = Date.now() - new Date(value || NaN).getTime();
     if (!Number.isFinite(elapsed)) return "time unknown";
     if (elapsed < 60000) return "just now";
     if (elapsed < 3600000) return `${Math.floor(elapsed / 60000)}m ago`;
@@ -64,335 +43,411 @@
     return `${Math.floor(elapsed / 86400000)}d ago`;
   }
 
-  function statusClass(value) {
-    if (["running", "working", "active", "implementing", "reviewing", "in-progress", "in_progress"].includes(value)) return "active";
-    if (["waiting", "blocked", "parked", "pending", "idle"].includes(value)) return "waiting";
-    if (["error", "failed"].includes(value)) return "error";
-    return "neutral";
-  }
-
-  function relativeTime(value, prefix) {
-    const node = el("span", null, `${prefix}${age(value)}`);
-    node.dataset.relativeTime = value || "";
-    node.dataset.timePrefix = prefix;
+  function when(value) {
+    const date = new Date(value || NaN);
+    const node = el("time", null, age(value));
+    if (Number.isFinite(date.getTime())) {
+      node.dateTime = date.toISOString();
+      node.title = date.toLocaleString();
+    }
+    node.dataset.relative = value || "";
     return node;
   }
 
-  function clientId() {
-    // getRandomValues also works on private-network HTTP origins where
-    // randomUUID is unavailable because the origin is not a secure context.
-    if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
-    const bytes = crypto.getRandomValues(new Uint8Array(16));
-    bytes[6] = (bytes[6] & 15) | 64;
-    bytes[8] = (bytes[8] & 63) | 128;
-    const hex = [...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("");
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  function badge(status, text) {
+    const [label, tone, glyph] = STATUS[status] || [status || "Unknown", "quiet", "·"];
+    const node = el("span", `badge ${tone}`);
+    const mark = el("span", "glyph", glyph);
+    mark.setAttribute("aria-hidden", "true");
+    node.append(mark, text || label);
+    return node;
+  }
+
+  /* Keyed rows: unchanged rows keep their node, so focus, text selection and
+     open disclosures survive a background refresh. */
+  function sync(container, items, build, update) {
+    const existing = new Map([...container.children].map(node => [node.dataset.key, node]));
+    items.forEach(([key, value], index) => {
+      const signature = JSON.stringify(value);
+      let node = existing.get(key);
+      existing.delete(key);
+      if (node && update && node.dataset.signature !== signature) {
+        update(node, value);
+        node.dataset.signature = signature;
+      } else if (!node || node.dataset.signature !== signature) {
+        const fresh = build(value);
+        if (update) update(fresh, value);
+        fresh.dataset.key = key;
+        fresh.dataset.signature = signature;
+        if (node?.open) fresh.open = true;
+        if (node) node.replaceWith(fresh); else container.append(fresh);
+        node = fresh;
+      }
+      if (container.children[index] !== node) container.insertBefore(node, container.children[index]);
+    });
+    for (const node of existing.values()) node.remove();
   }
 
   function commentButton(id, label) {
-    const button = el("button", "task-feedback", "Comment");
+    const button = el("button", "link-button", "Comment");
     button.type = "button";
     button.dataset.focusKey = `comment:${id}`;
     button.setAttribute("aria-label", `Comment on ${label}`);
     button.addEventListener("click", () => {
       if ([...target.options].some(option => option.value === id)) target.value = id;
       saveDraft();
+      byId("feedback").scrollIntoView({block: "nearest"});
       feedbackText.focus();
-      byId("feedback-heading").scrollIntoView({block: "center", behavior: "auto"});
     });
     return button;
   }
 
-  function renderTasks(tasks) {
-    const labels = {"in-progress": "In progress", todo: "Up next", complete: "Completed"};
-    for (const status of Object.keys(labels)) {
-      const destination = byId(status);
-      destination.replaceChildren();
-      const matching = tasks.filter(task => task.status === status);
-      if (status !== "complete") {
-        const heading = el("h3", "task-group-heading", labels[status]);
-        heading.append(el("span", "count", matching.length));
-        destination.append(heading);
-      }
-      if (!matching.length) {
-        destination.append(el("p", "empty", status === "in-progress" ? "No active task at this checkpoint." : status === "todo" ? "No upcoming work recorded." : "Completed work will appear here."));
-      }
-      for (const task of matching) {
-        const article = el("article", "task");
-        const row = el("div", "task-title");
-        const mark = el("span", `task-status-mark ${status}`, status === "complete" ? "✓" : status === "in-progress" ? "◐" : "○");
-        mark.setAttribute("aria-hidden", "true");
-        row.append(mark, el("h3", null, task.title), commentButton(task.id, task.title));
-        article.append(row);
-        if (task.id) article.append(el("span", "task-id", task.id));
-        if (task.detail) article.append(el("p", "task-detail", task.detail));
-        if (task.evidence) article.append(el("p", "task-evidence", `Evidence · ${task.evidence}`));
-        destination.append(article);
-      }
-    }
-  }
-
-  function updateBlock(destination, value, render) {
-    const signature = JSON.stringify(value);
-    if (destination.dataset.signature === signature) return;
-    render();
-    destination.dataset.signature = signature;
-  }
-
-  function contextRow(destination, label, value, code = false) {
-    const content = el("dd");
-    content.append(value instanceof Node ? value : el(code ? "code" : "span", null, value || "Not reported"));
-    destination.append(el("dt", null, label), content);
-  }
-
-  function pullRequestLink(value, name, id) {
+  function externalLink(value, label) {
     try {
       const url = new URL(value);
-      if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) return null;
-      const link = el("a", null, url.href);
+      if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) return null;
+      const link = el("a", null, url.host + url.pathname);
       link.href = url.href;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
-      link.dataset.focusKey = `pr:${id}`;
-      link.setAttribute("aria-label", `Pull request for ${name}: ${url.href} (opens in a new tab)`);
+      link.dataset.focusKey = `link:${label}`;
+      link.setAttribute("aria-label", `${label}: ${url.href} (opens in a new tab)`);
       return link;
     } catch { return null; }
   }
 
-  function createAgent(agent) {
-    const article = el("article", "agent");
-    article.dataset.agentId = agent.id;
-    const heading = el("div", "agent-heading");
-    heading.append(el("h3"), el("span", "badge"), el("span", "agent-role"), commentButton(agent.id, agent.name || agent.id));
-    const details = el("details", "agent-details");
-    const summary = el("summary", null, "Work details");
-    summary.dataset.focusKey = `agent-details:${agent.id}`;
-    details.append(summary, el("div", "agent-actions"), el("dl", "agent-context agent-work-context"), el("h4", null, "Runtime attribution"), el("dl", "agent-context agent-runtime-context"));
-    article.append(heading, el("p", "agent-task"), el("p", "agent-summary"), el("div", "agent-meta"), details);
-    return article;
-  }
-
-  function updateAgent(article, agent, measured) {
-    const name = agent.name || agent.id;
-    setText(article.querySelector("h3"), name);
-    const badge = article.querySelector(".badge");
-    badge.className = `badge ${statusClass(agent.status)}`;
-    setText(badge, agent.status || "Unknown");
-    const role = article.querySelector(".agent-role");
-    setText(role, agent.role);
-    role.hidden = !agent.role;
-    article.querySelector(".task-feedback").setAttribute("aria-label", `Comment on ${name}`);
-    const task = article.querySelector(".agent-task");
-    setText(task, agent.task);
-    task.hidden = !agent.task;
-    setText(article.querySelector(".agent-summary"), agent.summary || "Work summary not reported yet.");
-    const meta = article.querySelector(".agent-meta");
-    meta.replaceChildren();
-    if (measured?.model || agent.model) meta.append(el("span", null, measured?.model || agent.model));
-    meta.append(el("span", null, measured?.status === "measured" ? `${number(measured.total_tokens)} tokens · ${measured.provider || "runtime"}` : "Token usage unknown"));
-    meta.append(relativeTime(agent.updated_at, "Status · "));
-    if (measured?.status === "measured") meta.append(relativeTime(measured.observed_at, "Usage · "));
-
-    const details = article.querySelector(".agent-details");
-    details.firstChild.setAttribute("aria-label", `Work details for ${name}`);
-    const actions = details.querySelector(".agent-actions");
-    updateBlock(actions, agent.activity || [], () => {
-      actions.replaceChildren(el("h4", null, "Reported recent actions"));
-      if (!agent.activity?.length) actions.append(el("p", "muted", "No recent actions reported."));
-      else {
-        const list = el("ul");
-        for (const action of agent.activity.slice(0, 8)) list.append(el("li", null, action));
-        actions.append(list);
+  function renderTasks(tasks, agents) {
+    const container = byId("task-groups");
+    if (!tasks.length) {
+      container.replaceChildren(el("p", "empty", "No tasks recorded yet."));
+      return;
+    }
+    container.querySelector(":scope > .empty")?.remove();
+    const build = task => {
+      const row = el("article", "task");
+      row.dataset.taskId = task.id;
+      const head = el("div", "task-head");
+      const mark = el("span", `glyph ${STATUS[task.status][1]}`, STATUS[task.status][2]);
+      mark.setAttribute("aria-hidden", "true");
+      const title = el("h4");
+      title.append(mark, task.title);
+      head.append(title, el("code", null, task.id));
+      for (const agent of task.agents) {
+        const chip = el("a", "chip", agent.name);
+        chip.href = "#agents";
+        chip.title = `${agent.name}: ${STATUS[agent.status]?.[0] || agent.status}`;
+        chip.dataset.focusKey = `chip:${task.id}:${agent.id}`;
+        chip.dataset.tone = STATUS[agent.status]?.[1] || "quiet";
+        chip.addEventListener("click", () => {
+          const row = [...byId("agent-list").children].find(node => node.dataset.key === agent.id);
+          if (row) row.open = true;
+        });
+        head.append(chip);
       }
-    });
-    const work = details.querySelector(".agent-work-context");
-    updateBlock(work, [agent.branch, agent.worktree, agent.pr_url, name], () => {
-      work.replaceChildren();
-      contextRow(work, "Branch", agent.branch, true);
-      contextRow(work, "Worktree", agent.worktree || "Not reported; may share the parent checkout.", Boolean(agent.worktree));
-      contextRow(work, "Pull request", pullRequestLink(agent.pr_url, name, agent.id) || "Not reported");
-    });
-    const runtime = details.querySelector(".agent-runtime-context");
-    updateBlock(runtime, [measured, agent.model, agent.thread_id], () => {
-      runtime.replaceChildren();
-      contextRow(runtime, "Source", measured?.provider || "Not attached");
-      contextRow(runtime, "Runtime model", measured?.model);
-      if (agent.model && agent.model !== measured?.model) contextRow(runtime, "Reported model", agent.model);
-      contextRow(runtime, "Thread", measured?.thread_id, true);
-      if (agent.thread_id && agent.thread_id !== measured?.thread_id) contextRow(runtime, "Reported thread", agent.thread_id, true);
-      contextRow(runtime, "Agent path", measured?.agent_path, true);
-      contextRow(runtime, "Usage status", `${measured?.status || "unknown"}${measured?.reason ? ` · ${measured.reason.replaceAll("-", " ")}` : ""}`);
-      contextRow(runtime, "Usage reported", relativeTime(measured?.observed_at, ""));
-      runtime.lastChild.firstChild.title = dateLabel(measured?.observed_at);
-    });
-  }
-
-  function renderAgents(agents, telemetry) {
-    const destination = byId("agent-list");
-    const existing = new Map([...destination.querySelectorAll(".agent")].map(node => [node.dataset.agentId, node]));
-    for (const node of destination.querySelectorAll(":scope > .empty")) node.remove();
-    if (!agents.length) destination.append(el("p", "empty", "No subagents recorded. This loop may be working on its own."));
-    const usage = new Map((telemetry.agents || []).map(agent => [agent.id, agent]));
-    for (const agent of agents) {
-      const measured = usage.get(agent.id);
-      const signature = JSON.stringify([agent, measured]);
-      const prior = existing.get(agent.id);
-      existing.delete(agent.id);
-      if (prior?.dataset.signature === signature) continue;
-      const article = prior || createAgent(agent);
-      updateAgent(article, agent, measured);
-      article.dataset.signature = signature;
-      if (!prior) destination.append(article);
-    }
-    for (const node of existing.values()) node.remove();
-    // Reorder retained rows without recreating their controls or disclosures.
-    const ordered = new Map([...destination.querySelectorAll(".agent")].map(node => [node.dataset.agentId, node]));
-    agents.forEach((agent, index) => {
-      const node = ordered.get(agent.id);
-      if (destination.children[index] !== node) destination.insertBefore(node, destination.children[index] || null);
-    });
-    const rows = byId("usage-rows");
-    rows.replaceChildren();
-    for (const usageRow of telemetry.agents || []) {
-      const row = el("tr");
-      const name = agents.find(agent => agent.id === usageRow.id)?.name || usageRow.id;
-      const first = el("td", null, name);
-      first.append(el("small", null, `${usageRow.provider || "Unknown source"} · ${usageRow.status || "unknown"}`));
-      if (usageRow.status === "measured") first.append(relativeTime(usageRow.observed_at, "Usage · "));
-      if (usageRow.reason) first.append(el("small", null, usageRow.reason.replaceAll("-", " ")));
-      row.append(first);
-      for (const field of ["input_tokens", "cached_input_tokens", "output_tokens", "total_tokens"]) row.append(el("td", null, usageRow.status === "measured" ? number(usageRow[field]) : "Unknown"));
-      rows.append(row);
-    }
-    if (!rows.children.length) {
-      const cell = el("td", null, "No runtime usage counters attached.");
-      cell.colSpan = 5;
-      rows.append(el("tr"));
-      rows.lastChild.append(cell);
-    }
-    text("usage-note", "Counters come from attached runtime records. Cached input is shown separately and may already be included in input. Missing sessions are excluded; counts are not a bill or a measure of engineering progress.");
-  }
-
-  function renderArtifacts(artifacts) {
-    const destination = byId("artifact-list");
-    destination.replaceChildren();
-    if (!artifacts.length) destination.append(el("p", "empty", "Diagrams, rendered graphs, and other evidence will appear here when published."));
-    for (const artifact of artifacts) {
-      const image = /\.(png|jpe?g|gif|webp|svg)$/i.test(artifact.path);
-      const figure = el("figure", `artifact${image ? "" : " download-only"}`);
-      const url = `artifacts/${encodeURIComponent(artifact.path)}`;
-      if (image) {
-        const preview = el("img");
-        preview.src = url;
-        preview.alt = artifact.label || artifact.path;
-        preview.loading = "lazy";
-        figure.append(preview);
+      head.append(commentButton(task.id, task.title));
+      row.append(head);
+      if (task.detail) row.append(el("p", null, task.detail));
+      if (task.evidence) {
+        const evidence = el("p", "evidence");
+        evidence.append(el("span", "label", "Evidence"), task.evidence);
+        row.append(evidence);
       }
-      const caption = el("figcaption");
-      const link = el("a", null, "Download");
-      link.href = url;
-      link.setAttribute("aria-label", `Download ${artifact.label || artifact.path}`);
-      link.download = artifact.path.split("/").pop();
-      caption.append(el("span", null, artifact.label || artifact.path), link);
-      figure.append(caption);
-      destination.append(figure);
+      return row;
+    };
+    const groups = TASK_GROUPS.map(([status, label]) => [status, {
+      label, rows: tasks.filter(task => task.status === status).map(task => ({...task,
+        agents: agents.filter(agent => agent.task === task.id).map(({id, name, status}) => ({id, name: name || id, status}))})),
+    }]).filter(([, group]) => group.rows.length);
+    sync(container, groups.map(([status, group]) => [status, {status, label: group.label, count: group.rows.length}]), group => {
+      // Finished work stays one click away instead of pushing live work down.
+      const wrap = el(group.status === "complete" ? "details" : "div", "task-group");
+      const heading = el(group.status === "complete" ? "summary" : "h3", "group-heading", group.label);
+      heading.append(el("span", "count", group.count));
+      wrap.append(heading, el("div", "task-rows"));
+      return wrap;
+    });
+    for (const [status, group] of groups) {
+      const rows = [...container.children].find(node => node.dataset.key === status).querySelector(".task-rows");
+      sync(rows, group.rows.map(task => [task.id, task]), build);
     }
+  }
+
+  function usageOf(row) {
+    if (!row || row.status !== "measured" || !counted(row.total_tokens)) return null;
+    const cached = row.cached_input_tokens || 0;
+    return {total: row.total_tokens, cached, fresh: Math.max(0, row.total_tokens - cached),
+            input: row.input_tokens, output: row.output_tokens};
+  }
+
+  function fact(list, label, value) {
+    if (!value) return;
+    const item = el("div");
+    const body = el("dd");
+    body.append(value);
+    item.append(el("dt", null, label), body);
+    list.append(item);
+  }
+
+  /* Usage ticks every few seconds for a running agent. Its row is patched in
+     place so an open report keeps its focus, selection and scroll position. */
+  function buildAgent(agent) {
+    const row = el("details", "agent");
+    row.dataset.agentId = agent.id;
+    const summary = el("summary");
+    summary.dataset.focusKey = `agent:${agent.id}`;
+    const name = el("span", "agent-name");
+    name.append(el("strong"), el("span", "caption"));
+    const tokens = el("span", "agent-tokens");
+    const bar = el("span", "bar");
+    bar.setAttribute("role", "img");
+    bar.append(el("span", "fresh"), el("span", "cached"));
+    tokens.append(el("span", "number"), bar);
+    summary.append(name, el("span", "agent-status"), tokens, el("span", "agent-updated caption"));
+    const body = el("div", "agent-body");
+    const facts = el("dl", "facts usage");
+    for (const label of ["Tokens", "Runtime"]) {
+      const item = el("div");
+      item.append(el("dt", null, label), el("dd"));
+      facts.append(item);
+    }
+    body.append(el("div", "agent-report"), facts);
+    if (agent.commentable) body.append(commentButton(agent.id, agent.name));
+    row.append(summary, body);
+    return row;
+  }
+
+  function updateAgent(row, agent) {
+    const set = (selector, value) => {
+      const node = row.querySelector(selector);
+      if (node.textContent !== value) node.textContent = value;
+    };
+    set(".agent-name strong", agent.name);
+    set(".agent-name .caption", [agent.role, agent.taskTitle].filter(Boolean).join(" · "));
+    const status = row.querySelector(".agent-status");
+    if (status.dataset.status !== (agent.status || "")) {
+      status.replaceChildren(...(agent.status ? [badge(agent.status)] : []));
+      status.dataset.status = agent.status || "";
+    }
+    const updated = row.querySelector(".agent-updated");
+    if (updated.dataset.at !== (agent.updated_at || "")) {
+      updated.replaceChildren(...(agent.updated_at ? [when(agent.updated_at)] : []));
+      updated.dataset.at = agent.updated_at || "";
+    }
+    const usage = agent.usage, tokens = row.querySelector(".agent-tokens"), bar = tokens.querySelector(".bar");
+    set(".agent-tokens .number", usage ? compact(usage.total) : "Not measured");
+    tokens.classList.toggle("unmeasured", !usage);
+    bar.hidden = !usage;
+    if (usage) {
+      for (const [tone, amount] of [["fresh", usage.fresh], ["cached", usage.cached]]) {
+        const segment = bar.querySelector(`.${tone}`);
+        segment.hidden = !amount;
+        segment.style.width = `${amount / agent.scale * 100}%`;
+      }
+      bar.setAttribute("aria-label", `${exact(usage.total)} tokens, ${exact(usage.cached)} of them cached input`);
+      tokens.title = `${exact(usage.fresh)} new input and output · ${exact(usage.cached)} cached input`;
+    } else {
+      tokens.removeAttribute("title");
+    }
+    const [tokenFact, runtimeFact] = row.querySelectorAll(".usage > div");
+    const runtime = [agent.model, agent.provider, agent.thread && `session ${agent.thread.slice(0, 8)}`].filter(Boolean).join(" · ");
+    set(".usage > div:nth-child(1) dd", usage
+      ? `${exact(usage.input - usage.cached)} new input · ${exact(usage.cached)} cached · ${exact(usage.output)} output` : agent.unmeasured);
+    set(".usage > div:nth-child(2) dd", runtime);
+    tokenFact.hidden = false;
+    runtimeFact.hidden = !runtime;
+    // The authored report changes only at checkpoints; rebuild it only then.
+    const report = row.querySelector(".agent-report");
+    const signature = JSON.stringify([agent.summary, agent.activity, agent.branch, agent.worktree, agent.pr_url]);
+    if (report.dataset.signature === signature) return;
+    report.dataset.signature = signature;
+    report.replaceChildren();
+    if (agent.summary) report.append(el("p", null, agent.summary));
+    if (agent.activity?.length) {
+      const list = el("ul", "actions");
+      for (const item of agent.activity) list.append(el("li", null, item));
+      report.append(el("h4", "label", "Recent actions"), list);
+    }
+    const facts = el("dl", "facts");
+    fact(facts, "Branch", agent.branch && el("code", null, agent.branch));
+    fact(facts, "Worktree", agent.worktree && el("code", null, agent.worktree));
+    fact(facts, "Pull request", agent.pr_url && (externalLink(agent.pr_url, `Pull request for ${agent.name}`) || agent.pr_url));
+    if (facts.children.length) report.append(facts);
+  }
+
+  function renderAgents(state, telemetry) {
+    const measured = new Map((telemetry.agents || []).map(row => [row.id, row]));
+    const tasks = new Map(state.tasks.map(task => [task.id, task.title]));
+    const runtime = row => ({usage: usageOf(row), provider: row?.provider || "", thread: row?.thread_id || "",
+                             model: row?.model || "",
+                             unmeasured: !row || row.reason === "not-attached" ? "Not measured: no usage source attached"
+                               : `Not measured${row.reason ? `: ${row.reason.replaceAll("-", " ")}` : ""}`});
+    const rows = [{id: state.actor, name: "Parent session", role: "coordinator", ...runtime(measured.get(state.actor))}];
+    for (const agent of state.agents) {
+      const usage = runtime(measured.get(agent.id));
+      rows.push({...agent, name: agent.name || agent.id, taskTitle: tasks.get(agent.task) || agent.task, commentable: true,
+                 ...usage, model: agent.model || usage.model, thread: agent.thread_id || usage.thread});
+    }
+    const known = new Set(rows.map(row => row.id));
+    for (const row of telemetry.agents || []) {
+      if (!known.has(row.id)) rows.push({id: row.id, name: row.id, role: "attached session", ...runtime(row)});
+    }
+    const scale = Math.max(1, ...rows.map(row => row.usage?.total || 0));
+    sync(byId("agent-list"), rows.map(row => [row.id, {...row, scale}]), buildAgent, updateAgent);
+    byId("token-legend").hidden = !rows.some(row => row.usage);
+    const warning = byId("usage-warning");
+    warning.hidden = !telemetry.error;
+    text("usage-warning", telemetry.error || "");
+  }
+
+  function numeric(value) { return typeof value === "number"; }
+
+  function buildPanel(panel) {
+    const figure = el("figure", "panel");
+    figure.append(el("figcaption", null, panel.title));
+    const rows = panel.rows || [];
+    if (panel.kind === "stats") {
+      const grid = el("dl", "tiles");
+      for (const [label, value, note] of rows) {
+        const tile = el("div");
+        tile.append(el("dt", null, label), el("dd", null, numeric(value) ? compact(value) : value));
+        if (note !== undefined) tile.append(el("dd", "caption", note));
+        grid.append(tile);
+      }
+      figure.append(grid);
+    } else if (panel.kind === "bars") {
+      const scale = Math.max(...rows.map(row => row[1]), 0) || 1;
+      const list = el("dl", "bars");
+      for (const [label, value, note] of rows) {
+        const row = el("div");
+        const track = el("span", "bar");
+        const fill = el("span", "fresh");
+        fill.style.width = `${value / scale * 100}%`;
+        track.append(fill);
+        const amount = el("dd");
+        amount.append(track, el("span", "number", exact(value)), note === undefined ? "" : el("span", "caption", note));
+        row.append(el("dt", null, label), amount);
+        row.title = `${label}: ${exact(value)}`;
+        list.append(row);
+      }
+      figure.append(list);
+    } else if (panel.kind === "steps") {
+      const list = el("ol", "steps");
+      for (const [label, state, note] of rows) {
+        const tone = {done: "done", active: "active", todo: "quiet", failed: "failed"}[state];
+        const item = el("li", tone);
+        const mark = el("span", `glyph ${tone}`, (STATUS[state] || STATUS.todo)[2]);
+        mark.setAttribute("aria-hidden", "true");
+        item.append(mark, el("span", "step-label", label), el("span", "sr-only", ` (${state})`));
+        if (note !== undefined) item.append(el("span", "caption", note));
+        list.append(item);
+      }
+      figure.append(list);
+    } else {
+      const scroll = el("div", "scroll");
+      const table = el("table");
+      rows.forEach((cells, index) => {
+        const line = el("tr");
+        for (const cell of cells) {
+          const node = el(index ? "td" : "th", numeric(cell) ? "number" : null, numeric(cell) ? exact(cell) : cell);
+          if (!index) node.scope = "col";
+          line.append(node);
+        }
+        (index ? table.tBodies[0] || table.createTBody() : table.createTHead()).append(line);
+      });
+      scroll.append(table);
+      figure.append(scroll);
+    }
+    if (panel.note) figure.append(el("p", "caption", panel.note));
+    return figure;
+  }
+
+  function buildArtifact(artifact) {
+    const figure = el("figure", "panel artifact");
+    const url = `artifacts/${artifact.path.split("/").map(encodeURIComponent).join("/")}`;
+    const label = artifact.label || artifact.path;
+    const caption = el("figcaption", null, label);
+    const link = el("a", null, "Download");
+    link.href = url;
+    link.download = artifact.path.split("/").pop();
+    link.dataset.focusKey = `artifact:${artifact.path}`;
+    link.setAttribute("aria-label", `Download ${label}`);
+    caption.append(link);
+    figure.append(caption);
+    if (/\.(png|jpe?g|gif|webp|svg)$/i.test(artifact.path)) {
+      const image = el("img");
+      image.src = url;
+      image.alt = label;
+      image.loading = "lazy";
+      figure.append(image);
+    }
+    return figure;
+  }
+
+  function renderActivity(log) {
+    const entries = [...log].reverse().map((entry, index) => [`${entry.at}:${log.length - index}`, entry]);
+    sync(byId("activity-list"), entries, entry => {
+      const item = el("li");
+      item.append(when(entry.at), el("span", null, entry.text));
+      return item;
+    });
   }
 
   // A small readable Markdown subset; text never enters an HTML parser.
-  function renderDocument(destination, content) {
+  function renderProse(destination, content) {
     destination.replaceChildren();
-    if (!content) {
-      destination.append(el("p", "empty", "No document published yet."));
-      return;
-    }
-    let paragraph = [];
     let list = null;
-    let code = null;
-    const flush = () => {
-      if (paragraph.length) destination.append(el("p", null, paragraph.join("\n")));
-      paragraph = [];
-      list = null;
-    };
     for (const line of content.split("\n")) {
-      if (line.startsWith("```")) {
-        if (code) code = null;
-        else { flush(); code = el("pre"); destination.append(code); }
+      const heading = /^(#{1,4})\s+(.*)$/.exec(line);
+      const bullet = /^\s*[-*]\s+(.*)$/.exec(line);
+      if (bullet) {
+        if (!list) destination.append(list = el("ul"));
+        list.append(el("li", null, bullet[1]));
         continue;
       }
-      if (code) { code.textContent += `${line}\n`; continue; }
-      const heading = /^(#{1,6})\s+(.+)$/.exec(line);
-      if (heading) { flush(); destination.append(el(`h${Math.min(heading[1].length + 1, 6)}`, null, heading[2])); continue; }
-      const bullet = /^\s*[-*]\s+(.+)$/.exec(line);
-      if (bullet) {
-        if (!list) { flush(); list = el("ul"); destination.append(list); }
-        list.append(el("li", null, bullet[1]));
-      } else if (!line.trim()) flush();
-      else { list = null; paragraph.push(line); }
+      list = null;
+      if (heading) destination.append(el(heading[1].length < 2 ? "h3" : "h4", null, heading[2]));
+      else if (line.trim()) destination.append(el("p", null, line));
     }
-    flush();
   }
 
-  function renderDocuments(documents) {
-    const destination = byId("document-list");
-    for (const name of ["in-progress.md", "todo.md", "complete.md"]) {
-      let details = [...destination.children].find(node => node.dataset.name === name);
-      if (!details) {
-        details = el("details", "document");
-        details.dataset.name = name;
-        details.append(el("summary", null, name), el("div", "document-body"));
-        destination.append(details);
-      }
-      changed(`document:${name}`, documents[name], () => renderDocument(details.lastChild, documents[name]));
-    }
-    changed("document:handover", documents["handover.md"], () => renderDocument(byId("handover-content"), documents["handover.md"]));
-  }
-
-  function renderFeedback(feedback) {
-    const destination = byId("feedback-history");
-    const previousScroll = destination.scrollTop;
-    const pinnedBottom = previousScroll + destination.clientHeight >= destination.scrollHeight - 25;
-    destination.replaceChildren();
+  function renderFeedback(feedback, enabled) {
     const pending = feedback.filter(item => item.status === "pending").length;
-    text("feedback-pending", pending ? `${pending} awaiting checkpoint` : "");
     text("nav-feedback", pending);
     byId("nav-feedback").hidden = !pending;
-    if (!feedback.length) destination.append(el("p", "empty small", "Your feedback and the loop’s replies will appear here."));
-    for (const item of feedback) {
-      const article = el("article", "feedback-item");
-      const meta = el("div", "feedback-meta");
-      meta.append(el("span", null, item.kind === "steer" ? "Direction" : item.kind === "question" ? "Question" : "Feedback"));
-      if (item.target && item.target !== "loop") meta.append(el("span", null, `· ${item.target}`));
-      meta.append(el("span", `badge ${item.status === "pending" ? "waiting" : "neutral"}`, item.status === "pending" ? "Queued" : "Acknowledged"));
-      const time = el("time", null, dateLabel(item.created_at));
-      time.dateTime = item.created_at;
-      meta.append(time);
-      article.append(meta, el("p", "feedback-content", item.text));
+    text("feedback-total", !enabled ? "Off" : feedback.length ? pending ? `${pending} pending` : "All read" : "—");
+    text("feedback-caption", !enabled ? "Disabled for this workspace"
+      : feedback.length ? `${feedback.length - pending} of ${feedback.length} read by the session` : "Nothing sent");
+    sync(byId("feedback-history"), [...feedback].reverse().map(item => [String(item.id), item]), item => {
+      const entry = el("article", "message");
+      const meta = el("p", "meta");
+      meta.append(el("strong", null, KINDS[item.kind] || "Comment"));
+      if (item.target && item.target !== "loop") meta.append(el("code", null, item.target));
+      meta.append(when(item.created_at), item.status === "pending" ? badge("waiting", "Queued") : badge("done", "Read"));
+      entry.append(meta, el("p", null, item.text));
       if (item.response) {
-        const response = el("div", "feedback-response");
-        response.append(el("span", "response-label", "Loop response"), el("span", null, item.response));
-        article.append(response);
+        const reply = el("p", "reply");
+        reply.append(el("span", "label", "Reply"), el("span", null, item.response));
+        entry.append(reply);
       }
-      destination.append(article);
-    }
-    destination.scrollTop = pinnedBottom ? destination.scrollHeight : previousScroll;
+      return entry;
+    });
   }
 
   function updateTargets(state) {
-    const options = [{id: "loop", label: "Whole loop"}, ...(state.tasks || []).map(task => ({id: task.id, label: `Task · ${task.title}`})), ...(state.agents || []).map(agent => ({id: agent.id, label: `Agent · ${agent.name || agent.id}`}))];
+    const options = [{id: "loop", label: "Whole session"},
+      ...state.tasks.map(task => ({id: task.id, label: `Task · ${task.title}`})),
+      ...state.agents.map(agent => ({id: agent.id, label: `Agent · ${agent.name || agent.id}`}))];
     const signature = JSON.stringify(options);
-    if (signature === targetSignature) return;
-    // A running update must not replace the user's open dropdown or target.
-    if (document.activeElement === target) return;
+    // A background update must not replace an open dropdown.
+    if (signature === targetSignature || document.activeElement === target) return;
     const selected = target.value;
-    target.replaceChildren();
-    for (const option of options) {
+    target.replaceChildren(...options.map(option => {
       const node = el("option", null, option.label);
       node.value = option.id;
-      target.append(node);
-    }
-    if (![...target.options].some(option => option.value === selected)) {
-      const removed = el("option", null, `${selected} · previously selected`);
+      return node;
+    }));
+    if (!options.some(option => option.id === selected)) {
+      const removed = el("option", null, `${selected} · no longer listed`);
       removed.value = selected;
       target.append(removed);
     }
@@ -400,65 +455,80 @@
     targetSignature = signature;
   }
 
+  function section(id, count) {
+    byId(id).hidden = !count;
+    document.querySelector(`nav [data-section="${id}"]`).hidden = !count;
+    const badge = byId(`nav-${id}`);
+    if (badge) text(badge.id, count || "");
+  }
+
   function render(data) {
     current = data;
-    const state = data.state;
-    const tasks = state.tasks || [];
-    const agents = state.agents || [];
-    const telemetry = data.telemetry || {agents: [], totals: {}, coverage: {attached: 0, measured: 0}};
-    const completed = tasks.filter(task => task.status === "complete").length;
-    const running = agents.filter(agent => statusClass(agent.status) === "active").length;
-    const waiting = agents.filter(agent => statusClass(agent.status) === "waiting").length;
-    const completeAgents = agents.filter(agent => agent.status === "complete").length;
-    const failedAgents = agents.filter(agent => agent.status === "failed").length;
-    const unknownAgents = agents.length - running - waiting - completeAgents - failedAgents;
-    document.title = `${state.title || state.slug} · Progress workspace`;
-    text("loop-name", state.slug);
-    text("title", state.title || state.slug);
-    text("summary", state.summary || "No progress summary published yet.");
-    text("phase", state.phase || "No phase reported");
-    text("actor", state.actor);
-    text("repository", state.repo_root);
-    text("outcome", state.outcome ? `Outcome · ${state.outcome}` : "");
+    const state = data.state, telemetry = data.telemetry || {};
+    const tasks = state.tasks, agents = state.agents;
+    const focusKey = document.activeElement?.dataset.focusKey;
+    document.title = `${state.title} · Progress`;
+    text("title", state.title);
+    text("top-title", state.title);
+    text("summary", state.summary || "Waiting for the first checkpoint.");
+    text("outcome", state.outcome ? `Goal: ${state.outcome}` : "");
     byId("outcome").hidden = !state.outcome;
-    text("completed-count", `${completed} / ${tasks.length}`);
-    text("work-caption", tasks.length ? `${tasks.filter(task => task.status === "in-progress").length} in progress · ${tasks.filter(task => task.status === "todo").length} up next` : "No work recorded");
-    byId("work-progress").max = Math.max(1, tasks.length);
-    byId("work-progress").value = completed;
-    const measured = telemetry.coverage?.measured || 0;
-    const attached = telemetry.coverage?.attached || 0;
-    const expected = telemetry.coverage?.expected ?? attached;
-    text("token-total", measured ? compact(telemetry.totals?.total_tokens) : "Unknown");
-    byId("token-total").title = measured ? `${number(telemetry.totals?.total_tokens)} reported tokens` : "No measured runtime counters";
-    byId("token-coverage").hidden = !measured || measured >= expected;
-    text("usage-warning", telemetry.error || "");
-    byId("usage-warning").hidden = !telemetry.error;
-    text("token-caption", telemetry.error ? "Usage unavailable · see session details" : expected ? `${measured} of ${expected} sessions measured · ${expected - measured} unknown` : "No usage counters attached");
-    byId("token-caption").title = `${attached} sessions attached. Missing or incomplete counters are excluded from totals.`;
-    text("token-breakdown", measured ? `${compact(telemetry.totals?.input_tokens)} in · ${compact(telemetry.totals?.output_tokens)} out · ${compact(telemetry.totals?.cached_input_tokens)} cached` : "Unavailable usage stays unknown");
-    text("agent-total", `${agents.length} recorded`);
-    const activity = [[running, "working"], [waiting, "waiting"], [completeAgents, "complete"], [failedAgents, "failed"], [unknownAgents, "unknown"]];
-    text("agent-caption", agents.length ? activity.filter(([count]) => count).map(([count, label]) => `${count} ${label}`).join(" · ") : "No subagents recorded");
-    text("nav-work", tasks.length);
-    text("nav-agents", agents.length);
-    text("nav-findings", (state.findings || []).length);
-    text("nav-artifacts", (state.artifacts || []).length);
-    text("completed-badge", completed);
-    text("work-revision", `Checkpoint ${state.revision}`);
-    changed("tasks", tasks, () => renderTasks(tasks));
-    changed("findings", state.findings || [], () => {
-      const destination = byId("findings");
-      destination.replaceChildren(...(state.findings?.length ? state.findings.map(finding => el("p", "finding", finding)) : [el("p", "empty", "Findings and useful context will appear as the work progresses.")]));
-    });
-    changed("agents", [agents, telemetry.agents], () => renderAgents(agents, telemetry));
-    changed("artifacts", state.artifacts || [], () => renderArtifacts(state.artifacts || []));
-    changed("documents", data.documents || {}, () => renderDocuments(data.documents || {}));
-    changed("feedback", data.feedback || [], () => renderFeedback(data.feedback || []));
+    text("phase", state.phase);
+    byId("phase").className = `badge ${state.phase === "complete" ? "done" : "active"}`;
+
+    const tally = Object.fromEntries(TASK_GROUPS.map(([status]) => [status, tasks.filter(task => task.status === status).length]));
+    text("task-total", tasks.length ? `${tally.complete}/${tasks.length}` : "—");
+    text("task-caption", tasks.length
+      ? [tally["in-progress"] && `${tally["in-progress"]} in progress`, tally.todo && `${tally.todo} up next`].filter(Boolean).join(" · ") || "All done"
+      : "No tasks recorded");
+    const meter = byId("task-meter");
+    meter.replaceChildren(...[["done", tally.complete], ["active", tally["in-progress"]], ["quiet", tally.todo]]
+      .filter(([, count]) => count).map(([tone, count]) => {
+        const segment = el("span", tone);
+        segment.style.flexGrow = count;
+        return segment;
+      }));
+    meter.setAttribute("aria-label", tasks.length
+      ? `${tally.complete} done, ${tally["in-progress"]} in progress, ${tally.todo} up next` : "No tasks recorded");
+    text("nav-work", tasks.length || "");
+
+    const by = status => agents.filter(agent => agent.status === status).length;
+    text("agent-total", !agents.length ? "—" : by("running") ? `${by("running")} running` : agents.length);
+    text("agent-caption", agents.length ? ["waiting", "complete", "failed", "unknown"].filter(by)
+      .map(status => `${by(status)} ${STATUS[status][0].toLowerCase()}`).join(" · ") || "All running" : "None reported");
+    text("nav-agents", agents.length || "");
+
+    const totals = counted(telemetry.totals?.total_tokens) ? telemetry.totals : null, coverage = telemetry.coverage || {};
+    text("token-total", totals ? compact(totals.total_tokens) : "—");
+    text("token-caption", !totals ? telemetry.error ? "Usage unavailable" : "No usage measured" : [
+      totals.input_tokens ? `${Math.round((totals.cached_input_tokens || 0) / totals.input_tokens * 100)}% of input cached` : "",
+      `${compact(totals.output_tokens)} output`].filter(Boolean).join(" · "));
+    text("token-coverage", totals && coverage.measured < coverage.expected
+      ? `${coverage.measured} of ${plural(coverage.expected, "session")} measured` : "");
+
+    renderTasks(tasks, agents);
+    renderAgents(state, telemetry);
+    sync(byId("finding-list"), state.findings.map((finding, index) => [`${index}:${finding}`, finding]), finding => el("li", null, finding));
+    section("findings", state.findings.length);
+    sync(byId("panel-list"), state.panels.map(panel => [panel.id, panel]), buildPanel);
+    sync(byId("artifact-list"), state.artifacts.map(artifact => [artifact.path, artifact]), buildArtifact);
+    section("visuals", state.panels.length + state.artifacts.length);
+    renderActivity(state.log);
+    section("activity", state.log.length);
+    byId("handover").hidden = !data.handover;
+    if (data.handover && byId("handover-content").dataset.signature !== data.handover) {
+      renderProse(byId("handover-content"), data.handover);
+      byId("handover-content").dataset.signature = data.handover;
+    }
+    renderFeedback(data.feedback || [], data.feedback_enabled !== false);
     updateTargets(state);
-    const enabled = data.feedback_enabled !== false;
-    for (const field of form.elements) field.disabled = !enabled;
+    for (const field of form.elements) field.disabled = data.feedback_enabled === false;
     updateSubmitState();
-    text("feedback-explanation", enabled ? "Leave feedback here. The loop reads it at its next safe checkpoint." : "Feedback is disabled for this workspace. You can still inspect progress and previous replies.");
+    text("footer-state", `${data.workspace} · checkpoint ${state.revision}`);
+    // A rebuilt row must not strand a keyboard user at the document root.
+    if (focusKey && document.activeElement?.dataset.focusKey !== focusKey) {
+      [...document.querySelectorAll("[data-focus-key]")].find(node => node.dataset.focusKey === focusKey)?.focus({preventScroll: true});
+    }
     updateFreshness();
     updateNavigation();
   }
@@ -467,13 +537,12 @@
     if (!current) return;
     const updated = current.state.updated_at;
     const elapsed = Date.now() - new Date(updated).getTime();
-    const stale = !Number.isFinite(elapsed) || elapsed > 300000;
-    text("checkpoint-time", `Checkpoint ${age(updated)}${stale ? " · status may be stale" : ""}`);
+    // Reported progress is an observation, not proof the session is running now.
+    const stale = current.state.phase !== "complete" && current.state.revision > 0 && !(elapsed <= 300000);
+    text("checkpoint-time", current.state.revision ? `Updated ${age(updated)}${stale ? " · may be stale" : ""}` : "No checkpoint yet");
     byId("checkpoint-time").classList.toggle("stale", stale);
-    byId("checkpoint-time").title = `Progress last reported ${dateLabel(updated)}. Page refreshes do not imply the loop is currently executing.`;
-    text("footer-state", `Checkpoint ${current.state.revision} · ${dateLabel(updated)}`);
-    for (const node of document.querySelectorAll("[data-relative-time]")) node.textContent = `${node.dataset.timePrefix}${age(node.dataset.relativeTime)}`;
-    if (!failures && lastSuccess) text("connection-text", document.hidden ? "Updates paused" : "Page connected");
+    for (const node of document.querySelectorAll("time[data-relative]")) node.textContent = age(node.dataset.relative);
+    if (!failures) text("connection-text", document.hidden ? "Paused" : "Live");
   }
 
   function updateSubmitState() {
@@ -485,7 +554,7 @@
     try {
       sessionStorage.setItem(draftKey, JSON.stringify({text: feedbackText.value, kind: kind.value, target: target.value, pending: pendingSubmission}));
       text("draft-state", feedbackText.value ? "Draft kept in this tab" : "");
-    } catch { text("draft-state", feedbackText.value ? "Draft in memory" : ""); }
+    } catch { text("draft-state", ""); }
   }
 
   function restoreDraft() {
@@ -493,7 +562,7 @@
       const draft = JSON.parse(sessionStorage.getItem(draftKey) || "null");
       if (!draft) return;
       feedbackText.value = draft.text || "";
-      if (["feedback", "steer", "question"].includes(draft.kind)) kind.value = draft.kind;
+      if (draft.kind in KINDS) kind.value = draft.kind;
       if (draft.target && draft.target !== "loop") {
         const option = el("option", null, draft.target);
         option.value = draft.target;
@@ -506,8 +575,8 @@
   }
 
   function setResult(message, error = false) {
-    result.classList.toggle("error", error);
-    result.textContent = message;
+    byId("feedback-result").classList.toggle("error", error);
+    text("feedback-result", message);
   }
 
   async function submitFeedback(event) {
@@ -516,16 +585,22 @@
     const message = feedbackText.value.trim();
     if (!message) { feedbackText.focus(); return; }
     const content = {kind: kind.value, target: target.value, text: message};
-    if (!pendingSubmission || JSON.stringify(pendingSubmission.content) !== JSON.stringify(content)) pendingSubmission = {client_id: clientId(), content, revision: current.state.revision};
+    // The same content retried after a lost response reuses its idempotency key.
+    if (!pendingSubmission || JSON.stringify(pendingSubmission.content) !== JSON.stringify(content)) {
+      pendingSubmission = {client_id: clientId(), content, revision: current.state.revision};
+    }
     const submission = pendingSubmission;
     saveDraft();
     sending = true;
-    byId("submit-feedback").disabled = true;
+    updateSubmitState();
     text("submit-feedback", "Sending…");
     form.setAttribute("aria-busy", "true");
-    setResult("Saving feedback…");
+    setResult("");
     try {
-      const response = await fetch("api/feedback", {method: "POST", headers: {"Content-Type": "application/json", "X-Loop-Feedback": "1"}, body: JSON.stringify({...content, client_id: submission.client_id, revision: submission.revision}), signal: AbortSignal.timeout(12000)});
+      const response = await fetch("api/feedback", {method: "POST",
+        headers: {"Content-Type": "application/json", "X-Loop-Feedback": "1"},
+        body: JSON.stringify({...content, client_id: submission.client_id, revision: submission.revision}),
+        signal: AbortSignal.timeout(12000)});
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || `Feedback could not be saved (${response.status}).`);
       if (!body.feedback?.id) throw new Error("The server did not confirm a saved feedback record.");
@@ -535,18 +610,28 @@
         pendingSubmission = null;
       }
       saveDraft();
-      setResult("Saved. The loop will read this at its next checkpoint.");
-      etag = null;
+      setResult("Saved. The session reads it at its next checkpoint.");
       await poll(true);
     } catch (error) {
-      setResult(error.name === "TimeoutError" ? "Confirmation timed out. Your draft is kept; retrying will not create a duplicate." : `${error.message || "Could not confirm feedback."} Your draft is kept.`, true);
+      setResult(error.name === "TimeoutError" ? "Confirmation timed out. Your draft is kept; sending again will not duplicate it."
+        : `${error.message || "Could not confirm feedback."} Your draft is kept.`, true);
     } finally {
       sending = false;
-      for (const field of form.elements) field.disabled = current?.feedback_enabled === false;
-      text("submit-feedback", "Send feedback");
+      text("submit-feedback", "Send");
       form.setAttribute("aria-busy", "false");
       updateSubmitState();
     }
+  }
+
+  function clientId() {
+    // getRandomValues also works on private-network HTTP origins, where
+    // randomUUID is unavailable because the origin is not a secure context.
+    if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    const hex = [...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   }
 
   function schedule() {
@@ -559,17 +644,16 @@
     inFlight = true;
     byId("refresh").disabled = true;
     try {
-      const headers = etag && !force ? {"If-None-Match": etag} : {};
-      const response = await fetch("api/state", {headers, cache: "no-store", signal: AbortSignal.timeout(10000)});
+      const response = await fetch("api/state", {headers: etag && !force ? {"If-None-Match": etag} : {},
+        cache: "no-store", signal: AbortSignal.timeout(10000)});
       if (!response.ok && response.status !== 304) throw new Error(`Progress could not be loaded (${response.status}).`);
       if (response.status !== 304) {
         const data = await response.json();
-        if (!data.state || !Array.isArray(data.state.tasks)) throw new Error("The server returned an invalid progress snapshot.");
+        if (!Array.isArray(data.state?.tasks) || !Array.isArray(data.state.panels)) throw new Error("The server returned an invalid snapshot.");
         etag = response.headers.get("ETag");
         render(data);
       }
       failures = 0;
-      lastSuccess = Date.now();
       document.querySelector(".connection").dataset.state = "connected";
       byId("load-error").hidden = true;
       updateFreshness();
@@ -577,13 +661,33 @@
       failures += 1;
       document.querySelector(".connection").dataset.state = "offline";
       text("connection-text", "Disconnected");
-      const notice = byId("load-error");
-      notice.textContent = `${error.message || "Connection unavailable."} ${current ? "Showing the last received snapshot. " : ""}Retrying automatically; your feedback draft is kept.`;
-      notice.hidden = false;
+      text("load-error", `${error.message || "Connection unavailable."} ${current ? "Showing the last snapshot. " : ""}Retrying automatically; your draft is kept.`);
+      byId("load-error").hidden = false;
     } finally {
       inFlight = false;
       byId("refresh").disabled = false;
       schedule();
+    }
+  }
+
+  function updateNavigation() {
+    const line = document.querySelector(".topbar").getBoundingClientRect().bottom + 56;
+    let active = "work";
+    // Feedback is a section only once the rail stacks under the content.
+    const stacked = matchMedia("(max-width: 1020px)").matches;
+    const sections = [...document.querySelectorAll(`.content > section:not([hidden])${stacked ? ", #feedback" : ""}`)];
+    const atEnd = innerHeight + scrollY >= document.documentElement.scrollHeight - 2 && scrollY > 0;
+    for (const node of sections) {
+      if (atEnd || node.getBoundingClientRect().top <= line) active = node.id;
+    }
+    const nav = document.querySelector("nav");
+    for (const link of nav.querySelectorAll("a")) {
+      const here = link.hash === `#${active}`;
+      // On narrow screens the current section's link stays within the scrolling strip.
+      if (here && link.getAttribute("aria-current") !== "true") {
+        nav.scrollTo({left: link.offsetLeft - nav.offsetLeft - (nav.clientWidth - link.offsetWidth) / 2});
+      }
+      link.setAttribute("aria-current", String(here));
     }
   }
 
@@ -594,30 +698,22 @@
   byId("refresh").addEventListener("click", () => poll(true));
   document.addEventListener("visibilitychange", () => {
     clearTimeout(timer);
-    if (!document.hidden) poll(true);
-    else text("connection-text", "Updates paused");
+    if (document.hidden) text("connection-text", "Paused"); else poll(true);
   });
   document.addEventListener("keydown", event => {
-    if (event.key === "f" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.target.closest("input,textarea,select,[contenteditable]")) { event.preventDefault(); feedbackText.focus(); }
-  });
-  function updateNavigation() {
-    const mobile = matchMedia("(max-width: 650px)").matches;
-    const stacked = matchMedia("(max-width: 970px)").matches;
-    const anchor = (mobile ? document.querySelector(".navigation") : document.querySelector(".topbar")).getBoundingClientRect().bottom + 48;
-    const sections = document.querySelectorAll(stacked ? ".work-column > section[id], #feedback" : ".work-column > section[id]");
-    let active = "work";
-    for (const section of sections) {
-      if (section.getBoundingClientRect().top <= anchor) active = section.id;
+    const typing = event.target.closest("input,textarea,select,[contenteditable]");
+    if (event.key === "f" && !event.altKey && !event.ctrlKey && !event.metaKey && !typing) {
+      event.preventDefault();
+      feedbackText.focus();
+    } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && event.target === feedbackText) {
+      event.preventDefault();
+      form.requestSubmit();
     }
-    for (const link of document.querySelectorAll("nav a")) link.setAttribute("aria-current", String(link.hash === `#${active}`));
-  }
-  let navigationFrame = null;
-  const scheduleNavigation = () => {
-    if (navigationFrame !== null) return;
-    navigationFrame = requestAnimationFrame(() => { navigationFrame = null; updateNavigation(); });
-  };
-  document.addEventListener("scroll", scheduleNavigation, {passive: true});
-  window.addEventListener("resize", scheduleNavigation);
-
+  });
+  let frame = null;
+  const trackNavigation = () => { frame ??= requestAnimationFrame(() => { frame = null; updateNavigation(); }); };
+  document.addEventListener("scroll", trackNavigation, {passive: true});
+  window.addEventListener("resize", trackNavigation);
+  setInterval(updateFreshness, 30000);
   poll();
 })();

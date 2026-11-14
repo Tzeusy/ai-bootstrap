@@ -72,6 +72,86 @@ class WorkspaceTests(WorkspaceFixture, unittest.TestCase):
             dashboard.initialize(self.folder, title="Other", actor="foreign", repo_root=self.tmp.name)
         self.assertEqual((self.folder / "state.json").read_bytes(), before)
 
+    def test_deltas_merge_rows_by_identity_without_resending_the_roster(self):
+        """Spec: REQ-progress-dashboard-003 (keyed delta checkpoints)."""
+        dashboard.checkpoint(self.folder, self.snapshot())
+        dashboard.checkpoint(self.folder, {
+            "tasks": [{"id": "task-2", "title": "Verify", "detail": "Queued"}],
+            "agents": [{"id": "builder", "name": "Builder", "task": "task-1", "activity": ["Started."]}]})
+        result = dashboard.checkpoint(self.folder, {
+            "tasks": [{"id": "task-1", "status": "complete"}],
+            "agents": [{"id": "builder", "status": "complete", "activity": ["Started.", "Merged."]}],
+            "findings": ["Focused verification passes", "Review found no defects"]})
+        state = dashboard.snapshot(self.folder)
+        self.assertEqual(result["revision"], 3)
+        self.assertEqual([(t["id"], t["status"], t["title"]) for t in state["tasks"]],
+                         [("task-1", "complete", "Ship behavior"), ("task-2", "todo", "Verify")])
+        builder = state["agents"][1]
+        self.assertEqual((state["agents"][0]["summary"], builder["name"], builder["status"], builder["activity"]),
+                         ("Reviewing the package", "Builder", "complete", ["Started.", "Merged."]))
+        self.assertEqual(state["findings"], ["Focused verification passes", "Review found no defects"])
+        self.assertIn("task-1", (self.folder / "complete.md").read_text())
+        # Rows leave only on request; a named collection can be rebuilt wholesale.
+        dashboard.checkpoint(self.folder, {"agents": [{"id": "reviewer", "drop": True}],
+                                           "findings": ["Only this"], "replace": ["findings"]})
+        state = dashboard.snapshot(self.folder)
+        self.assertEqual(([a["id"] for a in state["agents"]], state["findings"]), (["builder"], ["Only this"]))
+        before = (self.folder / "state.json").read_bytes()
+        for bad in ({"agents": [{"id": "new", "status": "sleeping"}]}, {"tasks": [{"id": "untitled"}]},
+                    {"replace": ["summary"]}, {"tasks": [{"id": "task-2"}, {"id": "task-2"}]}):
+            with self.assertRaises(ValueError):
+                dashboard.checkpoint(self.folder, bad)
+        self.assertEqual((self.folder / "state.json").read_bytes(), before)
+
+    def test_templated_panels_and_derived_activity_need_no_authored_markup(self):
+        """Spec: REQ-progress-dashboard-001 (templated visuals, derived activity)."""
+        dashboard.checkpoint(self.folder, self.snapshot())
+        dashboard.checkpoint(self.folder, {"phase": "review", "tasks": [{"id": "task-1", "status": "complete"}],
+            "panels": [{"id": "gates", "title": "Gates", "kind": "steps", "rows": [["Tests", "done", "31 pass"], ["Review", "active"]]},
+                       {"id": "size", "title": "Payload", "kind": "bars", "rows": [["Before", 2140], ["After", 96.5]]}]})
+        dashboard.checkpoint(self.folder, {"panels": [{"id": "gates", "rows": [["Tests", "done"], ["Review", "done"]]}]})
+        state = dashboard.snapshot(self.folder)
+        self.assertEqual(state["panels"][0], {"id": "gates", "title": "Gates", "kind": "steps", "note": "",
+                                              "rows": [["Tests", "done"], ["Review", "done"]]})
+        self.assertEqual([entry["text"] for entry in state["log"]], [
+            "Phase: implementation", "Finding: Focused verification passes", "Ship behavior: in progress",
+            "reviewer: running", "Phase: review", "Ship behavior: complete", "Published: Gates", "Published: Payload"])
+        for rows in ([["Tests", "finished"]], [["Tests"]], [["Tests", "done", {"html": "<b>"}]]):
+            with self.assertRaises(ValueError):
+                dashboard.checkpoint(self.folder, {"panels": [{"id": "bad", "title": "Bad", "kind": "steps", "rows": rows}]})
+        for panel in ({"kind": "bars", "rows": [["A", "many"]]}, {"kind": "chart", "rows": []}, {"kind": "bars", "rows": [["A", -1]]}):
+            with self.assertRaises(ValueError):
+                dashboard.checkpoint(self.folder, {"panels": [{"id": "bad", "title": "Bad", **panel}]})
+        for _ in range(dashboard.LOG_LIMIT + 5):
+            dashboard.checkpoint(self.folder, {"phase": "a"})
+            dashboard.checkpoint(self.folder, {"phase": "b"})
+        self.assertEqual(len(dashboard.snapshot(self.folder)["log"]), dashboard.LOG_LIMIT)
+
+    def test_feedback_cursor_is_retained_by_the_workspace(self):
+        """Spec: REQ-progress-dashboard-003 (no session-held cursor)."""
+        dashboard.record_feedback(self.folder, self.feedback())
+        first = dashboard.checkpoint(self.folder, {"phase": "one"})
+        self.assertEqual(([row["id"] for row in first["feedback"]], first["pending_count"]), ([1], 1))
+        dashboard.record_feedback(self.folder, self.feedback("request-2", text="Second"))
+        second = dashboard.checkpoint(self.folder, {"phase": "two"})
+        self.assertEqual(([row["id"] for row in second["feedback"]], second["pending_count"]), ([2], 2))
+        self.assertEqual(dashboard.checkpoint(self.folder, {})["feedback"], [])
+        # A lost session re-reads everything unacknowledged without rewinding the retained cursor.
+        self.assertEqual([row["id"] for row in dashboard.surface(self.folder, 0)["feedback"]], [1, 2])
+        self.assertEqual(dashboard.surface(self.folder)["feedback"], [])
+
+    def test_start_defaults_identity_and_resumes_without_arguments(self):
+        cli = [sys.executable, str(SCRIPTS / "progress_dashboard.py"), "--root", self.tmp.name, "--slug", "fresh"]
+        started = json.loads(subprocess.run([*cli, "start"], capture_output=True, text=True, check=True).stdout)
+        self.addCleanup(subprocess.run, [*cli, "stop"], capture_output=True)
+        self.assertEqual(started["revision"], 0)
+        self.assertTrue(started["url"].startswith("http://127.0.0.1:"))
+        state = dashboard.snapshot(Path(started["workspace"]))
+        self.assertEqual((state["title"], state["actor"]), ("fresh", "parent"))
+        subprocess.run([*cli, "checkpoint"], input='{"summary":"Under way"}', capture_output=True, text=True, check=True)
+        resumed = json.loads(subprocess.run([*cli, "start", "--title", "Ignored"], capture_output=True, text=True, check=True).stdout)
+        self.assertEqual((resumed["revision"], resumed["url"]), (1, started["url"]))
+
     def test_unknown_fields_cannot_write_handover_or_fabricate_usage(self):
         for incoming in ({"handover": "automatic"}, {"tokens": 1234}, {"tasks": [{"id": "a", "status": "complete"}]}):
             with self.subTest(incoming=incoming), self.assertRaises(ValueError):

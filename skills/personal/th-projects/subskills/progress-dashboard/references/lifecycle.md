@@ -10,10 +10,11 @@ belongs before the subcommand and overrides the default workspace parent
 `~/.tmp`; reserve overrides for tests or explicit placement. Slugs contain 1–80
 lowercase letters, digits or hyphens and start with a letter/digit.
 
-`serve` starts/reuses one detached process and returns `{url,pid,reused}`. The
+`start` runs `init` then `serve`. `serve` starts/reuses one detached process
+and returns `{url,pid,reused}`. The
 default is IPv4 loopback, port chosen automatically. For remote access use an
 existing SSH forward, or explicitly launch with
-`serve --bind <this-host-Tailscale-IPv4>`. Only loopback/Tailscale IPv4 addresses
+`start --bind <this-host-Tailscale-IPv4>`. Only loopback/Tailscale IPv4 addresses
 are accepted. Tailnet HTTP exposure is an explicit launch choice. The helper
 never configures Tailscale Serve, firewalls, public listeners or global daemons.
 Changing a live server's address/port requires `stop` first.
@@ -25,12 +26,12 @@ generated state, feedback and server files are 0600.
 
 ## Resume or repair
 
-Reuse the existing session locator: helper path, slug, actor, repository,
-revision and feedback cursor. Repeat `init` with the same actor/repository to
-verify ownership and repair three generated progress files from `state.json`;
-then `serve` if a browser is needed. A different actor/repository refuses reuse.
-Recover the revision from `init`/`status`, not from Markdown stamps after an
-interrupted projection write. Preserve pending feedback and manual handover.
+Reuse the session locator: helper path and slug. `start` (or `init` without a
+server) verifies ownership, repairs the three generated progress files from
+`state.json` and reuses a live server. Identity is optional: `--actor` defaults
+to `parent` and `--repo-root` to the current Git repository; when supplied on
+resume, a different actor/repository refuses reuse. The workspace itself
+retains the revision and the feedback cursor. Preserve pending feedback and manual handover.
 
 The snapshot is the display source of truth; the owning tracker remains the
 work source of truth. Do not hand-edit generated Markdown, substitute it for

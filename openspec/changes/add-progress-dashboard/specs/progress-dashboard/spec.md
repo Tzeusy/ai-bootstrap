@@ -16,13 +16,18 @@ Scope: v1-mandatory
 
 #### Scenario: A workflow launches or resumes its view
 
-- **WHEN** a workflow initializes a stable slug with its actor and repository
+- **WHEN** a workflow starts a stable slug, with its actor and repository supplied or defaulted
 - **THEN** it gets a private local workspace with four readable Markdown files, repeat initialization preserves existing content, and a conflicting actor/repository is refused
 
 #### Scenario: A checkpoint updates current work
 
-- **WHEN** a validated partial snapshot has the expected current revision
-- **THEN** the helper commits the display state and regenerates the three progress projections without mutating the owning tracker, while stale revisions refuse overwrite
+- **WHEN** a validated delta names only new rows and the changed fields of existing rows
+- **THEN** the helper merges it by row identity, commits the display state, derives the activity log and regenerates the three progress projections without mutating the owning tracker, while a supplied stale revision refuses overwrite
+
+#### Scenario: A workflow publishes a chart or table
+
+- **WHEN** a checkpoint supplies panel rows for a fixed stats, bars, steps or table template
+- **THEN** the page renders them with its own marks, colors and layout, and no authored markup is accepted
 
 ### Requirement: Explicit Manual Handover
 
@@ -62,7 +67,7 @@ Scope: v1-mandatory
 
 #### Scenario: Feedback has already been surfaced or exceeds the batch budget
 
-- **WHEN** a parent supplies its feedback cursor or a pending message exceeds the bounded ten-entry/8KiB response budget
+- **WHEN** the workspace has already surfaced a message to the parent or a pending message exceeds the bounded ten-entry/8KiB response budget
 - **THEN** routine responses omit previously surfaced messages without consuming them, label oversized previews explicitly, and provide a full-item lookup required before interpreting or acknowledging a preview
 
 ### Requirement: Honest Incremental Usage and Agent Overview

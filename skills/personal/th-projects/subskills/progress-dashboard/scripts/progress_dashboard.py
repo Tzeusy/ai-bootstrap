@@ -10,6 +10,7 @@ import argparse
 import fcntl
 import ipaddress
 import json
+import math
 import os
 import re
 import secrets
@@ -27,10 +28,21 @@ from urllib.parse import urlsplit
 from urllib.request import urlopen
 
 SCHEMA = "progress-dashboard/v1"
-FILES = ("in-progress.md", "todo.md", "complete.md", "handover.md")
 STATUSES = ("in-progress", "todo", "complete")
+AGENT_STATUSES = ("running", "waiting", "complete", "failed", "unknown")
+PANEL_KINDS = ("stats", "bars", "table", "steps")
+STEP_STATES = ("done", "active", "todo", "failed")
+# collection -> (identity field, text fields, list field, row limit)
+ROWS = {
+    "tasks": ("id", ("title", "status", "detail", "evidence"), None, 200),
+    "agents": ("id", ("name", "role", "status", "task", "summary", "model", "updated_at",
+                      "branch", "worktree", "pr_url", "thread_id"), "activity", 100),
+    "artifacts": ("path", ("label",), None, 40),
+    "panels": ("id", ("title", "kind", "note"), "rows", 12),
+}
 MAX_JSON = 256 * 1024
 FEEDBACK_BATCH_BYTES = 8 * 1024
+LOG_LIMIT = 60
 
 
 def now() -> str:
@@ -132,19 +144,40 @@ def project(folder: Path, state: dict) -> None:
             atomic(path, content)
 
 
-def initialize(folder: Path, *, title: str, actor: str, repo_root: str, outcome="", feedback=True) -> dict:
-    identity = {"actor": text(actor, "actor", 200), "repo_root": str(Path(repo_root).expanduser().resolve())}
+def snapshot(folder: Path) -> dict:
+    """Load the display state; fields added after v1 workspaces were created default to empty."""
+    state = load(folder / "state.json")
+    state.setdefault("panels", [])
+    state.setdefault("log", [])
+    return state
+
+
+def repository() -> str:
+    try:
+        found = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
+                               timeout=5, check=False).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        found = ""
+    return found or os.getcwd()
+
+
+def initialize(folder: Path, *, title=None, actor=None, repo_root=None, outcome="", feedback=True) -> dict:
+    given = {"actor": actor and text(actor, "actor", 200),
+             "repo_root": repo_root and str(Path(repo_root).expanduser().resolve())}
     with lock(folder):
         path = folder / "state.json"
         if path.exists():
-            state = load(path)
-            if any(state[k] != v for k, v in identity.items()):
+            state = snapshot(folder)
+            # Omitted identity resumes the workspace; a supplied one must match it.
+            if any(value and state[key] != value for key, value in given.items()):
                 raise ValueError("slug already belongs to a different actor or repository")
         else:
-            state = {"schema": SCHEMA, "slug": folder.name, **identity,
-                     "title": text(title, "title", 300), "outcome": text(outcome, "outcome", 300),
+            state = {"schema": SCHEMA, "slug": folder.name, "actor": given["actor"] or "parent",
+                     "repo_root": given["repo_root"] or str(Path(repository()).resolve()),
+                     "title": text(title or folder.name, "title", 300), "outcome": text(outcome, "outcome", 300),
                      "summary": "", "phase": "starting", "revision": 0, "updated_at": now(),
-                     "tasks": [], "findings": [], "agents": [], "artifacts": [], "feedback_enabled": feedback}
+                     "tasks": [], "findings": [], "agents": [], "artifacts": [], "panels": [], "log": [],
+                     "feedback_enabled": feedback}
             save(path, state)
         project(folder, state)
         handover = folder / "handover.md"
@@ -176,56 +209,120 @@ def artifact_path(folder: Path, relative: str) -> Path:
     return target
 
 
-def validate_snapshot(folder: Path, incoming: dict) -> dict:
+def panel_rows(rows) -> list:
+    if not isinstance(rows, list) or len(rows) > 30:
+        raise ValueError("panel rows must be a list of at most 30 rows")
+    for row in rows:
+        if not isinstance(row, list) or not 1 <= len(row) <= 6:
+            raise ValueError("each panel row is a list of 1-6 cells")
+    return [[cell if type(cell) in (int, float) and math.isfinite(cell) else text(cell, "panel cell", 300)
+             for cell in row] for row in rows]
+
+
+def check_row(folder: Path, key: str, entry: dict) -> None:
+    if key == "tasks":
+        entry["status"] = entry["status"] or "todo"
+        if entry["status"] not in STATUSES or not entry["title"]:
+            raise ValueError("tasks require title and status in-progress, todo or complete")
+    elif key == "agents":
+        entry["status"] = entry["status"] or "running"
+        if entry["status"] not in AGENT_STATUSES:
+            raise ValueError("invalid agent status")
+        if entry["pr_url"]:
+            parsed = urlsplit(entry["pr_url"])
+            if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password:
+                raise ValueError("agent pr_url must be an absolute HTTP(S) URL without credentials")
+    elif key == "artifacts":
+        artifact_path(folder, entry["path"])
+    else:
+        rows, kind = entry["rows"], entry["kind"]
+        if kind not in PANEL_KINDS or not entry["title"]:
+            raise ValueError("panels require title and kind stats, bars, table or steps")
+        if kind != "table" and any(len(row) < 2 for row in rows):
+            raise ValueError(f"{kind} panel rows need a label and a value")
+        if kind == "bars" and any(type(row[1]) not in (int, float) or row[1] < 0 for row in rows):
+            raise ValueError("bars panel values must be non-negative numbers")
+        if kind == "steps" and any(row[1] not in STEP_STATES for row in rows):
+            raise ValueError("steps panel states are done, active, todo or failed")
+
+
+def merge(folder: Path, state: dict, incoming: dict) -> tuple[dict, list[str]]:
+    """Validate a delta against the current state; return changed fields and derived log lines.
+
+    Rows merge by identity, so a parent sends only the rows and fields that changed.
+    """
     if not isinstance(incoming, dict):
         raise ValueError("snapshot must be an object")  # noqa: TRY004 - stable JSON validation API
-    allowed = {"summary", "phase", "tasks", "findings", "agents", "artifacts"}
-    if set(incoming) - allowed:
-        raise ValueError("unknown snapshot fields: " + ", ".join(sorted(set(incoming) - allowed)))
-    result = {}
+    collections = ("findings", *ROWS)
+    if set(incoming) - {"summary", "phase", "replace", *collections}:
+        raise ValueError("unknown snapshot fields: "
+                         + ", ".join(sorted(set(incoming) - {"summary", "phase", "replace", *collections})))
+    replace = incoming.get("replace", [])
+    if not isinstance(replace, list) or not all(isinstance(key, str) and key in collections for key in replace):
+        raise ValueError("replace lists collections to rebuild from this snapshot: " + ", ".join(collections))
+    result, events = {}, []
     for key in ("summary", "phase"):
         if key in incoming:
             result[key] = text(incoming[key], key, 8000 if key == "summary" else 100)
-    for key, maximum in (("tasks", 200), ("findings", 100), ("agents", 100), ("artifacts", 40)):
-        if key not in incoming:
-            continue
-        rows = incoming[key]
-        if not isinstance(rows, list) or len(rows) > maximum:
-            raise ValueError(f"{key} must be a list with at most {maximum} entries")
-        if key == "findings":
-            result[key] = [text(row, "finding") for row in rows]
-            continue
-        fields = {"tasks": ("id", "title", "status", "detail", "evidence"),
-                  "agents": ("id", "name", "role", "status", "task", "summary", "model", "updated_at",
-                             "branch", "worktree", "pr_url", "thread_id", "activity"),
-                  "artifacts": ("path", "label")}[key]
-        cleaned, identities = [], set()
+    if result.get("phase", state["phase"]) != state["phase"]:
+        events.append(f"Phase: {result['phase']}")
+    if "findings" in incoming or "findings" in replace:
+        rows = incoming.get("findings", [])
+        if not isinstance(rows, list):
+            raise ValueError("findings must be a list")
+        merged = [] if "findings" in replace else list(state["findings"])
         for row in rows:
-            if not isinstance(row, dict) or set(row) - set(fields):
+            if text(row, "finding") not in merged:
+                merged.append(row)
+                if row not in state["findings"]:
+                    events.append(f"Finding: {row}")
+        if len(merged) > 100:
+            raise ValueError("findings must be a list with at most 100 entries")
+        result["findings"] = merged
+    for key, (ident, fields, extra, maximum) in ROWS.items():
+        if key not in incoming and key not in replace:
+            continue
+        rows = incoming.get(key, [])
+        if not isinstance(rows, list):
+            raise ValueError(f"{key} must be a list")  # noqa: TRY004 - stable JSON validation API
+        previous = {row[ident]: row for row in state[key]}
+        merged = {} if key in replace else dict(previous)
+        seen = set()
+        for row in rows:
+            if not isinstance(row, dict) or set(row) - {ident, "drop", *fields, *([extra] if extra else [])}:
                 raise ValueError(f"invalid {key} entry")
-            entry = {field: text(row.get(field, ""), field) for field in fields if field != "activity"}
-            if key == "agents":
-                activity = row.get("activity", [])
-                if not isinstance(activity, list) or len(activity) > 8:
-                    raise ValueError("agent activity must be a list of at most eight recent reports")
-                entry["activity"] = [text(item, "agent activity", 1000) for item in activity]
-                if entry["pr_url"]:
-                    parsed = urlsplit(entry["pr_url"])
-                    if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password:
-                        raise ValueError("agent pr_url must be an absolute HTTP(S) URL without credentials")
-            ident = entry.get("id", entry.get("path"))
-            if not ident or ident in identities:
+            name = text(row.get(ident, ""), ident)
+            if not name or name in seen or type(row.get("drop", False)) is not bool:
                 raise ValueError(f"{key} entries require unique identities")
-            identities.add(ident)
-            if key == "tasks" and (entry["status"] not in STATUSES or not entry["title"]):
-                raise ValueError("tasks require title and status in-progress, todo or complete")
-            if key == "agents" and entry["status"] not in ("running", "waiting", "complete", "failed", "unknown"):
-                raise ValueError("invalid agent status")
-            if key == "artifacts":
-                artifact_path(folder, entry["path"])
-            cleaned.append(entry)
-        result[key] = cleaned
-    return result
+            seen.add(name)
+            if row.get("drop"):
+                merged.pop(name, None)
+                continue
+            old = previous.get(name)
+            entry = dict(merged.get(name) or {ident: name, **dict.fromkeys(fields, ""), **({extra: []} if extra else {})})
+            entry.update({field: text(row[field], field) for field in fields if field in row})
+            if key == "agents" and "activity" in row:
+                reports = row["activity"]
+                if not isinstance(reports, list) or len(reports) > 8:
+                    raise ValueError("agent activity must be a list of at most eight recent reports")
+                fresh = [text(item, "agent activity", 1000) for item in reports]
+                entry["activity"] = (entry["activity"] + [item for item in fresh if item not in entry["activity"]])[-8:]
+            if key == "panels" and "rows" in row:
+                entry["rows"] = panel_rows(row["rows"])
+            check_row(folder, key, entry)
+            if key == "agents" and not row.get("updated_at"):
+                same = old is not None and all(entry[f] == old.get(f) for f in entry if f != "updated_at")
+                entry["updated_at"] = old["updated_at"] if same else now()
+            merged[name] = entry
+            label = entry.get("title") or entry.get("name") or entry.get("label") or name
+            if key in ("tasks", "agents") and (old is None or old["status"] != entry["status"]):
+                events.append(f"{label}: {entry['status'].replace('-', ' ')}")
+            elif old is None:
+                events.append(f"Published: {label}")
+        if len(merged) > maximum:
+            raise ValueError(f"{key} must be a list with at most {maximum} entries")
+        result[key] = list(merged.values())
+    return result, events
 
 
 def pending(folder: Path, limit=10, after=0) -> dict:
@@ -252,27 +349,34 @@ def pending(folder: Path, limit=10, after=0) -> dict:
             "feedback_more": any(row["id"] > cursor for row in unseen)}
 
 
-def checkpoint(folder: Path, incoming: dict, expected: int, after_feedback=0) -> dict:
-    if type(after_feedback) is not int or after_feedback < 0:
-        raise ValueError("feedback cursor must be a non-negative integer")
-    update = validate_snapshot(folder, incoming)
+def surface(folder: Path, after=None) -> dict:
+    """Pending feedback after the caller's cursor, or after the one this workspace retained.
+
+    Call with the workspace lock held. The retained cursor only advances, so an
+    explicit earlier cursor re-reads unacknowledged items without losing position.
+    """
+    stored = load(folder / "cursor.json", {}).get("feedback", 0)
+    result = pending(folder, after=stored if after is None else after)
+    if result["feedback_cursor"] > stored:
+        save(folder / "cursor.json", {"feedback": result["feedback_cursor"]})
+    return result
+
+
+def checkpoint(folder: Path, incoming: dict, expected=None, after_feedback=None) -> dict:
     with lock(folder):
-        state = load(folder / "state.json")
-        if state["revision"] != expected:
+        state = snapshot(folder)
+        if expected is not None and state["revision"] != expected:
             raise ValueError(f"revision conflict: current revision is {state['revision']}")
-        previous_agents = {row["id"]: row for row in state["agents"]}
-        for agent in update.get("agents", []):
-            if not agent["updated_at"]:
-                previous = previous_agents.get(agent["id"], {})
-                unchanged = all(value == previous.get(key) for key, value in agent.items() if key != "updated_at")
-                agent["updated_at"] = previous["updated_at"] if unchanged else now()
+        update, events = merge(folder, state, incoming)
         if any(state[key] != value for key, value in update.items()):
+            stamp = now()
             state.update(update)
-            state.update(revision=expected + 1, updated_at=now())
+            state.update(revision=state["revision"] + 1, updated_at=stamp,
+                         log=(state["log"] + [{"at": stamp, "text": line[:240]} for line in events])[-LOG_LIMIT:])
             # JSON commits the snapshot; projections are repairable from it on resume.
             save(folder / "state.json", state)
         project(folder, state)
-        return {"revision": state["revision"], **pending(folder, after=after_feedback)}
+        return {"revision": state["revision"], **surface(folder, after_feedback)}
 
 
 def feedback_item(folder: Path, feedback_id: int) -> dict:
@@ -459,23 +563,29 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--slug", required=True)
     p.add_argument("--root", help="workspace parent (default ~/.tmp)")
     commands = p.add_subparsers(dest="command", required=True)
-    init = commands.add_parser("init", help="create or resume a workspace without overwriting its content")
-    for arg in ("title", "actor", "repo-root"):
-        init.add_argument("--" + arg, required=True)
-    init.add_argument("--outcome", default="")
-    init.add_argument("--no-feedback", action="store_true")
-    init.add_argument("--codex-thread", default=os.environ.get("CODEX_THREAD_ID"),
-                      help="watch this Codex parent and known children; defaults to CODEX_THREAD_ID")
-    init.add_argument("--codex-home", help="runtime home; defaults to CODEX_HOME or ~/.codex")
-    update = commands.add_parser("checkpoint", help="merge a small snapshot and return bounded pending feedback")
+    for command, summary in (("start", "create or resume a workspace and its server; prints the private URL"),
+                             ("init", "create or resume a workspace without serving it")):
+        init = commands.add_parser(command, help=summary)
+        init.add_argument("--title", help="defaults to the slug")
+        init.add_argument("--actor", help="parent session identity; defaults to 'parent'")
+        init.add_argument("--repo-root", help="defaults to the current Git repository")
+        init.add_argument("--outcome", default="")
+        init.add_argument("--no-feedback", action="store_true")
+        init.add_argument("--codex-thread", default=os.environ.get("CODEX_THREAD_ID"),
+                          help="watch this Codex parent and known children; defaults to CODEX_THREAD_ID")
+        init.add_argument("--codex-home", help="runtime home; defaults to CODEX_HOME or ~/.codex")
+        if command == "start":
+            init.add_argument("--bind", default="127.0.0.1")
+            init.add_argument("--port", type=int, default=0)
+    update = commands.add_parser("checkpoint", help="merge changed rows by id and return bounded pending feedback")
     update.add_argument("--input", default="-", help="JSON file or - for stdin")
-    update.add_argument("--expected-revision", type=int, required=True)
-    update.add_argument("--after-feedback", type=int, default=0, help="last surfaced feedback id")
+    update.add_argument("--expected-revision", type=int, help="refuse unless this is the current revision")
+    update.add_argument("--after-feedback", type=int, help="feedback cursor; defaults to the retained one")
     status = commands.add_parser("status", help="compact checkpoint status, never the full dashboard")
     status.add_argument("--since", type=int)
-    status.add_argument("--after-feedback", type=int, default=0)
+    status.add_argument("--after-feedback", type=int)
     inbox = commands.add_parser("inbox", help="read bounded new feedback or one full item; never consumes it")
-    inbox.add_argument("--after-feedback", type=int, default=0)
+    inbox.add_argument("--after-feedback", type=int, help="0 re-reads every unacknowledged item")
     inbox.add_argument("--id", type=int, help="read one full feedback item before acting on a preview")
     ack = commands.add_parser("ack", help="record the disposition of one feedback item")
     ack.add_argument("--id", type=int, required=True)
@@ -504,16 +614,18 @@ def main() -> int:
     os.umask(0o077)
     args = parser().parse_args()
     try:
-        folder = workspace(args.slug, args.root, create=args.command == "init")
-        if args.command == "init":
+        folder = workspace(args.slug, args.root, create=args.command in ("init", "start"))
+        if args.command in ("init", "start"):
             state = initialize(folder, title=args.title, actor=args.actor, repo_root=args.repo_root,
                                outcome=args.outcome, feedback=not args.no_feedback)
-            result = {"workspace": str(folder), "revision": state["revision"], "files": FILES}
+            result = {"workspace": str(folder), "revision": state["revision"]}
             if args.codex_thread and not (folder / "runtime.json").exists():
                 try:
                     result.update(watch_codex(folder, args.codex_thread, args.codex_home))
                 except ValueError as error:
                     result["usage_warning"] = str(error)
+            if args.command == "start":
+                result["url"] = serve(folder, args.bind, args.port)["url"]
         elif args.command == "checkpoint":
             result = checkpoint(folder, json.loads(read_input(args.input)), args.expected_revision, args.after_feedback)
         elif args.command in ("status", "inbox"):
@@ -522,7 +634,7 @@ def main() -> int:
                 if args.command == "inbox" and args.id is not None:
                     result = {"feedback": feedback_item(folder, args.id)}
                 else:
-                    result = {"revision": state["revision"], **pending(folder, after=args.after_feedback)}
+                    result = {"revision": state["revision"], **surface(folder, args.after_feedback)}
                     if args.command == "status":
                         result.update(changed=state["revision"] != args.since, phase=state["phase"])
         elif args.command == "ack":

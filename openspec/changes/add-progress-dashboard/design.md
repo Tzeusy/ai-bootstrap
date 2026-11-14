@@ -67,8 +67,8 @@ page does not attest that a stale parent or agent is executing.
 
 ## Persistence and recovery
 
-Workspace identity pins actor and repository. Snapshot revision checks reject
-stale writers. A lock serializes mutations; atomic replacements avoid torn files.
+Workspace identity pins actor and repository. Optional revision checks reject
+stale concurrent writers. A lock serializes mutations; atomic replacements avoid torn files.
 JSON commits the display snapshot; Markdown projections can be repaired on resume.
 Feedback has a stable browser idempotency key, viewed revision, pending state and
 explicit parent disposition. A lost HTTP acknowledgement does not duplicate it.
