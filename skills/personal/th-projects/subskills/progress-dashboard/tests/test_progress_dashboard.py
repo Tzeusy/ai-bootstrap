@@ -22,7 +22,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 import progress_dashboard as dashboard
 from dashboard_server import DashboardServer
-from runtime_sources import configuration, resolve
+from runtime_sources import configuration, resolve, retain
 
 
 class WorkspaceFixture:
@@ -330,6 +330,13 @@ class RuntimeTests(WorkspaceFixture, unittest.TestCase):
         self.assertEqual(next(r for r in sources if r["id"] == "reviewer"), explicit)
         self.assertNotIn("reviewer", metadata)
         self.assertFalse(warnings)
+        proven, identities, _ = resolve(config, "owner", [{"id": "reviewer", "thread_id": self.child}], [])
+        saved = {"config": config, "sources": proven, "metadata": identities}
+        # A reused workflow label must not retain old-thread counts after the
+        # parent publishes a new explicit selector during an index outage.
+        retained, identities, _ = retain(config, "owner", [{"id": "reviewer", "thread_id": self.foreign}], saved, [])
+        self.assertEqual([row["id"] for row in retained], ["owner"])
+        self.assertNotIn("reviewer", identities)
         with self.assertRaises(ValueError):
             dashboard.watch_codex(self.folder, "invalid", self.home)
         self.assertFalse((self.folder / "runtime.json").exists())

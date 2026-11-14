@@ -123,6 +123,7 @@ def retain(config: dict, actor: str, agents: list[dict], saved: dict, explicit: 
         or not isinstance(saved.get("metadata"), dict)):
         raise ValueError("retained runtime bindings are invalid; restore the runtime index")
     expected = {actor, *[agent["id"] for agent in agents]}
+    selectors = {agent["id"]: agent.get("thread_id") for agent in agents}
     bindings = []
     for row in saved["sources"]:
         source = validate_source(row)
@@ -133,6 +134,7 @@ def retain(config: dict, actor: str, agents: list[dict], saved: dict, explicit: 
             or any(metadata[key] is not None and not isinstance(metadata[key], str)
                    for key in ("agent_path", "model"))):
             raise ValueError("retained runtime identity is invalid; restore the runtime index")
-        if source["id"] in expected:
+        selector = selectors.get(source["id"])
+        if source["id"] in expected and (not selector or selector == source["thread_id"]):
             bindings.append((source, metadata))
     return _merge(bindings, explicit)

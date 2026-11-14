@@ -27,6 +27,7 @@ explicit. An unavailable/unsupported index reports a warning; progress/feedback
 remain usable. A temporary lookup failure retains previously established
 sources and offsets across server restart. `runtime-sources.json` persists only
 proven bindings, pinned to that configuration, and changes only with attribution.
+Changed explicit thread selectors invalidate old retained attribution.
 Current explicit attachments retain precedence during outages; even a damaged
 binding cache cannot prune unresolved parser offsets. No transcript-directory crawl, unrelated-session read,
 auth-file access or runtime status inference occurs. Runtime model/thread/path
